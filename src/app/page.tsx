@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import ChatWidget from '@/components/ChatWidget'
 
 export default function HomePage() {
   return (
@@ -99,6 +100,9 @@ export default function HomePage() {
       <footer className="border-t border-gray-100 py-6 text-center text-sm text-gray-400">
         © 2024 헌드레드 지원센터. All rights reserved.
       </footer>
+
+      {/* 헌드레드비서 플로팅 채팅 위젯 */}
+      <ChatWidget />
     </div>
   )
 }
