@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { signOut } from 'next-auth/react'
+import ReportTab from './ReportTab'
 
 interface Customer {
   id: string
@@ -37,7 +38,7 @@ const STATUS_LABEL: Record<string, { label: string; color: string }> = {
 }
 
 export default function SalesDashboard({ userId, userName }: Props) {
-  const [activeTab, setActiveTab] = useState<'customers' | 'contracts'>('customers')
+  const [activeTab, setActiveTab] = useState<'customers' | 'contracts' | 'report'>('customers')
   const [customers, setCustomers] = useState<Customer[]>([])
   const [contracts, setContracts] = useState<Contract[]>([])
   const [loading, setLoading] = useState(true)
@@ -144,6 +145,7 @@ export default function SalesDashboard({ userId, userName }: Props) {
   const tabs = [
     { key: 'customers', label: `내 고객 (${customers.length})` },
     { key: 'contracts', label: `계약 완료 (${contracts.length})` },
+    { key: 'report', label: '📝 보고' },
   ]
 
   return (
@@ -437,6 +439,11 @@ export default function SalesDashboard({ userId, userName }: Props) {
               ))
             )}
           </div>
+        )}
+
+        {/* 보고 탭 */}
+        {activeTab === 'report' && (
+          <ReportTab userId={userId} userName={userName} />
         )}
       </div>
 
