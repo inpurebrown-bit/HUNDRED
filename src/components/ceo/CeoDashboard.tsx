@@ -8,6 +8,21 @@ interface Message {
   parts: { text: string }[]
 }
 
+interface Contract {
+  id: string
+  customer_id: string
+  sales_user_name: string
+  contract_amount: number
+  memo: string
+  created_at: string
+  customers: { name: string; phone: string; company: string }
+}
+
+interface OpsUser {
+  id: string
+  name: string
+}
+
 export default function CeoDashboard() {
   const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'ai'>('overview')
 
@@ -18,16 +33,12 @@ export default function CeoDashboard() {
           <h1 className="text-lg font-bold text-gray-900">대표 대시보드</h1>
           <p className="text-sm text-gray-500">헌드레드 지원센터</p>
         </div>
-        <button
-          onClick={() => signOut({ callbackUrl: '/login' })}
-          className="text-sm text-gray-500 hover:text-gray-700"
-        >
+        <button onClick={() => signOut({ callbackUrl: '/login' })} className="text-sm text-gray-500 hover:text-gray-700">
           로그아웃
         </button>
       </header>
 
       <div className="px-4 md:px-6 pt-4">
-        {/* 탭 */}
         <div className="flex gap-2 mb-6 flex-wrap">
           {[
             { key: 'overview', label: '전체 현황' },
@@ -41,9 +52,7 @@ export default function CeoDashboard() {
               onClick={() => setActiveTab(tab.key as any)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 activeTab === tab.key
-                  ? tab.key === 'ai'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-900 text-white'
+                  ? tab.key === 'ai' ? 'bg-indigo-600 text-white' : 'bg-gray-900 text-white'
                   : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-300'
               }`}
             >
@@ -62,57 +71,256 @@ export default function CeoDashboard() {
   )
 }
 
+// ─── 전체 현황 ───────────────────────────────────────────
 function OverviewTab() {
+  const [stats, setStats] = useState({ customers: 0, contracts: 0, opsCases: 0, revenue: 0 })
+
+  useEffect(() => {
+    async function load() {
+      const [cRes, conRes, opsRes] = await Promise.all([
+        fetch('/api/customers'),
+        fetch('/api/contracts'),
+        fetch('/api/ops-cases'),
+      ])
+      const [cData, conData, opsData] = await Promise.all([cRes.json(), conRes.json(), opsRes.json()])
+      const revenue = (opsData.cases || []).reduce((s: number, c: any) => s + (c.revenue || 0), 0)
+      const inProgress = (opsData.cases || []).filter((c: any) => !['completed', 'rejected'].includes(c.progress_stage)).length
+      setStats({
+        customers: cData.customers?.length || 0,
+        contracts: conData.contracts?.length || 0,
+        opsCases: inProgress,
+        revenue,
+      })
+    }
+    load()
+  }, [])
+
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
       {[
-        { label: '전체 고객 수', value: '-' },
-        { label: '이번달 총 매출', value: '-' },
-        { label: '영업팀 계약', value: '-' },
-        { label: '관리팀 진행 중', value: '-' },
-      ].map((stat) => (
-        <div key={stat.label} className="bg-white rounded-xl border border-gray-100 p-5">
-          <p className="text-sm text-gray-500">{stat.label}</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
+        { label: '전체 고객', value: stats.customers + '명' },
+        { label: '총 계약', value: stats.contracts + '건' },
+        { label: '관리팀 진행 중', value: stats.opsCases + '건' },
+        { label: '누적 매출', value: stats.revenue > 0 ? (stats.revenue / 10000).toFixed(0) + '만원' : '-' },
+      ].map((s) => (
+        <div key={s.label} className="bg-white rounded-xl border border-gray-100 p-5">
+          <p className="text-sm text-gray-500">{s.label}</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{s.value}</p>
         </div>
       ))}
     </div>
   )
 }
 
+// ─── 계약 배정 ───────────────────────────────────────────
 function AssignTab() {
+  const [contracts, setContracts] = useState<Contract[]>([])
+  const [opsUsers, setOpsUsers] = useState<OpsUser[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedOps, setSelectedOps] = useState<Record<string, string>>({})
+  const [assigning, setAssigning] = useState<string | null>(null)
+
+  async function load() {
+    setLoading(true)
+    const [cRes, uRes] = await Promise.all([
+      fetch('/api/assign'),
+      fetch('/api/users?role=ops'),
+    ])
+    const [cData, uData] = await Promise.all([cRes.json(), uRes.json()])
+    setContracts(cData.contracts || [])
+    setOpsUsers(uData.users || [])
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [])
+
+  async function assign(contractId: string) {
+    const opsUserId = selectedOps[contractId]
+    if (!opsUserId) return alert('관리팀 담당자를 선택해주세요')
+    const opsUser = opsUsers.find(u => u.id === opsUserId)
+    setAssigning(contractId)
+    await fetch('/api/assign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contract_id: contractId, ops_user_id: opsUserId, ops_user_name: opsUser?.name }),
+    })
+    setAssigning(null)
+    load()
+  }
+
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-6">
-      <h2 className="font-semibold text-gray-800 mb-4">미배정 계약 목록</h2>
-      <p className="text-gray-400 text-sm text-center py-8">
-        영업팀이 계약 버튼을 누른 건이 여기에 쌓입니다.
-      </p>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold text-gray-800">미배정 계약 목록</h2>
+        <span className="text-xs text-gray-400">{contracts.length}건 대기 중</span>
+      </div>
+
+      {loading ? (
+        <div className="bg-white rounded-xl border border-gray-100 p-10 text-center text-gray-400 text-sm">불러오는 중...</div>
+      ) : contracts.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-100 p-10 text-center text-gray-400 text-sm">
+          배정 대기 중인 계약이 없습니다.
+        </div>
+      ) : (
+        contracts.map(c => (
+          <div key={c.id} className="bg-white rounded-xl border border-gray-100 p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-semibold text-gray-900">{c.customers?.name}</span>
+                  {c.customers?.company && <span className="text-gray-400 text-xs">{c.customers.company}</span>}
+                  <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">배정 대기</span>
+                </div>
+                <div className="flex gap-3 text-xs text-gray-400">
+                  <span>📞 {c.customers?.phone}</span>
+                  {c.contract_amount > 0 && <span>💰 {c.contract_amount.toLocaleString()}원</span>}
+                  <span>영업: {c.sales_user_name}</span>
+                  <span>📅 {new Date(c.created_at).toLocaleDateString('ko-KR')}</span>
+                </div>
+                {c.memo && <p className="text-xs text-gray-500 mt-2 bg-gray-50 px-3 py-2 rounded-lg">{c.memo}</p>}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <select
+                  value={selectedOps[c.id] || ''}
+                  onChange={e => setSelectedOps(prev => ({ ...prev, [c.id]: e.target.value }))}
+                  className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-900"
+                >
+                  <option value="">담당자 선택</option>
+                  {opsUsers.map(u => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => assign(c.id)}
+                  disabled={assigning === c.id || !selectedOps[c.id]}
+                  className="bg-gray-900 hover:bg-gray-700 disabled:opacity-40 text-white px-4 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                >
+                  {assigning === c.id ? '배정 중...' : '배정'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ))
+      )}
     </div>
   )
 }
 
+// ─── 영업팀 현황 ─────────────────────────────────────────
 function SalesTab() {
+  const [customers, setCustomers] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/customers').then(r => r.json()).then(d => {
+      setCustomers(d.customers || [])
+      setLoading(false)
+    })
+  }, [])
+
+  const byStatus = {
+    lead: customers.filter(c => c.status === 'lead').length,
+    consulting: customers.filter(c => c.status === 'consulting').length,
+    contracted: customers.filter(c => c.status === 'contracted').length,
+  }
+
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-6">
-      <h2 className="font-semibold text-gray-800 mb-4">영업팀 전체 현황</h2>
-      <p className="text-gray-400 text-sm text-center py-8">
-        CRM 연동 후 데이터가 표시됩니다.
-      </p>
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-3 mb-2">
+        {[
+          { label: '신규 리드', count: byStatus.lead, color: 'text-sky-600' },
+          { label: '상담 중', count: byStatus.consulting, color: 'text-amber-600' },
+          { label: '계약 완료', count: byStatus.contracted, color: 'text-emerald-600' },
+        ].map(s => (
+          <div key={s.label} className="bg-white rounded-xl border border-gray-100 p-4 text-center">
+            <p className={`text-2xl font-black ${s.color}`}>{s.count}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{s.label}</p>
+          </div>
+        ))}
+      </div>
+      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-50">
+          <h3 className="text-sm font-semibold text-gray-800">전체 고객 목록 ({customers.length})</h3>
+        </div>
+        {loading ? (
+          <div className="p-8 text-center text-gray-400 text-sm">불러오는 중...</div>
+        ) : customers.length === 0 ? (
+          <div className="p-8 text-center text-gray-400 text-sm">등록된 고객이 없습니다.</div>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {customers.map(c => (
+              <div key={c.id} className="px-5 py-3 flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-medium text-gray-900">{c.name}</span>
+                  {c.company && <span className="text-xs text-gray-400 ml-2">{c.company}</span>}
+                  <p className="text-xs text-gray-400">{c.phone} · {c.sales_user_name}</p>
+                </div>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                  c.status === 'lead' ? 'bg-sky-100 text-sky-700' :
+                  c.status === 'consulting' ? 'bg-amber-100 text-amber-700' :
+                  'bg-emerald-100 text-emerald-700'
+                }`}>
+                  {c.status === 'lead' ? '신규 리드' : c.status === 'consulting' ? '상담 중' : '계약 완료'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
+// ─── 관리팀 현황 ─────────────────────────────────────────
 function OpsTab() {
+  const [cases, setCases] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/ops-cases').then(r => r.json()).then(d => {
+      setCases(d.cases || [])
+      setLoading(false)
+    })
+  }, [])
+
+  const STAGE_LABEL: Record<string, string> = {
+    assigned: '배정 완료', doc_collect: '서류 수집', reviewing: '심사 중',
+    approved: '승인 완료', executing: '자금 집행', completed: '완료', rejected: '거절/보류',
+  }
+
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-6">
-      <h2 className="font-semibold text-gray-800 mb-4">관리팀 전체 현황</h2>
-      <p className="text-gray-400 text-sm text-center py-8">
-        CRM 연동 후 데이터가 표시됩니다.
-      </p>
+    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+      <div className="px-5 py-3 border-b border-gray-50">
+        <h3 className="text-sm font-semibold text-gray-800">전체 케이스 ({cases.length})</h3>
+      </div>
+      {loading ? (
+        <div className="p-8 text-center text-gray-400 text-sm">불러오는 중...</div>
+      ) : cases.length === 0 ? (
+        <div className="p-8 text-center text-gray-400 text-sm">배정된 케이스가 없습니다.</div>
+      ) : (
+        <div className="divide-y divide-gray-50">
+          {cases.map(c => (
+            <div key={c.id} className="px-5 py-3 flex items-center justify-between">
+              <div>
+                <span className="text-sm font-medium text-gray-900">{c.customers?.name}</span>
+                {c.customers?.company && <span className="text-xs text-gray-400 ml-2">{c.customers.company}</span>}
+                <p className="text-xs text-gray-400">{c.ops_user_name} · {c.institution || '기관 미정'}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {c.revenue > 0 && <span className="text-xs text-emerald-600 font-medium">{c.revenue.toLocaleString()}원</span>}
+                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                  {STAGE_LABEL[c.progress_stage] || c.progress_stage}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
+// ─── AI 비서 ────────────────────────────────────────────
 function AiTab() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -126,54 +334,33 @@ function AiTab() {
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault()
     if (!input.trim() || loading) return
-
     const userMessage: Message = { role: 'user', parts: [{ text: input }] }
     const newMessages = [...messages, userMessage]
     setMessages(newMessages)
     setInput('')
     setLoading(true)
-
     try {
       const res = await fetch('/api/gemini', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: input,
-          history: messages,
-        }),
+        body: JSON.stringify({ message: input, history: messages }),
       })
       const data = await res.json()
-
-      if (data.reply) {
-        setMessages([...newMessages, {
-          role: 'model',
-          parts: [{ text: data.reply }],
-        }])
-      } else {
-        setMessages([...newMessages, {
-          role: 'model',
-          parts: [{ text: '오류가 발생했습니다: ' + (data.error || '알 수 없는 오류') }],
-        }])
-      }
-    } catch {
       setMessages([...newMessages, {
         role: 'model',
-        parts: [{ text: '서버 연결 오류가 발생했습니다.' }],
+        parts: [{ text: data.reply || ('오류: ' + (data.error || '알 수 없는 오류')) }],
       }])
+    } catch {
+      setMessages([...newMessages, { role: 'model', parts: [{ text: '서버 연결 오류가 발생했습니다.' }] }])
     } finally {
       setLoading(false)
     }
   }
 
-  const suggestions = [
-    '2024년 소상공인 정책자금 종류 알려줘',
-    '정책자금 신청 시 필요한 서류는?',
-    '기술보증기금과 신용보증기금 차이점',
-  ]
+  const suggestions = ['2024년 소상공인 정책자금 종류 알려줘', '정책자금 신청 시 필요한 서류는?', '기술보증기금과 신용보증기금 차이점']
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 flex flex-col" style={{ height: 'calc(100vh - 220px)' }}>
-      {/* 헤더 */}
       <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
         <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center">
           <span className="text-white text-sm font-bold">AI</span>
@@ -183,40 +370,29 @@ function AiTab() {
           <p className="text-xs text-gray-400">정책자금 전문 · Gemini 3.1 Flash</p>
         </div>
       </div>
-
-      {/* 메시지 영역 */}
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
         {messages.length === 0 && (
           <div className="text-center pt-8">
             <p className="text-gray-400 text-sm mb-6">무엇이든 물어보세요</p>
             <div className="flex flex-col gap-2 items-center">
               {suggestions.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setInput(s)}
-                  className="text-sm text-indigo-600 border border-indigo-100 bg-indigo-50 hover:bg-indigo-100 px-4 py-2 rounded-full transition-colors max-w-xs"
-                >
+                <button key={s} onClick={() => setInput(s)}
+                  className="text-sm text-indigo-600 border border-indigo-100 bg-indigo-50 hover:bg-indigo-100 px-4 py-2 rounded-full transition-colors max-w-xs">
                   {s}
                 </button>
               ))}
             </div>
           </div>
         )}
-
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div
-              className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm whitespace-pre-wrap leading-relaxed ${
-                msg.role === 'user'
-                  ? 'bg-indigo-600 text-white rounded-br-sm'
-                  : 'bg-gray-100 text-gray-800 rounded-bl-sm'
-              }`}
-            >
+            <div className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm whitespace-pre-wrap leading-relaxed ${
+              msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-sm' : 'bg-gray-100 text-gray-800 rounded-bl-sm'
+            }`}>
               {msg.parts[0].text}
             </div>
           </div>
         ))}
-
         {loading && (
           <div className="flex justify-start">
             <div className="bg-gray-100 px-4 py-3 rounded-2xl rounded-bl-sm">
@@ -230,22 +406,14 @@ function AiTab() {
         )}
         <div ref={bottomRef} />
       </div>
-
-      {/* 입력창 */}
       <form onSubmit={sendMessage} className="px-4 py-4 border-t border-gray-100">
         <div className="flex gap-2">
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
+          <input value={input} onChange={(e) => setInput(e.target.value)}
             placeholder="정책자금, 고객 분석, 업무 관련 무엇이든..."
             className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            disabled={loading}
-          />
-          <button
-            type="submit"
-            disabled={loading || !input.trim()}
-            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
-          >
+            disabled={loading} />
+          <button type="submit" disabled={loading || !input.trim()}
+            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-colors">
             전송
           </button>
         </div>
