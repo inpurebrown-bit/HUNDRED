@@ -180,7 +180,7 @@ function AiTab() {
         </div>
         <div>
           <p className="font-semibold text-gray-900 text-sm">헌드레드 AI 비서</p>
-          <p className="text-xs text-gray-400">정책자금 전문 · Gemini 1.5 Flash</p>
+          <p className="text-xs text-gray-400">정책자금 전문 · Gemini 2.5 Flash</p>
         </div>
       </div>
 

@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.5-flash',
       systemInstruction: `당신은 헌드레드 지원센터의 대표를 위한 전문 비서입니다.
 정책자금 컨설팅 업무에 특화되어 있으며, 다음 역할을 수행합니다:
 - 정책자금 관련 정보 제공 및 분석
