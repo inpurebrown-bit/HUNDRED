@@ -34,13 +34,9 @@ export default function ChatWidget() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: input,
-          history: messages,
-        }),
+        body: JSON.stringify({ message: input, history: messages }),
       })
       const data = await res.json()
-
       setMessages([...newMessages, {
         role: 'model',
         parts: [{ text: data.reply || ('오류: ' + (data.error || '알 수 없는 오류')) }],
@@ -65,38 +61,34 @@ export default function ChatWidget() {
     <>
       {/* 팝업 채팅창 */}
       {open && (
-        <div className="fixed bottom-24 right-4 md:right-6 z-50 w-80 md:w-96 bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden"
-          style={{ height: '480px' }}>
+        <div className="fixed bottom-24 right-4 md:right-6 z-50 w-80 md:w-96 rounded-2xl shadow-2xl border border-white/10 flex flex-col overflow-hidden"
+          style={{ height: '480px', background: '#13131a' }}>
           {/* 헤더 */}
-          <div className="bg-blue-600 px-4 py-3 flex items-center justify-between">
+          <div className="px-4 py-3 flex items-center justify-between border-b border-white/5"
+            style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #312e81 100%)' }}>
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                <span className="text-white text-xs font-bold">H</span>
+              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                <span className="text-white text-xs font-black">H</span>
               </div>
               <div>
-                <p className="text-white font-semibold text-sm">헌드레드비서</p>
-                <p className="text-blue-100 text-xs">정책자금 상담 AI</p>
+                <p className="text-white font-bold text-sm">헌드레드비서</p>
+                <p className="text-blue-200/60 text-xs">정책자금 상담 AI</p>
               </div>
             </div>
-            <button
-              onClick={() => setOpen(false)}
-              className="text-white/80 hover:text-white text-lg leading-none"
-            >
-              ✕
-            </button>
+            <button onClick={() => setOpen(false)} className="text-white/40 hover:text-white text-base leading-none transition-colors">✕</button>
           </div>
 
           {/* 메시지 영역 */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-gray-50">
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3" style={{ background: '#0e0e16' }}>
             {messages.length === 0 && (
               <div className="text-center pt-4">
-                <p className="text-gray-400 text-xs mb-4">정책자금에 대해 무엇이든 물어보세요</p>
+                <p className="text-white/20 text-xs mb-4">정책자금에 대해 무엇이든 물어보세요</p>
                 <div className="flex flex-col gap-2 items-center">
                   {suggestions.map((s) => (
                     <button
                       key={s}
                       onClick={() => setInput(s)}
-                      className="text-xs text-blue-600 border border-blue-100 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors w-full max-w-xs"
+                      className="text-xs text-blue-300 border border-blue-500/20 bg-blue-500/10 hover:bg-blue-500/20 px-3 py-1.5 rounded-full transition-colors w-full max-w-xs"
                     >
                       {s}
                     </button>
@@ -107,12 +99,15 @@ export default function ChatWidget() {
 
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div
-                  className={`max-w-[80%] px-3 py-2 rounded-xl text-xs leading-relaxed whitespace-pre-wrap ${
-                    msg.role === 'user'
-                      ? 'bg-blue-600 text-white rounded-br-sm'
-                      : 'bg-white text-gray-800 rounded-bl-sm border border-gray-100 shadow-sm'
-                  }`}
+                <div className={`max-w-[80%] px-3 py-2 rounded-xl text-xs leading-relaxed whitespace-pre-wrap ${
+                  msg.role === 'user'
+                    ? 'text-white rounded-br-sm'
+                    : 'text-white/80 rounded-bl-sm border border-white/5'
+                }`}
+                  style={msg.role === 'user'
+                    ? { background: 'linear-gradient(135deg, #2563eb, #4338ca)' }
+                    : { background: '#1a1a27' }
+                  }
                 >
                   {msg.parts[0].text}
                 </div>
@@ -121,11 +116,11 @@ export default function ChatWidget() {
 
             {loading && (
               <div className="flex justify-start">
-                <div className="bg-white border border-gray-100 shadow-sm px-3 py-2 rounded-xl rounded-bl-sm">
+                <div className="border border-white/5 px-3 py-2 rounded-xl rounded-bl-sm" style={{ background: '#1a1a27' }}>
                   <div className="flex gap-1">
-                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
                 </div>
               </div>
@@ -134,19 +129,21 @@ export default function ChatWidget() {
           </div>
 
           {/* 입력창 */}
-          <form onSubmit={sendMessage} className="px-3 py-3 border-t border-gray-100 bg-white">
+          <form onSubmit={sendMessage} className="px-3 py-3 border-t border-white/5" style={{ background: '#13131a' }}>
             <div className="flex gap-2">
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="정책자금 관련 질문을 입력하세요..."
-                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                style={{ background: '#0e0e16', border: '1px solid rgba(255,255,255,0.08)' }}
                 disabled={loading}
               />
               <button
                 type="submit"
                 disabled={loading || !input.trim()}
-                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+                className="text-white px-3 py-2 rounded-lg text-xs font-medium disabled:opacity-30 transition-all"
+                style={{ background: 'linear-gradient(135deg, #2563eb, #4338ca)' }}
               >
                 전송
               </button>
@@ -158,14 +155,20 @@ export default function ChatWidget() {
       {/* 플로팅 버튼 */}
       <button
         onClick={() => setOpen(!open)}
-        className="fixed bottom-4 right-4 md:right-6 z-50 w-16 h-16 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex flex-col items-center justify-center transition-all hover:scale-105 active:scale-95"
+        className="fixed bottom-4 right-4 md:right-6 z-50 w-16 h-16 rounded-full shadow-2xl flex flex-col items-center justify-center transition-all hover:scale-105 active:scale-95"
+        style={{
+          background: open
+            ? 'linear-gradient(135deg, #374151, #1f2937)'
+            : 'linear-gradient(135deg, #2563eb, #4338ca)',
+          boxShadow: open ? '0 8px 32px rgba(0,0,0,0.4)' : '0 8px 32px rgba(37,99,235,0.4)',
+        }}
       >
         {open ? (
-          <span className="text-xl">✕</span>
+          <span className="text-white text-xl">✕</span>
         ) : (
           <>
             <span className="text-lg">💬</span>
-            <span className="text-[9px] font-bold leading-tight mt-0.5">헌드레드비서</span>
+            <span className="text-[9px] text-white font-bold leading-tight mt-0.5">헌드레드비서</span>
           </>
         )}
       </button>
