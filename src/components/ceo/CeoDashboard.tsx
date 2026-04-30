@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { signOut } from 'next-auth/react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import MinutesTab from './MinutesTab'
+import CalendarTab from './CalendarTab'
 
 interface Message {
   role: 'user' | 'model'
@@ -26,7 +27,7 @@ interface OpsUser {
 }
 
 export default function CeoDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'revenue' | 'reports' | 'minutes' | 'ai'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'revenue' | 'reports' | 'minutes' | 'calendar' | 'ai'>('overview')
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -50,6 +51,7 @@ export default function CeoDashboard() {
             { key: 'revenue', label: '💰 매출 관리' },
             { key: 'reports', label: '📝 보고함' },
             { key: 'minutes', label: '📒 회의록' },
+            { key: 'calendar', label: '📅 일정관리' },
             { key: 'ai', label: '✦ AI 비서' },
           ].map((tab) => (
             <button
@@ -73,6 +75,7 @@ export default function CeoDashboard() {
         {activeTab === 'revenue' && <RevenueTab />}
         {activeTab === 'reports' && <ReportsTab />}
         {activeTab === 'minutes' && <MinutesTab />}
+        {activeTab === 'calendar' && <CalendarTab />}
         {activeTab === 'ai' && <AiTab />}
       </div>
     </div>
