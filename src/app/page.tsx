@@ -5,7 +5,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-white">
       {/* 네비게이션 */}
       <nav className="px-6 py-4 flex items-center justify-between border-b border-gray-100">
-        <span className="text-xl font-bold text-gray-900">tm 컨설팅</span>
+        <span className="text-xl font-bold text-gray-900">헌드레드 지원센터</span>
         <Link
           href="/login"
           className="text-sm text-gray-600 hover:text-gray-900 border border-gray-200 px-4 py-2 rounded-lg"
@@ -20,7 +20,7 @@ export default function HomePage() {
           정책자금, 제대로 받아가세요
         </h1>
         <p className="text-lg text-gray-500 mb-10 max-w-2xl mx-auto">
-          tm 컨설팅은 기업 맞춤형 정책자금 솔루션을 제공합니다.
+          헌드레드 지원센터는 기업 맞춤형 정책자금 솔루션을 제공합니다.
           전문 컨설턴트가 처음부터 끝까지 함께합니다.
         </p>
         <a
@@ -97,7 +97,7 @@ export default function HomePage() {
 
       {/* 푸터 */}
       <footer className="border-t border-gray-100 py-6 text-center text-sm text-gray-400">
-        © 2024 tm 컨설팅. All rights reserved.
+        © 2024 헌드레드 지원센터. All rights reserved.
       </footer>
     </div>
   )

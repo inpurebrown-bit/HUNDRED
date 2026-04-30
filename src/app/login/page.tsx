@@ -38,7 +38,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 w-full max-w-md">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-gray-900">tm 경영관리 시스템</h1>
+          <h1 className="text-2xl font-bold text-gray-900">헌드레드 지원센터</h1>
           <p className="text-gray-500 text-sm mt-2">내부 직원 전용</p>
         </div>
 

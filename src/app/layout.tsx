@@ -9,7 +9,7 @@ const geist = Geist({
 })
 
 export const metadata: Metadata = {
-  title: 'tm 컨설팅',
+  title: '헌드레드 지원센터',
   description: '정책자금 전문 컨설팅 기업',
 }
 
