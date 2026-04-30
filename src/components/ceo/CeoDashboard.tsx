@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { signOut } from 'next-auth/react'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 
 interface Message {
   role: 'user' | 'model'
@@ -24,7 +25,7 @@ interface OpsUser {
 }
 
 export default function CeoDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'ai'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'revenue' | 'ai'>('overview')
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -45,6 +46,7 @@ export default function CeoDashboard() {
             { key: 'assign', label: '계약 배정' },
             { key: 'sales', label: '영업팀' },
             { key: 'ops', label: '관리팀' },
+            { key: 'revenue', label: '💰 매출 관리' },
             { key: 'ai', label: '✦ AI 비서' },
           ].map((tab) => (
             <button
@@ -65,6 +67,7 @@ export default function CeoDashboard() {
         {activeTab === 'assign' && <AssignTab />}
         {activeTab === 'sales' && <SalesTab />}
         {activeTab === 'ops' && <OpsTab />}
+        {activeTab === 'revenue' && <RevenueTab />}
         {activeTab === 'ai' && <AiTab />}
       </div>
     </div>
@@ -316,6 +319,118 @@ function OpsTab() {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── 매출 관리 ───────────────────────────────────────────
+function RevenueTab() {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/revenue').then(r => r.json()).then(d => {
+      setData(d)
+      setLoading(false)
+    })
+  }, [])
+
+  const fmt = (n: number) => {
+    if (n >= 100000000) return (n / 100000000).toFixed(1) + '억'
+    if (n >= 10000) return (n / 10000).toFixed(0) + '만'
+    return n.toLocaleString()
+  }
+
+  if (loading) return <div className="text-center py-16 text-gray-400 text-sm">불러오는 중...</div>
+  if (!data) return null
+
+  return (
+    <div className="space-y-6 pb-8">
+      {/* 총계 카드 */}
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { label: '영업팀 총 매출', value: data.totalSales, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: '관리팀 총 매출', value: data.totalOps, color: 'text-violet-600', bg: 'bg-violet-50' },
+          { label: '통합 총 매출', value: data.total, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+        ].map(s => (
+          <div key={s.label} className={`${s.bg} rounded-xl p-5 text-center`}>
+            <p className={`text-2xl font-black ${s.color}`}>{fmt(s.value)}원</p>
+            <p className="text-xs text-gray-500 mt-1">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* 월별 차트 */}
+      <div className="bg-white rounded-xl border border-gray-100 p-5">
+        <h3 className="text-sm font-semibold text-gray-800 mb-4">월별 매출 추이 (최근 6개월)</h3>
+        {data.monthly.every((m: any) => m.합계 === 0) ? (
+          <p className="text-center text-gray-400 text-sm py-8">아직 매출 데이터가 없습니다.</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={data.monthly} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+              <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+              <YAxis tickFormatter={(v) => fmt(v)} tick={{ fontSize: 11 }} width={55} />
+              <Tooltip formatter={(v: any) => v.toLocaleString() + '원'} />
+              <Legend />
+              <Bar dataKey="영업팀" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="관리팀" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* 직원별 실적 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* 영업팀 직원별 */}
+        <div className="bg-white rounded-xl border border-gray-100 p-5">
+          <h3 className="text-sm font-semibold text-gray-800 mb-3">영업팀 직원별 실적</h3>
+          {data.salesByUser.length === 0 ? (
+            <p className="text-gray-400 text-xs text-center py-4">데이터 없음</p>
+          ) : (
+            <div className="space-y-2">
+              {data.salesByUser
+                .sort((a: any, b: any) => b.amount - a.amount)
+                .map((u: any) => (
+                  <div key={u.name} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold">
+                        {u.name?.charAt(0)}
+                      </div>
+                      <span className="text-sm text-gray-700">{u.name}</span>
+                      <span className="text-xs text-gray-400">{u.count}건</span>
+                    </div>
+                    <span className="text-sm font-semibold text-blue-600">{fmt(u.amount)}원</span>
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+
+        {/* 관리팀 직원별 */}
+        <div className="bg-white rounded-xl border border-gray-100 p-5">
+          <h3 className="text-sm font-semibold text-gray-800 mb-3">관리팀 직원별 실적</h3>
+          {data.opsByUser.length === 0 ? (
+            <p className="text-gray-400 text-xs text-center py-4">데이터 없음</p>
+          ) : (
+            <div className="space-y-2">
+              {data.opsByUser
+                .sort((a: any, b: any) => b.amount - a.amount)
+                .map((u: any) => (
+                  <div key={u.name} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 text-xs font-bold">
+                        {u.name?.charAt(0)}
+                      </div>
+                      <span className="text-sm text-gray-700">{u.name}</span>
+                      <span className="text-xs text-gray-400">{u.count}건</span>
+                    </div>
+                    <span className="text-sm font-semibold text-violet-600">{fmt(u.amount)}원</span>
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

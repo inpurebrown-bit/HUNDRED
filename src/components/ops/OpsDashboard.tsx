@@ -105,11 +105,12 @@ export default function OpsDashboard({ userId, userName }: Props) {
 
       <div className="px-4 md:px-6 py-6 max-w-5xl mx-auto">
         {/* 통계 카드 */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-4 gap-3 mb-6">
           {[
             { label: '담당 케이스', value: cases.length + '건', color: 'text-violet-600' },
             { label: '진행 중', value: inProgressCount + '건', color: 'text-amber-600' },
             { label: '완료', value: completedCount + '건', color: 'text-emerald-600' },
+            { label: '누적 매출', value: totalRevenue > 0 ? (totalRevenue / 10000).toFixed(0) + '만원' : '-', color: 'text-blue-600' },
           ].map(s => (
             <div key={s.label} className="bg-white rounded-xl border border-gray-100 p-4 text-center">
               <p className={`text-xl font-black ${s.color}`}>{s.value}</p>

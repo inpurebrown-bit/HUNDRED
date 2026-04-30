@@ -134,6 +134,13 @@ export default function SalesDashboard({ userId, userName }: Props) {
     loadAll()
   }
 
+  // 매출 집계
+  const totalRevenue = contracts.reduce((s, c) => s + (c.contract_amount || 0), 0)
+  const thisMonth = new Date().toISOString().slice(0, 7)
+  const monthRevenue = contracts
+    .filter(c => c.created_at?.slice(0, 7) === thisMonth)
+    .reduce((s, c) => s + (c.contract_amount || 0), 0)
+
   const tabs = [
     { key: 'customers', label: `내 고객 (${customers.length})` },
     { key: 'contracts', label: `계약 완료 (${contracts.length})` },
@@ -158,6 +165,20 @@ export default function SalesDashboard({ userId, userName }: Props) {
       </header>
 
       <div className="px-4 md:px-6 py-6 max-w-5xl mx-auto">
+        {/* 매출 요약 카드 */}
+        <div className="grid grid-cols-3 gap-3 mb-5">
+          {[
+            { label: '내 고객', value: customers.length + '명', color: 'text-blue-600' },
+            { label: '이번달 매출', value: monthRevenue > 0 ? (monthRevenue / 10000).toFixed(0) + '만원' : '-', color: 'text-emerald-600' },
+            { label: '누적 매출', value: totalRevenue > 0 ? (totalRevenue / 10000).toFixed(0) + '만원' : '-', color: 'text-gray-800' },
+          ].map(s => (
+            <div key={s.label} className="bg-white rounded-xl border border-gray-100 p-4 text-center">
+              <p className={`text-xl font-black ${s.color}`}>{s.value}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{s.label}</p>
+            </div>
+          ))}
+        </div>
+
         {/* 탭 */}
         <div className="flex gap-2 mb-6">
           {tabs.map(t => (
