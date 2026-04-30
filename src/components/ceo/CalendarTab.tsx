@@ -55,6 +55,8 @@ export default function CalendarTab() {
   // Google Calendar 설정
   const [gcalId, setGcalId] = useState('')
   const [gcalKey, setGcalKey] = useState('')
+  const [gcalSaved, setGcalSaved] = useState(false)
+  const [autoSyncing, setAutoSyncing] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -64,7 +66,29 @@ export default function CalendarTab() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [year, month])
+  // 저장된 구글 캘린더 설정 불러오기 + 자동 동기화
+  useEffect(() => {
+    async function initGcal() {
+      const res = await fetch('/api/settings')
+      const data = await res.json()
+      if (data.settings?.gcal_id && data.settings?.api_key) {
+        setGcalId(data.settings.gcal_id)
+        setGcalKey(data.settings.api_key)
+        setGcalSaved(true)
+        // 탭 열릴 때 자동 동기화
+        setAutoSyncing(true)
+        await fetch('/api/events/gcal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ calendar_id: data.settings.gcal_id, api_key: data.settings.api_key }),
+        })
+        setAutoSyncing(false)
+      }
+    }
+    initGcal()
+  }, [])
+
+  useEffect(() => { load() }, [year, month, autoSyncing])
 
   async function submitEvent(e: React.FormEvent) {
     e.preventDefault()
@@ -93,6 +117,15 @@ export default function CalendarTab() {
     if (!gcalId || !gcalKey) return alert('캘린더 ID와 API 키를 입력하세요')
     setSyncing(true)
     setSyncResult('')
+
+    // 설정 저장 (이후 자동 동기화에 사용)
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gcal_id: gcalId, api_key: gcalKey }),
+    })
+    setGcalSaved(true)
+
     const res = await fetch('/api/events/gcal', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -100,7 +133,7 @@ export default function CalendarTab() {
     })
     const data = await res.json()
     if (res.ok) {
-      setSyncResult(`✅ ${data.synced}개 동기화 완료`)
+      setSyncResult(`✅ ${data.synced}개 동기화 완료 · 이제 탭 열 때마다 자동 동기화됩니다`)
       load()
     } else {
       setSyncResult(`❌ ${data.error}`)
@@ -157,11 +190,22 @@ export default function CalendarTab() {
           <button onClick={nextMonth} className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-600">›</button>
           <button onClick={() => { setYear(now.getFullYear()); setMonth(now.getMonth() + 1) }}
             className="text-xs text-gray-500 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50">오늘</button>
+          {autoSyncing && (
+            <span className="text-xs text-emerald-600 flex items-center gap-1">
+              <span className="w-3 h-3 border-2 border-emerald-300 border-t-emerald-600 rounded-full animate-spin" />
+              Google 캘린더 동기화 중...
+            </span>
+          )}
         </div>
         <div className="flex gap-2">
           <button onClick={() => setShowGcal(!showGcal)}
-            className="flex items-center gap-1.5 text-xs border border-gray-200 px-3 py-2 rounded-lg hover:bg-gray-50 text-gray-600">
-            <span>🗓</span> Google 캘린더 연동
+            className={`flex items-center gap-1.5 text-xs border px-3 py-2 rounded-lg transition-colors ${
+              gcalSaved
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                : 'border-gray-200 hover:bg-gray-50 text-gray-600'
+            }`}>
+            <span>🗓</span>
+            {gcalSaved ? 'Google 연동됨 ✓' : 'Google 캘린더 연동'}
           </button>
           <button
             onClick={() => {
