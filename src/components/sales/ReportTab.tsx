@@ -303,7 +303,7 @@ export default function ReportTab({ userId, userName }: Props) {
             >
               {(daily.supply_db || []).map((item, i) => (
                 <ConsultRow key={i} item={item} idx={i}
-                  onChange={(k, v) => updateItem('supply_db', i, k, v)}
+                  onChange={(k: string, v: unknown) => updateItem('supply_db', i, k, v)}
                   onRemove={() => removeItem('supply_db', i)} />
               ))}
             </Section>
@@ -317,7 +317,7 @@ export default function ReportTab({ userId, userName }: Props) {
             >
               {(daily.outbound || []).map((item, i) => (
                 <ConsultRow key={i} item={item} idx={i}
-                  onChange={(k, v) => updateItem('outbound', i, k, v)}
+                  onChange={(k: string, v: unknown) => updateItem('outbound', i, k, v)}
                   onRemove={() => removeItem('outbound', i)} />
               ))}
             </Section>
@@ -331,7 +331,7 @@ export default function ReportTab({ userId, userName }: Props) {
             >
               {(daily.worried || []).map((item, i) => (
                 <WorriedRow key={i} item={item} idx={i}
-                  onChange={(k, v) => updateItem('worried', i, k, v)}
+                  onChange={(k: string, v: unknown) => updateItem('worried', i, k, v)}
                   onRemove={() => removeItem('worried', i)} />
               ))}
             </Section>
@@ -345,7 +345,7 @@ export default function ReportTab({ userId, userName }: Props) {
             >
               {(daily.decided || []).map((item, i) => (
                 <DecidedRow key={i} item={item} idx={i}
-                  onChange={(k, v) => updateItem('decided', i, k, v)}
+                  onChange={(k: string, v: unknown) => updateItem('decided', i, k, v)}
                   onRemove={() => removeItem('decided', i)} />
               ))}
             </Section>
@@ -359,7 +359,7 @@ export default function ReportTab({ userId, userName }: Props) {
             >
               {(daily.meetings || []).map((item, i) => (
                 <MeetingRow key={i} item={item} idx={i}
-                  onChange={(k, v) => updateItem('meetings', i, k, v)}
+                  onChange={(k: string, v: unknown) => updateItem('meetings', i, k, v)}
                   onRemove={() => removeItem('meetings', i)} />
               ))}
             </Section>
@@ -373,7 +373,7 @@ export default function ReportTab({ userId, userName }: Props) {
             >
               {(daily.payment_waiting || []).map((item, i) => (
                 <PaymentRow key={i} item={item} idx={i}
-                  onChange={(k, v) => updateItem('payment_waiting', i, k, v)}
+                  onChange={(k: string, v: unknown) => updateItem('payment_waiting', i, k, v)}
                   onRemove={() => removeItem('payment_waiting', i)} />
               ))}
             </Section>

@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
       if (insertErr) {
         if (insertErr.message?.includes('gcal_label')) {
           // gcal_label 컬럼 없음 → 해당 필드 제외하고 재삽입
-          const fallback = toInsert.map(({ gcal_label: _gl, ...rest }) => rest)
+          const fallback = toInsert.map(({ gcal_label: _gl, ...rest }: { gcal_label: string; [key: string]: unknown }) => rest)
           await supabaseAdmin.from('events').insert(fallback)
         } else {
           errors.push(`${cal.label || cal.id}: ${insertErr.message}`)

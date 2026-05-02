@@ -4,18 +4,19 @@ import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
 // PATCH: 고객 정보 수정
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
   const user = session.user as any
   const body = await req.json()
+  const { id } = await context.params
 
   // 본인 고객만 수정 가능 (ceo는 모두 가능)
   const { data: existing } = await supabaseAdmin
     .from('customers')
     .select('sales_user_id')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (!existing) return NextResponse.json({ error: '고객 없음' }, { status: 404 })
@@ -26,7 +27,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const { data, error } = await supabaseAdmin
     .from('customers')
     .update({ ...body, updated_at: new Date().toISOString() })
-    .eq('id', params.id)
+    .eq('id', id)
     .select()
     .single()
 
@@ -35,16 +36,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 // DELETE: 고객 삭제
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
   const user = session.user as any
+  const { id } = await context.params
 
   const { data: existing } = await supabaseAdmin
     .from('customers')
     .select('sales_user_id')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (!existing) return NextResponse.json({ error: '고객 없음' }, { status: 404 })
@@ -52,7 +54,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
 
-  const { error } = await supabaseAdmin.from('customers').delete().eq('id', params.id)
+  const { error } = await supabaseAdmin.from('customers').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }
