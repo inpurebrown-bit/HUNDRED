@@ -7,6 +7,7 @@ import MinutesTab from './MinutesTab'
 import CalendarTab from './CalendarTab'
 import PayRateTab from './PayRateTab'
 import PayrollTab from './PayrollTab'
+import PayslipTab from './PayslipTab'
 
 interface Message {
   role: 'user' | 'model'
@@ -29,7 +30,7 @@ interface OpsUser {
 }
 
 export default function CeoDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'revenue' | 'payrate' | 'payroll' | 'reports' | 'minutes' | 'calendar' | 'ai'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'revenue' | 'payrate' | 'payroll' | 'payslip' | 'reports' | 'minutes' | 'calendar' | 'ai'>('overview')
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -53,6 +54,7 @@ export default function CeoDashboard() {
             { key: 'revenue', label: '💰 매출 관리' },
             { key: 'payrate', label: '📊 결제율' },
             { key: 'payroll', label: '💼 급여·손익' },
+            { key: 'payslip', label: '📋 급여명세서' },
             { key: 'reports', label: '📝 보고함' },
             { key: 'minutes', label: '📒 회의록' },
             { key: 'calendar', label: '📅 일정관리' },
@@ -79,6 +81,7 @@ export default function CeoDashboard() {
         {activeTab === 'revenue' && <RevenueTab />}
         {activeTab === 'payrate' && <PayRateTab />}
         {activeTab === 'payroll' && <PayrollTab />}
+        {activeTab === 'payslip' && <PayslipTab />}
         {activeTab === 'reports' && <ReportsTab />}
         {activeTab === 'minutes' && <MinutesTab />}
         {activeTab === 'calendar' && <CalendarTab />}
@@ -340,14 +343,34 @@ function OpsTab() {
 // ─── 매출 관리 ───────────────────────────────────────────
 function RevenueTab() {
   const [data, setData] = useState<any>(null)
+  const [customers, setCustomers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [pnlMonth, setPnlMonth] = useState<string>(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  })
+  const [pnlData, setPnlData] = useState<any>(null)
+  const [pnlLoading, setPnlLoading] = useState(false)
 
   useEffect(() => {
-    fetch('/api/revenue').then(r => r.json()).then(d => {
-      setData(d)
+    Promise.all([
+      fetch('/api/revenue').then(r => r.json()),
+      fetch('/api/customers').then(r => r.json()),
+    ]).then(([revData, custData]) => {
+      setData(revData)
+      setCustomers(custData.customers || [])
       setLoading(false)
     })
   }, [])
+
+  // Load P&L when month changes
+  useEffect(() => {
+    setPnlLoading(true)
+    fetch(`/api/payroll?year_month=${pnlMonth}`).then(r => r.json()).then(json => {
+      setPnlData(json.record || null)
+      setPnlLoading(false)
+    }).catch(() => { setPnlLoading(false) })
+  }, [pnlMonth])
 
   const fmt = (n: number) => {
     if (n >= 100000000) return (n / 100000000).toFixed(1) + '억'
@@ -355,11 +378,90 @@ function RevenueTab() {
     return n.toLocaleString()
   }
 
+  // 이번 달 성과 계산
+  const now = new Date()
+  const thisMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const lastMonthStr = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`
+
+  const thisMonthRevenue = data?.monthly?.find((m: any) => m.month === thisMonthStr)?.합계 ?? 0
+  const lastMonthRevenue = data?.monthly?.find((m: any) => m.month === lastMonthStr)?.합계 ?? 0
+  const revenueChange = lastMonthRevenue > 0
+    ? (((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100).toFixed(1)
+    : null
+
+  const totalCustomers = customers.length
+  const contractedCustomers = customers.filter((c: any) => c.status === 'contracted').length
+  const conversionRate = totalCustomers > 0
+    ? ((contractedCustomers / totalCustomers) * 100).toFixed(1)
+    : '0.0'
+
+  const totalContractCount = data?.salesByUser?.reduce((s: number, u: any) => s + (u.count || 0), 0) || 0
+  const totalSalesAmt = data?.salesByUser?.reduce((s: number, u: any) => s + (u.amount || 0), 0) || 0
+  const avgContractValue = totalContractCount > 0 ? Math.round(totalSalesAmt / totalContractCount) : 0
+
+  // P&L 계산
+  let pnl: { totalRevenue: number; laborCost: number; otherTotal: number; netProfit: number } | null = null
+  if (pnlData?.employees) {
+    const emps = pnlData.employees
+    const opsEmps: any[] = emps.ops_employees || []
+    const salesEmps: any[] = emps.sales_employees || []
+    const otherCosts: Record<string, number> = emps.other_costs || {}
+
+    const calcOpsLocal = (emp: any) => {
+      const contractIncentive = Math.round(Number(emp.contract_revenue || 0) * 0.5)
+      const feeIncentive = Math.round(Number(emp.fee_revenue || 0) * 0.1)
+      const beforeDeduction = Number(emp.base_salary || 0) + contractIncentive + feeIncentive + Number(emp.performance_bonus || 0) - Number(emp.deduction || 0)
+      return beforeDeduction
+    }
+    const calcSalesLocal = (emp: any) => {
+      const contractIncentiveAmt = Math.round(Number(emp.contract_revenue || 0) * Number(emp.contract_incentive_rate || 0) / 100)
+      return contractIncentiveAmt + Number(emp.fee_incentive || 0) + Number(emp.performance_bonus || 0) - Number(emp.deduction || 0)
+    }
+
+    const totalRevenue =
+      opsEmps.reduce((s: number, e: any) => s + Number(e.contract_revenue || 0) + Number(e.fee_revenue || 0), 0) +
+      salesEmps.reduce((s: number, e: any) => s + Number(e.contract_revenue || 0), 0)
+    const tax = Math.round(totalRevenue * 0.10)
+    const laborCost =
+      opsEmps.reduce((s: number, e: any) => s + calcOpsLocal(e), 0) +
+      salesEmps.reduce((s: number, e: any) => s + calcSalesLocal(e), 0)
+    const otherTotal = Object.values(otherCosts).reduce((s: number, v: unknown) => s + Number(v), 0)
+    const netProfit = totalRevenue - tax - laborCost - otherTotal
+    pnl = { totalRevenue, laborCost, otherTotal, netProfit }
+  }
+
   if (loading) return <div className="text-center py-16 text-gray-400 text-sm">불러오는 중...</div>
   if (!data) return null
 
   return (
     <div className="space-y-6 pb-8">
+      {/* 이번 달 성과 */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">이번 달 성과</h3>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-white rounded-xl border border-gray-100 p-4">
+            <p className="text-xs text-gray-500 mb-1">이번 달 총 매출</p>
+            <p className="text-xl font-black text-gray-900">{fmt(thisMonthRevenue)}원</p>
+            {revenueChange !== null && (
+              <p className={`text-xs mt-1 font-medium ${Number(revenueChange) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                {Number(revenueChange) >= 0 ? '▲' : '▼'} {Math.abs(Number(revenueChange))}% 전월 대비
+              </p>
+            )}
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 p-4">
+            <p className="text-xs text-gray-500 mb-1">리드→계약 전환율</p>
+            <p className="text-xl font-black text-gray-900">{conversionRate}%</p>
+            <p className="text-xs text-gray-400 mt-1">{contractedCustomers}명 / 전체 {totalCustomers}명</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 p-4">
+            <p className="text-xs text-gray-500 mb-1">평균 계약 금액</p>
+            <p className="text-xl font-black text-gray-900">{fmt(avgContractValue)}원</p>
+            <p className="text-xs text-gray-400 mt-1">총 {totalContractCount}건 계약</p>
+          </div>
+        </div>
+      </div>
+
       {/* 총계 카드 */}
       <div className="grid grid-cols-3 gap-4">
         {[
@@ -383,13 +485,51 @@ function RevenueTab() {
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={data.monthly} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
               <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-              <YAxis tickFormatter={(v) => fmt(v)} tick={{ fontSize: 11 }} width={55} />
-              <Tooltip formatter={(v: any) => v.toLocaleString() + '원'} />
+              <YAxis tickFormatter={(v: number) => fmt(v)} tick={{ fontSize: 11 }} width={55} />
+              <Tooltip formatter={(v: number) => v.toLocaleString() + '원'} />
               <Legend />
               <Bar dataKey="영업팀" fill="#3b82f6" radius={[4, 4, 0, 0]} />
               <Bar dataKey="관리팀" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* 월별 손익 연동 */}
+      <div className="bg-white rounded-xl border border-gray-100 p-5">
+        <div className="flex items-center gap-3 mb-4">
+          <h3 className="text-sm font-semibold text-gray-800">월별 손익 연동</h3>
+          <input
+            type="month"
+            value={pnlMonth}
+            onChange={e => setPnlMonth(e.target.value)}
+            className="border border-gray-200 rounded px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          {pnlLoading && <span className="text-xs text-gray-400">불러오는 중...</span>}
+        </div>
+        {!pnlData ? (
+          <p className="text-center text-gray-400 text-sm py-6">
+            {pnlLoading ? '불러오는 중...' : `${pnlMonth} 급여 데이터가 없습니다.`}
+          </p>
+        ) : pnl && (
+          <div className="grid grid-cols-4 gap-3">
+            {[
+              { label: '총매출', value: pnl.totalRevenue, color: 'text-blue-700', bg: 'bg-blue-50' },
+              { label: '인건비', value: pnl.laborCost, color: 'text-amber-700', bg: 'bg-amber-50' },
+              { label: '운영비', value: pnl.otherTotal, color: 'text-violet-700', bg: 'bg-violet-50' },
+              {
+                label: '순이익',
+                value: pnl.netProfit,
+                color: pnl.netProfit >= 0 ? 'text-emerald-700' : 'text-red-700',
+                bg: pnl.netProfit >= 0 ? 'bg-emerald-50' : 'bg-red-50',
+              },
+            ].map(s => (
+              <div key={s.label} className={`${s.bg} rounded-lg p-4 text-center`}>
+                <p className="text-xs text-gray-500 mb-1">{s.label}</p>
+                <p className={`text-lg font-black ${s.color}`}>{fmt(s.value)}원</p>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
