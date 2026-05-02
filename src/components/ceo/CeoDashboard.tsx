@@ -5,6 +5,8 @@ import { signOut } from 'next-auth/react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import MinutesTab from './MinutesTab'
 import CalendarTab from './CalendarTab'
+import PayRateTab from './PayRateTab'
+import PayrollTab from './PayrollTab'
 
 interface Message {
   role: 'user' | 'model'
@@ -27,7 +29,7 @@ interface OpsUser {
 }
 
 export default function CeoDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'revenue' | 'reports' | 'minutes' | 'calendar' | 'ai'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'revenue' | 'payrate' | 'payroll' | 'reports' | 'minutes' | 'calendar' | 'ai'>('overview')
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -49,6 +51,8 @@ export default function CeoDashboard() {
             { key: 'sales', label: '영업팀' },
             { key: 'ops', label: '관리팀' },
             { key: 'revenue', label: '💰 매출 관리' },
+            { key: 'payrate', label: '📊 결제율' },
+            { key: 'payroll', label: '💼 급여·손익' },
             { key: 'reports', label: '📝 보고함' },
             { key: 'minutes', label: '📒 회의록' },
             { key: 'calendar', label: '📅 일정관리' },
@@ -73,6 +77,8 @@ export default function CeoDashboard() {
         {activeTab === 'sales' && <SalesTab />}
         {activeTab === 'ops' && <OpsTab />}
         {activeTab === 'revenue' && <RevenueTab />}
+        {activeTab === 'payrate' && <PayRateTab />}
+        {activeTab === 'payroll' && <PayrollTab />}
         {activeTab === 'reports' && <ReportsTab />}
         {activeTab === 'minutes' && <MinutesTab />}
         {activeTab === 'calendar' && <CalendarTab />}
