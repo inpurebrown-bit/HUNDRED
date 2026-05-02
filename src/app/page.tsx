@@ -541,6 +541,105 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ── 강의·강연 섹션 ── */}
+      <section className="py-20 md:py-28 px-4 md:px-8 bg-[#1B2A45] overflow-hidden">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+
+          {/* 강의 사진 */}
+          <div className="relative">
+            {/* 배경 장식 */}
+            <div className="absolute -inset-4 bg-[#C5A258]/5 rounded-3xl" />
+            <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-[#C5A258]/20">
+              <Image
+                src="/images/lecture.png"
+                alt="백승협 대표 강의 현장"
+                width={700}
+                height={500}
+                className="w-full object-cover"
+                unoptimized
+              />
+              {/* 오버레이 배지 */}
+              <div className="absolute bottom-4 left-4 right-4 flex flex-wrap gap-2">
+                <span className="bg-[#C5A258] text-white text-xs font-black px-3 py-1.5 rounded-full shadow-lg">
+                  📍 소상공인 정책자금 실전 강의
+                </span>
+                <span className="bg-[#1B2A45]/90 text-white text-xs font-semibold px-3 py-1.5 rounded-full border border-white/10">
+                  수강생 200명+ 직강 완료
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 텍스트 */}
+          <div className="space-y-6 text-white">
+            <div>
+              <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] uppercase mb-3">LECTURE & SEMINAR</p>
+              <h2 className="text-3xl md:text-4xl font-black leading-tight mb-4">
+                전국 강단에서<br />
+                <span className="text-[#C5A258]">검증된 전문가</span>
+              </h2>
+              <p className="text-sm text-white/60 leading-relaxed">
+                정책자금, 법인설립, 경영전략 등 기업 성장에 필요한 모든 분야를
+                전국 각지의 강단에서 직접 강의하며 수천 명의 대표님들과 함께했습니다.
+                책에서 배운 지식이 아닌, 현장에서 쌓은 실전 노하우를 나눕니다.
+              </p>
+            </div>
+
+            {/* 강의 실적 */}
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { num: '50+', label: '누적 강의 횟수' },
+                { num: '3,000+', label: '수강 대표님' },
+                { num: '15개', label: '강의 지역' },
+                { num: '98%', label: '수강생 만족도' },
+              ].map(s => (
+                <div key={s.label} className="bg-white/5 border border-white/10 rounded-xl p-4">
+                  <p className="text-2xl font-black text-[#C5A258]">{s.num}</p>
+                  <p className="text-xs text-white/40 mt-1">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* 강의 주제 태그 */}
+            <div>
+              <p className="text-xs text-white/40 mb-3">주요 강의 주제</p>
+              <div className="flex flex-wrap gap-2">
+                {['정책자금 실전 활용', '소상공인 자금조달', '법인전환 전략', '정부지원사업 공략법', '사업계획서 작성법', '기업 신용관리'].map(tag => (
+                  <span key={tag} className="text-xs border border-[#C5A258]/30 text-[#C5A258]/80 px-3 py-1 rounded-full">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* 강의 요청 CTA */}
+            <a href="#문의하기"
+              className="inline-flex items-center gap-2 bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-lg shadow-[#C5A258]/20">
+              강의 문의하기 →
+            </a>
+          </div>
+        </div>
+
+        {/* 하단: 언론/기관 노출 배지 */}
+        <div className="max-w-6xl mx-auto mt-16 border-t border-white/5 pt-10">
+          <p className="text-center text-xs text-white/30 tracking-widest uppercase mb-6">강의 협력 기관</p>
+          <div className="flex flex-wrap justify-center gap-4 md:gap-8">
+            {[
+              '소상공인진흥공단',
+              '중소기업진흥공단',
+              '한국창업보육협회',
+              '서울경영자총협회',
+              '한국중소기업경영컨설팅협회',
+              '지역 상공회의소',
+            ].map(org => (
+              <div key={org} className="bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white/50 font-medium">
+                {org}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── 현장 컨설팅 섹션 ── */}
       <section className="py-20 px-4 bg-[#F2EFE8]">
         <div className="max-w-6xl mx-auto">
