@@ -30,7 +30,7 @@ interface OpsUser {
 }
 
 export default function CeoDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'revenue' | 'payrate' | 'payroll' | 'payslip' | 'reports' | 'minutes' | 'calendar' | 'ai'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'revenue' | 'payrate' | 'payroll' | 'payslip' | 'reports' | 'minutes' | 'calendar' | 'ai' | 'ailogs'>('overview')
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -59,6 +59,7 @@ export default function CeoDashboard() {
             { key: 'minutes', label: '📒 회의록' },
             { key: 'calendar', label: '📅 일정관리' },
             { key: 'ai', label: '✦ AI 비서' },
+            { key: 'ailogs', label: '🔍 AI 질문 로그' },
           ].map((tab) => (
             <button
               key={tab.key}
@@ -86,6 +87,7 @@ export default function CeoDashboard() {
         {activeTab === 'minutes' && <MinutesTab />}
         {activeTab === 'calendar' && <CalendarTab />}
         {activeTab === 'ai' && <AiTab />}
+        {activeTab === 'ailogs' && <AiLogsTab />}
       </div>
     </div>
   )
@@ -860,6 +862,114 @@ function DailyDetail({ data }: { data: any }) {
           ))
         }
       </Section>
+    </div>
+  )
+}
+
+// ─── AI 질문 로그 ────────────────────────────────────────
+function AiLogsTab() {
+  const [logs, setLogs] = useState<any[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [expanded, setExpanded] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/ai-logs').then(r => r.json()).then(d => {
+      setLogs(d.logs || [])
+      setTotal(d.total || 0)
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [])
+
+  const filtered = search.trim()
+    ? logs.filter(l => l.question?.includes(search) || l.answer?.includes(search))
+    : logs
+
+  return (
+    <div className="space-y-4 pb-8">
+      {/* 요약 카드 */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-indigo-50 rounded-xl p-4 text-center">
+          <p className="text-2xl font-black text-indigo-600">{total}</p>
+          <p className="text-xs text-gray-500 mt-1">총 질문 수</p>
+        </div>
+        <div className="bg-amber-50 rounded-xl p-4 text-center">
+          <p className="text-2xl font-black text-amber-600">
+            {logs.filter(l => {
+              const d = new Date(l.created_at)
+              const now = new Date()
+              return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+            }).length}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">오늘 질문</p>
+        </div>
+        <div className="bg-emerald-50 rounded-xl p-4 text-center">
+          <p className="text-2xl font-black text-emerald-600">
+            {new Set(logs.map(l => l.visitor_ip)).size}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">방문자 수 (IP)</p>
+        </div>
+      </div>
+
+      {/* 검색 */}
+      <div className="flex items-center gap-3">
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="질문 또는 답변 내용 검색..."
+          className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        />
+        <span className="text-xs text-gray-400 shrink-0">{filtered.length}건</span>
+      </div>
+
+      {/* 로그 목록 */}
+      {loading ? (
+        <div className="text-center py-16 text-gray-400 text-sm">불러오는 중...</div>
+      ) : filtered.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
+          <p className="text-4xl mb-3">🤖</p>
+          <p className="text-gray-400 text-sm">아직 홈페이지 AI 질문이 없습니다.</p>
+          <p className="text-xs text-gray-300 mt-1">홈페이지 방문자가 AI에 질문하면 여기 저장됩니다.</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="divide-y divide-gray-50">
+            {filtered.map(log => (
+              <div key={log.id} className="px-5 py-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                onClick={() => setExpanded(expanded === log.id ? null : log.id)}>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium shrink-0">Q</span>
+                      <p className="text-sm font-medium text-gray-900 truncate">{log.question}</p>
+                    </div>
+                    {expanded !== log.id && (
+                      <p className="text-xs text-gray-400 truncate pl-7">{log.answer}</p>
+                    )}
+                    {expanded === log.id && (
+                      <div className="mt-3 pl-7 space-y-2">
+                        <div className="flex items-start gap-2">
+                          <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium shrink-0 mt-0.5">A</span>
+                          <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{log.answer}</p>
+                        </div>
+                        <p className="text-[10px] text-gray-300 pl-7">IP: {log.visitor_ip}</p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className="text-[10px] text-gray-400">
+                      {new Date(log.created_at).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    <span className="text-[10px] text-gray-300">{expanded === log.id ? '▲ 닫기' : '▼ 답변 보기'}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
