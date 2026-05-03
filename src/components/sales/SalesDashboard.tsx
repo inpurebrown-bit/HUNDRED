@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import Image from 'next/image'
 import { signOut } from 'next-auth/react'
 import ReportTab from './ReportTab'
 
@@ -49,6 +50,7 @@ export default function SalesDashboard({ userId, userName }: Props) {
   const [contractAmount, setContractAmount] = useState('')
   const [contractMemo, setContractMemo] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
   // 데이터 로드
@@ -149,50 +151,66 @@ export default function SalesDashboard({ userId, userName }: Props) {
   ]
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* 헤더 */}
-      <header className="bg-white border-b border-gray-100 px-4 md:px-6 py-4 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
-            <span className="text-white text-xs font-bold">{userName.charAt(0)}</span>
-          </div>
-          <div>
-            <h1 className="text-sm font-bold text-gray-900">영업팀 대시보드</h1>
-            <p className="text-xs text-gray-400">{userName} 님</p>
-          </div>
+    <div className="min-h-screen bg-[#FAF8F3]">
+      {/* ── 헤더 ── */}
+      <header className="bg-[#1B2A45] px-4 md:px-6 py-3 flex items-center justify-between sticky top-0 z-30">
+        <div className="relative h-8 w-24 shrink-0">
+          <Image src="/images/logo.png" alt="HUNDRED" fill className="object-contain object-left brightness-0 invert" unoptimized />
         </div>
-        <button onClick={() => signOut({ callbackUrl: '/login' })} className="text-xs text-gray-400 hover:text-gray-700">
-          로그아웃
-        </button>
+        <span className="text-white/60 text-xs font-medium hidden md:block">
+          {tabs.find(t => t.key === activeTab)?.label ?? '영업팀 대시보드'}
+        </span>
+        <div className="flex items-center gap-3 relative">
+          <button onClick={() => signOut({ callbackUrl: '/login' })}
+            className="text-white/40 hover:text-white/80 text-xs transition-colors">
+            로그아웃
+          </button>
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label="메뉴"
+            className={`flex flex-col gap-[5px] p-2 rounded-lg transition-colors ${menuOpen ? 'bg-white/20' : 'hover:bg-white/10'}`}
+          >
+            <span className={`block w-5 h-0.5 bg-white/80 transition-all origin-center ${menuOpen ? 'rotate-45 translate-y-[7px]' : ''}`} />
+            <span className={`block w-5 h-0.5 bg-white/80 transition-all ${menuOpen ? 'opacity-0' : ''}`} />
+            <span className={`block w-5 h-0.5 bg-white/80 transition-all origin-center ${menuOpen ? '-rotate-45 -translate-y-[7px]' : ''}`} />
+          </button>
+
+          {menuOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+              <div className="absolute top-full right-0 mt-2 bg-white border border-[#E8E2D4] rounded-2xl shadow-2xl z-50 py-2 min-w-[200px]">
+                {tabs.map(tab => (
+                  <button
+                    key={tab.key}
+                    onClick={() => { setActiveTab(tab.key as any); setMenuOpen(false) }}
+                    className={`w-full text-left px-4 py-3 text-sm transition-colors flex items-center gap-3 ${
+                      activeTab === tab.key
+                        ? 'text-[#C5A258] font-semibold bg-[#C5A258]/8'
+                        : 'text-[#1B2A45]/65 hover:text-[#1B2A45] hover:bg-[#FAF8F3]'
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${activeTab === tab.key ? 'bg-[#C5A258]' : 'bg-transparent'}`} />
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </header>
 
       <div className="px-4 md:px-6 py-6 max-w-5xl mx-auto">
         {/* 매출 요약 카드 */}
         <div className="grid grid-cols-3 gap-3 mb-5">
           {[
-            { label: '내 고객', value: customers.length + '명', color: 'text-blue-600' },
+            { label: '내 고객', value: customers.length + '명', color: 'text-[#C5A258]' },
             { label: '이번달 매출', value: monthRevenue > 0 ? (monthRevenue / 10000).toFixed(0) + '만원' : '-', color: 'text-emerald-600' },
-            { label: '누적 매출', value: totalRevenue > 0 ? (totalRevenue / 10000).toFixed(0) + '만원' : '-', color: 'text-gray-800' },
+            { label: '누적 매출', value: totalRevenue > 0 ? (totalRevenue / 10000).toFixed(0) + '만원' : '-', color: 'text-[#1B2A45]' },
           ].map(s => (
-            <div key={s.label} className="bg-white rounded-xl border border-gray-100 p-4 text-center">
+            <div key={s.label} className="bg-white rounded-xl border border-[#E8E2D4] p-4 text-center">
               <p className={`text-xl font-black ${s.color}`}>{s.value}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{s.label}</p>
+              <p className="text-xs text-[#1B2A45]/40 mt-0.5">{s.label}</p>
             </div>
-          ))}
-        </div>
-
-        {/* 탭 */}
-        <div className="flex gap-2 mb-6">
-          {tabs.map(t => (
-            <button
-              key={t.key}
-              onClick={() => setActiveTab(t.key as any)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                activeTab === t.key ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              {t.label}
-            </button>
           ))}
         </div>
 

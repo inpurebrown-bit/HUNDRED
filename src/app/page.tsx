@@ -317,7 +317,7 @@ export default function HomePage() {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-[#E8E2D4] shadow-sm">
         <div className="max-w-6xl mx-auto px-4 md:px-8 py-3 flex items-center justify-between">
           {/* 로고만 표시 */}
-          <div className="relative h-10 w-28 shrink-0">
+          <div className="relative h-14 w-40 shrink-0">
             <Image src="/images/logo.png" alt="HUNDRED Consultancy" fill className="object-contain object-left" unoptimized />
           </div>
 
@@ -366,8 +366,8 @@ export default function HomePage() {
 
         <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-8 w-full grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-0 items-center min-h-[calc(100vh-64px)]">
 
-          {/* 왼쪽 텍스트 */}
-          <div className="space-y-7 order-2 md:order-1 py-12">
+          {/* 오른쪽 텍스트 */}
+          <div className="space-y-7 order-2 md:order-2 py-12">
             <Reveal from="left">
               <div className="inline-flex items-center gap-2 border border-[#C5A258]/40 bg-[#C5A258]/8 rounded-full px-4 py-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#C5A258] animate-pulse" />
@@ -416,10 +416,10 @@ export default function HomePage() {
             </Reveal>
           </div>
 
-          {/* 오른쪽 CEO 사진 */}
-          <Reveal from="right" className="order-1 md:order-2 flex flex-col items-center md:items-end gap-3 relative">
+          {/* 왼쪽 CEO 사진 */}
+          <Reveal from="left" className="order-1 md:order-1 flex flex-col items-center md:items-start gap-3 relative">
             {/* 대표 이름 배지 */}
-            <div className="text-center md:text-right z-10">
+            <div className="text-center md:text-left z-10">
               <p className="text-[10px] tracking-[0.3em] text-[#C5A258]/70 uppercase font-semibold mb-0.5">헌드레드 지원센터 대표</p>
               <p className="text-2xl font-black text-[#1B2A45] tracking-widest">백 승 협</p>
             </div>

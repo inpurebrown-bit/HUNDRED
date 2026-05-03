@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { signOut } from 'next-auth/react'
+import Image from 'next/image'
 
 interface OpsCase {
   id: string
@@ -40,7 +41,14 @@ interface Props {
   userName: string
 }
 
+const opsTabs = [
+  { key: 'cases', label: '📋 담당 케이스' },
+  { key: 'report', label: '📝 보고' },
+]
+
 export default function OpsDashboard({ userId, userName }: Props) {
+  const [activeTab, setActiveTab] = useState<'cases' | 'report'>('cases')
+  const [menuOpen, setMenuOpen] = useState(false)
   const [cases, setCases] = useState<OpsCase[]>([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -86,35 +94,74 @@ export default function OpsDashboard({ userId, userName }: Props) {
   const inProgressCount = cases.filter(c => !['completed', 'rejected'].includes(c.progress_stage)).length
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* 헤더 */}
-      <header className="bg-white border-b border-gray-100 px-4 md:px-6 py-4 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center">
-            <span className="text-white text-xs font-bold">{userName.charAt(0)}</span>
-          </div>
-          <div>
-            <h1 className="text-sm font-bold text-gray-900">관리팀 대시보드</h1>
-            <p className="text-xs text-gray-400">{userName} 님</p>
-          </div>
+    <div className="min-h-screen bg-[#FAF8F3]">
+      {/* ── 헤더 ── */}
+      <header className="bg-[#1B2A45] px-4 md:px-6 py-3 flex items-center justify-between sticky top-0 z-30">
+        <div className="relative h-8 w-24 shrink-0">
+          <Image src="/images/logo.png" alt="HUNDRED" fill className="object-contain object-left brightness-0 invert" unoptimized />
         </div>
-        <button onClick={() => signOut({ callbackUrl: '/login' })} className="text-xs text-gray-400 hover:text-gray-700">
-          로그아웃
-        </button>
+        <span className="text-white/60 text-xs font-medium hidden md:block">
+          {opsTabs.find(t => t.key === activeTab)?.label ?? '관리팀 대시보드'}
+        </span>
+        <div className="flex items-center gap-3 relative">
+          <button onClick={() => signOut({ callbackUrl: '/login' })}
+            className="text-white/40 hover:text-white/80 text-xs transition-colors">
+            로그아웃
+          </button>
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label="메뉴"
+            className={`flex flex-col gap-[5px] p-2 rounded-lg transition-colors ${menuOpen ? 'bg-white/20' : 'hover:bg-white/10'}`}
+          >
+            <span className={`block w-5 h-0.5 bg-white/80 transition-all origin-center ${menuOpen ? 'rotate-45 translate-y-[7px]' : ''}`} />
+            <span className={`block w-5 h-0.5 bg-white/80 transition-all ${menuOpen ? 'opacity-0' : ''}`} />
+            <span className={`block w-5 h-0.5 bg-white/80 transition-all origin-center ${menuOpen ? '-rotate-45 -translate-y-[7px]' : ''}`} />
+          </button>
+
+          {menuOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+              <div className="absolute top-full right-0 mt-2 bg-white border border-[#E8E2D4] rounded-2xl shadow-2xl z-50 py-2 min-w-[200px]">
+                {opsTabs.map(tab => (
+                  <button
+                    key={tab.key}
+                    onClick={() => { setActiveTab(tab.key as any); setMenuOpen(false) }}
+                    className={`w-full text-left px-4 py-3 text-sm transition-colors flex items-center gap-3 ${
+                      activeTab === tab.key
+                        ? 'text-[#C5A258] font-semibold bg-[#C5A258]/8'
+                        : 'text-[#1B2A45]/65 hover:text-[#1B2A45] hover:bg-[#FAF8F3]'
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${activeTab === tab.key ? 'bg-[#C5A258]' : 'bg-transparent'}`} />
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </header>
 
       <div className="px-4 md:px-6 py-6 max-w-5xl mx-auto">
+
+        {/* ── 보고 탭 ── */}
+        {activeTab === 'report' && (
+          <OpsReportTab userId={userId} userName={userName} />
+        )}
+
+        {/* ── 케이스 탭 ── */}
+        {activeTab === 'cases' && (<>
         {/* 통계 카드 */}
         <div className="grid grid-cols-4 gap-3 mb-6">
           {[
-            { label: '담당 케이스', value: cases.length + '건', color: 'text-violet-600' },
+            { label: '담당 케이스', value: cases.length + '건', color: 'text-[#C5A258]' },
             { label: '진행 중', value: inProgressCount + '건', color: 'text-amber-600' },
             { label: '완료', value: completedCount + '건', color: 'text-emerald-600' },
-            { label: '누적 매출', value: totalRevenue > 0 ? (totalRevenue / 10000).toFixed(0) + '만원' : '-', color: 'text-blue-600' },
+            { label: '누적 매출', value: totalRevenue > 0 ? (totalRevenue / 10000).toFixed(0) + '만원' : '-', color: 'text-[#1B2A45]' },
           ].map(s => (
-            <div key={s.label} className="bg-white rounded-xl border border-gray-100 p-4 text-center">
+            <div key={s.label} className="bg-white rounded-xl border border-[#E8E2D4] p-4 text-center">
               <p className={`text-xl font-black ${s.color}`}>{s.value}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{s.label}</p>
+              <p className="text-xs text-[#1B2A45]/40 mt-0.5">{s.label}</p>
             </div>
           ))}
         </div>
@@ -124,7 +171,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
           <button
             onClick={() => setFilterStage('all')}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              filterStage === 'all' ? 'bg-gray-900 text-white' : 'bg-white text-gray-500 border border-gray-200'
+              filterStage === 'all' ? 'bg-[#1B2A45] text-white' : 'bg-white text-[#1B2A45]/60 border border-[#E8E2D4]'
             }`}
           >
             전체 ({cases.length})
@@ -137,7 +184,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
                 key={s.key}
                 onClick={() => setFilterStage(s.key)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  filterStage === s.key ? 'bg-gray-900 text-white' : 'bg-white text-gray-500 border border-gray-200'
+                  filterStage === s.key ? 'bg-[#1B2A45] text-white' : 'bg-white text-[#1B2A45]/60 border border-[#E8E2D4]'
                 }`}
               >
                 {s.label} ({count})
@@ -148,9 +195,9 @@ export default function OpsDashboard({ userId, userName }: Props) {
 
         {/* 케이스 목록 */}
         {loading ? (
-          <div className="text-center py-16 text-gray-400 text-sm">불러오는 중...</div>
+          <div className="text-center py-16 text-[#1B2A45]/40 text-sm">불러오는 중...</div>
         ) : filtered.length === 0 ? (
-          <div className="bg-white rounded-xl border border-gray-100 p-14 text-center text-gray-400 text-sm">
+          <div className="bg-white rounded-xl border border-[#E8E2D4] p-14 text-center text-[#1B2A45]/40 text-sm">
             {cases.length === 0
               ? '대표님이 배정한 케이스가 여기에 나타납니다.'
               : '해당 단계의 케이스가 없습니다.'}
@@ -160,7 +207,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
             {filtered.map(c => {
               const stage = STAGES.find(s => s.key === c.progress_stage) || STAGES[0]
               return (
-                <div key={c.id} className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                <div key={c.id} className="bg-white rounded-xl border border-[#E8E2D4] overflow-hidden">
                   {/* 카드 헤더 */}
                   <div
                     className="px-5 py-3.5 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors"
@@ -281,7 +328,157 @@ export default function OpsDashboard({ userId, userName }: Props) {
             })}
           </div>
         )}
+        </>)}
       </div>
+    </div>
+  )
+}
+
+// ── 관리팀 보고 탭 ─────────────────────────────────────────
+function OpsReportTab({ userId, userName }: { userId: string; userName: string }) {
+  const [reportType, setReportType] = useState<'morning' | 'daily'>('morning')
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const today = new Date().toISOString().slice(0, 10)
+
+  // 오전보고 폼
+  const [morning, setMorning] = useState({
+    total_calls: '', no_connect: '', connected: '', db_secured: '', outbound_contracts: '',
+  })
+
+  async function submitMorning(e: React.FormEvent) {
+    e.preventDefault()
+    setSubmitting(true)
+    await fetch('/api/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        report_type: 'morning',
+        report_date: today,
+        data: {
+          total_calls: Number(morning.total_calls),
+          no_connect: Number(morning.no_connect),
+          connected: Number(morning.connected),
+          db_secured: Number(morning.db_secured),
+          outbound_contracts: Number(morning.outbound_contracts),
+        },
+      }),
+    })
+    setSubmitting(false)
+    setSubmitted(true)
+  }
+
+  // 마감보고 폼 (간단 버전)
+  const [daily, setDaily] = useState({ today_contracts: '', month_contracts: '', goal: '', memo: '' })
+
+  async function submitDaily(e: React.FormEvent) {
+    e.preventDefault()
+    setSubmitting(true)
+    await fetch('/api/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        report_type: 'daily',
+        report_date: today,
+        data: {
+          today_contracts: Number(daily.today_contracts),
+          month_contracts: Number(daily.month_contracts),
+          goal: Number(daily.goal),
+          memo: daily.memo,
+        },
+      }),
+    })
+    setSubmitting(false)
+    setSubmitted(true)
+  }
+
+  if (submitted) {
+    return (
+      <div className="bg-white rounded-2xl border border-[#E8E2D4] p-10 text-center">
+        <p className="text-4xl mb-3">✅</p>
+        <p className="font-bold text-[#1B2A45]">보고 제출 완료!</p>
+        <p className="text-sm text-[#1B2A45]/40 mt-1">대표님께 전달되었습니다.</p>
+        <button onClick={() => setSubmitted(false)} className="mt-4 text-xs text-[#C5A258] hover:underline">다시 작성하기</button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        {[{ key: 'morning', label: '☀️ 오전보고' }, { key: 'daily', label: '📋 마감보고' }].map(t => (
+          <button key={t.key} onClick={() => setReportType(t.key as any)}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+              reportType === t.key ? 'bg-[#1B2A45] text-white' : 'bg-white text-[#1B2A45]/60 border border-[#E8E2D4]'
+            }`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {reportType === 'morning' && (
+        <form onSubmit={submitMorning} className="bg-white rounded-2xl border border-[#E8E2D4] p-5 space-y-4">
+          <h3 className="font-semibold text-[#1B2A45]">오전보고 — {today}</h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {[
+              { key: 'total_calls', label: '총 콜 수' },
+              { key: 'no_connect', label: '연결 안됨' },
+              { key: 'connected', label: '연결됨' },
+              { key: 'db_secured', label: 'DB 확보' },
+              { key: 'outbound_contracts', label: '아웃바운딩 계약' },
+            ].map(f => (
+              <div key={f.key}>
+                <label className="text-xs text-[#1B2A45]/50 mb-1 block">{f.label}</label>
+                <input type="number" min="0"
+                  value={morning[f.key as keyof typeof morning]}
+                  onChange={e => setMorning(p => ({ ...p, [f.key]: e.target.value }))}
+                  className="w-full border border-[#E8E2D4] focus:border-[#C5A258]/60 rounded-xl px-3 py-2 text-sm outline-none bg-[#FAF8F3]"
+                  placeholder="0" />
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end">
+            <button type="submit" disabled={submitting}
+              className="bg-[#C5A258] hover:bg-[#D4B568] disabled:opacity-50 text-white px-6 py-2.5 rounded-xl text-sm font-bold transition-colors">
+              {submitting ? '제출 중...' : '보고 제출'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {reportType === 'daily' && (
+        <form onSubmit={submitDaily} className="bg-white rounded-2xl border border-[#E8E2D4] p-5 space-y-4">
+          <h3 className="font-semibold text-[#1B2A45]">마감보고 — {today}</h3>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { key: 'today_contracts', label: '당일 계약' },
+              { key: 'month_contracts', label: '이번달 누적' },
+              { key: 'goal', label: '월 목표' },
+            ].map(f => (
+              <div key={f.key}>
+                <label className="text-xs text-[#1B2A45]/50 mb-1 block">{f.label}</label>
+                <input type="number" min="0"
+                  value={daily[f.key as keyof typeof daily] as string}
+                  onChange={e => setDaily(p => ({ ...p, [f.key]: e.target.value }))}
+                  className="w-full border border-[#E8E2D4] focus:border-[#C5A258]/60 rounded-xl px-3 py-2 text-sm outline-none bg-[#FAF8F3]"
+                  placeholder="0" />
+              </div>
+            ))}
+          </div>
+          <div>
+            <label className="text-xs text-[#1B2A45]/50 mb-1 block">특이사항 / 메모</label>
+            <textarea value={daily.memo} onChange={e => setDaily(p => ({ ...p, memo: e.target.value }))} rows={3}
+              className="w-full border border-[#E8E2D4] focus:border-[#C5A258]/60 rounded-xl px-3 py-2 text-sm outline-none bg-[#FAF8F3] resize-none"
+              placeholder="오늘의 업무 특이사항, 내일 예정 업무 등" />
+          </div>
+          <div className="flex justify-end">
+            <button type="submit" disabled={submitting}
+              className="bg-[#C5A258] hover:bg-[#D4B568] disabled:opacity-50 text-white px-6 py-2.5 rounded-xl text-sm font-bold transition-colors">
+              {submitting ? '제출 중...' : '보고 제출'}
+            </button>
+          </div>
+        </form>
+      )}
     </div>
   )
 }
