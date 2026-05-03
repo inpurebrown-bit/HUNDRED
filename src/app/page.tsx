@@ -821,27 +821,33 @@ export default function HomePage() {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
             {[
               {
-                photo: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=800&q=75',
+                // 건설현장 — 실제 공사 현장 작업자들
+                photo: 'https://images.unsplash.com/photo-1590674899484-d5640e854abe?w=800&q=80',
                 caption: '건설업 대표님과 현장 미팅', badge: '정책자금 3억 승인',
               },
               {
-                photo: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&q=75',
+                // 한식당 주방 — 실제 주방 조리 장면
+                photo: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&q=80',
                 caption: '요식업 대표님 매장 방문 상담', badge: '소진공 1억 승인',
               },
               {
-                photo: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=75',
+                // 소규모 사무실 미팅
+                photo: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=800&q=80',
                 caption: '인테리어 업체 사무실 방문', badge: '기보 2억 승인',
               },
               {
-                photo: 'https://images.unsplash.com/photo-1581093450021-4a7360e9a6b5?w=800&q=75',
+                // 공장 생산 라인 실제 현장
+                photo: 'https://images.unsplash.com/photo-1518314916381-77a37c2a49ae?w=800&q=80',
                 caption: '제조업 공장 현장 방문 상담', badge: '신보 5억 승인',
               },
               {
-                photo: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&q=75',
+                // 소매점 / 매장 내부
+                photo: 'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=800&q=80',
                 caption: '소매업 대표님 직접 방문', badge: '무상지원금 5천만원',
               },
               {
-                photo: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&q=75',
+                // 스타트업 팀 실무 미팅
+                photo: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&q=80',
                 caption: '스타트업 대표님 사무실 미팅', badge: '벤처인증 + 정책자금',
               },
             ].map((s, i) => (
