@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { signOut } from 'next-auth/react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import Image from 'next/image'
+import Link from 'next/link'
 import MinutesTab from './MinutesTab'
 import CalendarTab from './CalendarTab'
 import PayRateTab from './PayRateTab'
@@ -54,9 +55,9 @@ export default function CeoDashboard() {
     <div className="min-h-screen bg-[#FAF8F3]">
       {/* ── 헤더 ── */}
       <header className="bg-[#1B2A45] px-4 md:px-6 py-3 flex items-center justify-between sticky top-0 z-30">
-        <div className="relative h-8 w-24 shrink-0">
+        <Link href="/" className="relative h-8 w-24 shrink-0 block">
           <Image src="/images/logo.png" alt="HUNDRED" fill className="object-contain object-left brightness-0 invert" unoptimized />
-        </div>
+        </Link>
         <span className="text-white/60 text-xs font-medium hidden md:block">
           {tabs.find(t => t.key === activeTab)?.label ?? '대표 대시보드'}
         </span>
