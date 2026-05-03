@@ -376,18 +376,32 @@ export default function HomePage() {
             <Reveal from="left" delay={100}>
               <h1 className="leading-none tracking-tight"
                 style={{ fontFamily: 'var(--font-noto-serif-kr), Georgia, serif' }}>
-                {/* 1단: 크게 — 핵심 단어 */}
-                <span className="block text-[3.8rem] sm:text-[5rem] md:text-[5.5rem] font-black text-[#1B2A45] leading-[0.95]">부자들만</span>
-                <span className="block text-[1.1rem] sm:text-[1.3rem] font-medium text-[#1B2A45]/40 tracking-[0.15em] mb-1">오가던</span>
-                <span className="block text-[3.2rem] sm:text-[4.2rem] md:text-[4.6rem] font-black text-[#1B2A45] leading-[0.95]">추월차선이</span>
-                <span className="block text-[1.1rem] sm:text-[1.3rem] font-medium text-[#1B2A45]/40 tracking-[0.1em] mb-5">따로 있었다면</span>
 
-                {/* 2단: 반전 질문 */}
-                <span className="block text-[1rem] sm:text-[1.15rem] font-semibold text-[#1B2A45]/55 mb-0.5">나만 안되던 이유가</span>
-                <span className="block text-[1rem] sm:text-[1.15rem] font-semibold text-[#1B2A45]/55 mb-3">따로 있었다면</span>
-                <span className="block text-[2rem] sm:text-[2.6rem] md:text-[2.8rem] font-black text-[#C5A258] leading-tight"
+                {/* 부자(크게) + 들만(작게) 한 줄 */}
+                <span className="block leading-[1.1] mb-0">
+                  <span className="text-[3.5rem] font-black text-[#1B2A45]">부자</span>
+                  <span className="text-[1.1rem] font-medium text-[#1B2A45]/40">들만</span>
+                </span>
+
+                {/* 오가던 */}
+                <span className="block text-[1.1rem] font-medium text-[#1B2A45]/40 mb-0.5">오가던</span>
+
+                {/* 추월차선이 */}
+                <span className="block text-[2.5rem] font-black text-[#2E3D55] leading-[1.1] mb-0.5">추월차선이</span>
+
+                {/* 따로 있었다면.. */}
+                <span className="block text-[1.1rem] font-medium text-[#1B2A45]/40 mb-6">따로 있었다면..</span>
+
+                {/* 나만 안되던 이유가 */}
+                <span className="block text-[2.0rem] font-black text-[#1B2A45] leading-[1.15] mb-0.5">나만 안되던 이유가</span>
+
+                {/* 따로 있었다면 */}
+                <span className="block text-[1.1rem] font-medium text-[#1B2A45]/40 mb-4">따로 있었다면</span>
+
+                {/* 이번에도 부정하시겠습니까 ? */}
+                <span className="block text-[2.5rem] font-black text-[#C5A258] leading-tight"
                   style={{ textDecoration: 'underline', textDecorationColor: 'rgba(197,162,88,0.3)', textUnderlineOffset: '8px' }}>
-                  이번에도 부정하시겠습니까 ?
+                  이번에도 부정하시겠습니까&nbsp;?
                 </span>
               </h1>
             </Reveal>
@@ -691,6 +705,7 @@ export default function HomePage() {
             </p>
             <div className="space-y-2.5">
               {[
+                { p: '學', t: '자산경영학 전공' },
                 { p: '前', t: '법무법인 혜안 소속' },
                 { p: '前', t: 'PUREBROWN 대표이사' },
                 { p: '前', t: '㈜나라감정평가법인 소속' },
@@ -700,7 +715,7 @@ export default function HomePage() {
               ].map(item => (
                 <div key={item.t} className="flex items-center gap-3">
                   <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0
-                    ${item.p === '現' ? 'bg-[#C5A258] text-white' : 'bg-[#1B2A45]/10 text-[#1B2A45]/40'}`}>
+                    ${item.p === '現' ? 'bg-[#C5A258] text-white' : item.p === '學' ? 'bg-[#7B5EA7]/20 text-[#7B5EA7]' : 'bg-[#1B2A45]/10 text-[#1B2A45]/40'}`}>
                     {item.p}
                   </span>
                   <span className="text-sm text-[#1B2A45]/65">{item.t}</span>
