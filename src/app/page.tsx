@@ -773,10 +773,10 @@ export default function HomePage() {
             <div>
               <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] uppercase mb-3">LECTURE & SEMINAR</p>
               <h2 className="text-3xl md:text-4xl font-black leading-tight mb-4">
-                전국 강단에서<br /><span className="text-[#C5A258]">검증된 전문가</span>
+                전국에서<br /><span className="text-[#C5A258]">검증된 전문가</span>
               </h2>
               <p className="text-sm text-white/60 leading-relaxed">
-                정책자금, 법인설립, 경영전략 등 기업 성장에 필요한 모든 분야를 전국 각지의 강단에서 직접 강의하며 수천 명의 대표님들과 함께했습니다. 책에서 배운 지식이 아닌, 현장에서 쌓은 실전 노하우를 나눕니다.
+                정책자금, 법인설립, 경영전략 등 기업 성장에 필요한 모든 분야를 전국 각지에서 직접 강의하며 수천 명의 대표님들과 함께했습니다. 책에서 배운 지식이 아닌, 현장에서 쌓은 실전 노하우를 나눕니다.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
