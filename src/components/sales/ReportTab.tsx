@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, FormEvent, ReactNode } from 'react'
 
 // ── 타입 ────────────────────────────────────────────────
 interface MorningData {
@@ -98,7 +98,7 @@ export default function ReportTab({ userId, userName }: Props) {
   }, [submitted])
 
   // ── 오전보고 제출 ────────────────────────────────────
-  async function submitMorning(e: React.FormEvent) {
+  async function submitMorning(e: FormEvent) {
     e.preventDefault()
     setLoading(true)
     const res = await fetch('/api/reports', {
@@ -114,7 +114,7 @@ export default function ReportTab({ userId, userName }: Props) {
   }
 
   // ── 마감보고 제출 ────────────────────────────────────
-  async function submitDaily(e: React.FormEvent) {
+  async function submitDaily(e: FormEvent) {
     e.preventDefault()
     setLoading(true)
     const res = await fetch('/api/reports', {
@@ -435,7 +435,7 @@ function Section({ title, isEmpty, onToggleEmpty, onAdd, children }: {
   isEmpty: boolean
   onToggleEmpty: () => void
   onAdd: () => void
-  children: React.ReactNode
+  children: ReactNode
 }) {
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-5">

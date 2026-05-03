@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, FormEvent } from 'react'
 import { signOut } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -347,7 +347,7 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
     total_calls: '', no_connect: '', connected: '', db_secured: '', outbound_contracts: '',
   })
 
-  async function submitMorning(e: React.FormEvent) {
+  async function submitMorning(e: FormEvent) {
     e.preventDefault()
     setSubmitting(true)
     await fetch('/api/reports', {
@@ -372,7 +372,7 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
   // 마감보고 폼 (간단 버전)
   const [daily, setDaily] = useState({ today_contracts: '', month_contracts: '', goal: '', memo: '' })
 
-  async function submitDaily(e: React.FormEvent) {
+  async function submitDaily(e: FormEvent) {
     e.preventDefault()
     setSubmitting(true)
     await fetch('/api/reports', {

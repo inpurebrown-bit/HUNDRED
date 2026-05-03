@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, FormEvent, ReactNode } from 'react'
 
 interface MinuteSummary {
   title?: string
@@ -44,7 +44,7 @@ export default function MinutesTab() {
 
   useEffect(() => { load() }, [])
 
-  async function submit(e: React.FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault()
     if (!rawText.trim()) return
     setProcessing(true)
@@ -322,7 +322,7 @@ function MinuteDetail({ minute, onReprocess }: { minute: Minute; onReprocess: ()
   )
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
+function SectionTitle({ children }: { children: ReactNode }) {
   return (
     <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">{children}</p>
   )

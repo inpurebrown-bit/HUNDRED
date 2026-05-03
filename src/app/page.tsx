@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, FormEvent, ChangeEvent, ReactNode } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 
 // ─── 스크롤 인트로 컴포넌트 ──────────────────────────────
 function Reveal({ children, from = 'bottom', delay = 0, className = '' }: {
-  children: React.ReactNode
+  children: ReactNode
   from?: 'left' | 'right' | 'bottom'
   delay?: number
   className?: string
@@ -146,7 +146,7 @@ function FloatingAiWidget() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, open])
 
-  async function send(e: React.FormEvent) {
+  async function send(e: FormEvent) {
     e.preventDefault()
     const q = input.trim()
     if (!q || loading) return
@@ -291,7 +291,7 @@ export default function HomePage() {
     setInquiryTypes(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type])
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setSubmitting(true)
     try {
@@ -849,14 +849,14 @@ export default function HomePage() {
                   <div>
                     <label className="block text-xs text-[#1B2A45]/50 mb-1.5 font-medium">이름 *</label>
                     <input type="text" required value={formData.name}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(p => ({ ...p, name: e.target.value }))}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData(p => ({ ...p, name: e.target.value }))}
                       className="w-full bg-white border border-[#E8E2D4] focus:border-[#C5A258]/60 rounded-xl px-3 py-2.5 text-sm text-[#1B2A45] placeholder-[#1B2A45]/20 outline-none transition-colors"
                       placeholder="홍길동" />
                   </div>
                   <div>
                     <label className="block text-xs text-[#1B2A45]/50 mb-1.5 font-medium">지역</label>
                     <select value={formData.region}
-                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData(p => ({ ...p, region: e.target.value }))}
+                      onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData(p => ({ ...p, region: e.target.value }))}
                       className="w-full bg-white border border-[#E8E2D4] focus:border-[#C5A258]/60 rounded-xl px-3 py-2.5 text-sm text-[#1B2A45] outline-none transition-colors">
                       <option value="">선택</option>
                       {['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'].map(r => (
@@ -869,14 +869,14 @@ export default function HomePage() {
                   <div>
                     <label className="block text-xs text-[#1B2A45]/50 mb-1.5 font-medium">연락처 *</label>
                     <input type="tel" required value={formData.phone}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(p => ({ ...p, phone: e.target.value }))}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData(p => ({ ...p, phone: e.target.value }))}
                       className="w-full bg-white border border-[#E8E2D4] focus:border-[#C5A258]/60 rounded-xl px-3 py-2.5 text-sm text-[#1B2A45] placeholder-[#1B2A45]/20 outline-none transition-colors"
                       placeholder="010-0000-0000" />
                   </div>
                   <div>
                     <label className="block text-xs text-[#1B2A45]/50 mb-1.5 font-medium">회사명</label>
                     <input type="text" value={formData.company}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(p => ({ ...p, company: e.target.value }))}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData(p => ({ ...p, company: e.target.value }))}
                       className="w-full bg-white border border-[#E8E2D4] focus:border-[#C5A258]/60 rounded-xl px-3 py-2.5 text-sm text-[#1B2A45] placeholder-[#1B2A45]/20 outline-none transition-colors"
                       placeholder="(주)홍길동상사" />
                   </div>
@@ -902,7 +902,7 @@ export default function HomePage() {
                     {['없음', '있음(납부예정)', '있음(현재체납)'].map(opt => (
                       <label key={opt} className={`flex items-center gap-2 cursor-pointer text-sm ${formData.taxStatus === opt ? 'text-[#C5A258] font-semibold' : 'text-[#1B2A45]/60'}`}>
                         <input type="radio" name="taxStatus" value={opt} checked={formData.taxStatus === opt}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(p => ({ ...p, taxStatus: e.target.value }))}
+                          onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData(p => ({ ...p, taxStatus: e.target.value }))}
                           className="accent-[#C5A258]" />
                         {opt}
                       </label>
@@ -912,7 +912,7 @@ export default function HomePage() {
                 <div>
                   <label className="block text-xs text-[#1B2A45]/50 mb-1.5 font-medium">문의 내용</label>
                   <textarea rows={3} value={formData.message}
-                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData(p => ({ ...p, message: e.target.value }))}
+                    onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setFormData(p => ({ ...p, message: e.target.value }))}
                     className="w-full bg-white border border-[#E8E2D4] focus:border-[#C5A258]/60 rounded-xl px-3 py-2.5 text-sm text-[#1B2A45] placeholder-[#1B2A45]/20 outline-none transition-colors resize-none"
                     placeholder="필요한 자금 규모나 현재 상황을 간단히 적어주세요." />
                 </div>

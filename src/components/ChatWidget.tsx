@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, FormEvent } from 'react'
 
 interface Message {
   role: 'user' | 'model'
@@ -20,7 +20,7 @@ export default function ChatWidget() {
     }
   }, [messages, open])
 
-  async function sendMessage(e: React.FormEvent) {
+  async function sendMessage(e: FormEvent) {
     e.preventDefault()
     if (!input.trim() || loading) return
 

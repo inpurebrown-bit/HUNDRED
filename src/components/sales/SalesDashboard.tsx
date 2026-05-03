@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, FormEvent, ChangeEvent } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { signOut } from 'next-auth/react'
@@ -93,7 +93,7 @@ export default function SalesDashboard({ userId, userName }: Props) {
   // 신규 고객 등록
   const [newForm, setNewForm] = useState({ name: '', phone: '', company: '', loan_history: '', notes: '' })
 
-  async function submitNew(e: React.FormEvent) {
+  async function submitNew(e: FormEvent) {
     e.preventDefault()
     setSubmitting(true)
     const res = await fetch('/api/customers', {

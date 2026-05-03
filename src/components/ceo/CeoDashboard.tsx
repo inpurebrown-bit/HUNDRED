@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, FormEvent, ReactNode } from 'react'
 import { signOut } from 'next-auth/react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import Image from 'next/image'
@@ -786,7 +786,7 @@ function MorningDetail({ data }: { data: any }) {
 }
 
 function DailyDetail({ data }: { data: any }) {
-  const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  const Section = ({ title, children }: { title: string; children: ReactNode }) => (
     <div className="mb-4">
       <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">{title}</h4>
       {children}
@@ -1017,7 +1017,7 @@ function AiTab() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  async function sendMessage(e: React.FormEvent) {
+  async function sendMessage(e: FormEvent) {
     e.preventDefault()
     if (!input.trim() || loading) return
     const userMessage: Message = { role: 'user', parts: [{ text: input }] }

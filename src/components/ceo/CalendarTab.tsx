@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, FormEvent } from 'react'
 
 interface CalEvent {
   id: string
@@ -102,7 +102,7 @@ export default function CalendarTab() {
     if (!autoSyncing) load()
   }, [autoSyncing])
 
-  async function submitEvent(e: React.FormEvent) {
+  async function submitEvent(e: FormEvent) {
     e.preventDefault()
     await fetch('/api/events', {
       method: 'POST',

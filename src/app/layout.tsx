@@ -1,4 +1,5 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
+import type { ReactNode } from 'react'
 import { Geist, Noto_Serif_KR } from 'next/font/google'
 import './globals.css'
 import { Providers } from './providers'
@@ -22,7 +23,7 @@ export const metadata: Metadata = {
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: ReactNode
 }) {
   return (
     <html lang="ko" className={`${geist.variable} ${notoSerifKR.variable} h-full antialiased`}>

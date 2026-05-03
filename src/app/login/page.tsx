@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, FormEvent, ChangeEvent } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
@@ -13,7 +13,7 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
@@ -42,14 +42,14 @@ export default function LoginPage() {
           <div>
             <label className="block text-xs font-semibold text-[#1B2A45]/60 mb-1.5">아이디</label>
             <input type="text" value={username}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUsername(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setUsername(e.target.value)}
               className="w-full border border-[#E8E2D4] focus:border-[#C5A258]/60 rounded-xl px-4 py-3 text-sm text-[#1B2A45] bg-[#FAF8F3] outline-none transition-colors"
               placeholder="아이디 입력" required />
           </div>
           <div>
             <label className="block text-xs font-semibold text-[#1B2A45]/60 mb-1.5">비밀번호</label>
             <input type="password" value={password}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
               className="w-full border border-[#E8E2D4] focus:border-[#C5A258]/60 rounded-xl px-4 py-3 text-sm text-[#1B2A45] bg-[#FAF8F3] outline-none transition-colors"
               placeholder="비밀번호 입력" required />
           </div>
