@@ -377,15 +377,17 @@ export default function OverviewTabNew() {
           asRes?.json().catch(() => ({})) ?? {},
         ])
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const a = (d: unknown) => (d as any)
         setRevenueData(revData as RevenueData)
-        setAssignContracts((assignData as Record<string, unknown[]>).contracts ?? [])
-        setReports((reportsData as Record<string, unknown[]>).reports ?? [])
-        setEvents((eventsData as Record<string, unknown[]>).events ?? [])
-        setAllContracts((contractsData as Record<string, unknown[]>).contracts ?? [])
-        setOpsCases((opsData as Record<string, unknown[]>).cases ?? [])
-        setSalesGoals((goalsData as Record<string, unknown[]>).goals ?? [])
-        setLastMonthGoals((lastGoalsData as Record<string, unknown[]>).goals ?? [])
-        setAsRequests((asData as Record<string, unknown[]>).requests ?? [])
+        setAssignContracts(a(assignData).contracts ?? [])
+        setReports(a(reportsData).reports ?? [])
+        setEvents(a(eventsData).events ?? [])
+        setAllContracts(a(contractsData).contracts ?? [])
+        setOpsCases(a(opsData).cases ?? [])
+        setSalesGoals(a(goalsData).goals ?? [])
+        setLastMonthGoals(a(lastGoalsData).goals ?? [])
+        setAsRequests(a(asData).requests ?? [])
       } catch {
         // silently ignore
       } finally {
