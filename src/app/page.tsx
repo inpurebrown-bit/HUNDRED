@@ -374,31 +374,19 @@ export default function HomePage() {
             </Reveal>
 
             <Reveal from="left" delay={100}>
-              <h1 className="tracking-tight space-y-1 text-center"
+              <h1 className="tracking-tight text-center"
                 style={{ fontFamily: 'var(--font-noto-serif-kr), Georgia, serif' }}>
 
-                {/* ① 부자들만 */}
-                <div className="flex items-baseline justify-center gap-2 leading-snug">
-                  <span className="text-[2.0rem] font-black text-[#1B2A45]">부자</span>
-                  <span className="text-[0.95rem] font-medium text-[#1B2A45]/35 tracking-wide">들만</span>
-                </div>
-
-                {/* ② 오가던 */}
-                <div className="text-[0.9rem] font-normal text-[#1B2A45]/30 tracking-[0.18em] pb-1">오가던</div>
-
-                {/* ③ 추월차선이 */}
+                {/* 1단 */}
+                <div className="text-[1.5rem] font-bold text-[#3A4A5C] leading-snug">부자들만 오가던</div>
                 <div className="text-[1.5rem] font-bold text-[#3A4A5C] leading-snug">추월차선이</div>
+                <div className="text-[0.85rem] font-normal text-[#1B2A45]/30 tracking-[0.12em] mt-1 mb-6">따로 있었다면..</div>
 
-                {/* ④ 따로 있었다면.. */}
-                <div className="text-[0.9rem] font-normal text-[#1B2A45]/30 tracking-[0.12em] pb-6">따로 있었다면..</div>
-
-                {/* ⑤ 나만 안되던 이유가 */}
+                {/* 2단 */}
                 <div className="text-[1.5rem] font-bold text-[#3A4A5C] leading-snug">나만 안되던 이유가</div>
+                <div className="text-[0.85rem] font-normal text-[#1B2A45]/30 tracking-[0.12em] mt-1 mb-6">따로 있었다면</div>
 
-                {/* ⑥ 따로 있었다면 */}
-                <div className="text-[0.9rem] font-normal text-[#1B2A45]/30 tracking-[0.12em] pb-6">따로 있었다면</div>
-
-                {/* ⑦ 이번에도 부정하시겠습니까 ? */}
+                {/* 3단 — 필기체 금색 */}
                 <div className="text-[2.2rem] text-[#C5A258] leading-snug"
                   style={{
                     fontFamily: 'var(--font-nanum-brush), cursive',
