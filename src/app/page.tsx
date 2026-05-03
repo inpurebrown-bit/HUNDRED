@@ -374,35 +374,40 @@ export default function HomePage() {
             </Reveal>
 
             <Reveal from="left" delay={100}>
-              <h1 className="leading-none tracking-tight"
+              <h1 className="tracking-tight space-y-1"
                 style={{ fontFamily: 'var(--font-noto-serif-kr), Georgia, serif' }}>
 
-                {/* 부자(크게) + 들만(작게) 한 줄 */}
-                <span className="block leading-[1.1] mb-0">
-                  <span className="text-[3.5rem] font-black text-[#1B2A45]">부자</span>
-                  <span className="text-[1.1rem] font-medium text-[#1B2A45]/40">들만</span>
-                </span>
+                {/* ① 부자들만 */}
+                <div className="flex items-baseline gap-2 leading-snug">
+                  <span className="text-[2.0rem] font-black text-[#1B2A45]">부자</span>
+                  <span className="text-[0.95rem] font-medium text-[#1B2A45]/35 tracking-wide">들만</span>
+                </div>
 
-                {/* 오가던 */}
-                <span className="block text-[1.1rem] font-medium text-[#1B2A45]/40 mb-0.5">오가던</span>
+                {/* ② 오가던 */}
+                <div className="text-[0.9rem] font-normal text-[#1B2A45]/30 tracking-[0.18em] pl-0.5 pb-1">오가던</div>
 
-                {/* 추월차선이 */}
-                <span className="block text-[2.5rem] font-black text-[#2E3D55] leading-[1.1] mb-0.5">추월차선이</span>
+                {/* ③ 추월차선이 */}
+                <div className="text-[1.5rem] font-bold text-[#3A4A5C] leading-snug">추월차선이</div>
 
-                {/* 따로 있었다면.. */}
-                <span className="block text-[1.1rem] font-medium text-[#1B2A45]/40 mb-6">따로 있었다면..</span>
+                {/* ④ 따로 있었다면.. */}
+                <div className="text-[0.9rem] font-normal text-[#1B2A45]/30 tracking-[0.12em] pl-0.5 pb-5">따로 있었다면..</div>
 
-                {/* 나만 안되던 이유가 */}
-                <span className="block text-[2.0rem] font-black text-[#1B2A45] leading-[1.15] mb-0.5">나만 안되던 이유가</span>
+                {/* ⑤ 나만 안되던 이유가 */}
+                <div className="text-[1.5rem] font-bold text-[#3A4A5C] leading-snug">나만 안되던 이유가</div>
 
-                {/* 따로 있었다면 */}
-                <span className="block text-[1.1rem] font-medium text-[#1B2A45]/40 mb-4">따로 있었다면</span>
+                {/* ⑥ 따로 있었다면 */}
+                <div className="text-[0.9rem] font-normal text-[#1B2A45]/30 tracking-[0.12em] pl-0.5 pb-5">따로 있었다면</div>
 
-                {/* 이번에도 부정하시겠습니까 ? */}
-                <span className="block text-[2.5rem] font-black text-[#C5A258] leading-tight"
-                  style={{ textDecoration: 'underline', textDecorationColor: 'rgba(197,162,88,0.3)', textUnderlineOffset: '8px' }}>
+                {/* ⑦ 이번에도 부정하시겠습니까 ? */}
+                <div className="text-[1.8rem] text-[#C5A258] leading-snug whitespace-nowrap"
+                  style={{
+                    fontFamily: 'var(--font-nanum-brush), cursive',
+                    textDecoration: 'underline',
+                    textDecorationColor: 'rgba(197,162,88,0.25)',
+                    textUnderlineOffset: '6px',
+                  }}>
                   이번에도 부정하시겠습니까&nbsp;?
-                </span>
+                </div>
               </h1>
             </Reveal>
 
