@@ -278,14 +278,8 @@ export default function HomePage() {
   const [caseIdx, setCaseIdx] = useState(0)
   const [reviewIdx, setReviewIdx] = useState(0)
 
-  useEffect(() => {
-    const t = setInterval(() => setCaseIdx(i => (i + 1) % successCases.length), 3500)
-    return () => clearInterval(t)
-  }, [])
-  useEffect(() => {
-    const t = setInterval(() => setReviewIdx(i => (i + 1) % reviews.length), 4000)
-    return () => clearInterval(t)
-  }, [])
+  // 슬라이드 자동재생 제거 — 폼 작성 중 페이지 흔들림 방지
+  // 수동 화살표 버튼으로만 이동
 
   function toggleInquiry(type: string) {
     setInquiryTypes(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type])
@@ -379,11 +373,12 @@ export default function HomePage() {
             </Reveal>
 
             <Reveal from="left" delay={100}>
-              <h1 className="text-4xl sm:text-5xl md:text-[3.2rem] font-black leading-[1.15] tracking-tight"
+              <h1 className="text-3xl sm:text-4xl md:text-[2.8rem] font-black leading-[1.25] tracking-tight"
                 style={{ fontFamily: 'var(--font-noto-serif-kr), Georgia, serif' }}>
-                <span className="text-[#1B2A45]">먼저 걷고,</span><br />
-                <span className="text-[#1B2A45]">먼저 알아야</span><br />
-                <span className="text-[#C5A258]" style={{ textDecoration: 'underline', textDecorationColor: 'rgba(197,162,88,0.35)', textUnderlineOffset: '8px' }}>먼저 받습니다</span>
+                <span className="text-[#1B2A45]">부자들만 다니는</span><br />
+                <span className="text-[#1B2A45]">추월차선이 따로</span><br />
+                <span className="text-[#1B2A45]">존재한다고 하면</span><br />
+                <span className="text-[#C5A258]" style={{ textDecoration: 'underline', textDecorationColor: 'rgba(197,162,88,0.35)', textUnderlineOffset: '8px' }}>믿으시겠습니까 ?</span>
               </h1>
             </Reveal>
 
@@ -420,12 +415,12 @@ export default function HomePage() {
           </div>
 
           {/* 왼쪽 CEO 사진 */}
-          <Reveal from="left" className="order-1 md:order-1 flex flex-col items-center md:items-start gap-3 relative pt-16">
+          <Reveal from="left" className="order-1 md:order-1 flex flex-col items-center md:items-start gap-3 relative pt-28">
 
             {/* CEO 사진 — 배경제거본이라 자연스럽게 블렌딩 */}
             <div className="relative w-full max-w-[280px] md:max-w-[340px]" style={{ aspectRatio: '3/4' }}>
               {/* 대표 이름 — 사진 바로 위에 절대 위치 */}
-              <div className="absolute -top-[3.8rem] left-0 z-10 text-center md:text-left">
+              <div className="absolute -top-[5.5rem] left-0 z-10 text-center md:text-left">
                 <p className="text-xs tracking-[0.25em] text-[#C5A258] font-bold mb-0.5">헌드레드 지원센터 대표</p>
                 <p className="text-[2.6rem] text-[#1B2A45] leading-none"
                   style={{ fontFamily: 'var(--font-nanum-brush), cursive' }}>백승협</p>
@@ -441,9 +436,11 @@ export default function HomePage() {
             </div>
 
             {/* 인용구 박스 — 한 단락으로 자연스럽게 */}
-            <div className="bg-white border-l-4 border-[#C5A258] rounded-r-2xl rounded-bl-2xl px-5 py-4 max-w-[320px] shadow-md">
+            <div className="bg-white border-l-4 border-[#C5A258] rounded-r-2xl rounded-bl-2xl px-5 py-4 w-full shadow-md">
               <p className="text-[13px] text-[#1B2A45]/75 leading-[1.85] font-medium">
-                지금 이 순간에도 당신 옆 경쟁사는 정부 자금을 받고 있습니다. 몰라서 못 받는 것과, 알면서 포기하는 것은 다릅니다. <span className="text-[#C5A258] font-bold">헌드레드는 당신이 놓친 기회를 찾아드립니다.</span>
+                지금 이 순간에도 당신 옆 경쟁사는 정부 자금을 받고 있습니다.<br />
+                몰라서 못 받는 것과, 알면서 포기하는 건 다릅니다.<br />
+                <span className="text-[#C5A258] font-bold">헌드레드는 당신이 놓친 기회를 찾아드립니다.</span>
               </p>
             </div>
           </Reveal>
@@ -537,6 +534,17 @@ export default function HomePage() {
               </Reveal>
             ))}
           </div>
+
+          {/* 서비스 하단 CTA */}
+          <Reveal>
+            <div className="mt-14 text-center">
+              <p className="text-sm text-[#1B2A45]/50 mb-5">어떤 서비스가 내 사업에 맞는지 모르겠다면, 전문가가 직접 분석해드립니다</p>
+              <a href="#문의하기"
+                className="inline-flex items-center gap-2 bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-9 py-4 rounded-xl text-sm transition-all shadow-lg shadow-[#C5A258]/25 hover:scale-[1.02]">
+                무료 상담 신청 →
+              </a>
+            </div>
+          </Reveal>
         </div>
       </section>
 
