@@ -356,17 +356,30 @@ export default function HomePage() {
 
       {/* ── 히어로 섹션 ── */}
       <section className="relative min-h-screen flex items-center pt-16 overflow-hidden bg-[#FAF8F3]">
+        {/* 빌딩숲 배경 이미지 — 흐리게 */}
+        <div className="absolute inset-0 z-0">
+          <Image
+            src="https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1920&q=70"
+            alt=""
+            fill
+            className="object-cover object-center"
+            style={{ filter: 'blur(3px) grayscale(30%)', opacity: 0.13 }}
+            unoptimized
+          />
+        </div>
+        {/* ivory 오버레이 — 배경 색감 유지 */}
+        <div className="absolute inset-0 z-0 bg-[#FAF8F3]/80" />
         {/* 금색 점 패턴 */}
-        <div className="absolute inset-0 opacity-[0.06]"
+        <div className="absolute inset-0 z-0 opacity-[0.05]"
           style={{ backgroundImage: 'radial-gradient(#C5A258 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
         {/* 우측 골드 그라데이션 */}
-        <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-[#C5A258]/8 to-transparent pointer-events-none" />
+        <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-[#C5A258]/6 to-transparent pointer-events-none z-0" />
 
         <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-8 w-full grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-0 items-center min-h-[calc(100vh-64px)]">
 
           {/* 왼쪽 텍스트 */}
           <div className="space-y-7 order-1 md:order-1 py-12">
-            <Reveal from="left">
+            <Reveal from="left" className="flex justify-center">
               <div className="inline-flex items-center gap-2 border border-[#C5A258]/40 bg-[#C5A258]/8 rounded-full px-4 py-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#C5A258] animate-pulse" />
                 <span className="text-xs text-[#C5A258] tracking-widest font-semibold">The complete solution for business success</span>
