@@ -143,14 +143,16 @@ export default function OverviewTab() {
           asRes?.json().catch(() => ({})) ?? {},
         ])
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const a = (d: unknown) => (d as any)
         setRevenueData(revData)
-        setAssignContracts(assignData.contracts || [])
-        setReports(reportsData.reports || [])
-        setEvents(eventsData.events || [])
-        setAllContracts(contractsData.contracts || [])
-        setSalesGoals(goalsData.goals || [])
-        setLastMonthGoals(lastGoalsData.goals || [])
-        setAsRequests(asData.requests || [])
+        setAssignContracts(a(assignData).contracts || [])
+        setReports(a(reportsData).reports || [])
+        setEvents(a(eventsData).events || [])
+        setAllContracts(a(contractsData).contracts || [])
+        setSalesGoals(a(goalsData).goals || [])
+        setLastMonthGoals(a(lastGoalsData).goals || [])
+        setAsRequests(a(asData).requests || [])
       } catch {
         // silently handle
       } finally {
