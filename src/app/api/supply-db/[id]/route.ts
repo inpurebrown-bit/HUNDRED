@@ -5,7 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
@@ -14,6 +14,8 @@ export async function PATCH(
   if (user.role !== 'ceo') {
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
+
+  const { id } = await context.params
 
   try {
     const body = await req.json()
@@ -33,7 +35,7 @@ export async function PATCH(
     const { data, error } = await supabaseAdmin
       .from('supply_db')
       .update(updates)
-      .eq('id', params.id)
+      .eq('id', id)
       .select()
       .single()
 
@@ -52,7 +54,7 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
@@ -62,11 +64,13 @@ export async function DELETE(
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
 
+  const { id } = await context.params
+
   try {
     const { error } = await supabaseAdmin
       .from('supply_db')
       .delete()
-      .eq('id', params.id)
+      .eq('id', id)
 
     if (error) {
       if (error.message.includes('relation') || error.message.includes('does not exist')) {
