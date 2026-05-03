@@ -692,10 +692,18 @@ export default function HomePage() {
 
       {/* ── CEO 소개 — 사진 자연스럽게 ── */}
       <section id="대표소개" className="relative overflow-hidden bg-[#FAF8F3]">
+        {/* 빌딩숲 배경 이미지 */}
+        <div className="absolute inset-0 z-0" style={{
+          backgroundImage: 'url(https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1920&q=80)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center top',
+          opacity: 0.28,
+        }} />
+        <div className="absolute inset-0 z-0 bg-[#FAF8F3]/82" />
         {/* 섹션을 좌/우 분할: 좌(텍스트) ivory, 우(사진) dark */}
-        <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-[#1B2A45] hidden md:block" />
+        <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-[#1B2A45]/90 hidden md:block z-0" />
 
-        <div className="relative max-w-6xl mx-auto px-4 md:px-8 grid grid-cols-1 md:grid-cols-2 gap-0 min-h-[600px] items-stretch">
+        <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-8 grid grid-cols-1 md:grid-cols-2 gap-0 min-h-[600px] items-stretch">
 
           {/* 왼쪽 텍스트 */}
           <Reveal from="left" className="py-20 pr-0 md:pr-12 flex flex-col justify-center space-y-5">
