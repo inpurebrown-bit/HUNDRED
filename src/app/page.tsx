@@ -817,18 +817,45 @@ export default function HomePage() {
           </Reveal>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
             {[
-              { gradient: 'from-slate-500 to-slate-700', icon: '🏗️', caption: '건설업 대표님과 현장 미팅', badge: '정책자금 3억 승인' },
-              { gradient: 'from-amber-600 to-orange-700', icon: '🍽️', caption: '요식업 대표님 매장 방문 상담', badge: '소진공 1억 승인' },
-              { gradient: 'from-teal-600 to-cyan-800', icon: '🛋️', caption: '인테리어 업체 사무실 방문', badge: '기보 2억 승인' },
-              { gradient: 'from-gray-600 to-zinc-800', icon: '🏭', caption: '제조업 공장 현장 방문 상담', badge: '신보 5억 승인' },
-              { gradient: 'from-emerald-600 to-green-800', icon: '🛒', caption: '소매업 대표님 직접 방문', badge: '무상지원금 5천만원' },
-              { gradient: 'from-indigo-600 to-blue-800', icon: '💼', caption: '스타트업 대표님 사무실 미팅', badge: '벤처인증 + 정책자금' },
+              {
+                photo: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=800&q=75',
+                caption: '건설업 대표님과 현장 미팅', badge: '정책자금 3억 승인',
+              },
+              {
+                photo: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&q=75',
+                caption: '요식업 대표님 매장 방문 상담', badge: '소진공 1억 승인',
+              },
+              {
+                photo: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=75',
+                caption: '인테리어 업체 사무실 방문', badge: '기보 2억 승인',
+              },
+              {
+                photo: 'https://images.unsplash.com/photo-1581093450021-4a7360e9a6b5?w=800&q=75',
+                caption: '제조업 공장 현장 방문 상담', badge: '신보 5억 승인',
+              },
+              {
+                photo: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&q=75',
+                caption: '소매업 대표님 직접 방문', badge: '무상지원금 5천만원',
+              },
+              {
+                photo: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&q=75',
+                caption: '스타트업 대표님 사무실 미팅', badge: '벤처인증 + 정책자금',
+              },
             ].map((s, i) => (
               <Reveal key={i} from="bottom" delay={i * 60}>
-                <div className={`relative bg-gradient-to-br ${s.gradient} rounded-2xl overflow-hidden aspect-[4/3] flex flex-col items-center justify-center shadow-lg hover:scale-[1.02] transition-transform cursor-default`}>
-                  <span className="text-5xl md:text-6xl drop-shadow-lg">{s.icon}</span>
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
-                    <p className="text-white text-xs font-semibold leading-snug mb-1">{s.caption}</p>
+                <div className="relative rounded-2xl overflow-hidden aspect-[4/3] shadow-lg hover:scale-[1.02] transition-transform cursor-default group">
+                  {/* 실제 사진 */}
+                  <div className="absolute inset-0" style={{
+                    backgroundImage: `url(${s.photo})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    transition: 'transform 0.4s ease',
+                  }} />
+                  {/* 어두운 그라데이션 오버레이 */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+                  {/* 텍스트 */}
+                  <div className="absolute bottom-0 left-0 right-0 p-3">
+                    <p className="text-white text-xs font-semibold leading-snug mb-1.5 drop-shadow">{s.caption}</p>
                     <span className="text-[10px] bg-[#C5A258] text-white font-bold px-2 py-0.5 rounded-full">{s.badge}</span>
                   </div>
                 </div>
