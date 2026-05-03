@@ -361,12 +361,10 @@ export default function HomePage() {
           backgroundImage: 'url(https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1920&q=80)',
           backgroundSize: 'cover',
           backgroundPosition: 'center top',
-          opacity: 0.55,
+          opacity: 0.18,
         }} />
-        {/* 브랜드 컬러 그라데이션 오버레이 — ivory+navy 톤 유지 */}
-        <div className="absolute inset-0 z-0" style={{
-          background: 'linear-gradient(135deg, rgba(250,248,243,0.82) 0%, rgba(27,42,69,0.55) 100%)',
-        }} />
+        {/* ivory 오버레이 */}
+        <div className="absolute inset-0 z-0 bg-[#FAF8F3]/88" />
         {/* 금색 점 패턴 */}
         <div className="absolute inset-0 z-0 opacity-[0.05]"
           style={{ backgroundImage: 'radial-gradient(#C5A258 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
