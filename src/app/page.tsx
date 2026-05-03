@@ -374,32 +374,32 @@ export default function HomePage() {
             </Reveal>
 
             <Reveal from="left" delay={100}>
-              <h1 className="tracking-tight space-y-1"
+              <h1 className="tracking-tight space-y-1 text-center"
                 style={{ fontFamily: 'var(--font-noto-serif-kr), Georgia, serif' }}>
 
                 {/* ① 부자들만 */}
-                <div className="flex items-baseline gap-2 leading-snug">
+                <div className="flex items-baseline justify-center gap-2 leading-snug">
                   <span className="text-[2.0rem] font-black text-[#1B2A45]">부자</span>
                   <span className="text-[0.95rem] font-medium text-[#1B2A45]/35 tracking-wide">들만</span>
                 </div>
 
                 {/* ② 오가던 */}
-                <div className="text-[0.9rem] font-normal text-[#1B2A45]/30 tracking-[0.18em] pl-0.5 pb-1">오가던</div>
+                <div className="text-[0.9rem] font-normal text-[#1B2A45]/30 tracking-[0.18em] pb-1">오가던</div>
 
                 {/* ③ 추월차선이 */}
                 <div className="text-[1.5rem] font-bold text-[#3A4A5C] leading-snug">추월차선이</div>
 
                 {/* ④ 따로 있었다면.. */}
-                <div className="text-[0.9rem] font-normal text-[#1B2A45]/30 tracking-[0.12em] pl-0.5 pb-5">따로 있었다면..</div>
+                <div className="text-[0.9rem] font-normal text-[#1B2A45]/30 tracking-[0.12em] pb-6">따로 있었다면..</div>
 
                 {/* ⑤ 나만 안되던 이유가 */}
                 <div className="text-[1.5rem] font-bold text-[#3A4A5C] leading-snug">나만 안되던 이유가</div>
 
                 {/* ⑥ 따로 있었다면 */}
-                <div className="text-[0.9rem] font-normal text-[#1B2A45]/30 tracking-[0.12em] pl-0.5 pb-5">따로 있었다면</div>
+                <div className="text-[0.9rem] font-normal text-[#1B2A45]/30 tracking-[0.12em] pb-6">따로 있었다면</div>
 
                 {/* ⑦ 이번에도 부정하시겠습니까 ? */}
-                <div className="text-[1.8rem] text-[#C5A258] leading-snug whitespace-nowrap"
+                <div className="text-[2.2rem] text-[#C5A258] leading-snug"
                   style={{
                     fontFamily: 'var(--font-nanum-brush), cursive',
                     textDecoration: 'underline',
@@ -412,7 +412,7 @@ export default function HomePage() {
             </Reveal>
 
             <Reveal from="left" delay={200}>
-              <ul className="space-y-2">
+              <ul className="space-y-2 flex flex-col items-center">
                 {[
                   { p: '學', t: '자산경영학 전공' },
                   { p: '前', t: '법무법인 혜안 소속' },
@@ -431,7 +431,7 @@ export default function HomePage() {
             </Reveal>
 
             <Reveal from="left" delay={300}>
-              <div className="flex flex-wrap gap-3 pt-1">
+              <div className="flex flex-wrap justify-center gap-3 pt-1">
                 <a href="#문의하기"
                   className="inline-flex items-center gap-2 bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-7 py-3.5 rounded-xl text-sm transition-all shadow-lg shadow-[#C5A258]/25 hover:scale-[1.02]">
                   무료 상담 신청 →
