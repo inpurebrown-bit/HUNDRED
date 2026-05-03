@@ -357,18 +357,16 @@ export default function HomePage() {
       {/* ── 히어로 섹션 ── */}
       <section className="relative min-h-screen flex items-center pt-16 overflow-hidden bg-[#FAF8F3]">
         {/* 빌딩숲 배경 이미지 — 흐리게 */}
-        <div className="absolute inset-0 z-0">
-          <Image
-            src="https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1920&q=70"
-            alt=""
-            fill
-            className="object-cover object-center"
-            style={{ filter: 'blur(3px) grayscale(30%)', opacity: 0.13 }}
-            unoptimized
-          />
-        </div>
+        <div className="absolute inset-0 z-0" style={{
+          backgroundImage: 'url(https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1920&q=70)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          filter: 'blur(4px) grayscale(40%)',
+          opacity: 0.22,
+          transform: 'scale(1.05)',
+        }} />
         {/* ivory 오버레이 — 배경 색감 유지 */}
-        <div className="absolute inset-0 z-0 bg-[#FAF8F3]/80" />
+        <div className="absolute inset-0 z-0 bg-[#FAF8F3]/75" />
         {/* 금색 점 패턴 */}
         <div className="absolute inset-0 z-0 opacity-[0.05]"
           style={{ backgroundImage: 'radial-gradient(#C5A258 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
