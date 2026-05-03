@@ -500,30 +500,30 @@ export default function HomePage() {
               <h2 className="text-2xl md:text-3xl font-black text-[#1B2A45]">수상 및 표창 내역</h2>
             </div>
           </Reveal>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
             {awards.map((a, i) => (
-              <Reveal key={a.title} from="bottom" delay={i * 80}>
+              <Reveal key={a.title} from="bottom" delay={i * 80} className="h-full">
                 {/* 증서 프레임 스타일 */}
-                <div className="relative bg-[#FEFCF5] border border-[#D4B968]/50 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                <div className="relative bg-[#FEFCF5] border border-[#D4B968]/50 rounded-lg overflow-hidden hover:shadow-lg transition-shadow h-full flex flex-col"
                   style={{ boxShadow: '0 2px 8px rgba(197,162,88,0.12), inset 0 0 0 6px rgba(197,162,88,0.06)' }}>
                   {/* 상단 금색 띠 */}
-                  <div className="h-2 bg-gradient-to-r from-[#C5A258] via-[#E8D080] to-[#C5A258]" />
-                  <div className="px-4 py-5 text-center">
+                  <div className="h-2 bg-gradient-to-r from-[#C5A258] via-[#E8D080] to-[#C5A258] shrink-0" />
+                  <div className="px-4 py-5 text-center flex flex-col flex-1">
                     {/* 태극/봉황 장식 */}
-                    <div className="w-10 h-10 mx-auto mb-3 rounded-full border-2 border-[#C5A258]/40 flex items-center justify-center bg-[#C5A258]/5">
+                    <div className="w-10 h-10 mx-auto mb-3 rounded-full border-2 border-[#C5A258]/40 flex items-center justify-center bg-[#C5A258]/5 shrink-0">
                       <span className="text-lg font-black text-[#C5A258]">{a.seal}</span>
                     </div>
-                    <h3 className="text-sm font-black text-[#1B2A45] mb-2 tracking-wide"
+                    <h3 className="text-sm font-black text-[#1B2A45] mb-2 tracking-wide shrink-0"
                       style={{ fontFamily: 'var(--font-noto-serif-kr), Georgia, serif' }}>
                       {a.title}
                     </h3>
-                    <p className="text-[10px] text-[#1B2A45]/50 leading-relaxed whitespace-pre-line mb-3">{a.body}</p>
-                    <div className="border-t border-[#C5A258]/20 pt-2">
+                    <p className="text-[10px] text-[#1B2A45]/50 leading-relaxed whitespace-pre-line flex-1 mb-3">{a.body}</p>
+                    <div className="border-t border-[#C5A258]/20 pt-2 shrink-0">
                       <span className="text-[10px] text-[#C5A258] font-bold tracking-widest">{a.year}</span>
                     </div>
                   </div>
                   {/* 하단 금색 띠 */}
-                  <div className="h-1 bg-gradient-to-r from-[#C5A258] via-[#E8D080] to-[#C5A258]" />
+                  <div className="h-1 bg-gradient-to-r from-[#C5A258] via-[#E8D080] to-[#C5A258] shrink-0" />
                 </div>
               </Reveal>
             ))}
