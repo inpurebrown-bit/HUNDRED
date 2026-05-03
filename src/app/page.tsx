@@ -361,10 +361,10 @@ export default function HomePage() {
           backgroundImage: 'url(https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1920&q=80)',
           backgroundSize: 'cover',
           backgroundPosition: 'center top',
-          opacity: 0.18,
+          opacity: 0.28,
         }} />
         {/* ivory 오버레이 */}
-        <div className="absolute inset-0 z-0 bg-[#FAF8F3]/88" />
+        <div className="absolute inset-0 z-0 bg-[#FAF8F3]/82" />
         {/* 금색 점 패턴 */}
         <div className="absolute inset-0 z-0 opacity-[0.05]"
           style={{ backgroundImage: 'radial-gradient(#C5A258 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
