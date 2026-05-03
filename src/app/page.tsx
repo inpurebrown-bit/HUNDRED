@@ -1008,45 +1008,40 @@ export default function HomePage() {
       </section>
 
       {/* ── 푸터 ── */}
-      <footer className="bg-[#1B2A45] border-t border-[#C5A258]/10 py-5 px-4 md:px-8">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <footer className="bg-[#1B2A45] border-t border-[#C5A258]/10 py-4 px-4 md:px-8">
+        <div className="max-w-6xl mx-auto">
 
-          {/* 로고 + 문구 */}
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="relative h-8 w-24">
+          {/* 메인 행: 로고 | contact | 퀵메뉴 */}
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+
+            {/* 로고 */}
+            <div className="relative h-7 w-20 shrink-0">
               <Image src="/images/logo.png" alt="HUNDRED" fill className="object-contain object-left" unoptimized />
             </div>
-            <p className="text-[11px] text-white/30 leading-snug hidden md:block">기업 성공을 위한 모든 솔루션</p>
+
+            {/* Contact — 모바일에서도 한 줄 */}
+            <div className="flex items-center gap-3 text-[11px] text-white/35 flex-wrap">
+              <span>📞 1844-2599</span>
+              <span className="hidden sm:inline">✉️ 100-house@naver.com</span>
+              <span className="hidden lg:inline">📍 서울 구로구 디지털로 243 지하이시티 911호</span>
+              <span className="hidden md:inline">🕐 평일 09:00–18:00</span>
+            </div>
+
+            {/* 퀵메뉴 */}
+            <div className="flex items-center gap-3">
+              {['서비스', '성공사례', '대표소개', '문의하기'].map(label => (
+                <a key={label} href={`#${label}`}
+                  className="text-[11px] text-white/35 hover:text-[#C5A258] transition-colors whitespace-nowrap">
+                  {label}
+                </a>
+              ))}
+            </div>
           </div>
 
-          {/* 구분선 */}
-          <div className="hidden md:block w-px h-8 bg-white/10 shrink-0" />
-
-          {/* Contact */}
-          <div className="flex items-center gap-4 text-[11px] text-white/35">
-            <span>📞 1844-2599</span>
-            <span className="hidden sm:inline">✉️ 100-house@naver.com</span>
-            <span className="hidden lg:inline">📍 서울 구로구 디지털로 243 지하이시티 911호</span>
-            <span className="hidden sm:inline">🕐 평일 09:00–18:00</span>
-          </div>
-
-          {/* 구분선 */}
-          <div className="hidden md:block w-px h-8 bg-white/10 shrink-0" />
-
-          {/* 퀵메뉴 */}
-          <div className="flex items-center gap-4">
-            {['서비스', '성공사례', '대표소개', '문의하기'].map(label => (
-              <a key={label} href={`#${label}`}
-                className="text-[11px] text-white/35 hover:text-[#C5A258] transition-colors whitespace-nowrap">
-                {label}
-              </a>
-            ))}
-          </div>
-        </div>
-
-        {/* 카피라이트 */}
-        <div className="max-w-6xl mx-auto mt-3 pt-3 border-t border-white/5">
-          <p className="text-[10px] text-white/15 text-center">© 2025 HUNDRED Consultancy. All rights reserved.</p>
+          {/* 카피라이트 */}
+          <p className="text-[10px] text-white/15 text-center mt-3 pt-3 border-t border-white/5">
+            © 2025 HUNDRED Consultancy. All rights reserved.
+          </p>
         </div>
       </footer>
     </div>
