@@ -420,16 +420,16 @@ export default function HomePage() {
           </div>
 
           {/* 왼쪽 CEO 사진 */}
-          <Reveal from="left" className="order-1 md:order-1 flex flex-col items-center md:items-start gap-3 relative">
-            {/* 대표 이름 배지 */}
-            <div className="text-center md:text-left z-10">
-              <p className="text-xs tracking-[0.25em] text-[#C5A258] font-bold mb-1">헌드레드 지원센터 대표</p>
-              <p className="text-[2.6rem] text-[#1B2A45] leading-none"
-                style={{ fontFamily: 'var(--font-nanum-brush), cursive' }}>백승협</p>
-            </div>
+          <Reveal from="left" className="order-1 md:order-1 flex flex-col items-center md:items-start gap-3 relative pt-16">
 
             {/* CEO 사진 — 배경제거본이라 자연스럽게 블렌딩 */}
             <div className="relative w-full max-w-[280px] md:max-w-[340px]" style={{ aspectRatio: '3/4' }}>
+              {/* 대표 이름 — 사진 바로 위에 절대 위치 */}
+              <div className="absolute -top-[3.8rem] left-0 z-10 text-center md:text-left">
+                <p className="text-xs tracking-[0.25em] text-[#C5A258] font-bold mb-0.5">헌드레드 지원센터 대표</p>
+                <p className="text-[2.6rem] text-[#1B2A45] leading-none"
+                  style={{ fontFamily: 'var(--font-nanum-brush), cursive' }}>백승협</p>
+              </div>
               <Image
                 src="/images/ceo-main.png"
                 alt="백승협 대표"
