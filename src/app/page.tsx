@@ -120,6 +120,7 @@ const services = [
   { icon: '📊', title: '메인비즈 인증', desc: '경영혁신형 중소기업 인증으로 정부 지원 우대' },
   { icon: '💰', title: '무상지원금', desc: '상환 없이 받는 정부 무상 지원금 발굴 및 신청 대행' },
   { icon: '🚀', title: '벤처기업 인증', desc: '벤처 인증으로 세제 혜택 및 투자 유치 유리한 위치 확보' },
+  { icon: '🧪', title: '연구개발전담부서 및 연구소 설립', desc: '기업 부설 연구소·R&D 전담부서 설립으로 세제 혜택 및 정책자금 우대 확보' },
   { icon: '🏛', title: '법인설립', desc: '사업 확장과 절세를 위한 최적의 법인 구조 설계' },
   { icon: '📝', title: '특허·가출원', desc: '핵심 기술 보호와 경쟁력 확보를 위한 지식재산권 전략' },
   { icon: '📣', title: '광고·마케팅', desc: '온·오프라인 전반의 마케팅 전략 수립 및 실행' },
@@ -363,8 +364,8 @@ export default function HomePage() {
 
         <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-8 w-full grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-0 items-center min-h-[calc(100vh-64px)]">
 
-          {/* 오른쪽 텍스트 */}
-          <div className="space-y-7 order-2 md:order-2 py-12">
+          {/* 왼쪽 텍스트 */}
+          <div className="space-y-7 order-1 md:order-1 py-12">
             <Reveal from="left">
               <div className="inline-flex items-center gap-2 border border-[#C5A258]/40 bg-[#C5A258]/8 rounded-full px-4 py-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#C5A258] animate-pulse" />
@@ -373,18 +374,28 @@ export default function HomePage() {
             </Reveal>
 
             <Reveal from="left" delay={100}>
-              <h1 className="text-3xl sm:text-4xl md:text-[2.8rem] font-black leading-[1.25] tracking-tight"
+              <h1 className="leading-none tracking-tight"
                 style={{ fontFamily: 'var(--font-noto-serif-kr), Georgia, serif' }}>
-                <span className="text-[#1B2A45]">부자들만 다니는</span><br />
-                <span className="text-[#1B2A45]">추월차선이 따로</span><br />
-                <span className="text-[#1B2A45]">존재한다고 하면</span><br />
-                <span className="text-[#C5A258]" style={{ textDecoration: 'underline', textDecorationColor: 'rgba(197,162,88,0.35)', textUnderlineOffset: '8px' }}>믿으시겠습니까 ?</span>
+                {/* 1단: 크게 — 핵심 단어 */}
+                <span className="block text-[3.8rem] sm:text-[5rem] md:text-[5.5rem] font-black text-[#1B2A45] leading-[0.95]">부자들만</span>
+                <span className="block text-[1.1rem] sm:text-[1.3rem] font-medium text-[#1B2A45]/40 tracking-[0.15em] mb-1">오가던</span>
+                <span className="block text-[3.2rem] sm:text-[4.2rem] md:text-[4.6rem] font-black text-[#1B2A45] leading-[0.95]">추월차선이</span>
+                <span className="block text-[1.1rem] sm:text-[1.3rem] font-medium text-[#1B2A45]/40 tracking-[0.1em] mb-5">따로 있었다면</span>
+
+                {/* 2단: 반전 질문 */}
+                <span className="block text-[1rem] sm:text-[1.15rem] font-semibold text-[#1B2A45]/55 mb-0.5">나만 안되던 이유가</span>
+                <span className="block text-[1rem] sm:text-[1.15rem] font-semibold text-[#1B2A45]/55 mb-3">따로 있었다면</span>
+                <span className="block text-[2rem] sm:text-[2.6rem] md:text-[2.8rem] font-black text-[#C5A258] leading-tight"
+                  style={{ textDecoration: 'underline', textDecorationColor: 'rgba(197,162,88,0.3)', textUnderlineOffset: '8px' }}>
+                  이번에도 부정하시겠습니까 ?
+                </span>
               </h1>
             </Reveal>
 
             <Reveal from="left" delay={200}>
               <ul className="space-y-2">
                 {[
+                  { p: '學', t: '자산경영학 전공' },
                   { p: '前', t: '법무법인 혜안 소속' },
                   { p: '前', t: 'PUREBROWN 대표이사' },
                   { p: '前', t: '㈜나라감정평가법인 소속' },
@@ -393,7 +404,7 @@ export default function HomePage() {
                   { p: '現', t: 'HUNDRED consulting 대표' },
                 ].map((item) => (
                   <li key={item.t} className="flex items-center gap-2.5 text-sm text-[#1B2A45]/55">
-                    <span className={`text-[11px] font-bold w-5 shrink-0 ${item.p === '現' ? 'text-[#C5A258]' : 'text-[#1B2A45]/35'}`}>{item.p}</span>
+                    <span className={`text-[11px] font-bold w-5 shrink-0 ${item.p === '現' ? 'text-[#C5A258]' : item.p === '學' ? 'text-[#7B5EA7]' : 'text-[#1B2A45]/35'}`}>{item.p}</span>
                     {item.t}
                   </li>
                 ))}
@@ -414,13 +425,13 @@ export default function HomePage() {
             </Reveal>
           </div>
 
-          {/* 왼쪽 CEO 사진 */}
-          <Reveal from="left" className="order-1 md:order-1 flex flex-col items-center md:items-start gap-3 relative pt-28">
+          {/* 오른쪽 CEO 사진 */}
+          <Reveal from="right" className="order-2 md:order-2 flex flex-col items-center md:items-end gap-3 relative pt-28">
 
             {/* CEO 사진 — 배경제거본이라 자연스럽게 블렌딩 */}
             <div className="relative w-full max-w-[280px] md:max-w-[340px]" style={{ aspectRatio: '3/4' }}>
               {/* 대표 이름 — 사진 바로 위에 절대 위치 */}
-              <div className="absolute -top-[5.5rem] left-0 z-10 text-center md:text-left">
+              <div className="absolute -top-[5.5rem] left-0 z-10 text-center md:text-left w-full">
                 <p className="text-xs tracking-[0.25em] text-[#C5A258] font-bold mb-0.5">헌드레드 지원센터 대표</p>
                 <p className="text-[2.6rem] text-[#1B2A45] leading-none"
                   style={{ fontFamily: 'var(--font-nanum-brush), cursive' }}>백승협</p>
