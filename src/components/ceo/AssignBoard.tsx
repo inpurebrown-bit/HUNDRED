@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, FormEvent, ReactNode } from 'react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -216,7 +216,7 @@ function SupplyDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!form.company_name.trim()) return
     setSubmitting(true)
@@ -894,7 +894,7 @@ const inputCls =
 
 // ── Field wrapper ────────────────────────────────────────────────────────────
 
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+function Field({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) {
   return (
     <div>
       <label className="block text-xs font-medium text-[#1B2A45]/60 mb-1">

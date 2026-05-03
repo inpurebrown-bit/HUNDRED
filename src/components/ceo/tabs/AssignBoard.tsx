@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, FormEvent } from 'react'
 
 // ─── Types ────────────────────────────────────────────────
 interface SalesUser {
@@ -84,7 +84,7 @@ function SupplyDbSection({ salesUsers }: { salesUsers: SalesUser[] }) {
 
   useEffect(() => { loadRecords() }, [])
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setSubmitting(true)
     try {

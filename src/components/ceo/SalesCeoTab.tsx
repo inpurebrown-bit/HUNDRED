@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, FormEvent } from 'react'
 
 // ─── Types ────────────────────────────────────────────────
 interface Notice {
@@ -99,7 +99,7 @@ function NoticesSection() {
 
   useEffect(() => { load() }, [])
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!form.title.trim() || !form.content.trim()) return
     setSubmitting(true)

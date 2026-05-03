@@ -16,16 +16,14 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const year_month = searchParams.get('year_month')
 
-  let query = supabaseAdmin
+  const baseQuery = supabaseAdmin
     .from('sales_goals')
     .select('*')
     .order('user_name', { ascending: true })
 
-  if (year_month) {
-    query = query.eq('year_month', year_month)
-  }
-
-  const { data, error } = await query
+  const { data, error } = await (year_month
+    ? baseQuery.eq('year_month', year_month)
+    : baseQuery)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ sales_goals: data })

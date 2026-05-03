@@ -16,16 +16,14 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status')
 
-  let query = supabaseAdmin
+  const baseQuery = supabaseAdmin
     .from('as_requests')
     .select('*')
     .order('created_at', { ascending: false })
 
-  if (status) {
-    query = query.eq('status', status)
-  }
-
-  const { data, error } = await query
+  const { data, error } = await (status
+    ? baseQuery.eq('status', status)
+    : baseQuery)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ as_requests: data })

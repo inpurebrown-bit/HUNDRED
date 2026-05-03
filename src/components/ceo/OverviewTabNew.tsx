@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, RefObject } from 'react'
 import {
   BarChart,
   Bar,
@@ -527,7 +527,7 @@ export default function OverviewTabNew() {
 
   // ── Scroll helpers ───────────────────────────────────────
 
-  function scrollTo(ref: React.RefObject<HTMLDivElement | null>) {
+  function scrollTo(ref: RefObject<HTMLDivElement | null>) {
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 

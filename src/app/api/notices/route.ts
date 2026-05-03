@@ -8,17 +8,15 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const team = searchParams.get('team')
 
-  let query = supabaseAdmin
+  const baseQuery = supabaseAdmin
     .from('notices')
     .select('*')
     .eq('is_active', true)
     .order('created_at', { ascending: false })
 
-  if (team && team !== 'all') {
-    query = query.in('target_team', [team, 'all'])
-  }
-
-  const { data, error } = await query
+  const { data, error } = await (team && team !== 'all'
+    ? baseQuery.in('target_team', [team, 'all'])
+    : baseQuery)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ notices: data })
