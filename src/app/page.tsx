@@ -462,12 +462,15 @@ export default function HomePage() {
               />
             </div>
 
-            {/* 인용구 박스 — 한 단락으로 자연스럽게 */}
+            {/* 인용구 박스 */}
             <div className="bg-white border-l-4 border-[#C5A258] rounded-r-2xl rounded-bl-2xl px-5 py-4 w-full shadow-md">
-              <p className="text-[13px] text-[#1B2A45]/75 leading-[1.85] font-medium">
-                지금 이 순간에도 당신 옆 경쟁사는 정부 자금을 받고 있습니다.<br />
-                몰라서 못 받는 것과, 알면서 포기하는 건 다릅니다.<br />
-                <span className="text-[#C5A258] font-bold">헌드레드는 당신이 놓친 기회를 찾아드립니다.</span>
+              <p className="text-[13px] text-[#1B2A45]/75 leading-[2.0] font-medium">
+                뭐든 필요할 때 찾으면 늦습니다.<br />
+                잘될 때 그 기반으로 만들어 놔야,<br />
+                힘들 때 움직일 수 있는 원동력이 됩니다.<br />
+                <br />
+                <span className="text-[#1B2A45]/75">옆 가게가 어려운 상황에도 사업에 투자할 수 있는 건,</span><br />
+                <span className="text-[#C5A258] font-bold">시장이 어려운 지금을 기회로 바꿀 준비를 미리 해뒀기 때문입니다.</span>
               </p>
             </div>
           </Reveal>
