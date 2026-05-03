@@ -335,8 +335,8 @@ export default function HomePage() {
             <a href="#문의하기" className="hidden md:inline-flex text-xs bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-4 py-2 rounded-lg transition-colors">
               무료 상담
             </a>
-            <Link href="/login" className="hidden md:inline-flex text-xs border border-[#1B2A45]/20 hover:border-[#C5A258] text-[#1B2A45]/50 hover:text-[#C5A258] px-4 py-2 rounded-lg transition-colors font-medium">
-              관리자 로그인
+            <Link href="/login" className="text-xs font-semibold text-[#1B2A45]/40 hover:text-[#C5A258] transition-colors px-2 py-2 tracking-widest">
+              Login
             </Link>
             <button onClick={() => setMenuOpen(!menuOpen)} className="md:hidden p-2 text-[#1B2A45]/70 flex flex-col gap-1.5 justify-center">
               <span className={`block w-5 h-0.5 bg-current transition-all origin-center ${menuOpen ? 'rotate-45 translate-y-2' : ''}`} />
@@ -354,11 +354,7 @@ export default function HomePage() {
                 {label}
               </a>
             ))}
-            <a href="tel:18442599" className="block text-sm text-[#C5A258] font-bold py-1.5 border-b border-[#E8E2D4]">📞 1844-2599</a>
-            <Link href="/login" onClick={() => setMenuOpen(false)}
-              className="block text-sm text-[#1B2A45]/50 hover:text-[#C5A258] py-1.5 transition-colors">
-              🔐 관리자 로그인
-            </Link>
+            <a href="tel:18442599" className="block text-sm text-[#C5A258] font-bold py-1.5">📞 1844-2599</a>
           </div>
         )}
       </nav>
