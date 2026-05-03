@@ -10,6 +10,10 @@ import CalendarTab from './CalendarTab'
 import PayRateTab from './PayRateTab'
 import PayrollTab from './PayrollTab'
 import PayslipTab from './PayslipTab'
+import AssignBoard from './AssignBoard'
+import OverviewTabNew from './OverviewTabNew'
+import SalesCeoTab from './SalesCeoTab'
+import OpsCeoTab from './OpsCeoTab'
 
 interface Message {
   role: 'user' | 'model'
@@ -103,10 +107,10 @@ export default function CeoDashboard() {
 
       <div className="px-4 md:px-6 pt-6">
 
-        {activeTab === 'overview' && <OverviewTab />}
-        {activeTab === 'assign' && <AssignTab />}
-        {activeTab === 'sales' && <SalesTab />}
-        {activeTab === 'ops' && <OpsTab />}
+        {activeTab === 'overview' && <OverviewTabNew />}
+        {activeTab === 'assign' && <AssignBoard />}
+        {activeTab === 'sales' && <SalesCeoTab />}
+        {activeTab === 'ops' && <OpsCeoTab />}
         {activeTab === 'revenue' && <RevenueTab />}
         {activeTab === 'payrate' && <PayRateTab />}
         {activeTab === 'payroll' && <PayrollTab />}
