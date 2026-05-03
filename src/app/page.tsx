@@ -407,7 +407,7 @@ export default function HomePage() {
                   { p: '前', t: 'PUREBROWN 대표이사' },
                   { p: '前', t: '㈜나라감정평가법인 소속' },
                   { p: '前', t: 'GIGGLY 대표이사' },
-                  { p: '現', t: '세계탈장연맹본부(WDF) 전문의원' },
+                  { p: '現', t: '세계탐정연맹본부(WDF) 전문위원' },
                   { p: '現', t: 'HUNDRED consulting 대표' },
                 ].map((item) => (
                   <li key={item.t} className="flex items-center gap-2.5 text-sm text-[#1B2A45]/55">
@@ -703,7 +703,7 @@ export default function HomePage() {
                 { p: '前', t: 'PUREBROWN 대표이사' },
                 { p: '前', t: '㈜나라감정평가법인 소속' },
                 { p: '前', t: 'GIGGLY 대표이사' },
-                { p: '現', t: '세계탈장연맹본부(WDF) 전문의원' },
+                { p: '現', t: '세계탐정연맹본부(WDF) 전문위원' },
                 { p: '現', t: 'HUNDRED consulting 대표' },
               ].map(item => (
                 <div key={item.t} className="flex items-center gap-3">
