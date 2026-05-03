@@ -378,14 +378,14 @@ export default function OverviewTabNew() {
         ])
 
         setRevenueData(revData as RevenueData)
-        setAssignContracts(assignData.contracts ?? [])
-        setReports(reportsData.reports ?? [])
-        setEvents(eventsData.events ?? [])
-        setAllContracts(contractsData.contracts ?? [])
-        setOpsCases(opsData.cases ?? [])
-        setSalesGoals(goalsData.goals ?? [])
-        setLastMonthGoals(lastGoalsData.goals ?? [])
-        setAsRequests(asData.requests ?? [])
+        setAssignContracts((assignData as Record<string, unknown[]>).contracts ?? [])
+        setReports((reportsData as Record<string, unknown[]>).reports ?? [])
+        setEvents((eventsData as Record<string, unknown[]>).events ?? [])
+        setAllContracts((contractsData as Record<string, unknown[]>).contracts ?? [])
+        setOpsCases((opsData as Record<string, unknown[]>).cases ?? [])
+        setSalesGoals((goalsData as Record<string, unknown[]>).goals ?? [])
+        setLastMonthGoals((lastGoalsData as Record<string, unknown[]>).goals ?? [])
+        setAsRequests((asData as Record<string, unknown[]>).requests ?? [])
       } catch {
         // silently ignore
       } finally {
