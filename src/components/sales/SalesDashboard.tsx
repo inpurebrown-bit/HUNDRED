@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { signOut } from 'next-auth/react'
 import ReportTab from './ReportTab'
+import CustomerCard, { Customer, CustomerDetails, CardTabType } from './CustomerCard'
 import {
   getBusinessDaysInMonth,
   getElapsedBusinessDays,
@@ -12,18 +13,7 @@ import {
 } from '@/lib/businessDays'
 import { SUPPLY_RATE_TABLE, calcRecommendedSupply, isActiveRow } from '@/lib/supplyRules'
 
-// ── 타입 ───────────────────────────────────────────────────
-interface Customer {
-  id: string
-  name: string
-  phone: string
-  company: string
-  loan_history: string
-  notes: string
-  status: 'lead' | 'consulting' | 'contracted' | 'emotional' | 'trash' | 'db010'
-  sales_user_name: string
-  updated_at: string
-}
+// ── Types ──────────────────────────────────────────────────────────────
 interface Contract {
   id: string
   customer_id: string
@@ -47,32 +37,36 @@ interface Props {
   username: string
 }
 
-// ── 상수 ───────────────────────────────────────────────────
+// ── Constants ──────────────────────────────────────────────────────────
 const MONTHLY_GOALS: Record<string, number> = {
   'hd-sales1': 40,
   'hd-sales2': 20,
 }
 
-type SalesTab = 'board' | 'db010' | 'customers' | 'contracted' | 'emotional' | 'trash' | 'report'
+// All sales users for assignee dropdown
+const SALES_USERS = ['hd-sales1', 'hd-sales2', 'hd-sales3']
 
+type SalesTab = 'board' | 'db010' | 'customers' | 'contracted' | 'emotional' | 'trash' | 'revenue' | 'report'
 
+// ── Component ──────────────────────────────────────────────────────────
 export default function SalesDashboard({ userId, userName, username }: Props) {
   const [activeTab, setActiveTab] = useState<SalesTab>('board')
   const [customers, setCustomers] = useState<Customer[]>([])
   const [contracts, setContracts] = useState<Contract[]>([])
   const [notices, setNotices] = useState<Notice[]>([])
   const [loading, setLoading] = useState(true)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [saveStatus, setSaveStatus] = useState<Record<string, 'saved' | 'saving' | 'unsaved'>>({})
-  const [contractModal, setContractModal] = useState<Customer | null>(null)
-  const [contractAmount, setContractAmount] = useState('')
-  const [contractMemo, setContractMemo] = useState('')
-  const [submitting, setSubmitting] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [showNewForm, setShowNewForm] = useState(false)
-  const [show010Form, setShow010Form] = useState(false)
-  const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const [submitting, setSubmitting] = useState(false)
 
+  // New customer form state
+  const [showNewForm, setShowNewForm] = useState(false)
+  const [newForm, setNewForm] = useState({ name: '', phone: '', company: '', loan_history: '', notes: '' })
+
+  // 010DB form state
+  const [show010Form, setShow010Form] = useState(false)
+  const [form010, setForm010] = useState({ name: '', phone: '', company: '', loan_history: '', notes: '' })
+
+  // ── Data loading ──────────────────────────────────────────────────
   async function loadAll() {
     setLoading(true)
     const [cRes, conRes, nRes] = await Promise.all([
@@ -89,43 +83,65 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
 
   useEffect(() => { loadAll() }, [])
 
-  // ── 고객 CRUD ──────────────────────────────────────────
-  const autoSave = useCallback((id: string, patch: Partial<Customer>) => {
-    setSaveStatus(p => ({ ...p, [id]: 'unsaved' }))
-    if (autoSaveTimers.current[id]) clearTimeout(autoSaveTimers.current[id])
-    autoSaveTimers.current[id] = setTimeout(async () => {
-      setSaveStatus(p => ({ ...p, [id]: 'saving' }))
-      await fetch(`/api/customers/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
-      })
-      setSaveStatus(p => ({ ...p, [id]: 'saved' }))
-    }, 1200)
+  // ── Customer CRUD ─────────────────────────────────────────────────
+  const patchCustomer = useCallback(async (id: string, patch: Record<string, any>) => {
+    setCustomers(prev => prev.map(c => {
+      if (c.id !== id) return c
+      const mergedDetails = patch.details
+        ? { ...(c.details || {}), ...patch.details }
+        : c.details
+      return { ...c, ...patch, details: mergedDetails }
+    }))
+    await fetch(`/api/customers/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
   }, [])
 
-  function updateField(id: string, field: keyof Customer, value: string) {
-    setCustomers(p => p.map(c => c.id === id ? { ...c, [field]: value } : c))
-    autoSave(id, { [field]: value })
-  }
-
-  async function moveCustomer(id: string, newStatus: Customer['status']) {
-    setCustomers(p => p.map(c => c.id === id ? { ...c, status: newStatus } : c))
+  const moveCustomer = useCallback(async (id: string, newStatus: Customer['status']) => {
+    setCustomers(prev => prev.map(c => c.id === id ? { ...c, status: newStatus } : c))
     await fetch(`/api/customers/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus }),
     })
-  }
+  }, [])
 
-  async function deleteCustomer(id: string) {
+  const deleteCustomer = useCallback(async (id: string) => {
     if (!confirm('삭제하시겠습니까?')) return
     await fetch(`/api/customers/${id}`, { method: 'DELETE' })
-    setCustomers(p => p.filter(c => c.id !== id))
-  }
+    setCustomers(prev => prev.filter(c => c.id !== id))
+  }, [])
 
-  // ── 신규 고객 등록 ──────────────────────────────────────
-  const [newForm, setNewForm] = useState({ name: '', phone: '', company: '', loan_history: '', notes: '' })
+  const transferToOps = useCallback(async (customer: Customer) => {
+    const details = customer.details || {}
+    const progressMemo = [
+      customer.company && `업체: ${customer.company}`,
+      details.contract_fee && `계약금: ${details.contract_fee}`,
+      details.payment_amount && `입금액: ${details.payment_amount}`,
+      details.unpaid_amount && `미입금: ${details.unpaid_amount}`,
+      details.commission_rate && `수수료율: ${details.commission_rate}`,
+      details.tax_invoice && `세금계산서: ${details.tax_invoice}`,
+    ].filter(Boolean).join(' / ')
+
+    await patchCustomer(customer.id, {
+      details: { ...details, ops_transferred: true },
+    })
+    await fetch('/api/ops-cases', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer_id: customer.id,
+        progress_stage: 'assigned',
+        progress_memo: progressMemo,
+        revenue: 0,
+      }),
+    })
+    await loadAll()
+  }, [patchCustomer])
+
+  // ── New customer form ─────────────────────────────────────────────
   async function submitNew(e: FormEvent) {
     e.preventDefault()
     setSubmitting(true)
@@ -134,12 +150,15 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...newForm, status: 'lead' }),
     })
-    if (res.ok) { setNewForm({ name: '', phone: '', company: '', loan_history: '', notes: '' }); setShowNewForm(false); loadAll() }
+    if (res.ok) {
+      setNewForm({ name: '', phone: '', company: '', loan_history: '', notes: '' })
+      setShowNewForm(false)
+      loadAll()
+    }
     setSubmitting(false)
   }
 
-  // ── 010DB 등록 ─────────────────────────────────────────
-  const [form010, setForm010] = useState({ name: '', phone: '', company: '', loan_history: '', notes: '' })
+  // ── 010DB form ────────────────────────────────────────────────────
   async function submit010(e: FormEvent) {
     e.preventDefault()
     setSubmitting(true)
@@ -148,45 +167,26 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...form010, status: 'db010' }),
     })
-    if (res.ok) { setForm010({ name: '', phone: '', company: '', loan_history: '', notes: '' }); setShow010Form(false); loadAll() }
-    setSubmitting(false)
-  }
-
-  // ── 계약 처리 ──────────────────────────────────────────
-  async function submitContract() {
-    if (!contractModal) return
-    setSubmitting(true)
-    const res = await fetch('/api/contracts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        customer_id: contractModal.id,
-        contract_amount: Number(contractAmount.replace(/,/g, '')),
-        memo: contractMemo,
-      }),
-    })
     if (res.ok) {
-      await moveCustomer(contractModal.id, 'contracted')
-      setContractModal(null); setContractAmount(''); setContractMemo('')
+      setForm010({ name: '', phone: '', company: '', loan_history: '', notes: '' })
+      setShow010Form(false)
       loadAll()
     }
     setSubmitting(false)
   }
 
-  // ── 파생값 ────────────────────────────────────────────
+  // ── Derived values ────────────────────────────────────────────────
   const now = new Date()
   const thisMonth = now.toISOString().slice(0, 7)
-  const totalRevenue = contracts.reduce((s, c) => s + (c.contract_amount || 0), 0)
   const monthContracts = contracts.filter(c => c.created_at?.slice(0, 7) === thisMonth)
-  const monthRevenue = monthContracts.reduce((s, c) => s + (c.contract_amount || 0), 0)
   const monthContractCount = monthContracts.length
 
   const monthlyGoal = MONTHLY_GOALS[username] ?? 30
   const yr = now.getFullYear()
   const mo = now.getMonth()
   const dayOfMonth = now.getDate()
-  const bizTotal    = getBusinessDaysInMonth(yr, mo)
-  const bizElapsed  = getElapsedBusinessDays(yr, mo, dayOfMonth)
+  const bizTotal = getBusinessDaysInMonth(yr, mo)
+  const bizElapsed = getElapsedBusinessDays(yr, mo, dayOfMonth)
   const bizRemaining = getRemainingBusinessDays(yr, mo, dayOfMonth)
   const achievementRate = Math.min(100, Math.round(monthContractCount / monthlyGoal * 100))
   const remaining = Math.max(0, monthlyGoal - monthContractCount)
@@ -194,108 +194,43 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const onPaceCount = bizTotal > 0 ? Math.round((monthlyGoal / bizTotal) * bizElapsed) : 0
   const isAhead = monthContractCount >= onPaceCount
 
-  // 공급 관련 notice
   const supplyNotice = notices.find(n => n.notice_type === 'supply_count')
   const todaySupply = supplyNotice ? parseInt(supplyNotice.content) || 0 : 0
   const contractRate = todaySupply > 0 ? Math.round(monthContractCount / todaySupply * 100) : 0
   const tomorrowSupplyNeeded = calcRecommendedSupply(contractRate, bizElapsed)
 
-  // 고객 필터링
+  // ── Filtered lists ────────────────────────────────────────────────
   const db010List = customers.filter(c => c.status === 'db010')
   const activeCustomers = customers.filter(c => ['lead', 'consulting'].includes(c.status))
   const contractedCustomers = customers.filter(c => c.status === 'contracted')
   const emotionalCustomers = customers.filter(c => c.status === 'emotional')
   const trashCustomers = customers.filter(c => c.status === 'trash')
+  const revenueCustomers = customers.filter(c => c.status === 'contracted' && c.details?.ops_transferred === true)
 
-  // 공지사항 (공급 제외)
   const generalNotices = notices.filter(n => n.notice_type !== 'supply_count')
 
+  // Revenue tab totals
+  const totalRevenue = revenueCustomers
+    .filter(c => !c.details?.is_cancelled)
+    .reduce((sum, c) => sum + parseFloat(c.details?.contract_fee?.replace(/[^0-9.]/g, '') || '0'), 0)
+  const cancelledCount = revenueCustomers.filter(c => c.details?.is_cancelled).length
+
+  // ── Tabs ──────────────────────────────────────────────────────────
   const tabs: { key: SalesTab; label: string; count?: number }[] = [
     { key: 'board',      label: '🏠 메인보드' },
-    { key: 'db010',      label: `📞 010DB`, count: db010List.length },
-    { key: 'customers',  label: `👤 신규 고객`, count: activeCustomers.length },
-    { key: 'contracted', label: `✅ 계약 업체`, count: contractedCustomers.length },
-    { key: 'emotional',  label: `💬 감성톡`, count: emotionalCustomers.length },
-    { key: 'trash',      label: `🗑 자체거절`, count: trashCustomers.length },
+    { key: 'db010',      label: '📞 010DB',      count: db010List.length },
+    { key: 'customers',  label: '👤 신규 고객',   count: activeCustomers.length },
+    { key: 'contracted', label: '✅ 계약 업체',   count: contractedCustomers.length },
+    { key: 'emotional',  label: '💬 감성톡',      count: emotionalCustomers.length },
+    { key: 'trash',      label: '🗑 자체거절',    count: trashCustomers.length },
+    { key: 'revenue',    label: '💰 매출',        count: revenueCustomers.length },
     { key: 'report',     label: '📝 보고' },
   ]
 
-  // ── 공통 고객 카드 ──────────────────────────────────────
-  function CustomerCard({ c, actions }: { c: Customer; actions: React.ReactNode }) {
-    const expanded = expandedId === c.id
-    const ss = saveStatus[c.id]
-    return (
-      <div className="bg-white rounded-xl border border-[#E8E2D4] overflow-hidden">
-        <button
-          className="w-full px-5 py-4 flex items-center justify-between hover:bg-[#FAF8F3] transition-colors"
-          onClick={() => setExpandedId(expanded ? null : c.id)}
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="text-left min-w-0">
-              <p className="font-semibold text-[#1B2A45] text-sm truncate">{c.name}</p>
-              <p className="text-xs text-[#1B2A45]/40 mt-0.5 truncate">{c.company || c.phone}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {ss === 'saving' && <span className="text-[10px] text-amber-500">저장 중...</span>}
-            {ss === 'saved' && <span className="text-[10px] text-emerald-500">✓ 저장됨</span>}
-            <span className="text-gray-300 text-xs">{expanded ? '▲' : '▼'}</span>
-          </div>
-        </button>
-        {expanded && (
-          <div className="px-5 pb-5 space-y-3 border-t border-[#E8E2D4]/50 pt-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-gray-400 mb-0.5 block">업체명</label>
-                <input value={c.company} onChange={e => updateField(c.id, 'company', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A258]/50" />
-              </div>
-              <div>
-                <label className="text-xs text-gray-400 mb-0.5 block">대표자명</label>
-                <input value={c.name} onChange={e => updateField(c.id, 'name', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A258]/50" />
-              </div>
-              <div>
-                <label className="text-xs text-gray-400 mb-0.5 block">연락처</label>
-                <input value={c.phone} onChange={e => updateField(c.id, 'phone', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A258]/50" />
-              </div>
-              <div>
-                <label className="text-xs text-gray-400 mb-0.5 block">기대출 내역</label>
-                <input value={c.loan_history} onChange={e => updateField(c.id, 'loan_history', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A258]/50" />
-              </div>
-            </div>
-            <div>
-              <label className="text-xs text-gray-400 mb-0.5 block">
-                {c.status === 'db010' ? '📋 인콜일지 (날짜별 통화 내용)' : '상담 메모'}
-              </label>
-              <textarea value={c.notes} onChange={e => updateField(c.id, 'notes', e.target.value)}
-                rows={4}
-                placeholder={c.status === 'db010'
-                  ? '예)\n05-04 10:30 - 대표 통화, 관심 있음, 5월 중 미팅 요청\n05-05 09:00 - 부재중, 문자 발송'
-                  : '상담 내용을 입력하세요...'}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A258]/50 resize-none" />
-            </div>
-            {/* 액션 버튼 */}
-            <div className="flex items-center justify-between pt-1">
-              <button onClick={() => deleteCustomer(c.id)}
-                className="text-xs text-red-400 hover:text-red-600 transition-colors">삭제</button>
-              <div className="flex gap-2 flex-wrap justify-end">
-                {actions}
-              </div>
-            </div>
-            <p className="text-xs text-gray-300 text-right">수정: {new Date(c.updated_at).toLocaleString('ko-KR')}</p>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // ──────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#FAF8F3]">
-      {/* 헤더 */}
+      {/* Header */}
       <header className="bg-[#1B2A45] px-4 md:px-6 py-3 flex items-center justify-between sticky top-0 z-30">
         <Link href="/" className="relative h-8 w-24 shrink-0 block">
           <Image src="/images/logo.png" alt="HUNDRED" fill className="object-contain object-left brightness-0 invert" unoptimized />
@@ -320,7 +255,9 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   <button key={tab.key}
                     onClick={() => { setActiveTab(tab.key); setMenuOpen(false) }}
                     className={`w-full text-left px-4 py-3 text-sm transition-colors flex items-center justify-between ${
-                      activeTab === tab.key ? 'text-[#C5A258] font-semibold bg-[#C5A258]/8' : 'text-[#1B2A45]/65 hover:bg-[#FAF8F3]'
+                      activeTab === tab.key
+                        ? 'text-[#C5A258] font-semibold bg-[#C5A258]/8'
+                        : 'text-[#1B2A45]/65 hover:bg-[#FAF8F3]'
                     }`}>
                     <span className="flex items-center gap-2">
                       <span className={`w-1.5 h-1.5 rounded-full ${activeTab === tab.key ? 'bg-[#C5A258]' : 'bg-transparent'}`} />
@@ -348,9 +285,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 <div>
                   <p className="text-xs font-semibold text-gray-500 mb-0.5">{thisMonth} 월간 목표</p>
                   <div className="flex items-baseline gap-2">
-                    <span className={`text-4xl font-black ${isAhead ? 'text-emerald-600' : achievementRate >= 70 ? 'text-amber-600' : 'text-red-600'}`}>{monthContractCount}</span>
+                    <span className={`text-4xl font-black ${isAhead ? 'text-emerald-600' : achievementRate >= 70 ? 'text-amber-600' : 'text-red-600'}`}>
+                      {monthContractCount}
+                    </span>
                     <span className="text-lg text-gray-400 font-medium">/ {monthlyGoal}건</span>
-                    <span className={`text-sm font-bold px-2 py-0.5 rounded-full ${isAhead ? 'bg-emerald-100 text-emerald-700' : achievementRate >= 70 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'}`}>{achievementRate}%</span>
+                    <span className={`text-sm font-bold px-2 py-0.5 rounded-full ${isAhead ? 'bg-emerald-100 text-emerald-700' : achievementRate >= 70 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'}`}>
+                      {achievementRate}%
+                    </span>
                   </div>
                 </div>
                 <div className="text-right">
@@ -361,8 +302,10 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 </div>
               </div>
               <div className="bg-white/60 rounded-full h-3 overflow-hidden mb-3">
-                <div className={`h-full rounded-full transition-all duration-700 ${isAhead ? 'bg-emerald-500' : achievementRate >= 70 ? 'bg-amber-500' : 'bg-red-400'}`}
-                  style={{ width: `${Math.min(100, achievementRate)}%` }} />
+                <div
+                  className={`h-full rounded-full transition-all duration-700 ${isAhead ? 'bg-emerald-500' : achievementRate >= 70 ? 'bg-amber-500' : 'bg-red-400'}`}
+                  style={{ width: `${Math.min(100, achievementRate)}%` }}
+                />
               </div>
               <div className="flex items-center justify-between text-xs text-gray-500">
                 <span>남은 목표 <strong className="text-gray-800">{remaining}건</strong></span>
@@ -370,10 +313,14 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 <span>남은 영업일 <strong className="text-gray-800">{bizRemaining}일</strong></span>
               </div>
               <p className={`text-xs font-semibold mt-2 text-center ${isAhead ? 'text-emerald-600' : achievementRate >= 50 ? 'text-amber-600' : 'text-red-500'}`}>
-                {achievementRate >= 100 ? '🎉 목표 달성! 초과 달성 중입니다!'
-                  : isAhead ? '💪 잘 하고 있습니다! 이 페이스 유지하면 목표 달성!'
-                  : achievementRate >= 70 ? `👊 조금만 더! 하루 ${dailyPaceNeeded}건씩 하면 됩니다`
-                  : achievementRate >= 40 ? `⚡ 분발이 필요합니다. 하루 ${dailyPaceNeeded}건 목표!`
+                {achievementRate >= 100
+                  ? '🎉 목표 달성! 초과 달성 중입니다!'
+                  : isAhead
+                  ? '💪 잘 하고 있습니다! 이 페이스 유지하면 목표 달성!'
+                  : achievementRate >= 70
+                  ? `👊 조금만 더! 하루 ${dailyPaceNeeded}건씩 하면 됩니다`
+                  : achievementRate >= 40
+                  ? `⚡ 분발이 필요합니다. 하루 ${dailyPaceNeeded}건 목표!`
                   : `🚨 목표 대비 부진 — 하루 ${dailyPaceNeeded}건 이상 필수!`}
               </p>
             </div>
@@ -381,10 +328,10 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             {/* 공급 현황 + 계약율 */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
-                { label: '금일 공급 (대표 배정)', value: todaySupply > 0 ? todaySupply + '개' : '미배정', color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-100' },
-                { label: '이번달 계약', value: monthContractCount + '건', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-100' },
-                { label: '공급 대비 계약율', value: todaySupply > 0 ? contractRate + '%' : '—', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-100' },
-                { label: '내일 필요 공급(3계약 기준)', value: tomorrowSupplyNeeded > 0 ? tomorrowSupplyNeeded + '개' : '—', color: 'text-violet-700', bg: 'bg-violet-50', border: 'border-violet-100' },
+                { label: '금일 공급 (대표 배정)', value: todaySupply > 0 ? `${todaySupply}개` : '미배정', color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-100' },
+                { label: '이번달 계약', value: `${monthContractCount}건`, color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+                { label: '공급 대비 계약율', value: todaySupply > 0 ? `${contractRate}%` : '—', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-100' },
+                { label: '내일 필요 공급(3계약 기준)', value: tomorrowSupplyNeeded > 0 ? `${tomorrowSupplyNeeded}개` : '—', color: 'text-violet-700', bg: 'bg-violet-50', border: 'border-violet-100' },
               ].map(s => (
                 <div key={s.label} className={`${s.bg} border ${s.border} rounded-xl p-3.5`}>
                   <p className="text-[10px] text-gray-400 mb-1">{s.label}</p>
@@ -425,7 +372,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             </div>
 
             {/* 공지사항 */}
-            {generalNotices.length > 0 && (
+            {generalNotices.length > 0 ? (
               <div className="space-y-2">
                 <h3 className="text-sm font-bold text-gray-700">📢 공지사항</h3>
                 {generalNotices.map(n => (
@@ -436,8 +383,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   </div>
                 ))}
               </div>
-            )}
-            {generalNotices.length === 0 && (
+            ) : (
               <div className="bg-white border border-[#E8E2D4] rounded-xl p-6 text-center text-gray-400 text-sm">
                 공지사항 없음
               </div>
@@ -449,36 +395,45 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         {activeTab === 'db010' && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold text-gray-700">010 DB <span className="text-gray-400 font-normal">({db010List.length}건)</span></h2>
-              <button onClick={() => setShow010Form(!show010Form)}
+              <h2 className="text-sm font-bold text-gray-700">
+                010 DB <span className="text-gray-400 font-normal">({db010List.length}건)</span>
+              </h2>
+              <button onClick={() => setShow010Form(v => !v)}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                {show010Form ? '✕ 취소' : '+ DB 추가'}
+                {show010Form ? '✕ 취소' : '+ 010DB 등록'}
               </button>
             </div>
+
             {show010Form && (
               <form onSubmit={submit010} className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
                 <h3 className="font-semibold text-gray-800 text-sm mb-1">신규 DB 등록</h3>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { key: 'company', label: '업체명', placeholder: 'ABC주식회사' },
-                    { key: 'name', label: '대표자명', placeholder: '홍길동' },
-                    { key: 'phone', label: '연락처', placeholder: '010-0000-0000' },
+                    { key: 'company',     label: '업체명',     placeholder: 'ABC주식회사' },
+                    { key: 'name',        label: '대표자명',   placeholder: '홍길동' },
+                    { key: 'phone',       label: '연락처',     placeholder: '010-0000-0000' },
                     { key: 'loan_history', label: '기대출 내역', placeholder: '예) 국민은행 1억' },
                   ].map(f => (
                     <div key={f.key}>
                       <label className="text-xs text-gray-400 mb-0.5 block">{f.label}</label>
-                      <input value={form010[f.key as keyof typeof form010]}
+                      <input
+                        value={form010[f.key as keyof typeof form010]}
                         onChange={e => setForm010(p => ({ ...p, [f.key]: e.target.value }))}
                         placeholder={f.placeholder}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
                     </div>
                   ))}
                 </div>
                 <div>
                   <label className="text-xs text-gray-400 mb-0.5 block">인콜일지 초기 메모</label>
-                  <textarea value={form010.notes} onChange={e => setForm010(p => ({ ...p, notes: e.target.value }))} rows={2}
+                  <textarea
+                    value={form010.notes}
+                    onChange={e => setForm010(p => ({ ...p, notes: e.target.value }))}
+                    rows={2}
                     placeholder="첫 통화 메모..."
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  />
                 </div>
                 <button type="submit" disabled={submitting}
                   className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
@@ -486,21 +441,25 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 </button>
               </form>
             )}
-            {loading ? <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
-              : db010List.length === 0 ? <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">010 DB가 없습니다.</div>
-              : db010List.map(c => (
-                <CustomerCard key={c.id} c={c} actions={<>
-                  <button onClick={() => moveCustomer(c.id, 'lead')}
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-                    신규 고객으로 이동
-                  </button>
-                  <button onClick={() => moveCustomer(c.id, 'trash')}
-                    className="bg-gray-200 hover:bg-gray-300 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-                    자체거절
-                  </button>
-                </>} />
-              ))
-            }
+
+            {loading ? (
+              <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
+            ) : db010List.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
+                010 DB가 없습니다.
+              </div>
+            ) : db010List.map(c => (
+              <CustomerCard
+                key={c.id}
+                customer={c}
+                tabType="db010"
+                userName={userName}
+                salesUsers={SALES_USERS}
+                onStatusChange={async (newStatus) => moveCustomer(c.id, newStatus)}
+                onUpdate={async (patch) => patchCustomer(c.id, patch)}
+                onDelete={async () => deleteCustomer(c.id)}
+              />
+            ))}
           </div>
         )}
 
@@ -508,36 +467,46 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         {activeTab === 'customers' && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold text-gray-700">신규 고객 <span className="text-gray-400 font-normal">({activeCustomers.length}건)</span></h2>
-              <button onClick={() => setShowNewForm(!showNewForm)}
+              <h2 className="text-sm font-bold text-gray-700">
+                신규 고객 <span className="text-gray-400 font-normal">({activeCustomers.length}건)</span>
+              </h2>
+              <button onClick={() => setShowNewForm(v => !v)}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
                 {showNewForm ? '✕ 취소' : '+ 신규 고객 등록'}
               </button>
             </div>
+
             {showNewForm && (
               <form onSubmit={submitNew} className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
                 <h3 className="font-semibold text-gray-800 text-sm mb-1">신규 고객 등록</h3>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { key: 'name', label: '대표자명', placeholder: '홍길동', req: true },
-                    { key: 'phone', label: '연락처', placeholder: '010-0000-0000', req: true },
-                    { key: 'company', label: '업체명', placeholder: 'ABC주식회사', req: false },
+                    { key: 'name',        label: '대표자명',   placeholder: '홍길동',          req: true },
+                    { key: 'phone',       label: '연락처',     placeholder: '010-0000-0000',   req: true },
+                    { key: 'company',     label: '업체명',     placeholder: 'ABC주식회사',      req: false },
                     { key: 'loan_history', label: '기대출 내역', placeholder: '예) 국민은행 1억', req: false },
                   ].map(f => (
                     <div key={f.key}>
                       <label className="text-xs text-gray-400 mb-0.5 block">{f.label}{f.req && ' *'}</label>
-                      <input value={newForm[f.key as keyof typeof newForm]} required={f.req}
+                      <input
+                        value={newForm[f.key as keyof typeof newForm]}
+                        required={f.req}
                         onChange={e => setNewForm(p => ({ ...p, [f.key]: e.target.value }))}
                         placeholder={f.placeholder}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
                     </div>
                   ))}
                 </div>
                 <div>
                   <label className="text-xs text-gray-400 mb-0.5 block">상담 메모</label>
-                  <textarea value={newForm.notes} onChange={e => setNewForm(p => ({ ...p, notes: e.target.value }))} rows={2}
+                  <textarea
+                    value={newForm.notes}
+                    onChange={e => setNewForm(p => ({ ...p, notes: e.target.value }))}
+                    rows={2}
                     placeholder="초기 상담 내용..."
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  />
                 </div>
                 <button type="submit" disabled={submitting}
                   className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
@@ -545,112 +514,209 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 </button>
               </form>
             )}
-            {loading ? <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
-              : activeCustomers.length === 0 ? <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">신규 고객이 없습니다.</div>
-              : activeCustomers.map(c => (
-                <CustomerCard key={c.id} c={c} actions={<>
-                  <button onClick={() => moveCustomer(c.id, 'emotional')}
-                    className="bg-violet-100 hover:bg-violet-200 text-violet-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-                    💬 감성톡
-                  </button>
-                  <button onClick={() => moveCustomer(c.id, 'trash')}
-                    className="bg-gray-200 hover:bg-gray-300 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-                    🗑 자체거절
-                  </button>
-                  <button onClick={() => { setContractModal(c); setContractAmount(''); setContractMemo('') }}
-                    className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-                    🤝 계약
-                  </button>
-                </>} />
-              ))
-            }
+
+            {loading ? (
+              <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
+            ) : activeCustomers.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
+                신규 고객이 없습니다.
+              </div>
+            ) : activeCustomers.map(c => (
+              <CustomerCard
+                key={c.id}
+                customer={c}
+                tabType="lead"
+                userName={userName}
+                salesUsers={SALES_USERS}
+                onStatusChange={async (newStatus) => moveCustomer(c.id, newStatus)}
+                onUpdate={async (patch) => patchCustomer(c.id, patch)}
+                onDelete={async () => deleteCustomer(c.id)}
+              />
+            ))}
           </div>
         )}
 
         {/* ══════════ 계약 업체 ══════════ */}
         {activeTab === 'contracted' && (
           <div className="space-y-3">
-            <h2 className="text-sm font-bold text-gray-700">계약 업체 <span className="text-gray-400 font-normal">({contractedCustomers.length}건)</span></h2>
-            {loading ? <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
-              : contractedCustomers.length === 0 ? <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">계약 업체가 없습니다.</div>
-              : <>
-                {/* 계약 금액 요약 */}
+            <h2 className="text-sm font-bold text-gray-700">
+              계약 업체 <span className="text-gray-400 font-normal">({contractedCustomers.length}건)</span>
+            </h2>
+
+            {loading ? (
+              <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
+            ) : contractedCustomers.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
+                계약 업체가 없습니다.
+              </div>
+            ) : (
+              <>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-center">
                     <p className="text-[10px] text-gray-400 mb-0.5">이번달 계약</p>
                     <p className="text-2xl font-black text-emerald-700">{monthContractCount}건</p>
-                    <p className="text-xs text-gray-400">{monthRevenue > 0 ? (monthRevenue / 10000).toFixed(0) + '만원' : '-'}</p>
                   </div>
                   <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 text-center">
                     <p className="text-[10px] text-gray-400 mb-0.5">전체 계약</p>
                     <p className="text-2xl font-black text-gray-700">{contractedCustomers.length}건</p>
-                    <p className="text-xs text-gray-400">{totalRevenue > 0 ? (totalRevenue / 10000).toFixed(0) + '만원' : '-'}</p>
                   </div>
                 </div>
                 {contractedCustomers.map(c => (
-                  <CustomerCard key={c.id} c={c} actions={<>
-                    <button onClick={() => moveCustomer(c.id, 'lead')}
-                      className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-                      신규 고객으로 복귀
-                    </button>
-                  </>} />
+                  <CustomerCard
+                    key={c.id}
+                    customer={c}
+                    tabType="contracted"
+                    userName={userName}
+                    salesUsers={SALES_USERS}
+                    onStatusChange={async (newStatus) => moveCustomer(c.id, newStatus)}
+                    onUpdate={async (patch) => patchCustomer(c.id, patch)}
+                    onDelete={async () => deleteCustomer(c.id)}
+                    onTransferToOps={async () => transferToOps(c)}
+                  />
                 ))}
               </>
-            }
+            )}
           </div>
         )}
 
-        {/* ══════════ 감성톡 관리 업체 ══════════ */}
+        {/* ══════════ 감성톡 관리 ══════════ */}
         {activeTab === 'emotional' && (
           <div className="space-y-3">
-            <h2 className="text-sm font-bold text-gray-700">💬 감성톡 관리 업체 <span className="text-gray-400 font-normal">({emotionalCustomers.length}건)</span></h2>
+            <h2 className="text-sm font-bold text-gray-700">
+              💬 감성톡 관리 업체 <span className="text-gray-400 font-normal">({emotionalCustomers.length}건)</span>
+            </h2>
             <p className="text-xs text-gray-400 bg-violet-50 border border-violet-100 rounded-lg px-4 py-2">
               일단 거절했지만 감성적 접근이 가능한 업체 관리 · 장기 육성 대상
             </p>
-            {loading ? <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
-              : emotionalCustomers.length === 0 ? <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">감성톡 관리 업체가 없습니다.</div>
-              : emotionalCustomers.map(c => (
-                <CustomerCard key={c.id} c={c} actions={<>
-                  <button onClick={() => moveCustomer(c.id, 'lead')}
-                    className="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-                    신규 고객 복귀
-                  </button>
-                  <button onClick={() => moveCustomer(c.id, 'trash')}
-                    className="bg-gray-200 hover:bg-gray-300 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-                    🗑 자체거절
-                  </button>
-                  <button onClick={() => { setContractModal(c); setContractAmount(''); setContractMemo('') }}
-                    className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-                    🤝 계약
-                  </button>
-                </>} />
-              ))
-            }
+
+            {loading ? (
+              <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
+            ) : emotionalCustomers.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
+                감성톡 관리 업체가 없습니다.
+              </div>
+            ) : emotionalCustomers.map(c => (
+              <CustomerCard
+                key={c.id}
+                customer={c}
+                tabType="emotional"
+                userName={userName}
+                salesUsers={SALES_USERS}
+                onStatusChange={async (newStatus) => moveCustomer(c.id, newStatus)}
+                onUpdate={async (patch) => patchCustomer(c.id, patch)}
+                onDelete={async () => deleteCustomer(c.id)}
+              />
+            ))}
           </div>
         )}
 
-        {/* ══════════ 자체거절 업체 ══════════ */}
+        {/* ══════════ 자체거절 ══════════ */}
         {activeTab === 'trash' && (
           <div className="space-y-3">
-            <h2 className="text-sm font-bold text-gray-700">🗑 자체거절 업체 <span className="text-gray-400 font-normal">({trashCustomers.length}건)</span></h2>
+            <h2 className="text-sm font-bold text-gray-700">
+              🗑 자체거절 업체 <span className="text-gray-400 font-normal">({trashCustomers.length}건)</span>
+            </h2>
             <p className="text-xs text-gray-400 bg-gray-50 border border-gray-100 rounded-lg px-4 py-2">
               스스로 판단하여 진행 불가로 분류한 업체 · 복구 가능
             </p>
-            {loading ? <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
-              : trashCustomers.length === 0 ? <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">자체거절 업체가 없습니다.</div>
-              : trashCustomers.map(c => (
-                <CustomerCard key={c.id} c={c} actions={<>
-                  <button onClick={() => moveCustomer(c.id, 'lead')}
-                    className="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-                    신규 고객 복귀
-                  </button>
-                  <button onClick={() => moveCustomer(c.id, 'emotional')}
-                    className="bg-violet-100 hover:bg-violet-200 text-violet-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-                    💬 감성톡으로 이동
-                  </button>
-                </>} />
-              ))
-            }
+
+            {loading ? (
+              <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
+            ) : trashCustomers.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
+                자체거절 업체가 없습니다.
+              </div>
+            ) : trashCustomers.map(c => (
+              <CustomerCard
+                key={c.id}
+                customer={c}
+                tabType="trash"
+                userName={userName}
+                salesUsers={SALES_USERS}
+                onStatusChange={async (newStatus) => moveCustomer(c.id, newStatus)}
+                onUpdate={async (patch) => patchCustomer(c.id, patch)}
+                onDelete={async () => deleteCustomer(c.id)}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* ══════════ 매출 ══════════ */}
+        {activeTab === 'revenue' && (
+          <div className="space-y-4">
+            <h2 className="text-sm font-bold text-gray-700">
+              💰 매출 현황 <span className="text-gray-400 font-normal">({revenueCustomers.length}건 전송)</span>
+            </h2>
+
+            {/* Summary cards */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-center">
+                <p className="text-[10px] text-gray-400 mb-0.5">전송건수</p>
+                <p className="text-2xl font-black text-emerald-700">{revenueCustomers.length}건</p>
+              </div>
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-center">
+                <p className="text-[10px] text-gray-400 mb-0.5">총 계약금</p>
+                <p className="text-xl font-black text-blue-700">
+                  {totalRevenue > 0 ? `${(totalRevenue / 10000).toFixed(0)}만원` : '—'}
+                </p>
+              </div>
+              <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center">
+                <p className="text-[10px] text-gray-400 mb-0.5">취소건수</p>
+                <p className="text-2xl font-black text-red-600">{cancelledCount}건</p>
+              </div>
+            </div>
+
+            {/* Revenue list */}
+            {loading ? (
+              <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
+            ) : revenueCustomers.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
+                관리팀으로 전송된 계약 업체가 없습니다.
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
+                  <div className="grid grid-cols-6 gap-2 text-[10px] font-semibold text-gray-500">
+                    <span className="col-span-2">업체명</span>
+                    <span>계약금</span>
+                    <span>수수료율</span>
+                    <span>세금계산서</span>
+                    <span>상태</span>
+                  </div>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {revenueCustomers.map(c => {
+                    const cancelled = c.details?.is_cancelled
+                    return (
+                      <div key={c.id} className={`px-5 py-3 grid grid-cols-6 gap-2 items-center ${cancelled ? 'bg-gray-50' : ''}`}>
+                        <div className="col-span-2 min-w-0">
+                          <p className={`text-sm font-semibold truncate ${cancelled ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+                            {c.company || '(업체명 없음)'}
+                          </p>
+                          <p className="text-[10px] text-gray-400 truncate">{c.name}</p>
+                        </div>
+                        <p className={`text-xs ${cancelled ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+                          {c.details?.contract_fee || '—'}
+                        </p>
+                        <p className={`text-xs ${cancelled ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+                          {c.details?.commission_rate || '—'}
+                        </p>
+                        <p className={`text-xs ${cancelled ? 'text-gray-400' : c.details?.tax_invoice === '발급' ? 'text-emerald-600 font-medium' : 'text-gray-500'}`}>
+                          {c.details?.tax_invoice || '—'}
+                        </p>
+                        <div>
+                          {cancelled ? (
+                            <span className="inline-block bg-red-100 text-red-600 text-[10px] font-semibold px-2 py-0.5 rounded-full">취소</span>
+                          ) : (
+                            <span className="inline-block bg-emerald-100 text-emerald-700 text-[10px] font-semibold px-2 py-0.5 rounded-full">정상</span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -658,41 +724,8 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         {activeTab === 'report' && (
           <ReportTab userId={userId} userName={userName} />
         )}
-      </div>
 
-      {/* 계약 처리 모달 */}
-      {contractModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
-            <h3 className="font-bold text-gray-900 mb-1">계약 처리</h3>
-            <p className="text-sm text-gray-400 mb-5">
-              <strong className="text-gray-700">{contractModal.name}</strong> ({contractModal.company})을 계약 완료로 전환합니다.
-            </p>
-            <div className="space-y-3 mb-5">
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">계약 금액 (원)</label>
-                <input type="text" value={contractAmount}
-                  onChange={e => setContractAmount(e.target.value.replace(/[^0-9,]/g, ''))}
-                  placeholder="0"
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">메모</label>
-                <textarea value={contractMemo} onChange={e => setContractMemo(e.target.value)} rows={3}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none" />
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => setContractModal(null)}
-                className="flex-1 border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium">취소</button>
-              <button onClick={submitContract} disabled={submitting}
-                className="flex-1 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white py-3 rounded-xl text-sm font-bold transition-colors">
-                {submitting ? '처리 중...' : '🤝 계약 확정'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   )
 }
