@@ -649,6 +649,8 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
   const todayMorning = morningReports.filter(r => r.report_date === todayStr)
   const todayDaily = dailyReports.filter(r => r.report_date === todayStr)
 
+  const pct = (n: number, d: number) => d === 0 ? '—' : (n / d * 100).toFixed(1) + '%'
+
   // 오전보고 통계 (전체 누적)
   const morningStats = {
     total_calls: morningReports.reduce((s, r) => s + Number(r.data?.total_calls || 0), 0),
@@ -743,16 +745,19 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
         <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
           <p className="text-xs text-amber-700 font-bold mb-3">☀️ 오전보고 누적 통계 ({morningReports.length}건)</p>
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-            {[
-              { label: '총 콜', value: morningStats.total_calls },
-              { label: '연결안됨', value: morningStats.no_connect },
-              { label: '연결됨', value: morningStats.connected },
-              { label: 'DB확보', value: morningStats.db_secured },
-              { label: '아웃계약', value: morningStats.outbound_contracts },
-            ].map(s => (
+            {([
+              { label: '총 콜', value: morningStats.total_calls, rate: null, rateLabel: '' },
+              { label: '연결안됨', value: morningStats.no_connect, rate: pct(morningStats.no_connect, morningStats.total_calls), rateLabel: '미연결율' },
+              { label: '연결됨', value: morningStats.connected, rate: pct(morningStats.connected, morningStats.total_calls), rateLabel: '연결율' },
+              { label: 'DB확보', value: morningStats.db_secured, rate: pct(morningStats.db_secured, morningStats.total_calls), rateLabel: '확보율' },
+              { label: '아웃계약', value: morningStats.outbound_contracts, rate: pct(morningStats.outbound_contracts, morningStats.total_calls), rateLabel: '계약율' },
+            ] as const).map(s => (
               <div key={s.label} className="bg-white rounded-lg p-2.5 text-center border border-amber-100">
                 <p className="text-[10px] text-gray-400 mb-0.5">{s.label}</p>
-                <p className="text-xl font-black text-amber-700">{s.value}</p>
+                <p className="text-xl font-black text-amber-700">{s.value}<span className="text-xs font-normal text-gray-400">건</span></p>
+                {s.rate !== null && (
+                  <p className="text-[11px] font-semibold text-amber-500 mt-0.5">{s.rate} <span className="text-[10px] text-gray-400 font-normal">{s.rateLabel}</span></p>
+                )}
               </div>
             ))}
           </div>
@@ -763,10 +768,10 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
           <p className="text-xs text-blue-700 font-bold mb-3">📋 마감보고 누적 통계 ({dailyReports.length}건)</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
-              { label: '누적 계약', value: dailyStats.today_contracts + '건' },
-              { label: '이번달 계약', value: dailyStats.month_contracts + '건' },
-              { label: '공급DB 결정', value: dailyStats.supply_decided + '건' },
-              { label: '아웃바운딩 결정', value: dailyStats.outbound_decided + '건' },
+              { label: '누적 계약', value: dailyStats.today_contracts + '건', sub: null },
+              { label: '이번달 계약', value: dailyStats.month_contracts + '건', sub: null },
+              { label: '공급DB 결정', value: dailyStats.supply_decided + '건', sub: null },
+              { label: '아웃바운딩 결정', value: dailyStats.outbound_decided + '건', sub: null },
             ].map(s => (
               <div key={s.label} className="bg-white rounded-lg p-2.5 text-center border border-blue-100">
                 <p className="text-[10px] text-gray-400 mb-0.5">{s.label}</p>
@@ -806,27 +811,37 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="px-5 py-2.5 border-b border-gray-50 flex items-center justify-between">
+            <span className="text-xs text-gray-500 font-medium">누적 보고 (최대 50건)</span>
+            <span className="text-xs text-gray-400">{filtered.length}건</span>
+          </div>
           <div className="divide-y divide-gray-50">
-            {filtered.map(r => (
+            {filtered.slice(0, 50).map(r => {
+              const tc = Number(r.data?.total_calls || 0)
+              const cn = Number(r.data?.connected || 0)
+              const connRate = tc > 0 ? (cn / tc * 100).toFixed(0) + '%' : '—'
+              const dbRate = tc > 0 ? (Number(r.data?.db_secured || 0) / tc * 100).toFixed(0) + '%' : '—'
+              const ctRate = tc > 0 ? (Number(r.data?.outbound_contracts || 0) / tc * 100).toFixed(0) + '%' : '—'
+              return (
               <div key={r.id} className={`px-5 py-3.5 flex items-center gap-3 hover:bg-gray-50 transition-colors ${selected.has(r.id) ? 'bg-red-50' : ''}`}>
                 {isCeo && (
                   <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggleSelect(r.id)}
                     className="w-4 h-4 rounded shrink-0" />
                 )}
-                <div className="flex-1 flex items-center gap-3 min-w-0">
-                  <div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-gray-900">{r.user_name}</span>
-                    <span className="text-xs text-gray-400 ml-2">{r.report_date}</span>
+                    <span className="text-xs text-gray-400">{r.report_date}</span>
                   </div>
                   {r.report_type === 'morning' && (
-                    <span className="text-xs text-gray-400 hidden md:block">
-                      총콜 {r.data?.total_calls || 0} · 연결 {r.data?.connected || 0} · DB확보 {r.data?.db_secured || 0} · 계약 {r.data?.outbound_contracts || 0}
-                    </span>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      총콜 {tc}건 · 연결 {cn}건 <span className="text-amber-500 font-semibold">({connRate} 연결율)</span> · DB확보 {r.data?.db_secured || 0}건 <span className="text-amber-400">({dbRate})</span> · 계약 {r.data?.outbound_contracts || 0}건 <span className="text-green-500 font-semibold">({ctRate})</span>
+                    </p>
                   )}
                   {r.report_type === 'daily' && (
-                    <span className="text-xs text-gray-400 hidden md:block">
+                    <p className="text-xs text-gray-400 mt-0.5">
                       당일계약 {r.data?.today_contracts || 0}건 · 월누적 {r.data?.month_contracts || 0}건 · 목표 {r.data?.goal || 0}건
-                    </span>
+                    </p>
                   )}
                 </div>
                 <button onClick={() => setViewReport(r)}
@@ -834,7 +849,8 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
                   상세보기
                 </button>
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}

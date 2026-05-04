@@ -350,6 +350,7 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
 
   const morningReports = pastReports.filter(r => r.report_type === 'morning')
   const dailyReports = pastReports.filter(r => r.report_type === 'daily')
+  const pct = (n: number, d: number) => d === 0 ? '—' : (n / d * 100).toFixed(1) + '%'
   const morningStats = {
     total_calls: morningReports.reduce((s: number, r: any) => s + Number(r.data?.total_calls || 0), 0),
     no_connect:  morningReports.reduce((s: number, r: any) => s + Number(r.data?.no_connect || 0), 0),
@@ -454,16 +455,19 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
         <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
           <p className="text-xs text-amber-700 font-bold mb-3">☀️ 내 오전보고 누적 통계 ({morningReports.length}건)</p>
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-            {[
-              { label: '총 콜', value: morningStats.total_calls },
-              { label: '연결안됨', value: morningStats.no_connect },
-              { label: '연결됨', value: morningStats.connected },
-              { label: 'DB확보', value: morningStats.db_secured },
-              { label: '아웃계약', value: morningStats.outbound_contracts },
-            ].map((s: any) => (
+            {([
+              { label: '총 콜', value: morningStats.total_calls, rate: null, rateLabel: '' },
+              { label: '연결안됨', value: morningStats.no_connect, rate: pct(morningStats.no_connect, morningStats.total_calls), rateLabel: '미연결율' },
+              { label: '연결됨', value: morningStats.connected, rate: pct(morningStats.connected, morningStats.total_calls), rateLabel: '연결율' },
+              { label: 'DB확보', value: morningStats.db_secured, rate: pct(morningStats.db_secured, morningStats.total_calls), rateLabel: '확보율' },
+              { label: '아웃계약', value: morningStats.outbound_contracts, rate: pct(morningStats.outbound_contracts, morningStats.total_calls), rateLabel: '계약율' },
+            ] as const).map((s: any) => (
               <div key={s.label} className="bg-white rounded-lg p-2.5 text-center border border-amber-100">
                 <p className="text-[10px] text-gray-400 mb-0.5">{s.label}</p>
-                <p className="text-xl font-black text-amber-700">{s.value}</p>
+                <p className="text-xl font-black text-amber-700">{s.value}<span className="text-xs font-normal text-gray-400">건</span></p>
+                {s.rate !== null && (
+                  <p className="text-[11px] font-semibold text-amber-500 mt-0.5">{s.rate} <span className="text-[10px] text-gray-400 font-normal">{s.rateLabel}</span></p>
+                )}
               </div>
             ))}
           </div>
@@ -548,6 +552,54 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
             </button>
           </div>
         </form>
+      )}
+
+      {/* ── 누적 히스토리 ── */}
+      {reportType === 'morning' && morningReports.length > 0 && (
+        <div className="bg-white rounded-2xl border border-[#E8E2D4] overflow-hidden">
+          <div className="px-5 py-3 border-b border-[#E8E2D4]/60 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-[#1B2A45]">지난 오전보고 누적</h3>
+            <span className="text-xs text-[#1B2A45]/40">{morningReports.length}건</span>
+          </div>
+          <div className="divide-y divide-[#E8E2D4]/40">
+            {morningReports.slice(0, 50).map((r: any) => {
+              const tc = Number(r.data?.total_calls || 0)
+              const cn = Number(r.data?.connected || 0)
+              const connRate = tc > 0 ? (cn / tc * 100).toFixed(0) + '%' : '—'
+              const dbRate = tc > 0 ? (Number(r.data?.db_secured || 0) / tc * 100).toFixed(0) + '%' : '—'
+              const ctRate = tc > 0 ? (Number(r.data?.outbound_contracts || 0) / tc * 100).toFixed(0) + '%' : '—'
+              return (
+                <div key={r.id} className="px-5 py-3 flex items-center justify-between hover:bg-[#FAF8F3]">
+                  <div>
+                    <span className="text-sm font-medium text-[#1B2A45]">{r.report_date}</span>
+                    <p className="text-xs text-[#1B2A45]/40 mt-0.5">
+                      총콜 {tc}건 · 연결 {cn}건 <span className="text-amber-500 font-semibold">({connRate} 연결율)</span> · DB {r.data?.db_secured || 0}건 <span className="text-amber-400">({dbRate})</span> · 계약 {r.data?.outbound_contracts || 0}건 <span className="text-green-500 font-semibold">({ctRate})</span>
+                    </p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+      {reportType === 'daily' && dailyReports.length > 0 && (
+        <div className="bg-white rounded-2xl border border-[#E8E2D4] overflow-hidden">
+          <div className="px-5 py-3 border-b border-[#E8E2D4]/60 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-[#1B2A45]">지난 마감보고 누적</h3>
+            <span className="text-xs text-[#1B2A45]/40">{dailyReports.length}건</span>
+          </div>
+          <div className="divide-y divide-[#E8E2D4]/40">
+            {dailyReports.slice(0, 50).map((r: any) => (
+              <div key={r.id} className="px-5 py-3 hover:bg-[#FAF8F3]">
+                <span className="text-sm font-medium text-[#1B2A45]">{r.report_date}</span>
+                <p className="text-xs text-[#1B2A45]/40 mt-0.5">
+                  당일계약 {r.data?.today_contracts || 0}건 · 월누적 {r.data?.month_contracts || 0}건 · 목표 {r.data?.goal || 0}건
+                  {r.data?.memo ? <span className="ml-2">· {r.data.memo}</span> : null}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   )
