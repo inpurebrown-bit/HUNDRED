@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, FormEvent } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { signOut } from 'next-auth/react'
 import ReportTab from './ReportTab'
 import CustomerCard, { Customer, CustomerDetails, CardTabType } from './CustomerCard'
+import InCallForm, { InCallData } from './InCallForm'
 import {
   getBusinessDaysInMonth,
   getElapsedBusinessDays,
@@ -60,11 +61,9 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
 
   // New customer form state
   const [showNewForm, setShowNewForm] = useState(false)
-  const [newForm, setNewForm] = useState({ name: '', phone: '', company: '', loan_history: '', notes: '' })
 
   // 010DB form state
   const [show010Form, setShow010Form] = useState(false)
-  const [form010, setForm010] = useState({ name: '', phone: '', company: '', loan_history: '', notes: '' })
 
   // ── Data loading ──────────────────────────────────────────────────
   async function loadAll() {
@@ -141,17 +140,44 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
     await loadAll()
   }, [patchCustomer])
 
+  // ── 인콜 데이터 → API 페이로드 변환 ────────────────────────────────
+  function buildPayload(data: InCallData, status: string) {
+    const { name, phone, company, notes, ...rest } = data
+    return {
+      name, phone, company, notes, status,
+      details: {
+        corp_type: rest.corp_type,
+        region: rest.region,
+        business_reg_no: rest.business_reg_no,
+        assignee: rest.assignee,
+        reception_date: rest.reception_date,
+        business_type: rest.business_type,
+        years_in_business: rest.years_in_business,
+        employee_count: rest.employee_count,
+        loan_policy: rest.loan_policy,
+        loan_credit: rest.loan_credit,
+        revenue_2026: rest.revenue_2026,
+        revenue_2025: rest.revenue_2025,
+        revenue_2024: rest.revenue_2024,
+        revenue_2023: rest.revenue_2023,
+        credit_score: rest.credit_score,
+        tax_delinquency: rest.tax_delinquency,
+        assets: rest.assets,
+        required_funds: rest.required_funds,
+        sensitivity: rest.sensitivity,
+      },
+    }
+  }
+
   // ── New customer form ─────────────────────────────────────────────
-  async function submitNew(e: FormEvent) {
-    e.preventDefault()
+  async function submitNew(data: InCallData) {
     setSubmitting(true)
     const res = await fetch('/api/customers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...newForm, status: 'lead' }),
+      body: JSON.stringify(buildPayload(data, 'lead')),
     })
     if (res.ok) {
-      setNewForm({ name: '', phone: '', company: '', loan_history: '', notes: '' })
       setShowNewForm(false)
       loadAll()
     }
@@ -159,16 +185,14 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   }
 
   // ── 010DB form ────────────────────────────────────────────────────
-  async function submit010(e: FormEvent) {
-    e.preventDefault()
+  async function submit010(data: InCallData) {
     setSubmitting(true)
     const res = await fetch('/api/customers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form010, status: 'db010' }),
+      body: JSON.stringify(buildPayload(data, 'db010')),
     })
     if (res.ok) {
-      setForm010({ name: '', phone: '', company: '', loan_history: '', notes: '' })
       setShow010Form(false)
       loadAll()
     }
@@ -405,41 +429,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             </div>
 
             {show010Form && (
-              <form onSubmit={submit010} className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-                <h3 className="font-semibold text-gray-800 text-sm mb-1">신규 DB 등록</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { key: 'company',     label: '업체명',     placeholder: 'ABC주식회사' },
-                    { key: 'name',        label: '대표자명',   placeholder: '홍길동' },
-                    { key: 'phone',       label: '연락처',     placeholder: '010-0000-0000' },
-                    { key: 'loan_history', label: '기대출 내역', placeholder: '예) 국민은행 1억' },
-                  ].map(f => (
-                    <div key={f.key}>
-                      <label className="text-xs text-gray-400 mb-0.5 block">{f.label}</label>
-                      <input
-                        value={form010[f.key as keyof typeof form010]}
-                        onChange={e => setForm010(p => ({ ...p, [f.key]: e.target.value }))}
-                        placeholder={f.placeholder}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  <label className="text-xs text-gray-400 mb-0.5 block">인콜일지 초기 메모</label>
-                  <textarea
-                    value={form010.notes}
-                    onChange={e => setForm010(p => ({ ...p, notes: e.target.value }))}
-                    rows={2}
-                    placeholder="첫 통화 메모..."
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  />
-                </div>
-                <button type="submit" disabled={submitting}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
-                  {submitting ? '등록 중...' : '+ DB 등록'}
-                </button>
-              </form>
+              <InCallForm
+                title="010DB 인콜일지 등록"
+                salesUsers={SALES_USERS}
+                submitting={submitting}
+                onSubmit={submit010}
+                onCancel={() => setShow010Form(false)}
+              />
             )}
 
             {loading ? (
@@ -477,42 +473,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             </div>
 
             {showNewForm && (
-              <form onSubmit={submitNew} className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-                <h3 className="font-semibold text-gray-800 text-sm mb-1">신규 고객 등록</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { key: 'name',        label: '대표자명',   placeholder: '홍길동',          req: true },
-                    { key: 'phone',       label: '연락처',     placeholder: '010-0000-0000',   req: true },
-                    { key: 'company',     label: '업체명',     placeholder: 'ABC주식회사',      req: false },
-                    { key: 'loan_history', label: '기대출 내역', placeholder: '예) 국민은행 1억', req: false },
-                  ].map(f => (
-                    <div key={f.key}>
-                      <label className="text-xs text-gray-400 mb-0.5 block">{f.label}{f.req && ' *'}</label>
-                      <input
-                        value={newForm[f.key as keyof typeof newForm]}
-                        required={f.req}
-                        onChange={e => setNewForm(p => ({ ...p, [f.key]: e.target.value }))}
-                        placeholder={f.placeholder}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  <label className="text-xs text-gray-400 mb-0.5 block">상담 메모</label>
-                  <textarea
-                    value={newForm.notes}
-                    onChange={e => setNewForm(p => ({ ...p, notes: e.target.value }))}
-                    rows={2}
-                    placeholder="초기 상담 내용..."
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  />
-                </div>
-                <button type="submit" disabled={submitting}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
-                  {submitting ? '등록 중...' : '+ 고객 등록'}
-                </button>
-              </form>
+              <InCallForm
+                title="신규 고객 인콜일지 등록"
+                salesUsers={SALES_USERS}
+                submitting={submitting}
+                onSubmit={submitNew}
+                onCancel={() => setShowNewForm(false)}
+              />
             )}
 
             {loading ? (
