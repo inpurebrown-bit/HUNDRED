@@ -81,6 +81,63 @@ const today = () => new Date().toISOString().slice(0, 10)
 const inp = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
 const label = 'text-xs text-gray-500 mb-1 block font-medium'
 
+// ── 제출 전 UI 전용 필드(_*) 제거 ───────────────────────
+function stripUIFields(obj: any): any {
+  if (Array.isArray(obj)) return obj.map(stripUIFields)
+  if (obj !== null && typeof obj === 'object') {
+    return Object.fromEntries(
+      Object.entries(obj)
+        .filter(([k]) => !k.startsWith('_'))
+        .map(([k, v]) => [k, stripUIFields(v)])
+    )
+  }
+  return obj
+}
+
+// ── LockedInput: Enter → 초록 잠금, ✏️ 클릭으로 수정 ───
+function LockedInput({ value, onChange, locked, onLock, onUnlock, ...rest }: {
+  value: string
+  onChange: (v: string) => void
+  locked: boolean
+  onLock: () => void
+  onUnlock: () => void
+  [key: string]: any
+}) {
+  return (
+    <div className="relative">
+      <input
+        {...rest}
+        value={value}
+        readOnly={locked}
+        onChange={e => !locked && onChange(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter' && !locked && String(value).trim()) {
+            e.preventDefault()
+            onLock()
+          }
+        }}
+        className={`w-full border rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none transition-all duration-200 ${
+          locked
+            ? 'border-emerald-300 bg-emerald-50 text-emerald-900 font-semibold focus:ring-0'
+            : 'border-gray-200 focus:ring-2 focus:ring-blue-500'
+        }`}
+      />
+      {locked ? (
+        <button type="button" onClick={onUnlock} title="수정"
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-emerald-500 hover:text-emerald-700 text-sm leading-none">
+          ✏️
+        </button>
+      ) : (
+        String(value).trim() && (
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-300 pointer-events-none select-none">
+            Enter↵
+          </span>
+        )
+      )}
+    </div>
+  )
+}
+
 export default function ReportTab({ userId, userName }: Props) {
   const [activeReport, setActiveReport] = useState<'morning' | 'daily'>('morning')
   const [submitted, setSubmitted] = useState(false)
@@ -88,6 +145,10 @@ export default function ReportTab({ userId, userName }: Props) {
   const [loading, setLoading] = useState(false)
   const [pastReports, setPastReports] = useState<any[]>([])
   const [viewReport, setViewReport] = useState<any | null>(null)
+  // 수정 모드
+  const [editDate, setEditDate] = useState<string | null>(null)
+  // 오전보고 필드 잠금
+  const [lockedMorning, setLockedMorning] = useState<Record<string, boolean>>({})
 
   // 오전보고 상태
   const [morning, setMorning] = useState<MorningData>({
@@ -111,6 +172,24 @@ export default function ReportTab({ userId, userName }: Props) {
     fetch('/api/reports').then(r => r.json()).then(d => setPastReports(d.reports || []))
   }, [submitted])
 
+  // ── 과거 보고 수정하기 ────────────────────────────────
+  function loadForEdit(r: any) {
+    if (r.report_type === 'morning') {
+      setMorning({ total_calls: '', no_connect: '', connected: '', db_secured: '', outbound_contracts: '', ...r.data })
+      setLockedMorning({})
+      setActiveReport('morning')
+    } else {
+      setDaily({
+        supply_db: [], outbound: [], today_contracts: '', month_contracts: '',
+        goal: '', worried: [], decided: [], meetings: [], payment_waiting: [],
+        ...r.data,
+      })
+      setActiveReport('daily')
+    }
+    setEditDate(r.report_date)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   // ── 오전보고 제출 ────────────────────────────────────
   async function submitMorning(e: FormEvent) {
     e.preventDefault()
@@ -118,11 +197,13 @@ export default function ReportTab({ userId, userName }: Props) {
     const res = await fetch('/api/reports', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ report_type: 'morning', report_date: today(), data: morning }),
+      body: JSON.stringify({ report_type: 'morning', report_date: editDate || today(), data: morning }),
     })
     if (res.ok) {
       setSubmitType('morning')
       setSubmitted(true)
+      setEditDate(null)
+      setLockedMorning({})
     }
     setLoading(false)
   }
@@ -134,11 +215,12 @@ export default function ReportTab({ userId, userName }: Props) {
     const res = await fetch('/api/reports', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ report_type: 'daily', report_date: today(), data: daily }),
+      body: JSON.stringify({ report_type: 'daily', report_date: editDate || today(), data: stripUIFields(daily) }),
     })
     if (res.ok) {
       setSubmitType('daily')
       setSubmitted(true)
+      setEditDate(null)
     }
     setLoading(false)
   }
@@ -164,6 +246,15 @@ export default function ReportTab({ userId, userName }: Props) {
 
   const morningReports = pastReports.filter(r => r.report_type === 'morning')
   const dailyReports = pastReports.filter(r => r.report_type === 'daily')
+
+  // 과거 보고에 등장한 업체명 목록 (자동완성용)
+  const allCompanies: string[] = Array.from(new Set(
+    pastReports.flatMap(r =>
+      ['supply_db', 'outbound', 'worried', 'decided', 'meetings', 'payment_waiting'].flatMap(f =>
+        (r.data?.[f] || []).map((c: any) => c.company).filter(Boolean)
+      )
+    )
+  )).sort()
 
   const todayStr = new Date().toISOString().slice(0, 10)
   const pct = (n: number, d: number) => d === 0 ? '—' : (n / d * 100).toFixed(1) + '%'
@@ -279,47 +370,44 @@ export default function ReportTab({ userId, userName }: Props) {
       {activeReport === 'morning' && (
         <div className="space-y-4">
           <form onSubmit={submitMorning} className="bg-white rounded-xl border border-gray-100 p-5 space-y-4">
+            {editDate && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center justify-between">
+                <span className="text-xs text-amber-700 font-medium">✏️ 수정 중 — {editDate}</span>
+                <button type="button" onClick={() => { setEditDate(null); setLockedMorning({}) }}
+                  className="text-xs text-amber-500 hover:text-amber-700">취소</button>
+              </div>
+            )}
             <div className="flex items-center justify-between mb-1">
               <h3 className="font-semibold text-gray-800">☀️ 오전보고</h3>
-              <span className="text-xs text-gray-400">{today()} · {userName}</span>
+              <span className="text-xs text-gray-400">{editDate || today()} · {userName}</span>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <div>
-                <label className={label}>총 콜 수</label>
-                <input type="number" className={inp} placeholder="0"
-                  value={morning.total_calls}
-                  onChange={e => setMorning(p => ({ ...p, total_calls: e.target.value }))} />
-              </div>
-              <div>
-                <label className={label}>연결안됨</label>
-                <input type="number" className={inp} placeholder="0"
-                  value={morning.no_connect}
-                  onChange={e => setMorning(p => ({ ...p, no_connect: e.target.value }))} />
-              </div>
-              <div>
-                <label className={label}>연결됨</label>
-                <input type="number" className={inp} placeholder="0"
-                  value={morning.connected}
-                  onChange={e => setMorning(p => ({ ...p, connected: e.target.value }))} />
-              </div>
-              <div>
-                <label className={label}>DB확보 (결정업체)</label>
-                <input type="number" className={inp} placeholder="0"
-                  value={morning.db_secured}
-                  onChange={e => setMorning(p => ({ ...p, db_secured: e.target.value }))} />
-              </div>
-              <div>
-                <label className={label}>아웃바운딩 계약</label>
-                <input type="number" className={inp} placeholder="0"
-                  value={morning.outbound_contracts}
-                  onChange={e => setMorning(p => ({ ...p, outbound_contracts: e.target.value }))} />
-              </div>
+              {([
+                { key: 'total_calls',        label2: '총 콜 수' },
+                { key: 'no_connect',         label2: '연결안됨' },
+                { key: 'connected',          label2: '연결됨' },
+                { key: 'db_secured',         label2: 'DB확보 (결정업체)' },
+                { key: 'outbound_contracts', label2: '아웃바운딩 계약' },
+              ] as { key: keyof MorningData; label2: string }[]).map(f => (
+                <div key={f.key}>
+                  <label className={label}>{f.label2}</label>
+                  <LockedInput
+                    type="number"
+                    placeholder="0"
+                    value={morning[f.key]}
+                    locked={!!lockedMorning[f.key]}
+                    onChange={v => setMorning(p => ({ ...p, [f.key]: v }))}
+                    onLock={() => setLockedMorning(p => ({ ...p, [f.key]: true }))}
+                    onUnlock={() => setLockedMorning(p => ({ ...p, [f.key]: false }))}
+                  />
+                </div>
+              ))}
             </div>
 
             <button type="submit" disabled={loading}
               className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
-              {loading ? '전송 중...' : '오전보고 전송 →'}
+              {loading ? '전송 중...' : editDate ? '✏️ 오전보고 수정 전송 →' : '오전보고 전송 →'}
             </button>
           </form>
 
@@ -345,8 +433,12 @@ export default function ReportTab({ userId, userName }: Props) {
                           총콜 {tc}건 · 연결 {cn}건 <span className="text-amber-500 font-semibold">({connRate} 연결율)</span> · DB {r.data?.db_secured || 0}건 <span className="text-amber-400">({dbRate})</span> · 계약 {r.data?.outbound_contracts || 0}건 <span className="text-green-500 font-semibold">({ctRate})</span>
                         </p>
                       </div>
-                      <button onClick={() => setViewReport(r)}
-                        className="text-xs text-blue-500 hover:text-blue-700 shrink-0 ml-2">상세보기</button>
+                      <div className="flex gap-2 shrink-0 ml-2">
+                        <button onClick={() => setViewReport(r)}
+                          className="text-xs text-blue-500 hover:text-blue-700">상세보기</button>
+                        <button onClick={() => loadForEdit(r)}
+                          className="text-xs text-amber-500 hover:text-amber-700 font-medium">수정하기</button>
+                      </div>
                     </div>
                   )
                 })}
@@ -363,9 +455,16 @@ export default function ReportTab({ userId, userName }: Props) {
 
             {/* 기본 정보 */}
             <div className="bg-white rounded-xl border border-gray-100 p-5">
+              {editDate && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center justify-between mb-3">
+                  <span className="text-xs text-amber-700 font-medium">✏️ 수정 중 — {editDate}</span>
+                  <button type="button" onClick={() => setEditDate(null)}
+                    className="text-xs text-amber-500 hover:text-amber-700">취소</button>
+                </div>
+              )}
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-gray-800">📋 일일업무마감보고서</h3>
-                <span className="text-xs text-gray-400">{today()} · {userName}</span>
+                <span className="text-xs text-gray-400">{editDate || today()} · {userName}</span>
               </div>
 
               {/* 계약 현황 */}
@@ -407,7 +506,10 @@ export default function ReportTab({ userId, userName }: Props) {
               {(daily.supply_db || []).map((item, i) => (
                 <ConsultRow key={i} item={item} idx={i}
                   onChange={(k: string, v: unknown) => updateItem('supply_db', i, k, v)}
-                  onRemove={() => removeItem('supply_db', i)} />
+                  onRemove={() => removeItem('supply_db', i)}
+                  onLock={() => updateItem('supply_db', i, '_locked', true)}
+                  onUnlock={() => updateItem('supply_db', i, '_locked', false)}
+                  allCompanies={allCompanies} pastReports={dailyReports} />
               ))}
             </Section>
 
@@ -421,7 +523,10 @@ export default function ReportTab({ userId, userName }: Props) {
               {(daily.outbound || []).map((item, i) => (
                 <ConsultRow key={i} item={item} idx={i}
                   onChange={(k: string, v: unknown) => updateItem('outbound', i, k, v)}
-                  onRemove={() => removeItem('outbound', i)} />
+                  onRemove={() => removeItem('outbound', i)}
+                  onLock={() => updateItem('outbound', i, '_locked', true)}
+                  onUnlock={() => updateItem('outbound', i, '_locked', false)}
+                  allCompanies={allCompanies} pastReports={dailyReports} />
               ))}
             </Section>
 
@@ -435,7 +540,9 @@ export default function ReportTab({ userId, userName }: Props) {
               {(daily.worried || []).map((item, i) => (
                 <WorriedRow key={i} item={item} idx={i}
                   onChange={(k: string, v: unknown) => updateItem('worried', i, k, v)}
-                  onRemove={() => removeItem('worried', i)} />
+                  onRemove={() => removeItem('worried', i)}
+                  onLock={() => updateItem('worried', i, '_locked', true)}
+                  onUnlock={() => updateItem('worried', i, '_locked', false)} />
               ))}
             </Section>
 
@@ -449,7 +556,9 @@ export default function ReportTab({ userId, userName }: Props) {
               {(daily.decided || []).map((item, i) => (
                 <DecidedRow key={i} item={item} idx={i}
                   onChange={(k: string, v: unknown) => updateItem('decided', i, k, v)}
-                  onRemove={() => removeItem('decided', i)} />
+                  onRemove={() => removeItem('decided', i)}
+                  onLock={() => updateItem('decided', i, '_locked', true)}
+                  onUnlock={() => updateItem('decided', i, '_locked', false)} />
               ))}
             </Section>
 
@@ -463,7 +572,9 @@ export default function ReportTab({ userId, userName }: Props) {
               {(daily.meetings || []).map((item, i) => (
                 <MeetingRow key={i} item={item} idx={i}
                   onChange={(k: string, v: unknown) => updateItem('meetings', i, k, v)}
-                  onRemove={() => removeItem('meetings', i)} />
+                  onRemove={() => removeItem('meetings', i)}
+                  onLock={() => updateItem('meetings', i, '_locked', true)}
+                  onUnlock={() => updateItem('meetings', i, '_locked', false)} />
               ))}
             </Section>
 
@@ -477,13 +588,15 @@ export default function ReportTab({ userId, userName }: Props) {
               {(daily.payment_waiting || []).map((item, i) => (
                 <PaymentRow key={i} item={item} idx={i}
                   onChange={(k: string, v: unknown) => updateItem('payment_waiting', i, k, v)}
-                  onRemove={() => removeItem('payment_waiting', i)} />
+                  onRemove={() => removeItem('payment_waiting', i)}
+                  onLock={() => updateItem('payment_waiting', i, '_locked', true)}
+                  onUnlock={() => updateItem('payment_waiting', i, '_locked', false)} />
               ))}
             </Section>
 
             <button type="submit" disabled={loading}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-3 rounded-xl text-sm font-semibold transition-colors">
-              {loading ? '전송 중...' : '📋 마감보고 전송 →'}
+              {loading ? '전송 중...' : editDate ? '✏️ 마감보고 수정 전송 →' : '📋 마감보고 전송 →'}
             </button>
           </form>
 
@@ -503,8 +616,12 @@ export default function ReportTab({ userId, userName }: Props) {
                         당일계약 {r.data?.today_contracts || 0}건 · 월누적 {r.data?.month_contracts || 0}건 · 목표 {r.data?.goal || 0}건
                       </p>
                     </div>
-                    <button onClick={() => setViewReport(r)}
-                      className="text-xs text-blue-500 hover:text-blue-700">상세보기</button>
+                    <div className="flex gap-2 shrink-0 ml-2">
+                      <button onClick={() => setViewReport(r)}
+                        className="text-xs text-blue-500 hover:text-blue-700">상세보기</button>
+                      <button onClick={() => loadForEdit(r)}
+                        className="text-xs text-amber-500 hover:text-amber-700 font-medium">수정하기</button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -575,6 +692,69 @@ function Section({ title, isEmpty, onToggleEmpty, onAdd, children }: {
   )
 }
 
+// ── 업체명 자동완성 + 타임라인 컴포넌트 ───────────────────
+function CompanyInput({ value, onChange, onKeyDown, allCompanies, companyHistory }: {
+  value: string
+  onChange: (v: string) => void
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void
+  allCompanies: string[]
+  companyHistory: { date: string; type: string; status: string; content: string }[]
+}) {
+  const [open, setOpen] = useState(false)
+  const filtered = value.trim()
+    ? allCompanies.filter(c => c.includes(value) && c !== value).slice(0, 8)
+    : []
+
+  return (
+    <div className="relative">
+      <input
+        className={inp}
+        placeholder="업체명 입력 후 Enter"
+        value={value}
+        onChange={e => { onChange(e.target.value); setOpen(true) }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={onKeyDown}
+      />
+      {/* 자동완성 드롭다운 */}
+      {open && filtered.length > 0 && (
+        <div className="absolute z-20 top-full left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+          {filtered.map(c => (
+            <button key={c} type="button"
+              onMouseDown={() => { onChange(c); setOpen(false) }}
+              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-2">
+              <span className="text-gray-300 text-xs">🕐</span>{c}
+            </button>
+          ))}
+        </div>
+      )}
+      {/* 해당 업체 타임라인 */}
+      {value.trim() && companyHistory.length > 0 && (
+        <div className="mt-2 border border-blue-100 rounded-xl overflow-hidden bg-blue-50/30">
+          <div className="px-3 py-1.5 bg-blue-100/60 flex items-center gap-1.5">
+            <span className="text-[10px] text-blue-600 font-semibold">📋 {value} 과거 보고 기록</span>
+          </div>
+          <div className="divide-y divide-blue-100/60 max-h-48 overflow-y-auto">
+            {companyHistory.map((h, i) => (
+              <div key={i} className="px-3 py-2">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-[10px] text-gray-400">{h.date}</span>
+                  {h.status && (
+                    <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-medium">
+                      {h.status}
+                    </span>
+                  )}
+                </div>
+                {h.content && <p className="text-xs text-gray-600">{h.content}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── 상태 옵션 ─────────────────────────────────────────────
 const CONSULT_STATUSES: { value: ConsultStatus; label: string; color: string }[] = [
   { value: '결정업체',   label: '결정업체',   color: 'bg-emerald-500 text-white border-emerald-500' },
@@ -587,8 +767,58 @@ const CONSULT_STATUSES: { value: ConsultStatus; label: string; color: string }[]
 ]
 
 // ── 공급DB / 아웃바운딩 행 ────────────────────────────────
-function ConsultRow({ item, idx, onChange, onRemove }: any) {
+function ConsultRow({ item, idx, onChange, onRemove, onLock, onUnlock, allCompanies, pastReports }: any) {
   const cur: ConsultStatus = item.status || (item.is_decided ? '결정업체' : '')
+  const locked: boolean = !!item._locked
+  const statusInfo = CONSULT_STATUSES.find(s => s.value === cur)
+
+  // 해당 업체의 과거 보고 기록 추출
+  const companyHistory: { date: string; type: string; status: string; content: string }[] =
+    item.company?.trim()
+      ? (pastReports as any[]).flatMap(r => {
+          const entries: any[] = []
+          const fields = ['supply_db', 'outbound'] as const
+          fields.forEach(f => {
+            ;(r.data?.[f] || []).forEach((c: any) => {
+              if (c.company === item.company) {
+                entries.push({
+                  date: r.report_date + ' ' + (r.created_at ? new Date(r.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''),
+                  type: f === 'supply_db' ? '공급DB' : '아웃바운딩',
+                  status: c.status || (c.is_decided ? '결정업체' : ''),
+                  content: c.content || '',
+                })
+              }
+            })
+          })
+          return entries
+        }).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10)
+      : []
+
+  if (locked) {
+    return (
+      <div className="border-l-4 border-emerald-400 bg-emerald-50/50 rounded-r-lg p-3 flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-gray-800 text-sm">{item.company || '(업체명 없음)'}</span>
+            {statusInfo && (
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${statusInfo.color}`}>
+                {statusInfo.label}
+              </span>
+            )}
+            {cur === '재통화예정' && item.callback_date && (
+              <span className="text-[10px] text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-full">{item.callback_date}</span>
+            )}
+          </div>
+          {item.content && <p className="text-xs text-gray-500 mt-0.5 truncate">{item.content}</p>}
+        </div>
+        <button type="button" onClick={onUnlock}
+          className="shrink-0 text-xs text-amber-500 hover:text-amber-700 font-medium border border-amber-200 rounded-lg px-2 py-1 bg-white">
+          수정
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="border border-gray-100 rounded-lg p-3 space-y-2 bg-gray-50/50">
       <div className="flex items-center justify-between">
@@ -596,9 +826,14 @@ function ConsultRow({ item, idx, onChange, onRemove }: any) {
         <button type="button" onClick={onRemove} className="text-xs text-red-400 hover:text-red-600">삭제</button>
       </div>
       <div>
-        <label className="text-xs text-gray-400 mb-0.5 block">업체명</label>
-        <input className={inp} placeholder="업체명" value={item.company}
-          onChange={e => onChange('company', e.target.value)} />
+        <label className="text-xs text-gray-400 mb-0.5 block">업체명 <span className="text-gray-300">(Enter로 확정)</span></label>
+        <CompanyInput
+          value={item.company}
+          onChange={v => onChange('company', v)}
+          onKeyDown={e => e.key === 'Enter' && item.company.trim() && (e.preventDefault(), onLock())}
+          allCompanies={allCompanies || []}
+          companyHistory={companyHistory}
+        />
       </div>
       <div>
         <label className="text-xs text-gray-400 mb-1 block">상태</label>
@@ -626,12 +861,40 @@ function ConsultRow({ item, idx, onChange, onRemove }: any) {
         <textarea className={inp + ' resize-none'} rows={2} placeholder="상담 내용을 입력하세요"
           value={item.content} onChange={e => onChange('content', e.target.value)} />
       </div>
+      <div className="flex justify-end">
+        <button type="button" onClick={onLock} disabled={!item.company?.trim()}
+          className="text-xs bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg font-medium transition-colors">
+          ✓ 확정
+        </button>
+      </div>
     </div>
   )
 }
 
 // ── 고민관리업체 행 ──────────────────────────────────────
-function WorriedRow({ item, idx, onChange, onRemove }: any) {
+function WorriedRow({ item, idx, onChange, onRemove, onLock, onUnlock }: any) {
+  const locked: boolean = !!item._locked
+  const probColor = item.probability === '상' ? 'text-emerald-600' : item.probability === '중' ? 'text-amber-600' : 'text-red-500'
+
+  if (locked) {
+    return (
+      <div className="border-l-4 border-amber-400 bg-amber-50/40 rounded-r-lg p-3 flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-gray-800 text-sm">{item.company || '(업체명 없음)'}</span>
+            {item.probability && <span className={`text-xs font-bold ${probColor}`}>[{item.probability}]</span>}
+          </div>
+          {item.content && <p className="text-xs text-gray-500 mt-0.5 truncate">{item.content}</p>}
+          {item.reason && <p className="text-xs text-gray-400 truncate">{item.reason}</p>}
+        </div>
+        <button type="button" onClick={onUnlock}
+          className="shrink-0 text-xs text-amber-500 hover:text-amber-700 font-medium border border-amber-200 rounded-lg px-2 py-1 bg-white">
+          수정
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="border border-gray-100 rounded-lg p-3 space-y-2 bg-gray-50/50">
       <div className="flex items-center justify-between">
@@ -642,7 +905,8 @@ function WorriedRow({ item, idx, onChange, onRemove }: any) {
         <div>
           <label className="text-xs text-gray-400 mb-0.5 block">업체명</label>
           <input className={inp} placeholder="업체명" value={item.company}
-            onChange={e => onChange('company', e.target.value)} />
+            onChange={e => onChange('company', e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && item.company.trim() && (e.preventDefault(), onLock())} />
         </div>
         <div>
           <label className="text-xs text-gray-400 mb-0.5 block">계약 확률</label>
@@ -673,12 +937,36 @@ function WorriedRow({ item, idx, onChange, onRemove }: any) {
         <input className={inp} placeholder="고민하는 이유" value={item.reason}
           onChange={e => onChange('reason', e.target.value)} />
       </div>
+      <div className="flex justify-end">
+        <button type="button" onClick={onLock} disabled={!item.company?.trim()}
+          className="text-xs bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg font-medium transition-colors">
+          ✓ 확정
+        </button>
+      </div>
     </div>
   )
 }
 
 // ── 결정업체 행 ──────────────────────────────────────────
-function DecidedRow({ item, idx, onChange, onRemove }: any) {
+function DecidedRow({ item, idx, onChange, onRemove, onLock, onUnlock }: any) {
+  const locked: boolean = !!item._locked
+
+  if (locked) {
+    return (
+      <div className="border-l-4 border-blue-400 bg-blue-50/40 rounded-r-lg p-3 flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <span className="font-semibold text-gray-800 text-sm">{item.company || '(업체명 없음)'}</span>
+          {item.current_progress && <p className="text-xs text-gray-500 mt-0.5 truncate">진행: {item.current_progress}</p>}
+          {item.next_action && <p className="text-xs text-gray-400 truncate">다음: {item.next_action}</p>}
+        </div>
+        <button type="button" onClick={onUnlock}
+          className="shrink-0 text-xs text-amber-500 hover:text-amber-700 font-medium border border-amber-200 rounded-lg px-2 py-1 bg-white">
+          수정
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="border border-gray-100 rounded-lg p-3 space-y-2 bg-gray-50/50">
       <div className="flex items-center justify-between">
@@ -688,7 +976,8 @@ function DecidedRow({ item, idx, onChange, onRemove }: any) {
       <div>
         <label className="text-xs text-gray-400 mb-0.5 block">업체명</label>
         <input className={inp} placeholder="업체명" value={item.company}
-          onChange={e => onChange('company', e.target.value)} />
+          onChange={e => onChange('company', e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && item.company.trim() && (e.preventDefault(), onLock())} />
       </div>
       <div>
         <label className="text-xs text-gray-400 mb-0.5 block">상담내용</label>
@@ -705,12 +994,37 @@ function DecidedRow({ item, idx, onChange, onRemove }: any) {
         <input className={inp} placeholder="다음 액션" value={item.next_action}
           onChange={e => onChange('next_action', e.target.value)} />
       </div>
+      <div className="flex justify-end">
+        <button type="button" onClick={onLock} disabled={!item.company?.trim()}
+          className="text-xs bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg font-medium transition-colors">
+          ✓ 확정
+        </button>
+      </div>
     </div>
   )
 }
 
 // ── 미팅업체 행 ──────────────────────────────────────────
-function MeetingRow({ item, idx, onChange, onRemove }: any) {
+function MeetingRow({ item, idx, onChange, onRemove, onLock, onUnlock }: any) {
+  const locked: boolean = !!item._locked
+
+  if (locked) {
+    return (
+      <div className="border-l-4 border-violet-400 bg-violet-50/40 rounded-r-lg p-3 flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <span className="font-semibold text-gray-800 text-sm">{item.company || '(업체명 없음)'}</span>
+          {(item.date || item.time) && (
+            <p className="text-xs text-gray-500 mt-0.5">{item.date} {item.time} {item.location && `· ${item.location}`}</p>
+          )}
+        </div>
+        <button type="button" onClick={onUnlock}
+          className="shrink-0 text-xs text-amber-500 hover:text-amber-700 font-medium border border-amber-200 rounded-lg px-2 py-1 bg-white">
+          수정
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="border border-gray-100 rounded-lg p-3 space-y-2 bg-gray-50/50">
       <div className="flex items-center justify-between">
@@ -721,7 +1035,8 @@ function MeetingRow({ item, idx, onChange, onRemove }: any) {
         <div>
           <label className="text-xs text-gray-400 mb-0.5 block">업체명</label>
           <input className={inp} placeholder="업체명" value={item.company}
-            onChange={e => onChange('company', e.target.value)} />
+            onChange={e => onChange('company', e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && item.company.trim() && (e.preventDefault(), onLock())} />
         </div>
         <div>
           <label className="text-xs text-gray-400 mb-0.5 block">날짜</label>
@@ -739,12 +1054,38 @@ function MeetingRow({ item, idx, onChange, onRemove }: any) {
             onChange={e => onChange('location', e.target.value)} />
         </div>
       </div>
+      <div className="flex justify-end">
+        <button type="button" onClick={onLock} disabled={!item.company?.trim()}
+          className="text-xs bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg font-medium transition-colors">
+          ✓ 확정
+        </button>
+      </div>
     </div>
   )
 }
 
 // ── 입금대기 업체 행 ─────────────────────────────────────
-function PaymentRow({ item, idx, onChange, onRemove }: any) {
+function PaymentRow({ item, idx, onChange, onRemove, onLock, onUnlock }: any) {
+  const locked: boolean = !!item._locked
+
+  if (locked) {
+    return (
+      <div className="border-l-4 border-sky-400 bg-sky-50/40 rounded-r-lg p-3 flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <span className="font-semibold text-gray-800 text-sm">{item.company || '(업체명 없음)'}</span>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {item.ceo_name && `${item.ceo_name} · `}{item.phone && `${item.phone}`}
+            {item.first_call_date && ` · 첫콜 ${item.first_call_date}`}
+          </p>
+        </div>
+        <button type="button" onClick={onUnlock}
+          className="shrink-0 text-xs text-amber-500 hover:text-amber-700 font-medium border border-amber-200 rounded-lg px-2 py-1 bg-white">
+          수정
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="border border-gray-100 rounded-lg p-3 space-y-2 bg-gray-50/50">
       <div className="flex items-center justify-between">
@@ -760,7 +1101,8 @@ function PaymentRow({ item, idx, onChange, onRemove }: any) {
         <div>
           <label className="text-xs text-gray-400 mb-0.5 block">업체명</label>
           <input className={inp} placeholder="업체명" value={item.company}
-            onChange={e => onChange('company', e.target.value)} />
+            onChange={e => onChange('company', e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && item.company.trim() && (e.preventDefault(), onLock())} />
         </div>
         <div>
           <label className="text-xs text-gray-400 mb-0.5 block">대표명</label>
@@ -772,6 +1114,12 @@ function PaymentRow({ item, idx, onChange, onRemove }: any) {
           <input className={inp} placeholder="010-0000-0000" value={item.phone}
             onChange={e => onChange('phone', e.target.value)} />
         </div>
+      </div>
+      <div className="flex justify-end">
+        <button type="button" onClick={onLock} disabled={!item.company?.trim()}
+          className="text-xs bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg font-medium transition-colors">
+          ✓ 확정
+        </button>
       </div>
     </div>
   )
