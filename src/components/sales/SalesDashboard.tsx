@@ -31,6 +31,13 @@ interface Contract {
 interface Props {
   userId: string
   userName: string
+  username: string
+}
+
+// 사원별 월 목표 (고정)
+const MONTHLY_GOALS: Record<string, number> = {
+  'hd-sales1': 40,
+  'hd-sales2': 20,
 }
 
 const STATUS_LABEL: Record<string, { label: string; color: string }> = {
@@ -39,7 +46,7 @@ const STATUS_LABEL: Record<string, { label: string; color: string }> = {
   contracted:  { label: '계약 완료',   color: 'bg-emerald-100 text-emerald-700' },
 }
 
-export default function SalesDashboard({ userId, userName }: Props) {
+export default function SalesDashboard({ userId, userName, username }: Props) {
   const [activeTab, setActiveTab] = useState<'customers' | 'contracts' | 'report'>('customers')
   const [customers, setCustomers] = useState<Customer[]>([])
   const [contracts, setContracts] = useState<Contract[]>([])
@@ -140,10 +147,23 @@ export default function SalesDashboard({ userId, userName }: Props) {
 
   // 매출 집계
   const totalRevenue = contracts.reduce((s, c) => s + (c.contract_amount || 0), 0)
-  const thisMonth = new Date().toISOString().slice(0, 7)
+  const now = new Date()
+  const thisMonth = now.toISOString().slice(0, 7)
   const monthRevenue = contracts
     .filter(c => c.created_at?.slice(0, 7) === thisMonth)
     .reduce((s, c) => s + (c.contract_amount || 0), 0)
+
+  // 월 목표 달성률
+  const monthlyGoal = MONTHLY_GOALS[username] ?? 30
+  const monthContractCount = contracts.filter(c => c.created_at?.slice(0, 7) === thisMonth).length
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  const dayOfMonth = now.getDate()
+  const daysRemaining = daysInMonth - dayOfMonth + 1  // 오늘 포함
+  const achievementRate = Math.min(100, Math.round(monthContractCount / monthlyGoal * 100))
+  const remaining = Math.max(0, monthlyGoal - monthContractCount)
+  const dailyPaceNeeded = daysRemaining > 0 ? (remaining / daysRemaining).toFixed(1) : '0'
+  const onPaceCount = Math.round((monthlyGoal / daysInMonth) * dayOfMonth)
+  const isAhead = monthContractCount >= onPaceCount
 
   const tabs = [
     { key: 'customers', label: `내 고객 (${customers.length})` },
@@ -201,6 +221,50 @@ export default function SalesDashboard({ userId, userName }: Props) {
       </header>
 
       <div className="px-4 md:px-6 py-6 max-w-5xl mx-auto">
+        {/* ── 월 목표 달성 배너 ── */}
+        <div className={`rounded-2xl p-5 mb-4 border ${isAhead ? 'bg-emerald-50 border-emerald-200' : achievementRate >= 70 ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200'}`}>
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <p className="text-xs font-semibold text-gray-500 mb-0.5">{thisMonth} 월간 목표</p>
+              <div className="flex items-baseline gap-2">
+                <span className={`text-4xl font-black ${isAhead ? 'text-emerald-600' : achievementRate >= 70 ? 'text-amber-600' : 'text-red-600'}`}>
+                  {monthContractCount}
+                </span>
+                <span className="text-lg text-gray-400 font-medium">/ {monthlyGoal}건</span>
+                <span className={`text-sm font-bold px-2 py-0.5 rounded-full ${isAhead ? 'bg-emerald-100 text-emerald-700' : achievementRate >= 70 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'}`}>
+                  {achievementRate}%
+                </span>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-gray-400">{dayOfMonth}일째 / {daysInMonth}일</p>
+              <p className={`text-sm font-bold mt-0.5 ${isAhead ? 'text-emerald-600' : 'text-red-500'}`}>
+                {isAhead ? '🔥 목표 페이스 초과' : `⚡ 하루 ${dailyPaceNeeded}건 필요`}
+              </p>
+            </div>
+          </div>
+          {/* 프로그레스 바 */}
+          <div className="bg-white/60 rounded-full h-3 overflow-hidden mb-3">
+            <div
+              className={`h-full rounded-full transition-all duration-700 ${isAhead ? 'bg-emerald-500' : achievementRate >= 70 ? 'bg-amber-500' : 'bg-red-400'}`}
+              style={{ width: `${Math.min(100, achievementRate)}%` }}
+            />
+          </div>
+          <div className="flex items-center justify-between text-xs text-gray-500">
+            <span>남은 목표 <strong className="text-gray-800">{remaining}건</strong></span>
+            <span>페이스 기준 <strong className={isAhead ? 'text-emerald-600' : 'text-red-500'}>{onPaceCount}건</strong> 위치</span>
+            <span>남은 일수 <strong className="text-gray-800">{daysRemaining}일</strong></span>
+          </div>
+          {/* 동기부여 멘트 */}
+          <p className={`text-xs font-semibold mt-2 text-center ${isAhead ? 'text-emerald-600' : achievementRate >= 50 ? 'text-amber-600' : 'text-red-500'}`}>
+            {achievementRate >= 100 ? '🎉 목표 달성! 초과 달성 중입니다!' :
+             isAhead ? `💪 잘 하고 있습니다! 이 페이스 유지하면 목표 달성!` :
+             achievementRate >= 70 ? `👊 조금만 더! 하루 ${dailyPaceNeeded}건씩 하면 됩니다` :
+             achievementRate >= 40 ? `⚡ 분발이 필요합니다. 하루 ${dailyPaceNeeded}건 목표!` :
+             `🚨 목표 대비 부진 — 하루 ${dailyPaceNeeded}건 이상 필수!`}
+          </p>
+        </div>
+
         {/* 매출 요약 카드 */}
         <div className="grid grid-cols-3 gap-3 mb-5">
           {[

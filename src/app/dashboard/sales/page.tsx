@@ -11,5 +11,5 @@ export default async function SalesPage() {
   const user = session.user as any
   if (user.role !== 'sales') redirect('/dashboard')
 
-  return <SalesDashboard userId={user.id} userName={user.name} />
+  return <SalesDashboard userId={user.id} userName={user.name} username={user.username} />
 }

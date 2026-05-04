@@ -503,16 +503,22 @@ export default function ReportTab({ userId, userName }: Props) {
       {/* 상세보기 모달 */}
       {viewReport && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto p-6 shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-gray-900">
-                {viewReport.report_type === 'morning' ? '☀️ 오전보고' : '📋 마감보고'} — {viewReport.report_date}
-              </h3>
-              <button onClick={() => setViewReport(null)} className="text-gray-400 hover:text-gray-700">✕</button>
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl">
+            <div className="sticky top-0 bg-white px-6 py-4 border-b border-gray-100 flex items-center justify-between rounded-t-2xl">
+              <div>
+                <h3 className="font-bold text-gray-900">
+                  {viewReport.report_type === 'morning' ? '☀️ 오전보고' : '📋 마감보고'}
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">{viewReport.report_date} · {userName}</p>
+              </div>
+              <button onClick={() => setViewReport(null)} className="text-gray-400 hover:text-gray-700 text-xl leading-none">✕</button>
             </div>
-            <pre className="text-xs text-gray-600 whitespace-pre-wrap bg-gray-50 rounded-lg p-4">
-              {JSON.stringify(viewReport.data, null, 2)}
-            </pre>
+            <div className="p-6">
+              {viewReport.report_type === 'morning'
+                ? <MorningDetailView data={viewReport.data} />
+                : <DailyDetailView data={viewReport.data} />
+              }
+            </div>
           </div>
         </div>
       )}
@@ -735,6 +741,169 @@ function PaymentRow({ item, idx, onChange, onRemove }: any) {
             onChange={e => onChange('phone', e.target.value)} />
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── 오전보고 상세 뷰 ──────────────────────────────────────
+function MorningDetailView({ data }: { data: any }) {
+  const tc = Number(data?.total_calls || 0)
+  const cn = Number(data?.connected || 0)
+  const nc = Number(data?.no_connect || 0)
+  const db = Number(data?.db_secured || 0)
+  const oc = Number(data?.outbound_contracts || 0)
+  const p = (n: number) => tc === 0 ? '—' : (n / tc * 100).toFixed(1) + '%'
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        {[
+          { label: '총 콜 수', value: tc + '건', sub: null, color: 'text-gray-900' },
+          { label: '연결안됨', value: nc + '건', sub: p(nc) + ' 미연결율', color: 'text-gray-600' },
+          { label: '연결됨', value: cn + '건', sub: p(cn) + ' 연결율', color: 'text-amber-600' },
+          { label: 'DB확보', value: db + '건', sub: p(db) + ' 확보율', color: 'text-blue-600' },
+          { label: '아웃바운딩 계약', value: oc + '건', sub: p(oc) + ' 계약율', color: 'text-green-600' },
+        ].map(f => (
+          <div key={f.label} className="bg-gray-50 rounded-xl p-3.5">
+            <p className="text-xs text-gray-400 mb-1">{f.label}</p>
+            <p className={`text-2xl font-black ${f.color}`}>{f.value}</p>
+            {f.sub && <p className="text-[11px] text-gray-400 mt-0.5 font-medium">{f.sub}</p>}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── 마감보고 상세 뷰 ──────────────────────────────────────
+function DailyDetailView({ data }: { data: any }) {
+  const goal = Number(data?.goal || 0)
+  const month = Number(data?.month_contracts || 0)
+  const remaining = goal > 0 ? Math.max(0, goal - month) : null
+  const rate = goal > 0 ? Math.round(month / goal * 100) : null
+
+  return (
+    <div className="space-y-5">
+      {/* 계약 현황 */}
+      <div>
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">계약 현황</p>
+        <div className="grid grid-cols-2 gap-2.5">
+          {[
+            { label: '당일 계약', value: (data?.today_contracts || 0) + '건', color: 'text-blue-700', bg: 'bg-blue-50' },
+            { label: '이번달 누적', value: month + '건', color: 'text-emerald-700', bg: 'bg-emerald-50' },
+            { label: '월 목표', value: goal > 0 ? goal + '건' : '미설정', color: 'text-gray-700', bg: 'bg-gray-50' },
+            { label: '남은 목표', value: remaining !== null ? remaining + '건' + (rate !== null ? ` (${rate}%)` : '') : '—', color: 'text-amber-700', bg: 'bg-amber-50' },
+          ].map(f => (
+            <div key={f.label} className={`${f.bg} rounded-xl p-3`}>
+              <p className="text-xs text-gray-400 mb-0.5">{f.label}</p>
+              <p className={`text-xl font-black ${f.color}`}>{f.value}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 공급DB 상담결과 */}
+      {data?.supply_db !== null && (
+        <div>
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">공급DB 상담결과</p>
+          {(data?.supply_db || []).length === 0 ? (
+            <p className="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">항목 없음</p>
+          ) : (
+            <div className="space-y-2">
+              {(data.supply_db as any[]).map((item: any, i: number) => (
+                <div key={i} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-semibold text-gray-800 text-sm">{item.company}</span>
+                    {item.is_decided && <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-semibold">결정</span>}
+                  </div>
+                  {item.content && <p className="text-xs text-gray-500">{item.content}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 아웃바운딩 상담결과 */}
+      {data?.outbound !== null && (
+        <div>
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">아웃바운딩 상담결과</p>
+          {(data?.outbound || []).length === 0 ? (
+            <p className="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">항목 없음</p>
+          ) : (
+            <div className="space-y-2">
+              {(data.outbound as any[]).map((item: any, i: number) => (
+                <div key={i} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-semibold text-gray-800 text-sm">{item.company}</span>
+                    {item.is_decided && <span className="text-[10px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full font-semibold">결정</span>}
+                  </div>
+                  {item.content && <p className="text-xs text-gray-500">{item.content}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 미팅 일정 */}
+      {(data?.meetings || []).length > 0 && (
+        <div>
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">미팅 일정</p>
+          <div className="space-y-2">
+            {(data.meetings as any[]).map((m: any, i: number) => (
+              <div key={i} className="flex items-center gap-3 bg-blue-50 rounded-xl p-3 border border-blue-100">
+                <div className="text-blue-500 text-lg">📅</div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">{m.company}</p>
+                  <p className="text-xs text-gray-500">{m.date} {m.time} {m.location && `· ${m.location}`}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 입금대기 */}
+      {(data?.payment_waiting || []).length > 0 && (
+        <div>
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">입금대기 업체</p>
+          <div className="space-y-2">
+            {(data.payment_waiting as any[]).map((p: any, i: number) => (
+              <div key={i} className="flex items-center gap-3 bg-amber-50 rounded-xl p-3 border border-amber-100">
+                <div className="text-amber-500 text-lg">💰</div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">{p.company} ({p.ceo_name})</p>
+                  <p className="text-xs text-gray-500">{p.phone} · 최초콜 {p.first_call_date}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 걱정되는 업체 */}
+      {(data?.worried || []).length > 0 && (
+        <div>
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">검토 필요 업체</p>
+          <div className="space-y-2">
+            {(data.worried as any[]).map((w: any, i: number) => (
+              <div key={i} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-semibold text-sm text-gray-800">{w.company}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+                    w.probability === '상' ? 'bg-green-100 text-green-600'
+                    : w.probability === '중' ? 'bg-yellow-100 text-yellow-600'
+                    : 'bg-red-100 text-red-500'
+                  }`}>{w.probability}</span>
+                </div>
+                {w.reason && <p className="text-xs text-gray-500">사유: {w.reason}</p>}
+                {w.content && <p className="text-xs text-gray-500">내용: {w.content}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
