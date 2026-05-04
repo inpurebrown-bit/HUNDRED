@@ -71,6 +71,7 @@ const label = 'text-xs text-gray-500 mb-1 block font-medium'
 export default function ReportTab({ userId, userName }: Props) {
   const [activeReport, setActiveReport] = useState<'morning' | 'daily'>('morning')
   const [submitted, setSubmitted] = useState(false)
+  const [submitType, setSubmitType] = useState<'morning' | 'daily'>('morning')
   const [loading, setLoading] = useState(false)
   const [pastReports, setPastReports] = useState<any[]>([])
   const [viewReport, setViewReport] = useState<any | null>(null)
@@ -107,8 +108,8 @@ export default function ReportTab({ userId, userName }: Props) {
       body: JSON.stringify({ report_type: 'morning', report_date: today(), data: morning }),
     })
     if (res.ok) {
+      setSubmitType('morning')
       setSubmitted(true)
-      setTimeout(() => setSubmitted(false), 3000)
     }
     setLoading(false)
   }
@@ -123,8 +124,8 @@ export default function ReportTab({ userId, userName }: Props) {
       body: JSON.stringify({ report_type: 'daily', report_date: today(), data: daily }),
     })
     if (res.ok) {
+      setSubmitType('daily')
       setSubmitted(true)
-      setTimeout(() => setSubmitted(false), 3000)
     }
     setLoading(false)
   }
@@ -173,10 +174,32 @@ export default function ReportTab({ userId, userName }: Props) {
         </button>
       </div>
 
-      {/* 제출 완료 알림 */}
+      {/* ── 전송 완료 팝업 모달 ── */}
       {submitted && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-sm text-emerald-700 font-medium">
-          ✅ 보고가 대표님께 전송되었습니다!
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] px-6">
+          <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm text-center animate-[fadeIn_0.2s_ease]">
+            {/* 아이콘 */}
+            <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-5">
+              <span className="text-4xl">✅</span>
+            </div>
+            {/* 제목 */}
+            <h2 className="text-xl font-black text-gray-900 mb-2">
+              {submitType === 'morning' ? '오전보고 완료!' : '마감보고 완료!'}
+            </h2>
+            {/* 설명 */}
+            <p className="text-sm text-gray-500 mb-1">
+              대표님께 성공적으로 전송되었습니다.
+            </p>
+            <p className="text-xs text-gray-400 mb-7">
+              {today()} · {userName}
+            </p>
+            {/* 확인 버튼 */}
+            <button
+              onClick={() => setSubmitted(false)}
+              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-2xl text-sm transition-colors">
+              확인
+            </button>
+          </div>
         </div>
       )}
 

@@ -340,6 +340,7 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
   const [reportType, setReportType] = useState<'morning' | 'daily'>('morning')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [submitType, setSubmitType] = useState<'morning' | 'daily'>('morning')
   const today = new Date().toISOString().slice(0, 10)
 
   // 오전보고 폼
@@ -366,6 +367,7 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
       }),
     })
     setSubmitting(false)
+    setSubmitType('morning')
     setSubmitted(true)
   }
 
@@ -390,22 +392,32 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
       }),
     })
     setSubmitting(false)
+    setSubmitType('daily')
     setSubmitted(true)
-  }
-
-  if (submitted) {
-    return (
-      <div className="bg-white rounded-2xl border border-[#E8E2D4] p-10 text-center">
-        <p className="text-4xl mb-3">✅</p>
-        <p className="font-bold text-[#1B2A45]">보고 제출 완료!</p>
-        <p className="text-sm text-[#1B2A45]/40 mt-1">대표님께 전달되었습니다.</p>
-        <button onClick={() => setSubmitted(false)} className="mt-4 text-xs text-[#C5A258] hover:underline">다시 작성하기</button>
-      </div>
-    )
   }
 
   return (
     <div className="space-y-4">
+      {/* ── 전송 완료 팝업 모달 ── */}
+      {submitted && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] px-6">
+          <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm text-center">
+            <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-5">
+              <span className="text-4xl">✅</span>
+            </div>
+            <h2 className="text-xl font-black text-gray-900 mb-2">
+              {submitType === 'morning' ? '오전보고 완료!' : '마감보고 완료!'}
+            </h2>
+            <p className="text-sm text-gray-500 mb-1">대표님께 성공적으로 전송되었습니다.</p>
+            <p className="text-xs text-gray-400 mb-7">{today} · {userName}</p>
+            <button
+              onClick={() => setSubmitted(false)}
+              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-2xl text-sm transition-colors">
+              확인
+            </button>
+          </div>
+        </div>
+      )}
       <div className="flex gap-2">
         {[{ key: 'morning', label: '☀️ 오전보고' }, { key: 'daily', label: '📋 마감보고' }].map(t => (
           <button key={t.key} onClick={() => setReportType(t.key as any)}
