@@ -10,6 +10,7 @@ import {
   getElapsedBusinessDays,
   getRemainingBusinessDays,
 } from '@/lib/businessDays'
+import { SUPPLY_RATE_TABLE, calcRecommendedSupply, isActiveRow } from '@/lib/supplyRules'
 
 // ── 타입 ───────────────────────────────────────────────────
 interface Customer {
@@ -54,14 +55,6 @@ const MONTHLY_GOALS: Record<string, number> = {
 
 type SalesTab = 'board' | 'db010' | 'customers' | 'contracted' | 'emotional' | 'trash' | 'report'
 
-// ── 공급기준표 (고정) ─────────────────────────────────────
-const SUPPLY_RATE_TABLE = [
-  { supply: 10, r10: 1, r20: 2, r30: 3 },
-  { supply: 20, r10: 2, r20: 4, r30: 6 },
-  { supply: 30, r10: 3, r20: 6, r30: 9 },
-  { supply: 50, r10: 5, r20: 10, r30: 15 },
-  { supply: 100, r10: 10, r20: 20, r30: 30 },
-]
 
 export default function SalesDashboard({ userId, userName, username }: Props) {
   const [activeTab, setActiveTab] = useState<SalesTab>('board')
@@ -205,7 +198,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const supplyNotice = notices.find(n => n.notice_type === 'supply_count')
   const todaySupply = supplyNotice ? parseInt(supplyNotice.content) || 0 : 0
   const contractRate = todaySupply > 0 ? Math.round(monthContractCount / todaySupply * 100) : 0
-  const tomorrowSupplyNeeded = contractRate > 0 ? Math.ceil(3 / (contractRate / 100)) : 0
+  const tomorrowSupplyNeeded = calcRecommendedSupply(contractRate, bizElapsed)
 
   // 고객 필터링
   const db010List = customers.filter(c => c.status === 'db010')
@@ -404,30 +397,31 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
                 <h3 className="text-sm font-bold text-gray-700">📊 공급기준표</h3>
-                <span className="text-[10px] text-gray-400">공급 건수 대비 예상 계약 수</span>
+                <span className="text-[10px] text-gray-400">결제율 기준 내일 공급 권장</span>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50">
-                      <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">공급 수</th>
-                      <th className="px-4 py-2.5 text-xs font-semibold text-blue-500 text-center">계약율 10%</th>
-                      <th className="px-4 py-2.5 text-xs font-semibold text-amber-500 text-center">계약율 20%</th>
-                      <th className="px-4 py-2.5 text-xs font-semibold text-green-500 text-center">계약율 30%</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {SUPPLY_RATE_TABLE.map(row => (
-                      <tr key={row.supply} className={todaySupply === row.supply ? 'bg-amber-50' : ''}>
-                        <td className="px-4 py-2.5 font-semibold text-gray-800">{row.supply}개</td>
-                        <td className="px-4 py-2.5 text-center text-blue-600 font-medium">{row.r10}건</td>
-                        <td className="px-4 py-2.5 text-center text-amber-600 font-medium">{row.r20}건</td>
-                        <td className="px-4 py-2.5 text-center text-green-600 font-medium">{row.r30}건</td>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">기준</th>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-[#C5A258] text-center">권장 공급</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {SUPPLY_RATE_TABLE.map(row => {
+                    const isActive = isActiveRow(row, contractRate, bizElapsed)
+                    return (
+                      <tr key={row.condition} className={isActive ? 'bg-amber-50' : ''}>
+                        <td className={`px-4 py-2.5 text-xs ${isActive ? 'font-bold text-amber-700' : 'text-gray-600'}`}>
+                          {isActive && <span className="mr-1">▶</span>}{row.condition}
+                        </td>
+                        <td className={`px-4 py-2.5 text-center font-bold ${row.supply === 0 ? 'text-red-500' : isActive ? 'text-amber-600 text-base' : 'text-gray-700'}`}>
+                          {row.supply}개
+                        </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
 
             {/* 공지사항 */}
