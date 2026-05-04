@@ -264,28 +264,23 @@ export default function CustomerCard({
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
       {/* ── Collapsed header ── */}
       <button
-        className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+        className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
         onClick={() => setExpanded(e => !e)}
       >
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="text-left min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <p className="font-semibold text-gray-800 text-sm">{company || '(업체명 없음)'}</p>
-              <span className="text-gray-400 text-xs">{name}</span>
-              <span className="text-gray-300 text-xs">{phone}</span>
-            </div>
-            {chipLabel && (
-              <span className="inline-block mt-0.5 text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
-                {chipLabel}
-              </span>
-            )}
-          </div>
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <p className="font-semibold text-gray-800 text-sm truncate max-w-[130px]">{company || '(업체명 없음)'}</p>
+          <span className="text-gray-400 text-xs shrink-0">{name}</span>
+          <span className="text-gray-300 text-[11px] shrink-0 hidden sm:inline">{phone}</span>
+          {chipLabel && (
+            <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium shrink-0">
+              {chipLabel}
+            </span>
+          )}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {saveStatus === 'saving' && <span className="text-[10px] text-amber-500">저장 중...</span>}
-          {saveStatus === 'saved' && expanded && <span className="text-[10px] text-emerald-500">✓ 저장됨</span>}
-          {saveStatus === 'unsaved' && <span className="text-[10px] text-gray-400">●</span>}
-          <span className="text-gray-300 text-xs">{expanded ? '▲' : '▼'}</span>
+        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+          {saveStatus === 'saving' && <span className="text-[10px] text-amber-500">저장중</span>}
+          {saveStatus === 'unsaved' && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />}
+          <span className="text-gray-300 text-[10px]">{expanded ? '▲' : '▼'}</span>
         </div>
       </button>
 
