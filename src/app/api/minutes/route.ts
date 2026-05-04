@@ -31,10 +31,29 @@ export async function POST(req: NextRequest) {
   const user = session.user as any
   if (user.role !== 'ceo') return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
-  const { raw_text, meeting_date } = await req.json()
-  if (!raw_text) return NextResponse.json({ error: '텍스트가 없습니다' }, { status: 400 })
+  const body = await req.json()
+  const { raw_text, meeting_date, mode, summary: directSummary } = body
 
   const date = meeting_date || new Date().toISOString().slice(0, 10)
+
+  // 구조화된 회의록 직접 저장 (AI 불필요)
+  if (mode === 'structured') {
+    const { data, error } = await supabaseAdmin
+      .from('minutes')
+      .upsert({
+        meeting_date: date,
+        raw_text: '',
+        summary: directSummary,
+        created_by: user.name,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'meeting_date' })
+      .select()
+      .single()
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ minute: data }, { status: 201 })
+  }
+
+  if (!raw_text) return NextResponse.json({ error: '텍스트가 없습니다' }, { status: 400 })
 
   try {
     const model = genAI.getGenerativeModel({
