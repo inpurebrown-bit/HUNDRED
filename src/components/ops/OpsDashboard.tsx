@@ -341,7 +341,27 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [submitType, setSubmitType] = useState<'morning' | 'daily'>('morning')
+  const [pastReports, setPastReports] = useState<any[]>([])
   const today = new Date().toISOString().slice(0, 10)
+
+  useEffect(() => {
+    fetch('/api/reports').then(r => r.json()).then(d => setPastReports(d.reports || []))
+  }, [submitted])
+
+  const morningReports = pastReports.filter(r => r.report_type === 'morning')
+  const dailyReports = pastReports.filter(r => r.report_type === 'daily')
+  const morningStats = {
+    total_calls: morningReports.reduce((s: number, r: any) => s + Number(r.data?.total_calls || 0), 0),
+    no_connect:  morningReports.reduce((s: number, r: any) => s + Number(r.data?.no_connect || 0), 0),
+    connected:   morningReports.reduce((s: number, r: any) => s + Number(r.data?.connected || 0), 0),
+    db_secured:  morningReports.reduce((s: number, r: any) => s + Number(r.data?.db_secured || 0), 0),
+    outbound_contracts: morningReports.reduce((s: number, r: any) => s + Number(r.data?.outbound_contracts || 0), 0),
+  }
+  const dailyStats = {
+    today_contracts: dailyReports.reduce((s: number, r: any) => s + Number(r.data?.today_contracts || 0), 0),
+    month_contracts: dailyReports.filter((r: any) => r.report_date?.slice(0, 7) === today.slice(0, 7))
+      .reduce((s: number, r: any) => s + Number(r.data?.today_contracts || 0), 0),
+  }
 
   // 오전보고 폼
   const [morning, setMorning] = useState({
@@ -428,6 +448,43 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
           </button>
         ))}
       </div>
+
+      {/* ── 통계 카드 ── */}
+      {reportType === 'morning' && morningReports.length > 0 && (
+        <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+          <p className="text-xs text-amber-700 font-bold mb-3">☀️ 내 오전보고 누적 통계 ({morningReports.length}건)</p>
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            {[
+              { label: '총 콜', value: morningStats.total_calls },
+              { label: '연결안됨', value: morningStats.no_connect },
+              { label: '연결됨', value: morningStats.connected },
+              { label: 'DB확보', value: morningStats.db_secured },
+              { label: '아웃계약', value: morningStats.outbound_contracts },
+            ].map((s: any) => (
+              <div key={s.label} className="bg-white rounded-lg p-2.5 text-center border border-amber-100">
+                <p className="text-[10px] text-gray-400 mb-0.5">{s.label}</p>
+                <p className="text-xl font-black text-amber-700">{s.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {reportType === 'daily' && dailyReports.length > 0 && (
+        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+          <p className="text-xs text-blue-700 font-bold mb-3">📋 내 마감보고 누적 통계 ({dailyReports.length}건)</p>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: '누적 계약', value: dailyStats.today_contracts + '건' },
+              { label: '이번달 계약', value: dailyStats.month_contracts + '건' },
+            ].map((s: any) => (
+              <div key={s.label} className="bg-white rounded-lg p-2.5 text-center border border-blue-100">
+                <p className="text-[10px] text-gray-400 mb-0.5">{s.label}</p>
+                <p className="text-xl font-black text-blue-700">{s.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {reportType === 'morning' && (
         <form onSubmit={submitMorning} className="bg-white rounded-2xl border border-[#E8E2D4] p-5 space-y-4">

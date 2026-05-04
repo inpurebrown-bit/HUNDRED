@@ -115,7 +115,7 @@ export default function CeoDashboard() {
         {activeTab === 'payrate' && <PayRateTab />}
         {activeTab === 'payroll' && <PayrollTab />}
         {activeTab === 'payslip' && <PayslipTab />}
-        {activeTab === 'reports' && <ReportsTab />}
+        {activeTab === 'reports' && <ReportsTab isCeo={true} />}
         {activeTab === 'minutes' && <MinutesTab />}
         {activeTab === 'calendar' && <CalendarTab />}
         {activeTab === 'ai' && <AiTab />}
@@ -624,35 +624,80 @@ function RevenueTab() {
 }
 
 // ─── 보고함 ──────────────────────────────────────────────
-function ReportsTab() {
+function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
   const [reports, setReports] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | 'morning' | 'daily'>('all')
+  const [filter, setFilter] = useState<'morning' | 'daily'>('morning')
   const [viewReport, setViewReport] = useState<any | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [deleting, setDeleting] = useState(false)
 
-  useEffect(() => {
+  const loadReports = () => {
+    setLoading(true)
     fetch('/api/reports').then(r => r.json()).then(d => {
       setReports(d.reports || [])
       setLoading(false)
     })
-  }, [])
+  }
 
-  const filtered = filter === 'all' ? reports : reports.filter(r => r.report_type === filter)
+  useEffect(() => { loadReports() }, [])
 
-  // 오늘 보고 현황
+  const filtered = reports.filter(r => r.report_type === filter)
+  const morningReports = reports.filter(r => r.report_type === 'morning')
+  const dailyReports = reports.filter(r => r.report_type === 'daily')
   const todayStr = new Date().toISOString().slice(0, 10)
-  const todayMorning = reports.filter(r => r.report_type === 'morning' && r.report_date === todayStr)
-  const todayDaily = reports.filter(r => r.report_type === 'daily' && r.report_date === todayStr)
+  const todayMorning = morningReports.filter(r => r.report_date === todayStr)
+  const todayDaily = dailyReports.filter(r => r.report_date === todayStr)
+
+  // 오전보고 통계 (전체 누적)
+  const morningStats = {
+    total_calls: morningReports.reduce((s, r) => s + Number(r.data?.total_calls || 0), 0),
+    no_connect:  morningReports.reduce((s, r) => s + Number(r.data?.no_connect || 0), 0),
+    connected:   morningReports.reduce((s, r) => s + Number(r.data?.connected || 0), 0),
+    db_secured:  morningReports.reduce((s, r) => s + Number(r.data?.db_secured || 0), 0),
+    outbound_contracts: morningReports.reduce((s, r) => s + Number(r.data?.outbound_contracts || 0), 0),
+  }
+  // 마감보고 통계
+  const dailyStats = {
+    today_contracts: dailyReports.reduce((s, r) => s + Number(r.data?.today_contracts || 0), 0),
+    month_contracts: dailyReports.filter(r => r.report_date?.slice(0, 7) === todayStr.slice(0, 7))
+      .reduce((s, r) => s + Number(r.data?.today_contracts || 0), 0),
+    supply_decided: dailyReports.reduce((s, r) => s + (r.data?.supply_db || []).filter((i: any) => i.is_decided).length, 0),
+    outbound_decided: dailyReports.reduce((s, r) => s + (r.data?.outbound || []).filter((i: any) => i.is_decided).length, 0),
+  }
+
+  // 선택 삭제
+  async function deleteSelected() {
+    if (selected.size === 0) return
+    if (!confirm(`선택한 ${selected.size}건을 삭제하시겠습니까?`)) return
+    setDeleting(true)
+    await Promise.all([...selected].map(id =>
+      fetch(`/api/reports/${id}`, { method: 'DELETE' })
+    ))
+    setSelected(new Set())
+    setDeleting(false)
+    loadReports()
+  }
+
+  function toggleSelect(id: string) {
+    setSelected(prev => {
+      const n = new Set(prev)
+      n.has(id) ? n.delete(id) : n.add(id)
+      return n
+    })
+  }
+  function toggleAll() {
+    if (selected.size === filtered.length) setSelected(new Set())
+    else setSelected(new Set(filtered.map(r => r.id)))
+  }
 
   return (
     <div className="space-y-5 pb-8">
-      {/* 오늘 보고 현황 */}
+      {/* 오늘 현황 */}
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
           <p className="text-xs text-amber-600 font-semibold mb-1">☀️ 오늘 오전보고</p>
-          {todayMorning.length === 0 ? (
-            <p className="text-sm text-amber-400">아직 제출 없음</p>
-          ) : (
+          {todayMorning.length === 0 ? <p className="text-sm text-amber-400">아직 제출 없음</p> : (
             <div className="space-y-1">
               {todayMorning.map(r => (
                 <div key={r.id} className="flex items-center justify-between">
@@ -665,9 +710,7 @@ function ReportsTab() {
         </div>
         <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
           <p className="text-xs text-blue-600 font-semibold mb-1">📋 오늘 마감보고</p>
-          {todayDaily.length === 0 ? (
-            <p className="text-sm text-blue-400">아직 제출 없음</p>
-          ) : (
+          {todayDaily.length === 0 ? <p className="text-sm text-blue-400">아직 제출 없음</p> : (
             <div className="space-y-1">
               {todayDaily.map(r => (
                 <div key={r.id} className="flex items-center justify-between">
@@ -680,14 +723,13 @@ function ReportsTab() {
         </div>
       </div>
 
-      {/* 필터 */}
+      {/* 탭 */}
       <div className="flex gap-2">
         {[
-          { key: 'all', label: `전체 (${reports.length})` },
-          { key: 'morning', label: `오전보고 (${reports.filter(r => r.report_type === 'morning').length})` },
-          { key: 'daily', label: `마감보고 (${reports.filter(r => r.report_type === 'daily').length})` },
+          { key: 'morning', label: `☀️ 오전보고 (${morningReports.length})` },
+          { key: 'daily',   label: `📋 마감보고 (${dailyReports.length})` },
         ].map(f => (
-          <button key={f.key} onClick={() => setFilter(f.key as any)}
+          <button key={f.key} onClick={() => { setFilter(f.key as any); setSelected(new Set()) }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               filter === f.key ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 border border-gray-200'
             }`}>
@@ -696,7 +738,66 @@ function ReportsTab() {
         ))}
       </div>
 
-      {/* 보고 목록 */}
+      {/* ── 통계 카드 ── */}
+      {filter === 'morning' && morningReports.length > 0 && (
+        <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+          <p className="text-xs text-amber-700 font-bold mb-3">☀️ 오전보고 누적 통계 ({morningReports.length}건)</p>
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            {[
+              { label: '총 콜', value: morningStats.total_calls },
+              { label: '연결안됨', value: morningStats.no_connect },
+              { label: '연결됨', value: morningStats.connected },
+              { label: 'DB확보', value: morningStats.db_secured },
+              { label: '아웃계약', value: morningStats.outbound_contracts },
+            ].map(s => (
+              <div key={s.label} className="bg-white rounded-lg p-2.5 text-center border border-amber-100">
+                <p className="text-[10px] text-gray-400 mb-0.5">{s.label}</p>
+                <p className="text-xl font-black text-amber-700">{s.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {filter === 'daily' && dailyReports.length > 0 && (
+        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+          <p className="text-xs text-blue-700 font-bold mb-3">📋 마감보고 누적 통계 ({dailyReports.length}건)</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[
+              { label: '누적 계약', value: dailyStats.today_contracts + '건' },
+              { label: '이번달 계약', value: dailyStats.month_contracts + '건' },
+              { label: '공급DB 결정', value: dailyStats.supply_decided + '건' },
+              { label: '아웃바운딩 결정', value: dailyStats.outbound_decided + '건' },
+            ].map(s => (
+              <div key={s.label} className="bg-white rounded-lg p-2.5 text-center border border-blue-100">
+                <p className="text-[10px] text-gray-400 mb-0.5">{s.label}</p>
+                <p className="text-xl font-black text-blue-700">{s.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 삭제 툴바 — CEO만 */}
+      {isCeo && filtered.length > 0 && (
+        <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-4 py-2.5">
+          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+            <input type="checkbox"
+              checked={selected.size === filtered.length && filtered.length > 0}
+              onChange={toggleAll}
+              className="w-4 h-4 rounded" />
+            전체선택
+            {selected.size > 0 && <span className="text-xs text-gray-400">({selected.size}개 선택됨)</span>}
+          </label>
+          {selected.size > 0 && (
+            <button onClick={deleteSelected} disabled={deleting}
+              className="text-xs bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-bold px-3 py-1.5 rounded-lg transition-colors">
+              {deleting ? '삭제 중...' : `🗑 ${selected.size}건 삭제`}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* 목록 */}
       {loading ? (
         <div className="text-center py-10 text-gray-400 text-sm">불러오는 중...</div>
       ) : filtered.length === 0 ? (
@@ -707,13 +808,12 @@ function ReportsTab() {
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
           <div className="divide-y divide-gray-50">
             {filtered.map(r => (
-              <div key={r.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    r.report_type === 'morning' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
-                  }`}>
-                    {r.report_type === 'morning' ? '☀️ 오전' : '📋 마감'}
-                  </span>
+              <div key={r.id} className={`px-5 py-3.5 flex items-center gap-3 hover:bg-gray-50 transition-colors ${selected.has(r.id) ? 'bg-red-50' : ''}`}>
+                {isCeo && (
+                  <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggleSelect(r.id)}
+                    className="w-4 h-4 rounded shrink-0" />
+                )}
+                <div className="flex-1 flex items-center gap-3 min-w-0">
                   <div>
                     <span className="text-sm font-medium text-gray-900">{r.user_name}</span>
                     <span className="text-xs text-gray-400 ml-2">{r.report_date}</span>
@@ -730,7 +830,7 @@ function ReportsTab() {
                   )}
                 </div>
                 <button onClick={() => setViewReport(r)}
-                  className="text-xs text-blue-500 hover:text-blue-700 font-medium">
+                  className="text-xs text-blue-500 hover:text-blue-700 font-medium shrink-0">
                   상세보기
                 </button>
               </div>

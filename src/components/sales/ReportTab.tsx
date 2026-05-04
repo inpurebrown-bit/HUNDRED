@@ -152,6 +152,22 @@ export default function ReportTab({ userId, userName }: Props) {
   const morningReports = pastReports.filter(r => r.report_type === 'morning')
   const dailyReports = pastReports.filter(r => r.report_type === 'daily')
 
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const morningStats = {
+    total_calls: morningReports.reduce((s, r) => s + Number(r.data?.total_calls || 0), 0),
+    no_connect:  morningReports.reduce((s, r) => s + Number(r.data?.no_connect || 0), 0),
+    connected:   morningReports.reduce((s, r) => s + Number(r.data?.connected || 0), 0),
+    db_secured:  morningReports.reduce((s, r) => s + Number(r.data?.db_secured || 0), 0),
+    outbound_contracts: morningReports.reduce((s, r) => s + Number(r.data?.outbound_contracts || 0), 0),
+  }
+  const dailyStats = {
+    today_contracts: dailyReports.reduce((s, r) => s + Number(r.data?.today_contracts || 0), 0),
+    month_contracts: dailyReports.filter(r => r.report_date?.slice(0, 7) === todayStr.slice(0, 7))
+      .reduce((s, r) => s + Number(r.data?.today_contracts || 0), 0),
+    supply_decided: dailyReports.reduce((s, r) => s + (r.data?.supply_db || []).filter((i: any) => i.is_decided).length, 0),
+    outbound_decided: dailyReports.reduce((s, r) => s + (r.data?.outbound || []).filter((i: any) => i.is_decided).length, 0),
+  }
+
   return (
     <div className="space-y-4">
       {/* 탭 선택 */}
@@ -173,6 +189,45 @@ export default function ReportTab({ userId, userName }: Props) {
           📋 일일마감보고
         </button>
       </div>
+
+      {/* ── 통계 카드 ── */}
+      {activeReport === 'morning' && morningReports.length > 0 && (
+        <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+          <p className="text-xs text-amber-700 font-bold mb-3">☀️ 내 오전보고 누적 통계 ({morningReports.length}건)</p>
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            {[
+              { label: '총 콜', value: morningStats.total_calls },
+              { label: '연결안됨', value: morningStats.no_connect },
+              { label: '연결됨', value: morningStats.connected },
+              { label: 'DB확보', value: morningStats.db_secured },
+              { label: '아웃계약', value: morningStats.outbound_contracts },
+            ].map(s => (
+              <div key={s.label} className="bg-white rounded-lg p-2.5 text-center border border-amber-100">
+                <p className="text-[10px] text-gray-400 mb-0.5">{s.label}</p>
+                <p className="text-xl font-black text-amber-700">{s.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {activeReport === 'daily' && dailyReports.length > 0 && (
+        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+          <p className="text-xs text-blue-700 font-bold mb-3">📋 내 마감보고 누적 통계 ({dailyReports.length}건)</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[
+              { label: '누적 계약', value: dailyStats.today_contracts + '건' },
+              { label: '이번달 계약', value: dailyStats.month_contracts + '건' },
+              { label: '공급DB 결정', value: dailyStats.supply_decided + '건' },
+              { label: '아웃바운딩 결정', value: dailyStats.outbound_decided + '건' },
+            ].map(s => (
+              <div key={s.label} className="bg-white rounded-lg p-2.5 text-center border border-blue-100">
+                <p className="text-[10px] text-gray-400 mb-0.5">{s.label}</p>
+                <p className="text-xl font-black text-blue-700">{s.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── 전송 완료 팝업 모달 ── */}
       {submitted && (
