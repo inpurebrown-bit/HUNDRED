@@ -10,6 +10,11 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts'
+import {
+  getBusinessDaysInMonth as _bizInMonth,
+  getElapsedBusinessDays as _bizElapsed,
+  getRemainingBusinessDays as _bizRemaining,
+} from '@/lib/businessDays'
 
 // ─── Interfaces ───────────────────────────────────────────
 
@@ -87,45 +92,24 @@ interface EmployeeRow {
   dailyNeeded: number | null
 }
 
-// ─── Business day utilities ───────────────────────────────
-
-function countBusinessDays(from: Date, to: Date): number {
-  let count = 0
-  const cur = new Date(from)
-  cur.setHours(0, 0, 0, 0)
-  const end = new Date(to)
-  end.setHours(0, 0, 0, 0)
-  while (cur <= end) {
-    const d = cur.getDay()
-    if (d !== 0 && d !== 6) count++
-    cur.setDate(cur.getDate() + 1)
-  }
-  return count
-}
+// ─── Business day utilities (1-indexed month wrappers) ───
 
 function getMonthBusinessDays(year: number, month: number): number {
-  const start = new Date(year, month - 1, 1)
-  const end = new Date(year, month, 0)
-  return countBusinessDays(start, end)
+  return _bizInMonth(year, month - 1)
 }
 
 function getElapsedBusinessDays(year: number, month: number): number {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const start = new Date(year, month - 1, 1)
-  const end = today < new Date(year, month, 0) ? today : new Date(year, month, 0)
-  if (start > end) return 0
-  return countBusinessDays(start, end)
+  const now = new Date()
+  const isCurrentMonth = now.getFullYear() === year && now.getMonth() === month - 1
+  const dayOfMonth = isCurrentMonth ? now.getDate() : new Date(year, month, 0).getDate()
+  return _bizElapsed(year, month - 1, dayOfMonth)
 }
 
 function getRemainingBusinessDays(year: number, month: number): number {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  const end = new Date(year, month, 0)
-  if (tomorrow > end) return 0
-  return countBusinessDays(tomorrow, end)
+  const now = new Date()
+  const isCurrentMonth = now.getFullYear() === year && now.getMonth() === month - 1
+  if (!isCurrentMonth) return 0
+  return _bizRemaining(year, month - 1, now.getDate())
 }
 
 // ─── Loading skeleton ─────────────────────────────────────

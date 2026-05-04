@@ -5,6 +5,11 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { signOut } from 'next-auth/react'
 import ReportTab from './ReportTab'
+import {
+  getBusinessDaysInMonth,
+  getElapsedBusinessDays,
+  getRemainingBusinessDays,
+} from '@/lib/businessDays'
 
 // ── 타입 ───────────────────────────────────────────────────
 interface Customer {
@@ -184,13 +189,16 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const monthContractCount = monthContracts.length
 
   const monthlyGoal = MONTHLY_GOALS[username] ?? 30
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  const yr = now.getFullYear()
+  const mo = now.getMonth()
   const dayOfMonth = now.getDate()
-  const daysRemaining = daysInMonth - dayOfMonth + 1
+  const bizTotal    = getBusinessDaysInMonth(yr, mo)
+  const bizElapsed  = getElapsedBusinessDays(yr, mo, dayOfMonth)
+  const bizRemaining = getRemainingBusinessDays(yr, mo, dayOfMonth)
   const achievementRate = Math.min(100, Math.round(monthContractCount / monthlyGoal * 100))
   const remaining = Math.max(0, monthlyGoal - monthContractCount)
-  const dailyPaceNeeded = daysRemaining > 0 ? (remaining / daysRemaining).toFixed(1) : '0'
-  const onPaceCount = Math.round((monthlyGoal / daysInMonth) * dayOfMonth)
+  const dailyPaceNeeded = bizRemaining > 0 ? (remaining / bizRemaining).toFixed(1) : '0'
+  const onPaceCount = bizTotal > 0 ? Math.round((monthlyGoal / bizTotal) * bizElapsed) : 0
   const isAhead = monthContractCount >= onPaceCount
 
   // 공급 관련 notice
@@ -353,7 +361,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-gray-400">{dayOfMonth}일째 / {daysInMonth}일</p>
+                  <p className="text-xs text-gray-400">영업일 {bizElapsed}일째 / {bizTotal}일</p>
                   <p className={`text-sm font-bold mt-0.5 ${isAhead ? 'text-emerald-600' : 'text-red-500'}`}>
                     {isAhead ? '🔥 목표 페이스 초과' : `⚡ 하루 ${dailyPaceNeeded}건 필요`}
                   </p>
@@ -366,7 +374,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               <div className="flex items-center justify-between text-xs text-gray-500">
                 <span>남은 목표 <strong className="text-gray-800">{remaining}건</strong></span>
                 <span>페이스 기준 <strong className={isAhead ? 'text-emerald-600' : 'text-red-500'}>{onPaceCount}건</strong> 위치</span>
-                <span>남은 일수 <strong className="text-gray-800">{daysRemaining}일</strong></span>
+                <span>남은 영업일 <strong className="text-gray-800">{bizRemaining}일</strong></span>
               </div>
               <p className={`text-xs font-semibold mt-2 text-center ${isAhead ? 'text-emerald-600' : achievementRate >= 50 ? 'text-amber-600' : 'text-red-500'}`}>
                 {achievementRate >= 100 ? '🎉 목표 달성! 초과 달성 중입니다!'

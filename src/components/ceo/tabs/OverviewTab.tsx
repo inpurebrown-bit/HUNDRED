@@ -2,29 +2,21 @@
 
 import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import {
+  getBusinessDaysInMonth as _bizInMonth,
+  getElapsedBusinessDays as _bizElapsed,
+} from '@/lib/businessDays'
 
-// ─── Business day utilities ───────────────────────────────
+// ─── Business day utilities (1-indexed month wrappers) ────
 function getBusinessDaysInMonth(year: number, month: number): number {
-  let count = 0
-  const date = new Date(year, month - 1, 1)
-  while (date.getMonth() === month - 1) {
-    const day = date.getDay()
-    if (day !== 0 && day !== 6) count++
-    date.setDate(date.getDate() + 1)
-  }
-  return count
+  return _bizInMonth(year, month - 1)
 }
 
 function getElapsedBusinessDays(year: number, month: number): number {
-  let count = 0
-  const today = new Date()
-  const date = new Date(year, month - 1, 1)
-  while (date <= today && date.getMonth() === month - 1) {
-    const day = date.getDay()
-    if (day !== 0 && day !== 6) count++
-    date.setDate(date.getDate() + 1)
-  }
-  return count
+  const now = new Date()
+  const isCurrentMonth = now.getFullYear() === year && now.getMonth() === month - 1
+  const dayOfMonth = isCurrentMonth ? now.getDate() : new Date(year, month, 0).getDate()
+  return _bizElapsed(year, month - 1, dayOfMonth)
 }
 
 // ─── Loading skeleton ────────────────────────────────────

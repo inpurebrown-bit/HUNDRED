@@ -11,10 +11,23 @@ interface MorningData {
   outbound_contracts: string
 }
 
+type ConsultStatus =
+  | '결정업체'
+  | '계약대기'
+  | '계약서대기'
+  | '입금대기'
+  | '고민중'
+  | '재통화예정'
+  | '감성톡관리'
+  | ''
+
 interface ConsultItem {
   company: string
   content: string
-  is_decided: boolean
+  status: ConsultStatus
+  callback_date?: string  // 재통화예정일 때만 사용
+  /** @deprecated 구버전 호환 */
+  is_decided?: boolean
 }
 
 interface WorriedItem {
@@ -165,8 +178,8 @@ export default function ReportTab({ userId, userName }: Props) {
     today_contracts: dailyReports.reduce((s, r) => s + Number(r.data?.today_contracts || 0), 0),
     month_contracts: dailyReports.filter(r => r.report_date?.slice(0, 7) === todayStr.slice(0, 7))
       .reduce((s, r) => s + Number(r.data?.today_contracts || 0), 0),
-    supply_decided: dailyReports.reduce((s, r) => s + (r.data?.supply_db || []).filter((i: any) => i.is_decided).length, 0),
-    outbound_decided: dailyReports.reduce((s, r) => s + (r.data?.outbound || []).filter((i: any) => i.is_decided).length, 0),
+    supply_decided: dailyReports.reduce((s, r) => s + (r.data?.supply_db || []).filter((i: any) => i.is_decided || ['결정업체','계약대기','계약서대기','입금대기'].includes(i.status)).length, 0),
+    outbound_decided: dailyReports.reduce((s, r) => s + (r.data?.outbound || []).filter((i: any) => i.is_decided || ['결정업체','계약대기','계약서대기','입금대기'].includes(i.status)).length, 0),
   }
 
   return (
@@ -389,7 +402,7 @@ export default function ReportTab({ userId, userName }: Props) {
               title="금일 신규 공급DB 상담결과"
               isEmpty={daily.supply_db === null}
               onToggleEmpty={() => setDaily(p => ({ ...p, supply_db: p.supply_db === null ? [] : null }))}
-              onAdd={() => addItem('supply_db', { company: '', content: '', is_decided: false })}
+              onAdd={() => addItem('supply_db', { company: '', content: '', status: '' as ConsultStatus })}
             >
               {(daily.supply_db || []).map((item, i) => (
                 <ConsultRow key={i} item={item} idx={i}
@@ -403,7 +416,7 @@ export default function ReportTab({ userId, userName }: Props) {
               title="금일 신규 아웃바운딩 상담결과"
               isEmpty={daily.outbound === null}
               onToggleEmpty={() => setDaily(p => ({ ...p, outbound: p.outbound === null ? [] : null }))}
-              onAdd={() => addItem('outbound', { company: '', content: '', is_decided: false })}
+              onAdd={() => addItem('outbound', { company: '', content: '', status: '' as ConsultStatus })}
             >
               {(daily.outbound || []).map((item, i) => (
                 <ConsultRow key={i} item={item} idx={i}
@@ -562,32 +575,51 @@ function Section({ title, isEmpty, onToggleEmpty, onAdd, children }: {
   )
 }
 
+// ── 상태 옵션 ─────────────────────────────────────────────
+const CONSULT_STATUSES: { value: ConsultStatus; label: string; color: string }[] = [
+  { value: '결정업체',   label: '결정업체',   color: 'bg-emerald-500 text-white border-emerald-500' },
+  { value: '계약대기',   label: '계약대기',   color: 'bg-blue-500 text-white border-blue-500' },
+  { value: '계약서대기', label: '계약서대기', color: 'bg-sky-500 text-white border-sky-500' },
+  { value: '입금대기',   label: '입금대기',   color: 'bg-violet-500 text-white border-violet-500' },
+  { value: '고민중',     label: '고민중',     color: 'bg-amber-500 text-white border-amber-500' },
+  { value: '재통화예정', label: '재통화예정', color: 'bg-orange-500 text-white border-orange-500' },
+  { value: '감성톡관리', label: '감성톡관리', color: 'bg-pink-500 text-white border-pink-500' },
+]
+
 // ── 공급DB / 아웃바운딩 행 ────────────────────────────────
 function ConsultRow({ item, idx, onChange, onRemove }: any) {
+  const cur: ConsultStatus = item.status || (item.is_decided ? '결정업체' : '')
   return (
     <div className="border border-gray-100 rounded-lg p-3 space-y-2 bg-gray-50/50">
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-gray-500">#{idx + 1}</span>
         <button type="button" onClick={onRemove} className="text-xs text-red-400 hover:text-red-600">삭제</button>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className="text-xs text-gray-400 mb-0.5 block">업체명</label>
-          <input className={inp} placeholder="업체명" value={item.company}
-            onChange={e => onChange('company', e.target.value)} />
-        </div>
-        <div className="flex items-end gap-2">
-          <div className="flex-1">
-            <label className="text-xs text-gray-400 mb-0.5 block">결정업체 여부</label>
-            <button type="button"
-              onClick={() => onChange('is_decided', !item.is_decided)}
-              className={`w-full py-2 rounded-lg text-xs font-medium border transition-colors ${
-                item.is_decided ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-500 border-gray-200'
+      <div>
+        <label className="text-xs text-gray-400 mb-0.5 block">업체명</label>
+        <input className={inp} placeholder="업체명" value={item.company}
+          onChange={e => onChange('company', e.target.value)} />
+      </div>
+      <div>
+        <label className="text-xs text-gray-400 mb-1 block">상태</label>
+        <div className="flex flex-wrap gap-1.5">
+          {CONSULT_STATUSES.map(s => (
+            <button key={s.value} type="button"
+              onClick={() => onChange('status', cur === s.value ? '' : s.value)}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                cur === s.value ? s.color : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
               }`}>
-              {item.is_decided ? '✅ 결정' : '미결정'}
+              {s.label}
             </button>
-          </div>
+          ))}
         </div>
+        {cur === '재통화예정' && (
+          <div className="mt-2">
+            <label className="text-xs text-gray-400 mb-0.5 block">재통화 예정일</label>
+            <input type="date" className={inp} value={item.callback_date || ''}
+              onChange={e => onChange('callback_date', e.target.value)} />
+          </div>
+        )}
       </div>
       <div>
         <label className="text-xs text-gray-400 mb-0.5 block">상담내용</label>
@@ -814,7 +846,14 @@ function DailyDetailView({ data }: { data: any }) {
                 <div key={i} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-semibold text-gray-800 text-sm">{item.company}</span>
-                    {item.is_decided && <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-semibold">결정</span>}
+                    {(item.status || (item.is_decided ? '결정업체' : '')) && (
+                      <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-semibold">
+                        {item.status || '결정업체'}
+                      </span>
+                    )}
+                    {item.status === '재통화예정' && item.callback_date && (
+                      <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded-full">{item.callback_date}</span>
+                    )}
                   </div>
                   {item.content && <p className="text-xs text-gray-500">{item.content}</p>}
                 </div>
@@ -836,7 +875,14 @@ function DailyDetailView({ data }: { data: any }) {
                 <div key={i} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-semibold text-gray-800 text-sm">{item.company}</span>
-                    {item.is_decided && <span className="text-[10px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full font-semibold">결정</span>}
+                    {(item.status || (item.is_decided ? '결정업체' : '')) && (
+                      <span className="text-[10px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full font-semibold">
+                        {item.status || '결정업체'}
+                      </span>
+                    )}
+                    {item.status === '재통화예정' && item.callback_date && (
+                      <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded-full">{item.callback_date}</span>
+                    )}
                   </div>
                   {item.content && <p className="text-xs text-gray-500">{item.content}</p>}
                 </div>
