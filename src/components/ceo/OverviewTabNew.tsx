@@ -370,9 +370,9 @@ export default function OverviewTabNew() {
         setEvents(a(eventsData).events ?? [])
         setAllContracts(a(contractsData).contracts ?? [])
         setOpsCases(a(opsData).cases ?? [])
-        setSalesGoals(a(goalsData).goals ?? [])
-        setLastMonthGoals(a(lastGoalsData).goals ?? [])
-        setAsRequests(a(asData).requests ?? [])
+        setSalesGoals(a(goalsData).sales_goals ?? a(goalsData).goals ?? [])
+        setLastMonthGoals(a(lastGoalsData).sales_goals ?? a(lastGoalsData).goals ?? [])
+        setAsRequests(a(asData).as_requests ?? a(asData).requests ?? [])
       } catch {
         // silently ignore
       } finally {
@@ -499,10 +499,10 @@ export default function OverviewTabNew() {
   async function handleConfirm(id: string) {
     setMarkingId(id)
     try {
-      await fetch('/api/as-requests', {
+      await fetch(`/api/as-requests?id=${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status: 'reviewed' }),
+        body: JSON.stringify({ status: 'reviewed' }),
       })
       setAsRequests(prev => prev.filter(r => r.id !== id))
     } catch {

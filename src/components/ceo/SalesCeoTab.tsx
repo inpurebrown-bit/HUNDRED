@@ -1,15 +1,16 @@
 'use client'
 
-import { useState, useEffect, FormEvent } from 'react'
+import React, { useState, useEffect, FormEvent } from 'react'
 
 // ─── Types ────────────────────────────────────────────────
 interface Notice {
   id: string
   title: string
   content: string
-  type: 'daily' | 'weekly' | 'monthly' | 'promo' | 'general'
-  target: 'all' | 'sales' | 'ops'
-  expires_at: string | null
+  notice_type: 'daily' | 'weekly' | 'monthly' | 'promo' | 'general'
+  target_team: 'all' | 'sales' | 'ops'
+  expires_at?: string | null
+  end_date?: string | null
   created_at: string
 }
 
@@ -81,7 +82,7 @@ function NoticesSection() {
   const [submitting, setSubmitting] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({
-    title: '', content: '', type: 'general', target: 'all', expires_at: '',
+    title: '', content: '', notice_type: 'general', target_team: 'all', end_date: '',
   })
 
   async function load() {
@@ -108,11 +109,15 @@ function NoticesSection() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...form,
-          expires_at: form.expires_at || null,
+          title: form.title,
+          content: form.content,
+          notice_type: form.notice_type,
+          target_team: form.target_team,
+          end_date: form.end_date || null,
+          is_active: true,
         }),
       })
-      setForm({ title: '', content: '', type: 'general', target: 'all', expires_at: '' })
+      setForm({ title: '', content: '', notice_type: 'general', target_team: 'all', end_date: '' })
       setShowForm(false)
       load()
     } catch {
@@ -163,16 +168,16 @@ function NoticesSection() {
           {notices.map(n => (
             <div
               key={n.id}
-              className={`border rounded-xl px-4 py-3 flex items-start gap-3 ${NOTICE_STYLES[n.type] ?? NOTICE_STYLES.general}`}
+              className={`border rounded-xl px-4 py-3 flex items-start gap-3 ${NOTICE_STYLES[n.notice_type] ?? NOTICE_STYLES.general}`}
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
                   <span className="text-[10px] font-semibold uppercase tracking-wide opacity-70">
-                    {NOTICE_TYPE_LABEL[n.type] ?? n.type}
+                    {NOTICE_TYPE_LABEL[n.notice_type] ?? n.notice_type}
                   </span>
-                  {n.expires_at && (
+                  {(n.expires_at ?? n.end_date) && (
                     <span className="text-[10px] opacity-60">
-                      ~ {new Date(n.expires_at).toLocaleDateString('ko-KR')}
+                      ~ {new Date((n.expires_at ?? n.end_date)!).toLocaleDateString('ko-KR')}
                     </span>
                   )}
                 </div>
@@ -219,8 +224,8 @@ function NoticesSection() {
               <div>
                 <label className="text-xs text-[#1B2A45]/50 mb-1 block">유형</label>
                 <select
-                  value={form.type}
-                  onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
+                  value={form.notice_type}
+                  onChange={e => setForm(f => ({ ...f, notice_type: e.target.value }))}
                   className="w-full border border-[#E8E2D4] rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A45]/30"
                 >
                   <option value="daily">일별</option>
@@ -233,8 +238,8 @@ function NoticesSection() {
               <div>
                 <label className="text-xs text-[#1B2A45]/50 mb-1 block">대상</label>
                 <select
-                  value={form.target}
-                  onChange={e => setForm(f => ({ ...f, target: e.target.value }))}
+                  value={form.target_team}
+                  onChange={e => setForm(f => ({ ...f, target_team: e.target.value }))}
                   className="w-full border border-[#E8E2D4] rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A45]/30"
                 >
                   <option value="all">전체</option>
@@ -246,8 +251,8 @@ function NoticesSection() {
                 <label className="text-xs text-[#1B2A45]/50 mb-1 block">종료일 (선택)</label>
                 <input
                   type="date"
-                  value={form.expires_at}
-                  onChange={e => setForm(f => ({ ...f, expires_at: e.target.value }))}
+                  value={form.end_date}
+                  onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))}
                   className="w-full border border-[#E8E2D4] rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A45]/30"
                 />
               </div>
@@ -425,7 +430,7 @@ function SalesCustomersSection() {
                             {personCustomers.map(c => {
                               const isCustOpen = expandedCustomer === c.id
                               return (
-                                <>
+                                <React.Fragment key={c.id}>
                                   <tr
                                     key={c.id}
                                     onClick={() => setExpandedCustomer(isCustOpen ? null : c.id)}
@@ -469,7 +474,7 @@ function SalesCustomersSection() {
                                       </td>
                                     </tr>
                                   )}
-                                </>
+                                </React.Fragment>
                               )
                             })}
                           </tbody>
