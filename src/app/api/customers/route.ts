@@ -35,28 +35,36 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
   const user = session.user as any
-  if (user.role !== 'sales') {
-    return NextResponse.json({ error: '영업팀만 고객 등록 가능' }, { status: 403 })
+  if (user.role !== 'sales' && user.role !== 'ceo') {
+    return NextResponse.json({ error: '권한이 없습니다' }, { status: 403 })
   }
 
   const body = await req.json()
-  const { name, phone, company, loan_history, notes, status } = body
+  const { name, phone, company, loan_history, notes, status, details } = body
 
-  if (!name) return NextResponse.json({ error: '이름은 필수입니다' }, { status: 400 })
+  if (!name || !name.trim()) {
+    return NextResponse.json({ error: '고객명(대표자)은 필수입니다' }, { status: 400 })
+  }
+
+  const insertRow: Record<string, any> = {
+    name: name.trim(),
+    phone: phone || '',
+    company: company || '',
+    loan_history: loan_history || '',
+    notes: notes || '',
+    status: status || 'lead',
+    sales_user_id: user.id,
+    sales_user_name: user.name,
+  }
+
+  // details JSONB 필드 저장 (인콜일지 모든 항목 포함)
+  if (details && typeof details === 'object') {
+    insertRow.details = details
+  }
 
   const { data, error } = await supabaseAdmin
     .from('customers')
-    .insert({
-      name,
-      phone: phone || '',
-      company: company || '',
-      loan_history: loan_history || '',
-      notes: notes || '',
-      status: status || 'lead',
-      sales_user_id: user.id,
-      sales_user_name: user.name,
-      created_at: new Date().toISOString(),
-    })
+    .insert(insertRow)
     .select()
     .single()
 

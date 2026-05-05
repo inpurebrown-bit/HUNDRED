@@ -26,7 +26,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
 
   const { data, error } = await supabaseAdmin
     .from('customers')
-    .update({ ...body, updated_at: new Date().toISOString() })
+    .update(body)
     .eq('id', id)
     .select()
     .single()

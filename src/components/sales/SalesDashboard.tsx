@@ -59,6 +59,15 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
+  // 토스트 알림
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  function showToast(msg: string, type: 'success' | 'error' = 'success') {
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    setToast({ msg, type })
+    toastTimer.current = setTimeout(() => setToast(null), 3500)
+  }
+
   // 검색
   const [searchQuery, setSearchQuery] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
@@ -176,14 +185,22 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   // ── New customer form ─────────────────────────────────────────────
   async function submitNew(data: InCallData) {
     setSubmitting(true)
-    const res = await fetch('/api/customers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(buildPayload(data, 'lead')),
-    })
-    if (res.ok) {
-      setShowNewForm(false)
-      loadAll()
+    try {
+      const res = await fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildPayload(data, 'lead')),
+      })
+      const json = await res.json()
+      if (res.ok) {
+        setShowNewForm(false)
+        showToast(`✅ "${data.company || data.name}" 신규고객 등록 완료!`)
+        loadAll()
+      } else {
+        showToast(`❌ 등록 실패: ${json.error || '알 수 없는 오류'}`, 'error')
+      }
+    } catch (e: any) {
+      showToast(`❌ 네트워크 오류: ${e.message}`, 'error')
     }
     setSubmitting(false)
   }
@@ -191,14 +208,22 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   // ── 010DB form ────────────────────────────────────────────────────
   async function submit010(data: InCallData) {
     setSubmitting(true)
-    const res = await fetch('/api/customers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(buildPayload(data, 'db010')),
-    })
-    if (res.ok) {
-      setShow010Form(false)
-      loadAll()
+    try {
+      const res = await fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildPayload(data, 'db010')),
+      })
+      const json = await res.json()
+      if (res.ok) {
+        setShow010Form(false)
+        showToast(`✅ "${data.company || data.name}" 010DB 등록 완료!`)
+        loadAll()
+      } else {
+        showToast(`❌ 등록 실패: ${json.error || '알 수 없는 오류'}`, 'error')
+      }
+    } catch (e: any) {
+      showToast(`❌ 네트워크 오류: ${e.message}`, 'error')
     }
     setSubmitting(false)
   }
@@ -278,6 +303,15 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   // ── Render ────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#FAF8F3]">
+      {/* ── 토스트 알림 ── */}
+      {toast && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[9999] px-5 py-3 rounded-xl shadow-2xl text-sm font-semibold text-white transition-all animate-bounce-once max-w-sm text-center ${
+          toast.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'
+        }`}>
+          {toast.msg}
+        </div>
+      )}
+
       {/* Header */}
       <header className="bg-[#1B2A45] px-4 md:px-6 py-3 flex items-center justify-between sticky top-0 z-30">
         <Link href="/" className="relative h-8 w-24 shrink-0 block">
