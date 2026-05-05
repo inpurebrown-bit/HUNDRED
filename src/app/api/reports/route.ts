@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ reports: data })
 }
 
-// POST: 보고 제출
+// POST: 보고 제출 (upsert → 없으면 INSERT, 있으면 UPDATE)
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
@@ -43,21 +43,43 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'report_type, report_date 필요' }, { status: 400 })
   }
 
-  // 같은 날 같은 타입 보고 중복 방지 → upsert
-  const { data: result, error } = await supabaseAdmin
+  // 기존 보고 확인
+  const { data: existing } = await supabaseAdmin
     .from('reports')
-    .upsert({
-      user_id: user.id,
-      user_name: user.name,
-      report_type,
-      report_date,
-      data,
-      updated_at: new Date().toISOString(),
-    }, {
-      onConflict: 'user_id,report_type,report_date',
-    })
-    .select()
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('report_type', report_type)
+    .eq('report_date', report_date)
     .single()
+
+  let result, error
+
+  if (existing?.id) {
+    // 이미 있으면 UPDATE
+    const res = await supabaseAdmin
+      .from('reports')
+      .update({ data, updated_at: new Date().toISOString() })
+      .eq('id', existing.id)
+      .select()
+      .single()
+    result = res.data
+    error = res.error
+  } else {
+    // 없으면 INSERT
+    const res = await supabaseAdmin
+      .from('reports')
+      .insert({
+        user_id: user.id,
+        user_name: user.name,
+        report_type,
+        report_date,
+        data,
+      })
+      .select()
+      .single()
+    result = res.data
+    error = res.error
+  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ report: result }, { status: 201 })

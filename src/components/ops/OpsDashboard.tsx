@@ -399,27 +399,39 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
     total_calls: '', no_connect: '', connected: '', db_secured: '', outbound_contracts: '',
   })
 
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
   async function submitMorning(e: FormEvent) {
     e.preventDefault()
     setSubmitting(true)
-    await fetch('/api/reports', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        report_type: 'morning',
-        report_date: today,
-        data: {
-          total_calls: Number(morning.total_calls),
-          no_connect: Number(morning.no_connect),
-          connected: Number(morning.connected),
-          db_secured: Number(morning.db_secured),
-          outbound_contracts: Number(morning.outbound_contracts),
-        },
-      }),
-    })
+    setSubmitError(null)
+    try {
+      const res = await fetch('/api/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          report_type: 'morning',
+          report_date: today,
+          data: {
+            total_calls: Number(morning.total_calls),
+            no_connect: Number(morning.no_connect),
+            connected: Number(morning.connected),
+            db_secured: Number(morning.db_secured),
+            outbound_contracts: Number(morning.outbound_contracts),
+          },
+        }),
+      })
+      const json = await res.json()
+      if (res.ok) {
+        setSubmitType('morning')
+        setSubmitted(true)
+      } else {
+        setSubmitError(`전송 실패: ${json.error || '서버 오류'}`)
+      }
+    } catch (err: any) {
+      setSubmitError(`네트워크 오류: ${err.message}`)
+    }
     setSubmitting(false)
-    setSubmitType('morning')
-    setSubmitted(true)
   }
 
   // 마감보고 폼 (간단 버전)
@@ -428,27 +440,44 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
   async function submitDaily(e: FormEvent) {
     e.preventDefault()
     setSubmitting(true)
-    await fetch('/api/reports', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        report_type: 'daily',
-        report_date: today,
-        data: {
-          today_contracts: Number(daily.today_contracts),
-          month_contracts: Number(daily.month_contracts),
-          goal: Number(daily.goal),
-          memo: daily.memo,
-        },
-      }),
-    })
+    setSubmitError(null)
+    try {
+      const res = await fetch('/api/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          report_type: 'daily',
+          report_date: today,
+          data: {
+            today_contracts: Number(daily.today_contracts),
+            month_contracts: Number(daily.month_contracts),
+            goal: Number(daily.goal),
+            memo: daily.memo,
+          },
+        }),
+      })
+      const json = await res.json()
+      if (res.ok) {
+        setSubmitType('daily')
+        setSubmitted(true)
+      } else {
+        setSubmitError(`전송 실패: ${json.error || '서버 오류'}`)
+      }
+    } catch (err: any) {
+      setSubmitError(`네트워크 오류: ${err.message}`)
+    }
     setSubmitting(false)
-    setSubmitType('daily')
-    setSubmitted(true)
   }
 
   return (
     <div className="space-y-4">
+      {/* ── 전송 실패 에러 ── */}
+      {submitError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 flex items-center justify-between">
+          <span>❌ {submitError}</span>
+          <button onClick={() => setSubmitError(null)} className="text-red-400 hover:text-red-600 ml-3 shrink-0">✕</button>
+        </div>
+      )}
       {/* ── 전송 완료 팝업 모달 ── */}
       {submitted && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] px-6">
