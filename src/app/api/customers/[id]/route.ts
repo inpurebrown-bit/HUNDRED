@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { sendPushNotification } from '@/lib/pushNotify'
 
 // PATCH: 고객 정보 수정
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -15,7 +16,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   // 본인 고객만 수정 가능 (ceo는 모두 가능)
   const { data: existing } = await supabaseAdmin
     .from('customers')
-    .select('sales_user_id')
+    .select('sales_user_id, status, name, company')
     .eq('id', id)
     .single()
 
@@ -32,6 +33,19 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // 계약 완료로 상태 변경 시 대표에게 푸시 알림
+  if (body.status === 'contracted' && existing.status !== 'contracted') {
+    const customerName = existing.company || existing.name || '고객'
+    await sendPushNotification({
+      title: '🎉 계약 완료!',
+      body: `${customerName} — ${user.name || '영업팀'}이(가) 계약을 완료했습니다.`,
+      url: '/',
+      tag: 'contract',
+      target: 'ceo',
+    })
+  }
+
   return NextResponse.json({ customer: data })
 }
 
