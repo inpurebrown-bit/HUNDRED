@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
 
   const query = supabaseAdmin
     .from('contracts')
-    .select(`*, customers(name, phone, company)`)
+    .select('id, customer_id, sales_user_id, sales_user_name, contract_amount, memo, status, ops_user_id, ops_user_name, created_at, customers(name, phone, company)')
     .order('created_at', { ascending: false })
 
   const finalQuery = user.role === 'sales'

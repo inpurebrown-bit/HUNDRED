@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, FormEvent, ReactNode } from 'react'
+import InCallForm, { InCallData } from '@/components/sales/InCallForm'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -188,8 +189,9 @@ function SupplyDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState<SupplyFormState>(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
+  const [assignTo, setAssignTo] = useState<string>('')  // 배정할 영업사원 id
+  const [toast, setToast] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [patchingId, setPatchingId] = useState<string | null>(null)
   const [inlineAssign, setInlineAssign] = useState<Record<string, string>>({})
@@ -212,24 +214,62 @@ function SupplyDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
 
   useEffect(() => { load() }, [load])
 
-  function handleFormChange(field: keyof SupplyFormState, value: string) {
-    setForm(prev => ({ ...prev, [field]: value }))
+  // ── InCallForm 제출 → customers 테이블에 저장 (영업팀과 동일 포맷) ──
+  async function handleInCallSubmit(data: InCallData) {
+    setSubmitting(true)
+    try {
+      const selectedUser = salesUsers.find(u => u.id === assignTo)
+      const body: Record<string, any> = {
+        name: data.name || '',
+        phone: data.phone || '',
+        company: data.company || '',
+        loan_history: data.loan_credit || '',
+        notes: data.notes || '',
+        status: 'db010',
+        details: data,
+      }
+      // CEO가 특정 영업사원에게 배정
+      if (assignTo && selectedUser) {
+        body.sales_user_id = selectedUser.id
+        body.sales_user_name = selectedUser.name
+      }
+      const res = await fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json()
+      if (res.ok) {
+        setShowForm(false)
+        setAssignTo('')
+        const target = selectedUser ? `${selectedUser.name}에게 배정` : '미배정'
+        setToast(`✅ DB 등록 완료 (${target})`)
+        setTimeout(() => setToast(null), 3500)
+      } else {
+        alert(`등록 실패: ${json.error}`)
+      }
+    } catch (e: any) {
+      alert(`오류: ${e.message}`)
+    }
+    setSubmitting(false)
   }
 
+  // ── 구형 supply_db 수정 (기존 데이터용) ──
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!form.company_name.trim()) return
+    const form: any = {}
+    if (!form.company_name?.trim()) return
     setSubmitting(true)
     try {
       const selectedUser = salesUsers.find(u => u.id === form.assigned_user_id)
       const body = {
         reception_date: form.reception_date,
         company_name: form.company_name.trim(),
-        region: form.region.trim(),
-        business_number: form.business_number.trim(),
-        customer_name: form.customer_name.trim(),
-        phone: form.phone.trim(),
-        industry: form.industry.trim(),
+        region: form.region?.trim(),
+        business_number: form.business_number?.trim(),
+        customer_name: form.customer_name?.trim(),
+        phone: form.phone?.trim(),
+        industry: form.industry?.trim(),
         last_year_revenue: form.last_year_revenue ? Number(form.last_year_revenue) : null,
         credit_score: form.credit_score ? Number(form.credit_score) : null,
         tax_delinquent: form.tax_delinquent,
@@ -243,9 +283,8 @@ function SupplyDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || '등록 실패')
-      setForm({ ...EMPTY_FORM, reception_date: today() })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || '등록 실패')
       setShowForm(false)
       load()
     } catch (e: any) {
@@ -330,157 +369,50 @@ function SupplyDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
         </button>
       </div>
 
-      {/* Collapsible form */}
+      {/* toast */}
+      {toast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] px-5 py-3 rounded-xl shadow-2xl text-sm font-semibold text-white bg-emerald-500">
+          {toast}
+        </div>
+      )}
+
+      {/* InCallForm 기반 DB 등록 폼 */}
       {showForm && (
-        <form
-          onSubmit={handleSubmit}
-          className="bg-white rounded-xl border border-[#E8E2D4] p-5 mb-5 space-y-4"
-        >
-          <p className="text-sm font-semibold text-[#1B2A45]">신규 공급 DB 등록</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <Field label="접수일자" required>
-              <input
-                type="date"
-                value={form.reception_date}
-                onChange={e => handleFormChange('reception_date', e.target.value)}
-                className={inputCls}
-              />
-            </Field>
-            <Field label="상호명" required>
-              <input
-                type="text"
-                placeholder="주식회사 예시"
-                value={form.company_name}
-                onChange={e => handleFormChange('company_name', e.target.value)}
-                required
-                className={inputCls}
-              />
-            </Field>
-            <Field label="지역">
-              <input
-                type="text"
-                placeholder="서울, 경기..."
-                value={form.region}
-                onChange={e => handleFormChange('region', e.target.value)}
-                className={inputCls}
-              />
-            </Field>
-            <Field label="사업자등록번호">
-              <input
-                type="text"
-                placeholder="000-00-00000"
-                value={form.business_number}
-                onChange={e => handleFormChange('business_number', e.target.value)}
-                className={inputCls}
-              />
-            </Field>
-            <Field label="고객명">
-              <input
-                type="text"
-                placeholder="홍길동"
-                value={form.customer_name}
-                onChange={e => handleFormChange('customer_name', e.target.value)}
-                className={inputCls}
-              />
-            </Field>
-            <Field label="연락처">
-              <input
-                type="text"
-                placeholder="010-0000-0000"
-                value={form.phone}
-                onChange={e => handleFormChange('phone', e.target.value)}
-                className={inputCls}
-              />
-            </Field>
-            <Field label="업종">
-              <input
-                type="text"
-                placeholder="제조, 도소매..."
-                value={form.industry}
-                onChange={e => handleFormChange('industry', e.target.value)}
-                className={inputCls}
-              />
-            </Field>
-            <Field label="작년 매출 (만원)">
-              <input
-                type="number"
-                placeholder="5000"
-                min={0}
-                value={form.last_year_revenue}
-                onChange={e => handleFormChange('last_year_revenue', e.target.value)}
-                className={inputCls}
-              />
-            </Field>
-            <Field label="신용점수">
-              <input
-                type="number"
-                placeholder="700"
-                min={0}
-                max={1000}
-                value={form.credit_score}
-                onChange={e => handleFormChange('credit_score', e.target.value)}
-                className={inputCls}
-              />
-            </Field>
-            <Field label="세금체납여부">
-              <select
-                value={form.tax_delinquent}
-                onChange={e => handleFormChange('tax_delinquent', e.target.value)}
-                className={inputCls}
-              >
-                <option value="없음">없음</option>
-                <option value="있음">있음</option>
-              </select>
-            </Field>
-            <Field label="필요자금 (만원)">
-              <input
-                type="number"
-                placeholder="10000"
-                min={0}
-                value={form.required_funds}
-                onChange={e => handleFormChange('required_funds', e.target.value)}
-                className={inputCls}
-              />
-            </Field>
-            <Field label="담당자 배정">
-              <select
-                value={form.assigned_user_id}
-                onChange={e => handleFormChange('assigned_user_id', e.target.value)}
-                className={inputCls}
-              >
-                <option value="">미배정</option>
-                {salesUsers.map(u => (
-                  <option key={u.id} value={u.id}>{u.name}</option>
-                ))}
-              </select>
-            </Field>
-          </div>
-          <Field label="메모">
-            <textarea
-              rows={2}
-              placeholder="특이사항, 메모..."
-              value={form.notes}
-              onChange={e => handleFormChange('notes', e.target.value)}
-              className={inputCls + ' resize-none'}
-            />
-          </Field>
-          <div className="flex items-center gap-3 pt-1">
+        <div className="bg-white rounded-xl border border-[#E8E2D4] p-5 mb-5">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm font-bold text-[#1B2A45]">📋 신규 DB 등록 (인콜일지 양식)</p>
             <button
-              type="submit"
-              disabled={submitting || !form.company_name.trim()}
-              className="px-5 py-2 rounded-lg bg-[#C5A258] text-white text-sm font-semibold hover:bg-[#C5A258]/90 disabled:opacity-40 transition-colors"
-            >
-              {submitting ? '저장 중...' : '등록'}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setShowForm(false); setForm({ ...EMPTY_FORM, reception_date: today() }) }}
-              className="px-5 py-2 rounded-lg border border-[#E8E2D4] text-[#1B2A45]/60 text-sm hover:bg-[#FAF8F3] transition-colors"
-            >
-              취소
-            </button>
+              onClick={() => { setShowForm(false); setAssignTo('') }}
+              className="text-gray-400 hover:text-gray-600 text-sm"
+            >✕ 닫기</button>
           </div>
-        </form>
+          {/* 영업사원 배정 선택 */}
+          <div className="mb-4">
+            <label className="text-xs font-semibold text-gray-500 block mb-1">배정할 영업사원</label>
+            <select
+              value={assignTo}
+              onChange={e => setAssignTo(e.target.value)}
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm w-full max-w-xs focus:outline-none focus:ring-2 focus:ring-[#C5A258]"
+            >
+              <option value="">미배정 (나중에 설정)</option>
+              {salesUsers.map(u => (
+                <option key={u.id} value={u.id}>{u.name}</option>
+              ))}
+            </select>
+            {assignTo && (
+              <p className="text-xs text-emerald-600 mt-1">
+                ✅ {salesUsers.find(u => u.id === assignTo)?.name}의 010DB 탭에 등록됩니다
+              </p>
+            )}
+          </div>
+          <InCallForm
+            title="DB 등록"
+            salesUsers={[]}
+            submitting={submitting}
+            onSubmit={handleInCallSubmit}
+            onCancel={() => { setShowForm(false); setAssignTo('') }}
+          />
+        </div>
       )}
 
       {/* List */}

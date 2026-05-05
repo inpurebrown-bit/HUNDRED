@@ -40,10 +40,27 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { name, phone, company, loan_history, notes, status, details } = body
+  const { name, phone, company, loan_history, notes, status, details, sales_user_id, sales_user_name } = body
 
   if (!name || !name.trim()) {
     return NextResponse.json({ error: '고객명(대표자)은 필수입니다' }, { status: 400 })
+  }
+
+  // CEO는 특정 영업팀 직원에게 배정 가능, 아니면 본인 id로
+  let assignedUserId = user.id
+  let assignedUserName = user.name
+
+  if (user.role === 'ceo' && sales_user_id) {
+    // CEO가 특정 영업사원에게 배정
+    const { data: salesUser } = await supabaseAdmin
+      .from('users')
+      .select('id, name')
+      .eq('id', sales_user_id)
+      .single()
+    if (salesUser) {
+      assignedUserId = salesUser.id
+      assignedUserName = sales_user_name || salesUser.name
+    }
   }
 
   const insertRow: Record<string, any> = {
@@ -53,8 +70,8 @@ export async function POST(req: NextRequest) {
     loan_history: loan_history || '',
     notes: notes || '',
     status: status || 'lead',
-    sales_user_id: user.id,
-    sales_user_name: user.name,
+    sales_user_id: assignedUserId,
+    sales_user_name: assignedUserName,
   }
 
   // details JSONB 필드 저장 (인콜일지 모든 항목 포함)
