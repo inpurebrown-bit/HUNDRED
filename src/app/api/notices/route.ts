@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { sendPushNotification } from '@/lib/pushNotify'
 
-// GET: 공개 - 활성 공지사항 조회 (인증 불필요)
+// GET: 공개 - 활성 공지사항 조회
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const team = searchParams.get('team')
@@ -22,7 +23,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ notices: data })
 }
 
-// POST: CEO only - 공지사항 등록
+// POST: CEO only - 공지사항 등록 + 직원 푸시 알림
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
@@ -33,15 +34,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const {
-    title,
-    content,
-    notice_type,
-    target_team,
-    is_active,
-    start_date,
-    end_date,
-  } = body
+  const { title, content, notice_type, target_team, is_active, start_date, end_date } = body
 
   if (!title) return NextResponse.json({ error: '제목은 필수입니다' }, { status: 400 })
 
@@ -60,6 +53,22 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // 공지 유형이 supply_count가 아닐 때만 푸시 알림 발송
+  if (notice_type !== 'supply_count') {
+    const pushTarget = target_team === 'sales' ? 'sales'
+      : target_team === 'ops' ? 'ops'
+      : 'employees' // all → 전 직원
+
+    await sendPushNotification({
+      title: '📢 새 공지사항',
+      body: title,
+      url: '/',
+      tag: 'notice',
+      target: pushTarget,
+    })
+  }
+
   return NextResponse.json({ notice: data }, { status: 201 })
 }
 
@@ -77,11 +86,7 @@ export async function DELETE(req: NextRequest) {
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id는 필수입니다' }, { status: 400 })
 
-  const { error } = await supabaseAdmin
-    .from('notices')
-    .delete()
-    .eq('id', id)
-
+  const { error } = await supabaseAdmin.from('notices').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ success: true })
 }

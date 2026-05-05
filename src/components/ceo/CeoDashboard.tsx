@@ -36,7 +36,7 @@ interface OpsUser {
 }
 
 export default function CeoDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'revenue' | 'payrate' | 'payroll' | 'payslip' | 'reports' | 'minutes' | 'calendar' | 'ai' | 'ailogs'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'revenue' | 'payrate' | 'payroll' | 'payslip' | 'reports' | 'notices' | 'minutes' | 'calendar' | 'ai' | 'ailogs'>('overview')
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
@@ -67,6 +67,7 @@ export default function CeoDashboard() {
     { key: 'payroll', label: '💼 급여·손익' },
     { key: 'payslip', label: '📋 급여명세서' },
     { key: 'reports', label: '📝 보고함' },
+    { key: 'notices', label: '📢 공지사항' },
     { key: 'minutes', label: '📒 회의록' },
     { key: 'calendar', label: '📅 일정관리' },
     { key: 'ai', label: '✦ AI 비서' },
@@ -177,6 +178,7 @@ export default function CeoDashboard() {
         {activeTab === 'payroll' && <PayrollTab />}
         {activeTab === 'payslip' && <PayslipTab />}
         {activeTab === 'reports' && <ReportsTab isCeo={true} />}
+        {activeTab === 'notices' && <NoticesTab />}
         {activeTab === 'minutes' && <MinutesTab />}
         {activeTab === 'calendar' && <CalendarTab />}
         {activeTab === 'ai' && <AiTab />}
@@ -1281,6 +1283,167 @@ function AiTab() {
           </button>
         </div>
       </form>
+    </div>
+  )
+}
+
+// ─── 공지사항 탭 ────────────────────────────────────────────
+function NoticesTab() {
+  const [notices, setNotices] = useState<any[]>([])
+  const [title, setTitle] = useState('')
+  const [content, setContent] = useState('')
+  const [targetTeam, setTargetTeam] = useState<'all' | 'sales' | 'ops'>('all')
+  const [loading, setLoading] = useState(false)
+  const [posting, setPosting] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
+
+  useEffect(() => { loadNotices() }, [])
+
+  async function loadNotices() {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/notices')
+      const data = await res.json()
+      setNotices((data.notices || []).filter((n: any) => n.notice_type !== 'supply_count'))
+    } catch {}
+    setLoading(false)
+  }
+
+  function showToast(msg: string) {
+    setToast(msg)
+    setTimeout(() => setToast(null), 3500)
+  }
+
+  async function handlePost(e: FormEvent) {
+    e.preventDefault()
+    if (!title.trim()) return
+    setPosting(true)
+    try {
+      const res = await fetch('/api/notices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: title.trim(),
+          content: content.trim(),
+          notice_type: 'general',
+          target_team: targetTeam,
+          is_active: true,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setTitle('')
+        setContent('')
+        setTargetTeam('all')
+        const teamLabel = targetTeam === 'all' ? '전 직원' : targetTeam === 'sales' ? '영업팀' : '관리팀'
+        showToast(`✅ 공지 등록 완료! ${teamLabel}에게 알림 발송됐습니다.`)
+        loadNotices()
+      } else {
+        showToast(`❌ ${data.error || '등록 실패'}`)
+      }
+    } catch {
+      showToast('❌ 네트워크 오류')
+    }
+    setPosting(false)
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm('이 공지를 삭제할까요?')) return
+    await fetch(`/api/notices?id=${id}`, { method: 'DELETE' })
+    loadNotices()
+  }
+
+  const teamLabel = (t: string) =>
+    t === 'sales' ? '영업팀' : t === 'ops' ? '관리팀' : '전체'
+
+  return (
+    <div className="max-w-2xl mx-auto pb-20">
+      {toast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] px-5 py-3 rounded-xl shadow-2xl text-sm font-semibold text-white bg-emerald-500">
+          {toast}
+        </div>
+      )}
+
+      {/* 공지 작성 폼 */}
+      <div className="bg-white rounded-2xl border border-[#E8E2D4] p-5 mb-6 shadow-sm">
+        <h2 className="text-base font-bold text-[#1B2A45] mb-1 flex items-center gap-2">
+          <span className="text-xl">📢</span> 새 공지사항 작성
+        </h2>
+        <p className="text-xs text-gray-400 mb-4">등록하면 대상 직원 핸드폰으로 즉시 알림이 발송됩니다</p>
+        <form onSubmit={handlePost} className="space-y-3">
+          <input
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder="공지 제목 *"
+            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A258]"
+            required
+          />
+          <textarea
+            value={content}
+            onChange={e => setContent(e.target.value)}
+            placeholder="공지 내용 (선택)"
+            rows={4}
+            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A258] resize-none"
+          />
+          {/* 대상 선택 */}
+          <div className="flex gap-2">
+            {(['all', 'sales', 'ops'] as const).map(t => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTargetTeam(t)}
+                className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+                  targetTeam === t
+                    ? 'bg-[#1B2A45] text-white border-[#1B2A45]'
+                    : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                {t === 'all' ? '👥 전 직원' : t === 'sales' ? '📞 영업팀만' : '⚙️ 관리팀만'}
+              </button>
+            ))}
+          </div>
+          <button
+            type="submit"
+            disabled={posting || !title.trim()}
+            className="w-full bg-[#1B2A45] hover:bg-[#243860] disabled:opacity-40 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors"
+          >
+            {posting ? '발송 중...' : '📤 공지 등록 + 알림 발송'}
+          </button>
+        </form>
+      </div>
+
+      {/* 공지 목록 */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-gray-500">공지 내역</h3>
+        {loading ? (
+          <p className="text-sm text-gray-400 text-center py-8">불러오는 중...</p>
+        ) : notices.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-8">등록된 공지가 없습니다</p>
+        ) : (
+          notices.map(n => (
+            <div key={n.id} className="bg-white rounded-xl border border-[#E8E2D4] p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-2 mb-1">
+                <div className="flex items-center gap-2 min-w-0">
+                  <p className="text-sm font-semibold text-[#1B2A45] truncate">{n.title}</p>
+                  <span className="shrink-0 text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full">
+                    {teamLabel(n.target_team)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-[10px] text-gray-400">
+                    {new Date(n.created_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <button
+                    onClick={() => handleDelete(n.id)}
+                    className="text-gray-300 hover:text-red-400 text-xs transition-colors"
+                  >✕</button>
+                </div>
+              </div>
+              {n.content && <p className="text-sm text-gray-600 whitespace-pre-wrap mt-1">{n.content}</p>}
+            </div>
+          ))
+        )}
+      </div>
     </div>
   )
 }

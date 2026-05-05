@@ -32,6 +32,12 @@ export async function POST(req: NextRequest) {
   let query = supabaseAdmin.from('push_subscriptions').select('*')
   if (target === 'ceo') {
     query = query.eq('user_role', 'ceo')
+  } else if (target === 'employees') {
+    query = query.neq('user_role', 'ceo')
+  } else if (target === 'sales') {
+    query = query.eq('user_role', 'sales')
+  } else if (target === 'ops') {
+    query = query.eq('user_role', 'ops')
   } else if (target !== 'all') {
     query = query.eq('user_id', target)
   }
