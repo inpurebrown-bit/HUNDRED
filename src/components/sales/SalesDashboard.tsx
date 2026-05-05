@@ -60,7 +60,6 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const [submitting, setSubmitting] = useState(false)
 
   // 검색
-  const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
 
@@ -287,55 +286,57 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         <span className="text-white/60 text-xs font-medium hidden md:block">
           {tabs.find(t => t.key === activeTab)?.label ?? '영업팀 대시보드'} · {userName}
         </span>
-        <div className="flex items-center gap-3 relative">
-          {/* 검색창 (활성화 시) */}
-          {showSearch && (
-            <div className="relative">
-              <input
-                ref={searchRef}
-                type="text"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder="업체명·이름·연락처 검색..."
-                autoFocus
-                className="bg-white/10 text-white placeholder-white/40 text-xs px-3 py-1.5 rounded-lg border border-white/20 focus:outline-none focus:bg-white/20 w-48 md:w-64"
-              />
-              {/* 검색 결과 드롭다운 */}
-              {searchResults.length > 0 && (
-                <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 w-80 max-h-80 overflow-y-auto">
-                  <p className="text-[10px] text-gray-400 px-3 pt-2.5 pb-1 font-semibold">{searchResults.length}건 검색됨</p>
-                  {searchResults.map(c => (
-                    <button key={c.id}
-                      onClick={() => {
-                        const tab = STATUS_TAB[c.status] ?? 'customers'
-                        setActiveTab(tab)
-                        setShowSearch(false)
-                        setSearchQuery('')
-                      }}
-                      className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors flex items-center justify-between gap-2 border-t border-gray-50">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-800 truncate">{c.company || '(업체명 없음)'}</p>
-                        <p className="text-[11px] text-gray-400 truncate">{c.name} · {c.phone}</p>
-                      </div>
-                      <span className="shrink-0 text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">
-                        {STATUS_LABEL[c.status] ?? c.status}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {q.length >= 1 && searchResults.length === 0 && (
-                <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-200 z-50 w-72 px-4 py-3 text-xs text-gray-400">
-                  검색 결과 없음
-                </div>
-              )}
-            </div>
-          )}
+        <div className="flex items-center gap-2 relative">
+          {/* 항상 표시되는 검색창 */}
+          <div className="relative">
+            <input
+              ref={searchRef}
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="업체명·이름·연락처..."
+              className="bg-white/10 text-white placeholder-white/40 text-xs px-3 py-1.5 rounded-lg border border-white/20 focus:outline-none focus:bg-white/20 w-36 md:w-52"
+            />
+            <button
+              onClick={() => setSearchQuery(searchQuery)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-white/50 hover:text-white text-[10px]"
+              title="검색하기">
+              검색
+            </button>
+            {/* 검색 결과 드롭다운 */}
+            {searchResults.length > 0 && (
+              <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 w-80 max-h-80 overflow-y-auto">
+                <p className="text-[10px] text-gray-400 px-3 pt-2.5 pb-1 font-semibold">{searchResults.length}건 검색됨</p>
+                {searchResults.map(c => (
+                  <button key={c.id}
+                    onClick={() => {
+                      const tab = STATUS_TAB[c.status] ?? 'customers'
+                      setActiveTab(tab)
+                      setSearchQuery('')
+                    }}
+                    className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors flex items-center justify-between gap-2 border-t border-gray-50">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{c.company || '(업체명 없음)'}</p>
+                      <p className="text-[11px] text-gray-400 truncate">{c.name} · {c.phone}</p>
+                    </div>
+                    <span className="shrink-0 text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">
+                      {STATUS_LABEL[c.status] ?? c.status}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {q.length >= 1 && searchResults.length === 0 && (
+              <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-200 z-50 w-72 px-4 py-3 text-xs text-gray-400">
+                검색 결과 없음
+              </div>
+            )}
+          </div>
+          {/* 대시보드로 돌아가기 */}
           <button
-            onClick={() => { setShowSearch(v => !v); setSearchQuery('') }}
-            className={`text-xs px-2 py-1.5 rounded-lg transition-colors ${showSearch ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white/80'}`}
-            title="검색">
-            🔍
+            onClick={() => setActiveTab('board')}
+            className="text-white/50 hover:text-white text-[10px] px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors whitespace-nowrap hidden md:block">
+            🏠 홈
           </button>
           <button onClick={() => signOut({ callbackUrl: '/login' })}
             className="text-white/40 hover:text-white/80 text-xs transition-colors">로그아웃</button>

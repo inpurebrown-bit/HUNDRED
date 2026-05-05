@@ -24,3 +24,40 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ── 입력 필드 텍스트 항상 검정색 ── */
+input,
+input[type="text"],
+input[type="number"],
+input[type="tel"],
+input[type="email"],
+input[type="date"],
+input[type="month"],
+input[type="password"],
+textarea,
+select {
+  color: #111 !important;
+  -webkit-text-fill-color: #111 !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #aaa !important;
+  -webkit-text-fill-color: #aaa !important;
+}
+
+/* 자동완성 배경색 방지 */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+  -webkit-text-fill-color: #111 !important;
+}
+
+@media print {
+  @page {
+    margin: 12mm;
+    size: A4;
+  }
+}

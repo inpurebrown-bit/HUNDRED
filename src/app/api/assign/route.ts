@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   // 계약 정보 조회
   const { data: contract } = await supabaseAdmin
     .from('contracts')
-    .select('*, customers(name, phone, company, loan_history)')
+    .select('id, customer_id, sales_user_name, contract_amount, memo, status, created_at, customers(name, phone, company, loan_history)')
     .eq('id', contract_id)
     .single()
 
@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabaseAdmin
     .from('contracts')
-    .select(`*, customers(name, phone, company)`)
+    .select('id, customer_id, sales_user_name, contract_amount, memo, status, created_at, customers(name, phone, company)')
     .eq('status', 'pending_assign')
     .order('created_at', { ascending: false })
 

@@ -55,6 +55,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saveStatus, setSaveStatus] = useState<Record<string, 'saved' | 'saving' | 'unsaved'>>({})
   const [filterStage, setFilterStage] = useState<string>('all')
+  const [searchQuery, setSearchQuery] = useState('')
   const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
   async function loadCases() {
@@ -87,7 +88,16 @@ export default function OpsDashboard({ userId, userName }: Props) {
     autoSave(id, { [field]: value })
   }
 
-  const filtered = filterStage === 'all' ? cases : cases.filter(c => c.progress_stage === filterStage)
+  const q = searchQuery.trim().toLowerCase()
+  const filteredByStage = filterStage === 'all' ? cases : cases.filter(c => c.progress_stage === filterStage)
+  const filtered = q.length >= 1
+    ? filteredByStage.filter(c =>
+        c.customers?.company?.toLowerCase().includes(q) ||
+        c.customers?.name?.toLowerCase().includes(q) ||
+        c.customers?.phone?.replace(/-/g, '').includes(q.replace(/-/g, '')) ||
+        c.institution?.toLowerCase().includes(q)
+      )
+    : filteredByStage
 
   // 통계
   const totalRevenue = cases.reduce((sum, c) => sum + (c.revenue || 0), 0)
@@ -104,7 +114,27 @@ export default function OpsDashboard({ userId, userName }: Props) {
         <span className="text-white/60 text-xs font-medium hidden md:block">
           {opsTabs.find(t => t.key === activeTab)?.label ?? '관리팀 대시보드'}
         </span>
-        <div className="flex items-center gap-3 relative">
+        <div className="flex items-center gap-2 relative">
+          {/* 항상 표시되는 검색창 */}
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="업체명·이름·기관..."
+              className="bg-white/10 text-white placeholder-white/40 text-xs px-3 py-1.5 rounded-lg border border-white/20 focus:outline-none focus:bg-white/20 w-32 md:w-44"
+            />
+            {q.length >= 1 && (
+              <button onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-white/50 hover:text-white text-xs">✕</button>
+            )}
+          </div>
+          {/* 대시보드(케이스탭)로 돌아가기 */}
+          <button
+            onClick={() => setActiveTab('cases')}
+            className="text-white/50 hover:text-white text-[10px] px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors whitespace-nowrap hidden md:block">
+            🏠 홈
+          </button>
           <button onClick={() => signOut({ callbackUrl: '/login' })}
             className="text-white/40 hover:text-white/80 text-xs transition-colors">
             로그아웃

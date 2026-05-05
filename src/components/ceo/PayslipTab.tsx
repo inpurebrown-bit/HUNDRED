@@ -42,7 +42,7 @@ interface CompanyInfo {
 const DEFAULT_COMPANY: CompanyInfo = {
   business_number: '333-36-01551',
   address: '서울특별시 구로구 디지털로 243, 911호',
-  ceo_name: '백승혁',
+  ceo_name: '백승협',
   bank_account: '3333-09-9388152',
 }
 

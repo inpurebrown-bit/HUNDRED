@@ -29,6 +29,13 @@ interface Report {
   report_date: string
   data: any
 }
+// 다음날 확인 필요 아이템
+interface NextDayCheck {
+  id: string
+  company: string
+  note: string
+  done: boolean
+}
 
 // ── 헬퍼 ──────────────────────────────────────────────────
 const todayStr = () => new Date().toISOString().slice(0, 10)
@@ -60,6 +67,9 @@ export default function MinutesTab() {
   const [generalDecisions, setGeneralDecisions] = useState('')
   const [nextMeeting, setNextMeeting] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // 다음날 확인 필요 체크리스트 (직원별)
+  const [nextDayChecks, setNextDayChecks] = useState<Record<string, NextDayCheck[]>>({})
 
   // ── 데이터 로드 ─────────────────────────────────────────
   async function loadMinutes() {
@@ -142,41 +152,200 @@ export default function MinutesTab() {
 
   // ── 출력 ────────────────────────────────────────────────
   function handlePrint() {
-    const el = document.getElementById('meetingPrintArea')
-    if (!el) return
-    const win = window.open('', '_blank', 'width=900,height=800')
+    const win = window.open('', '_blank', 'width=900,height=900')
     if (!win) return
-    win.document.write(`<!DOCTYPE html><html><head>
-      <meta charset="utf-8" /><title>회의자료 ${prepDate}</title>
+
+    // 각 직원의 데이터 정리
+    const staffBlocks = userNames.map(name => {
+      const mr = morningMap[name]
+      const dr = dailyMap[name]
+      const tc = Number(mr?.data?.total_calls || 0)
+      const cn = Number(mr?.data?.connected || 0)
+      const db = Number(mr?.data?.db_secured || 0)
+      const oc = Number(mr?.data?.outbound_contracts || 0)
+
+      const pressPoints: string[] = []
+      if (mr) {
+        if (tc === 0) pressPoints.push('콜 0건 — 활동 없음, 원인 확인')
+        else {
+          if (cn / (tc || 1) < 0.3) pressPoints.push(`연결율 ${pct(cn, tc)} — 30% 미달`)
+          if (oc === 0 && cn > 0) pressPoints.push('아웃계약 0건 — 클로징 전략 점검')
+          if (db === 0 && cn > 0) pressPoints.push('DB확보 0건 — 상담전환 안됨')
+        }
+        if (pressPoints.length === 0) pressPoints.push('✓ 전체 양호')
+      }
+
+      const decidedSupply = (dr?.data?.supply_db || []).filter((i: any) => i.is_decided)
+      const decidedOut = (dr?.data?.outbound || []).filter((i: any) => i.is_decided)
+      const meetings = dr?.data?.meetings || []
+      const payment = dr?.data?.payment_waiting || []
+      const worried = dr?.data?.worried || []
+
+      const checks = nextDayChecks[name] || []
+      const hasChecks = checks.some(c => c.company.trim())
+
+      return `
+      <div class="staff-block">
+        <div class="staff-header">
+          <span class="staff-name">${name}</span>
+          <span class="staff-date">${prepDate}</span>
+        </div>
+        <div class="two-col">
+          <!-- 오전보고 -->
+          <div>
+            <div class="section-title amber">☀️ 오전보고</div>
+            ${mr ? `
+            <div class="stat-grid">
+              <div class="stat"><div class="sv">${tc}</div><div class="sl">총 콜</div></div>
+              <div class="stat"><div class="sv c-amber">${cn}</div><div class="sl">연결됨</div><div class="sr">${pct(cn, tc)}</div></div>
+              <div class="stat"><div class="sv c-blue">${db}</div><div class="sl">DB확보</div><div class="sr">${pct(db, tc)}</div></div>
+              <div class="stat"><div class="sv c-green">${oc}</div><div class="sl">아웃계약</div><div class="sr">${pct(oc, tc)}</div></div>
+            </div>
+            <div class="press-box">
+              <div class="press-title">📌 프레스 체크</div>
+              ${pressPoints.map(p => `<div class="press-item ${p.startsWith('✓') ? 'good' : 'bad'}">${p}</div>`).join('')}
+            </div>` : `<div class="empty-box">오전보고 미제출</div>`}
+          </div>
+          <!-- 마감보고 -->
+          <div>
+            <div class="section-title blue">📋 마감보고</div>
+            ${dr ? `
+            <div class="stat-grid">
+              <div class="stat"><div class="sv c-blue">${dr.data?.today_contracts || 0}</div><div class="sl">당일계약</div></div>
+              <div class="stat"><div class="sv c-blue">${dr.data?.month_contracts || 0}</div><div class="sl">월누적</div></div>
+              <div class="stat"><div class="sv">${dr.data?.goal || 0}</div><div class="sl">월목표</div></div>
+            </div>
+            ${decidedSupply.length > 0 ? `<div class="sub-section"><b>✅ 결정(공급):</b> ${decidedSupply.map((i: any) => `<span class="chip chip-green">${i.company}</span>`).join('')}</div>` : ''}
+            ${decidedOut.length > 0 ? `<div class="sub-section"><b>✅ 결정(아웃):</b> ${decidedOut.map((i: any) => `<span class="chip chip-violet">${i.company}</span>`).join('')}</div>` : ''}
+            ${meetings.length > 0 ? `<div class="sub-section"><b>📅 미팅:</b> ${meetings.map((m: any) => `${m.company} ${m.date} ${m.time}`).join(' / ')}</div>` : ''}
+            ${payment.length > 0 ? `<div class="sub-section"><b>💰 입금대기:</b> ${payment.map((p: any) => `<span class="chip chip-amber">${p.company}</span>`).join('')}</div>` : ''}
+            ${worried.length > 0 ? `<div class="sub-section"><b>⚠️ 검토필요:</b> ${worried.map((w: any) => `${w.company}(${w.probability})`).join(' / ')}</div>` : ''}
+            ` : `<div class="empty-box">마감보고 미제출</div>`}
+          </div>
+        </div>
+        <!-- 다음날 확인 필요 -->
+        ${hasChecks ? `
+        <div class="next-day-box">
+          <div class="next-day-title">🔔 다음날 확인 필요</div>
+          ${checks.filter(c => c.company.trim()).map(c => `
+            <div class="next-day-item">
+              <span class="check-box">${c.done ? '☑' : '☐'}</span>
+              <span class="check-company">${c.company}</span>
+              ${c.note ? `<span class="check-note"> — ${c.note}</span>` : ''}
+            </div>
+          `).join('')}
+        </div>` : ''}
+        <!-- 지시사항 메모 라인 -->
+        <div class="memo-area">
+          <div class="memo-title">✏️ 회의 중 지시사항 / 다음 스텝</div>
+          <div class="line"></div>
+          <div class="line"></div>
+          <div class="line"></div>
+        </div>
+      </div>`
+    }).join('')
+
+    // 팔로업 섹션
+    const followupHtml = activeFollowups.length > 0 ? `
+    <div class="followup-block">
+      <div class="followup-title">📌 진행중인 팔로업 업체 (${activeFollowups.length}건)</div>
+      <table class="followup-table">
+        <tr><th>업체명</th><th>담당</th><th>내용</th><th>마감일</th></tr>
+        ${activeFollowups.map((f: any) => `
+          <tr>
+            <td><b>${f.company}</b></td>
+            <td>${f.user_name}</td>
+            <td>${f.note || '-'}</td>
+            <td class="${f.until_date === today ? 'urgent' : ''}">${f.until_date}${f.until_date === today ? ' ⚠️' : ''}</td>
+          </tr>
+        `).join('')}
+      </table>
+    </div>` : ''
+
+    win.document.write(`<!DOCTYPE html><html lang="ko"><head>
+      <meta charset="utf-8"/>
+      <title>HUNDRED 회의자료 ${prepDate}</title>
       <style>
-        body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; font-size: 12px; color: #111; padding: 20px; }
-        h1 { font-size: 18px; font-weight: bold; margin-bottom: 4px; }
-        h2 { font-size: 14px; font-weight: bold; margin: 16px 0 6px; }
-        h3 { font-size: 12px; font-weight: bold; margin: 10px 0 4px; }
-        .card { border: 1px solid #ccc; border-radius: 8px; margin-bottom: 14px; overflow: hidden; }
-        .card-header { background: #1B2A45; color: white; padding: 8px 14px; font-weight: bold; font-size: 13px; }
-        .card-body { padding: 12px 14px; }
-        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .stat-row { display: flex; gap: 6px; margin-bottom: 8px; }
-        .stat { border: 1px solid #eee; border-radius: 6px; padding: 4px 8px; text-align: center; min-width: 50px; }
-        .stat .val { font-size: 16px; font-weight: 900; }
-        .stat .lbl { font-size: 9px; color: #888; }
-        .stat .rate { font-size: 10px; color: #d97706; font-weight: 600; }
-        .press { background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 8px; margin-top: 6px; }
-        .press h4 { font-size: 10px; color: #dc2626; font-weight: bold; margin: 0 0 4px; }
-        .chip { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 10px; margin: 2px; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',sans-serif; font-size: 11px; color: #111; background: #fff; padding: 16px 20px; }
+        h1 { font-size: 17px; font-weight: 900; color: #1B2A45; }
+        .doc-header { border-bottom: 3px solid #1B2A45; padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-end; }
+        .doc-meta { font-size: 10px; color: #666; }
+        /* 팔로업 */
+        .followup-block { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px; padding: 10px 12px; margin-bottom: 14px; }
+        .followup-title { font-size: 11px; font-weight: 900; color: #c2410c; margin-bottom: 6px; }
+        .followup-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+        .followup-table th { background: #fed7aa; padding: 3px 6px; text-align: left; }
+        .followup-table td { padding: 3px 6px; border-bottom: 1px solid #fed7aa; }
+        .urgent { color: #dc2626; font-weight: bold; }
+        /* 직원 블록 */
+        .staff-block { border: 1px solid #d1d5db; border-radius: 6px; margin-bottom: 12px; overflow: hidden; page-break-inside: avoid; }
+        .staff-header { background: #1B2A45; color: white; padding: 7px 12px; display: flex; justify-content: space-between; align-items: center; }
+        .staff-name { font-size: 13px; font-weight: 900; }
+        .staff-date { font-size: 10px; opacity: 0.6; }
+        .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-bottom: 1px solid #e5e7eb; }
+        .two-col > div { padding: 10px 12px; }
+        .two-col > div:first-child { border-right: 1px solid #e5e7eb; }
+        .section-title { font-size: 10px; font-weight: 900; margin-bottom: 6px; }
+        .section-title.amber { color: #d97706; }
+        .section-title.blue { color: #2563eb; }
+        .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 6px; }
+        .stat { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; padding: 4px 3px; text-align: center; }
+        .sv { font-size: 15px; font-weight: 900; line-height: 1; }
+        .sl { font-size: 8px; color: #9ca3af; margin-top: 1px; }
+        .sr { font-size: 9px; color: #d97706; font-weight: 700; }
+        .c-amber { color: #d97706; }
+        .c-blue { color: #2563eb; }
+        .c-green { color: #16a34a; }
+        .press-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 4px; padding: 6px 8px; }
+        .press-title { font-size: 9px; font-weight: 900; color: #dc2626; margin-bottom: 3px; }
+        .press-item { font-size: 10px; padding: 1px 0; }
+        .press-item.bad { color: #dc2626; }
+        .press-item.good { color: #16a34a; }
+        .sub-section { font-size: 10px; margin-top: 4px; line-height: 1.5; }
+        .chip { display: inline-block; padding: 1px 6px; border-radius: 99px; font-size: 9px; margin: 1px; }
         .chip-green { background: #dcfce7; color: #16a34a; }
         .chip-violet { background: #ede9fe; color: #7c3aed; }
-        .chip-amber { background: #fef3c7; color: #d97706; }
-        .followup-box { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; }
-        .followup-item { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed #fed7aa; }
-        .write-line { border-bottom: 1px dashed #ccc; margin: 6px 0; height: 20px; }
-        @media print { body { padding: 10px; } }
+        .chip-amber { background: #fef3c7; color: #b45309; }
+        .empty-box { background: #f3f4f6; border-radius: 4px; padding: 8px; text-align: center; font-size: 10px; color: #9ca3af; }
+        /* 다음날 확인 필요 */
+        .next-day-box { background: #eff6ff; border-top: 1px dashed #bfdbfe; padding: 8px 12px; }
+        .next-day-title { font-size: 10px; font-weight: 900; color: #1d4ed8; margin-bottom: 5px; }
+        .next-day-item { display: flex; align-items: center; gap: 6px; font-size: 10px; margin-bottom: 3px; }
+        .check-box { font-size: 12px; flex-shrink: 0; }
+        .check-company { font-weight: 700; }
+        .check-note { color: #6b7280; }
+        /* 메모 영역 */
+        .memo-area { padding: 8px 12px; background: #f9fafb; }
+        .memo-title { font-size: 9px; font-weight: 700; color: #9ca3af; margin-bottom: 5px; }
+        .line { border-bottom: 1px dashed #d1d5db; height: 18px; margin-bottom: 2px; }
+        /* 전체 메모 */
+        .total-memo { border: 1px solid #d1d5db; border-radius: 6px; padding: 10px 12px; margin-top: 12px; }
+        .total-memo-title { font-size: 11px; font-weight: 900; color: #374151; margin-bottom: 8px; }
+        @media print {
+          @page { margin: 10mm; size: A4; }
+          body { padding: 0; }
+          .staff-block { page-break-inside: avoid; }
+        }
       </style>
-    </head><body>${el.innerHTML}</body></html>`)
+    </head><body>
+      <div class="doc-header">
+        <h1>HUNDRED 일일 회의자료</h1>
+        <div class="doc-meta">
+          <div>📅 보고기준: <b>${prepDate}</b></div>
+          <div>🖨️ 출력: ${today}</div>
+        </div>
+      </div>
+      ${followupHtml}
+      ${staffBlocks}
+      <div class="total-memo">
+        <div class="total-memo-title">📝 전체 결정사항 / 오늘 회의 메모</div>
+        ${[1,2,3,4].map(() => '<div class="line"></div>').join('')}
+      </div>
+    </body></html>`)
     win.document.close()
     win.focus()
-    setTimeout(() => { win.print() }, 500)
+    setTimeout(() => win.print(), 600)
   }
 
   // ──────────────────────────────────────────────────────
@@ -219,13 +388,8 @@ export default function MinutesTab() {
             </div>
           </div>
 
-          {/* ─── 출력 영역 ─── */}
-          <div id="meetingPrintArea">
-            {/* Print-only header (screen에서는 숨김) */}
-            <div className="hidden" style={{ display: 'none' }}>
-              <h1>HUNDRED 일일 회의자료</h1>
-              <p style={{ fontSize: 12, color: '#666' }}>{prepDate} 보고 기준 · 인쇄: {today}</p>
-            </div>
+          {/* ─── 화면 미리보기 ─── */}
+          <div>
 
             {/* 팔로업 */}
             {activeFollowups.length > 0 && (
@@ -408,13 +572,54 @@ export default function MinutesTab() {
                         </div>
                       </div>
 
-                      {/* 다음 스텝 논의 공간 (출력용) */}
-                      <div className="border-t border-gray-100 px-5 py-3 bg-gray-50">
-                        <p className="text-[10px] font-bold text-gray-400 mb-2">✏️ 회의 중 다음 스텝 논의 / 지시사항</p>
-                        <div className="space-y-1.5">
-                          <div className="h-5 border-b border-dashed border-gray-300" />
-                          <div className="h-5 border-b border-dashed border-gray-300" />
+                      {/* 다음날 확인 필요 체크리스트 */}
+                      <div className="border-t border-blue-100 px-5 py-3 bg-blue-50/40">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-[10px] font-bold text-blue-600">🔔 다음날 확인 필요</p>
+                          <button
+                            onClick={() => setNextDayChecks(prev => ({
+                              ...prev,
+                              [name]: [...(prev[name] || []), { id: uid(), company: '', note: '', done: false }]
+                            }))}
+                            className="text-[10px] bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-0.5 rounded transition-colors">
+                            + 추가
+                          </button>
                         </div>
+                        {(nextDayChecks[name] || []).length === 0 ? (
+                          <p className="text-[10px] text-blue-300 text-center py-1">추가하면 출력물에 포함됩니다</p>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {(nextDayChecks[name] || []).map((chk, ci) => (
+                              <div key={chk.id} className="flex items-center gap-2">
+                                <input type="checkbox" checked={chk.done}
+                                  onChange={e => setNextDayChecks(prev => ({
+                                    ...prev,
+                                    [name]: (prev[name] || []).map((c, i) => i === ci ? { ...c, done: e.target.checked } : c)
+                                  }))}
+                                  className="w-3.5 h-3.5 rounded shrink-0" />
+                                <input type="text" value={chk.company}
+                                  onChange={e => setNextDayChecks(prev => ({
+                                    ...prev,
+                                    [name]: (prev[name] || []).map((c, i) => i === ci ? { ...c, company: e.target.value } : c)
+                                  }))}
+                                  placeholder="업체명"
+                                  className="border border-blue-200 rounded px-2 py-0.5 text-xs bg-white w-28 focus:outline-none" />
+                                <input type="text" value={chk.note}
+                                  onChange={e => setNextDayChecks(prev => ({
+                                    ...prev,
+                                    [name]: (prev[name] || []).map((c, i) => i === ci ? { ...c, note: e.target.value } : c)
+                                  }))}
+                                  placeholder="확인 내용"
+                                  className="flex-1 border border-blue-200 rounded px-2 py-0.5 text-xs bg-white focus:outline-none" />
+                                <button onClick={() => setNextDayChecks(prev => ({
+                                  ...prev,
+                                  [name]: (prev[name] || []).filter((_, i) => i !== ci)
+                                }))}
+                                  className="text-red-300 hover:text-red-500 text-xs">✕</button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )

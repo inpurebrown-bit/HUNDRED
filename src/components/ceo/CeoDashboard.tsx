@@ -38,6 +38,24 @@ interface OpsUser {
 export default function CeoDashboard() {
   const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'revenue' | 'payrate' | 'payroll' | 'payslip' | 'reports' | 'minutes' | 'calendar' | 'ai' | 'ailogs'>('overview')
   const [menuOpen, setMenuOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<any[]>([])
+
+  async function handleSearch(q: string) {
+    setSearchQuery(q)
+    if (q.trim().length < 1) { setSearchResults([]); return }
+    try {
+      const res = await fetch('/api/customers')
+      const data = await res.json()
+      const all: any[] = data.customers || []
+      const lower = q.trim().toLowerCase()
+      setSearchResults(all.filter((c: any) =>
+        c.company?.toLowerCase().includes(lower) ||
+        c.name?.toLowerCase().includes(lower) ||
+        c.phone?.replace(/-/g, '').includes(lower.replace(/-/g, ''))
+      ).slice(0, 15))
+    } catch { setSearchResults([]) }
+  }
 
   const tabs = [
     { key: 'overview', label: '📊 전체 현황' },
@@ -65,7 +83,50 @@ export default function CeoDashboard() {
         <span className="text-white/60 text-xs font-medium hidden md:block">
           {tabs.find(t => t.key === activeTab)?.label ?? '대표 대시보드'}
         </span>
-        <div className="flex items-center gap-3 relative">
+        <div className="flex items-center gap-2 relative">
+          {/* 검색창 */}
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => handleSearch(e.target.value)}
+              placeholder="업체명·이름·연락처..."
+              className="bg-white/10 text-white placeholder-white/40 text-xs px-3 py-1.5 rounded-lg border border-white/20 focus:outline-none focus:bg-white/20 w-32 md:w-48"
+            />
+            {searchQuery.length >= 1 && (
+              <button onClick={() => { setSearchQuery(''); setSearchResults([]) }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-white/50 hover:text-white text-xs">✕</button>
+            )}
+            {searchResults.length > 0 && (
+              <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 w-80 max-h-80 overflow-y-auto">
+                <p className="text-[10px] text-gray-400 px-3 pt-2.5 pb-1 font-semibold">{searchResults.length}건 검색됨</p>
+                {searchResults.map((c: any) => (
+                  <button key={c.id}
+                    onClick={() => { setActiveTab('sales'); setSearchQuery(''); setSearchResults([]) }}
+                    className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors flex items-center justify-between gap-2 border-t border-gray-50">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{c.company || '(업체명 없음)'}</p>
+                      <p className="text-[11px] text-gray-400 truncate">{c.name} · {c.phone} · {c.sales_user_name}</p>
+                    </div>
+                    <span className="shrink-0 text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">
+                      {c.status === 'lead' ? '신규' : c.status === 'consulting' ? '상담중' : c.status === 'contracted' ? '계약' : c.status}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {searchQuery.length >= 1 && searchResults.length === 0 && (
+              <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-200 z-50 w-72 px-4 py-3 text-xs text-gray-400">
+                검색 결과 없음
+              </div>
+            )}
+          </div>
+          {/* 전체 현황으로 돌아가기 */}
+          <button
+            onClick={() => setActiveTab('overview')}
+            className="text-white/50 hover:text-white text-[10px] px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors whitespace-nowrap hidden md:block">
+            🏠 홈
+          </button>
           <button onClick={() => signOut({ callbackUrl: '/login' })}
             className="text-white/40 hover:text-white/80 text-xs transition-colors">
             로그아웃

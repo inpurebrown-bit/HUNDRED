@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const query = supabaseAdmin
     .from('customers')
     .select('*')
-    .order('updated_at', { ascending: false })
+    .order('created_at', { ascending: false })
 
   // 영업팀은 본인 고객만
   const finalQuery = user.role === 'sales'
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       status: status || 'lead',
       sales_user_id: user.id,
       sales_user_name: user.name,
-      updated_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
     })
     .select()
     .single()

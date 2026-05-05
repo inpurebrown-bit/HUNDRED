@@ -74,8 +74,8 @@ function PayRateSubView() {
   })
 
   const [employees, setEmployees] = useState<EmployeeRow[]>([
-    defaultEmployee(),
-    defaultEmployee(),
+    { ...defaultEmployee(), name: '손제후' },
+    { ...defaultEmployee(), name: '김윤지' },
     defaultEmployee(),
     defaultEmployee(),
   ])
@@ -373,15 +373,12 @@ function PnlSubView() {
   })
   const [ceoSalary, setCeoSalary] = useState<number>(0)
 
-  // 매출 계산 헬퍼
-  function vatExcl(n: number): number { return Math.round(Number(n) / 1.1) }
-  function vatAmt(n: number): number { return Number(n) - vatExcl(n) }
-
-  // 영업팀 합계
-  const salesTotal = salesEmps.reduce((s, e) => s + vatExcl(e.sales_vat_incl), 0)
-  // 관리팀 합계
-  const opsFeeTotal = opsEmps.reduce((s, e) => s + vatExcl(e.fee_vat_incl), 0)
-  const opsContractTotal = opsEmps.reduce((s, e) => s + vatExcl(e.contract_vat_incl), 0)
+  // 매출 계산 (직접 부가세 제외 금액 입력)
+  // sales_vat_incl 필드를 부가세 제외 금액으로 직접 사용
+  const salesTotal = salesEmps.reduce((s, e) => s + Number(e.sales_vat_incl), 0)
+  // 관리팀 합계 (fee_vat_incl, contract_vat_incl 도 부가세 제외 금액)
+  const opsFeeTotal = opsEmps.reduce((s, e) => s + Number(e.fee_vat_incl), 0)
+  const opsContractTotal = opsEmps.reduce((s, e) => s + Number(e.contract_vat_incl), 0)
   // 총 매출
   const totalRevenue = salesTotal + opsFeeTotal + opsContractTotal
 
@@ -482,9 +479,7 @@ function PnlSubView() {
               <thead>
                 <tr className="text-xs text-gray-400">
                   <th className="text-left pb-1">직원명</th>
-                  <th className="text-right pb-1">매출(VAT포함)</th>
-                  <th className="text-right pb-1">VAT제외</th>
-                  <th className="text-right pb-1">부가세</th>
+                  <th className="text-right pb-1">매출 (부가세 제외)</th>
                   <th />
                 </tr>
               </thead>
@@ -497,10 +492,8 @@ function PnlSubView() {
                     </td>
                     <td className="pr-2 py-0.5">
                       <input type="number" value={e.sales_vat_incl} onChange={ev => updateSalesEmp(i, 'sales_vat_incl', ev.target.value)}
-                        className={INPUT_CLS} min="0" />
+                        className={INPUT_CLS} min="0" placeholder="0" />
                     </td>
-                    <td className={CALC_CLS}>{vatExcl(e.sales_vat_incl).toLocaleString('ko-KR')}</td>
-                    <td className={CALC_CLS}>{vatAmt(e.sales_vat_incl).toLocaleString('ko-KR')}</td>
                     <td>
                       <button onClick={() => setSalesEmps(prev => prev.filter((_, idx) => idx !== i))}
                         className="text-red-400 hover:text-red-600 text-xs ml-1">✕</button>
@@ -520,10 +513,8 @@ function PnlSubView() {
               <thead>
                 <tr className="text-xs text-gray-400">
                   <th className="text-left pb-1">직원명</th>
-                  <th className="text-right pb-1">수수료(포함)</th>
-                  <th className="text-right pb-1">수수료VAT제외</th>
-                  <th className="text-right pb-1">계약(포함)</th>
-                  <th className="text-right pb-1">계약VAT제외</th>
+                  <th className="text-right pb-1">수수료 (부가세 제외)</th>
+                  <th className="text-right pb-1">계약 (부가세 제외)</th>
                   <th />
                 </tr>
               </thead>
@@ -536,14 +527,12 @@ function PnlSubView() {
                     </td>
                     <td className="pr-2 py-0.5">
                       <input type="number" value={e.fee_vat_incl} onChange={ev => updateOpsEmp(i, 'fee_vat_incl', ev.target.value)}
-                        className={INPUT_CLS} min="0" />
+                        className={INPUT_CLS} min="0" placeholder="0" />
                     </td>
-                    <td className={CALC_CLS}>{vatExcl(e.fee_vat_incl).toLocaleString('ko-KR')}</td>
                     <td className="pr-2 py-0.5">
                       <input type="number" value={e.contract_vat_incl} onChange={ev => updateOpsEmp(i, 'contract_vat_incl', ev.target.value)}
-                        className={INPUT_CLS} min="0" />
+                        className={INPUT_CLS} min="0" placeholder="0" />
                     </td>
-                    <td className={CALC_CLS}>{vatExcl(e.contract_vat_incl).toLocaleString('ko-KR')}</td>
                     <td>
                       <button onClick={() => setOpsEmps(prev => prev.filter((_, idx) => idx !== i))}
                         className="text-red-400 hover:text-red-600 text-xs ml-1">✕</button>
@@ -574,12 +563,12 @@ function PnlSubView() {
               </thead>
               <tbody>
                 {salesEmps.map((e, i) => {
-                  const excl = vatExcl(e.sales_vat_incl)
+                  const amt = Number(e.sales_vat_incl)
                   return (
                     <tr key={i}>
                       <td className="pr-2 py-0.5 text-gray-600 text-xs">{e.name || `직원${i+1}`}</td>
-                      <td className={CALC_CLS}>{Math.round(excl * 0.15).toLocaleString('ko-KR')}</td>
-                      <td className={CALC_CLS}>{Math.round(excl * 0.30).toLocaleString('ko-KR')}</td>
+                      <td className={CALC_CLS}>{Math.round(amt * 0.15).toLocaleString('ko-KR')}</td>
+                      <td className={CALC_CLS}>{Math.round(amt * 0.30).toLocaleString('ko-KR')}</td>
                     </tr>
                   )
                 })}
@@ -632,6 +621,27 @@ function PnlSubView() {
               <span>순이익</span>
               <span className={netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}>
                 {netProfit.toLocaleString('ko-KR')}원
+              </span>
+            </div>
+          </div>
+
+          {/* 개인 고정 생활비 */}
+          <div className="mt-3">
+            <p className="text-[10px] text-gray-400 font-semibold mb-2 uppercase tracking-wide">개인 고정 생활비</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-rose-50 border border-rose-100 rounded-lg px-3 py-2 flex items-center justify-between">
+                <span className="text-xs text-rose-600">💳 카드값</span>
+                <span className="text-sm font-bold text-rose-700">300만원</span>
+              </div>
+              <div className="bg-orange-50 border border-orange-100 rounded-lg px-3 py-2 flex items-center justify-between">
+                <span className="text-xs text-orange-600">🏠 집월세</span>
+                <span className="text-sm font-bold text-orange-700">65만원</span>
+              </div>
+            </div>
+            <div className="mt-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 flex items-center justify-between">
+              <span className="text-xs text-gray-500">순이익 - 생활비</span>
+              <span className={`text-sm font-bold ${(netProfit - 3650000) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                {(netProfit - 3650000).toLocaleString('ko-KR')}원
               </span>
             </div>
           </div>
