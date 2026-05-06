@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, FormEvent, ChangeEvent, ReactNode } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useSession, signOut } from 'next-auth/react'
 
 // ─── 스크롤 인트로 컴포넌트 ──────────────────────────────
 function Reveal({ children, from = 'bottom', delay = 0, className = '' }: {
@@ -271,6 +272,7 @@ function FloatingAiWidget() {
 }
 
 export default function HomePage() {
+  const { data: session } = useSession()
   const [menuOpen, setMenuOpen] = useState(false)
   const [formData, setFormData] = useState({ name: '', region: '', phone: '', company: '', message: '', taxStatus: '없음' })
   const [inquiryTypes, setInquiryTypes] = useState<string[]>([])
@@ -278,6 +280,28 @@ export default function HomePage() {
   const [submitting, setSubmitting] = useState(false)
   const [caseIdx, setCaseIdx] = useState(0)
   const [reviewIdx, setReviewIdx] = useState(0)
+  const [installPrompt, setInstallPrompt] = useState<any>(null)
+  const [installable, setInstallable] = useState(false)
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault()
+      setInstallPrompt(e)
+      setInstallable(true)
+    }
+    window.addEventListener('beforeinstallprompt', handler)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  async function handleInstall() {
+    if (!installPrompt) return
+    installPrompt.prompt()
+    const { outcome } = await installPrompt.userChoice
+    if (outcome === 'accepted') {
+      setInstallable(false)
+      setInstallPrompt(null)
+    }
+  }
 
   // 슬라이드 자동재생 제거 — 폼 작성 중 페이지 흔들림 방지
   // 수동 화살표 버튼으로만 이동
@@ -330,9 +354,30 @@ export default function HomePage() {
             <a href="#문의하기" className="hidden md:inline-flex text-xs bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-4 py-2 rounded-lg transition-colors">
               무료 상담
             </a>
-            <Link href="/login" className="text-xs font-semibold text-[#1B2A45]/40 hover:text-[#C5A258] transition-colors px-2 py-2 tracking-widest">
-              Login
-            </Link>
+            {/* 앱 다운로드 버튼 — beforeinstallprompt 지원 시에만 표시 */}
+            {installable && (
+              <button onClick={handleInstall}
+                className="hidden md:inline-flex items-center gap-1.5 text-xs border border-[#1B2A45]/20 hover:border-[#C5A258]/60 text-[#1B2A45]/50 hover:text-[#C5A258] font-semibold px-3 py-2 rounded-lg transition-colors">
+                <span>📲</span> 앱 설치
+              </button>
+            )}
+            {/* 로그인 상태: 이름 + 로그아웃 */}
+            {session ? (
+              <div className="hidden md:flex items-center gap-2">
+                <Link href={`/dashboard/${(session.user as any)?.role === 'ceo' ? 'ceo' : (session.user as any)?.role === 'ops' ? 'ops' : 'sales'}`}
+                  className="text-xs font-semibold text-[#C5A258] hover:text-[#D4B568] transition-colors px-2 py-2">
+                  {session.user?.name}
+                </Link>
+                <button onClick={() => signOut({ callbackUrl: '/' })}
+                  className="text-xs font-semibold text-[#1B2A45]/40 hover:text-red-500 transition-colors px-2 py-2">
+                  로그아웃
+                </button>
+              </div>
+            ) : (
+              <Link href="/login" className="hidden md:block text-xs font-semibold text-[#1B2A45]/40 hover:text-[#C5A258] transition-colors px-2 py-2 tracking-widest">
+                Login
+              </Link>
+            )}
             <button onClick={() => setMenuOpen(!menuOpen)} className="md:hidden p-2 text-[#1B2A45]/70 flex flex-col gap-1.5 justify-center">
               <span className={`block w-5 h-0.5 bg-current transition-all origin-center ${menuOpen ? 'rotate-45 translate-y-2' : ''}`} />
               <span className={`block w-5 h-0.5 bg-current transition-all ${menuOpen ? 'opacity-0' : ''}`} />
@@ -349,7 +394,31 @@ export default function HomePage() {
                 {label}
               </a>
             ))}
-            <a href="tel:18442599" className="block text-sm text-[#C5A258] font-bold py-1.5">📞 1844-2599</a>
+            <a href="tel:18442599" className="block text-sm text-[#C5A258] font-bold py-1.5 border-b border-[#E8E2D4]">📞 1844-2599</a>
+            {installable && (
+              <button onClick={() => { handleInstall(); setMenuOpen(false) }}
+                className="block w-full text-left text-sm text-[#1B2A45]/70 hover:text-[#C5A258] py-1.5 border-b border-[#E8E2D4]">
+                📲 앱 설치
+              </button>
+            )}
+            {session ? (
+              <>
+                <Link href={`/dashboard/${(session.user as any)?.role === 'ceo' ? 'ceo' : (session.user as any)?.role === 'ops' ? 'ops' : 'sales'}`}
+                  onClick={() => setMenuOpen(false)}
+                  className="block text-sm text-[#C5A258] font-semibold py-1.5 border-b border-[#E8E2D4]">
+                  {session.user?.name} 대시보드 →
+                </Link>
+                <button onClick={() => { signOut({ callbackUrl: '/' }); setMenuOpen(false) }}
+                  className="block w-full text-left text-sm text-red-400 hover:text-red-500 py-1.5">
+                  로그아웃
+                </button>
+              </>
+            ) : (
+              <Link href="/login" onClick={() => setMenuOpen(false)}
+                className="block text-sm text-[#1B2A45]/60 hover:text-[#C5A258] py-1.5 font-semibold tracking-widest">
+                Login
+              </Link>
+            )}
           </div>
         )}
       </nav>
