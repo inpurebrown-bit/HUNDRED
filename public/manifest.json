@@ -1,11 +1,11 @@
 {
-  "name": "헌드레드 지원센터",
-  "short_name": "헌드레드",
+  "name": "Hundred Consulting",
+  "short_name": "Hundred Consulting",
   "description": "정책자금 전문 컨설팅 기업",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1e3a5f",
-  "theme_color": "#1e3a5f",
+  "background_color": "#FAF8F3",
+  "theme_color": "#FAF8F3",
   "orientation": "portrait",
   "icons": [
     {

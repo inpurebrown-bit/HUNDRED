@@ -23,21 +23,40 @@ const nanumBrush = Nanum_Brush_Script({
 })
 
 export const metadata: Metadata = {
-  title: '헌드레드 지원센터',
+  title: 'Hundred Consulting',
   description: '정책자금 전문 컨설팅 기업',
   manifest: '/manifest.json',
+  openGraph: {
+    title: 'Hundred Consulting',
+    description: '정책자금 전문 컨설팅 기업',
+    images: [
+      {
+        url: 'https://hundred-beryl.vercel.app/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'Hundred Consultancy',
+      },
+    ],
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Hundred Consulting',
+    description: '정책자금 전문 컨설팅 기업',
+    images: ['https://hundred-beryl.vercel.app/og-image.png'],
+  },
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
-    title: '헌드레드',
+    statusBarStyle: 'default',
+    title: 'Hundred Consulting',
   },
   other: {
     'mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-capable': 'yes',
-    'apple-mobile-web-app-status-bar-style': 'black-translucent',
-    'apple-mobile-web-app-title': '헌드레드',
-    'msapplication-TileColor': '#1e3a5f',
-    'theme-color': '#1e3a5f',
+    'apple-mobile-web-app-status-bar-style': 'default',
+    'apple-mobile-web-app-title': 'Hundred Consulting',
+    'msapplication-TileColor': '#FAF8F3',
+    'theme-color': '#FAF8F3',
   },
 }
 
