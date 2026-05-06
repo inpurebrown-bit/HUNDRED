@@ -219,7 +219,23 @@ export default function MinutesTab() {
             ${decidedOut.length > 0 ? `<div class="sub-section"><b>✅ 결정(아웃):</b> ${decidedOut.map((i: any) => `<span class="chip chip-violet">${i.company}</span>`).join('')}</div>` : ''}
             ${meetings.length > 0 ? `<div class="sub-section"><b>📅 미팅:</b> ${meetings.map((m: any) => `${m.company} ${m.date} ${m.time}`).join(' / ')}</div>` : ''}
             ${payment.length > 0 ? `<div class="sub-section"><b>💰 입금대기:</b> ${payment.map((p: any) => `<span class="chip chip-amber">${p.company}</span>`).join('')}</div>` : ''}
-            ${worried.length > 0 ? `<div class="sub-section"><b>⚠️ 검토필요:</b> ${worried.map((w: any) => `${w.company}(${w.probability})`).join(' / ')}</div>` : ''}
+            ${worried.length > 0 ? (() => {
+              const probOrder: Record<string,number> = {'상':0,'중':1,'하':2}
+              const sw = [...worried].sort((a:any,b:any) => (probOrder[a.probability]??3)-(probOrder[b.probability]??3))
+              return `<div class="sub-section">
+                <b>⚠️ 검토필요 (${worried.length}건):</b>
+                <div class="worried-list">
+                  ${sw.map((w:any, i:number) => `
+                    <div class="worried-item">
+                      <span class="w-num">${i+1}</span>
+                      <span class="w-company">${w.company}</span>
+                      <span class="badge badge-${w.probability==='상'?'red':w.probability==='중'?'amber':'gray'}">${w.probability}</span>
+                      ${w.content ? `<span class="w-content"> — ${w.content}</span>` : ''}
+                      ${w.reason ? `<span class="w-reason"> (${w.reason})</span>` : ''}
+                    </div>`).join('')}
+                </div>
+              </div>`
+            })() : ''}
             ` : `<div class="empty-box">마감보고 미제출</div>`}
           </div>
         </div>
@@ -278,14 +294,19 @@ export default function MinutesTab() {
         .followup-table th { background: #fed7aa; padding: 3px 6px; text-align: left; }
         .followup-table td { padding: 3px 6px; border-bottom: 1px solid #fed7aa; }
         .urgent { color: #dc2626; font-weight: bold; }
+        /* 직원 2단 그리드 */
+        .staff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
         /* 직원 블록 */
-        .staff-block { border: 1px solid #d1d5db; border-radius: 6px; margin-bottom: 12px; overflow: hidden; page-break-inside: avoid; }
+        .staff-block { border: 1px solid #d1d5db; border-radius: 6px; overflow: hidden; break-inside: avoid; }
         .staff-header { background: #1B2A45; color: white; padding: 7px 12px; display: flex; justify-content: space-between; align-items: center; }
         .staff-name { font-size: 13px; font-weight: 900; }
         .staff-date { font-size: 10px; opacity: 0.6; }
+        /* 2단 배치 시: 오전/마감 세로로 */
         .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-bottom: 1px solid #e5e7eb; }
-        .two-col > div { padding: 10px 12px; }
+        .two-col > div { padding: 8px 10px; }
         .two-col > div:first-child { border-right: 1px solid #e5e7eb; }
+        .staff-grid .two-col { grid-template-columns: 1fr; }
+        .staff-grid .two-col > div:first-child { border-right: none; border-bottom: 1px solid #e5e7eb; }
         .section-title { font-size: 10px; font-weight: 900; margin-bottom: 6px; }
         .section-title.amber { color: #d97706; }
         .section-title.blue { color: #2563eb; }
@@ -307,6 +328,17 @@ export default function MinutesTab() {
         .chip-green { background: #dcfce7; color: #16a34a; }
         .chip-violet { background: #ede9fe; color: #7c3aed; }
         .chip-amber { background: #fef3c7; color: #b45309; }
+        /* 검토필요 상세 */
+        .worried-list { margin-top: 3px; }
+        .worried-item { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px; padding: 2px 0; border-bottom: 1px dotted #e5e7eb; font-size: 10px; line-height: 1.4; }
+        .w-num { color: #9ca3af; font-weight: 900; min-width: 14px; font-size: 9px; }
+        .w-company { font-weight: 700; color: #111827; }
+        .w-content { color: #374151; }
+        .w-reason { color: #6b7280; font-size: 9px; }
+        .badge { font-size: 8px; font-weight: 700; padding: 1px 4px; border-radius: 99px; }
+        .badge-red   { background: #fee2e2; color: #b91c1c; }
+        .badge-amber { background: #fef3c7; color: #b45309; }
+        .badge-gray  { background: #f3f4f6; color: #6b7280; }
         .empty-box { background: #f3f4f6; border-radius: 4px; padding: 8px; text-align: center; font-size: 10px; color: #9ca3af; }
         /* 다음날 확인 필요 */
         .next-day-box { background: #eff6ff; border-top: 1px dashed #bfdbfe; padding: 8px 12px; }
@@ -337,7 +369,9 @@ export default function MinutesTab() {
         </div>
       </div>
       ${followupHtml}
-      ${staffBlocks}
+      <div class="staff-grid">
+        ${staffBlocks}
+      </div>
       <div class="total-memo">
         <div class="total-memo-title">📝 전체 결정사항 / 오늘 회의 메모</div>
         ${[1,2,3,4].map(() => '<div class="line"></div>').join('')}

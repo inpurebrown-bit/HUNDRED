@@ -1016,19 +1016,40 @@ function DailyDetail({ data }: { data: any }) {
       <Section title="고민관리업체">
         {data?.worried === null ? <p className="text-gray-400 text-xs">해당 없음</p>
           : (data?.worried || []).length === 0 ? <p className="text-gray-400 text-xs">항목 없음</p>
-          : (data.worried as any[]).map((item: any, i: number) => (
-            <div key={i} className="bg-gray-50 rounded-lg p-3 mb-2">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-semibold text-gray-800">{item.company}</span>
-                <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${
-                  item.probability === '상' ? 'bg-emerald-100 text-emerald-700' :
-                  item.probability === '중' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'
-                }`}>{item.probability}</span>
-              </div>
-              <p className="text-xs text-gray-500">{item.content}</p>
-              <p className="text-xs text-gray-400 mt-1">고민사유: {item.reason}</p>
-            </div>
-          ))
+          : (() => {
+              const probOrder: Record<string, number> = { '상': 0, '중': 1, '하': 2 }
+              const sorted = [...(data.worried as any[])].sort((a, b) =>
+                (probOrder[a.probability] ?? 3) - (probOrder[b.probability] ?? 3)
+              )
+              const groups = ['상', '중', '하'] as const
+              return groups.map(grade => {
+                const items = sorted.filter((w: any) => w.probability === grade)
+                if (items.length === 0) return null
+                const gradeStyle = grade === '상' ? 'bg-red-100 text-red-700' : grade === '중' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'
+                // 전체 sorted 기준으로 연번 계산
+                return (
+                  <div key={grade} className="mb-3">
+                    <p className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mb-1.5 ${gradeStyle}`}>감도 {grade} ({items.length}건)</p>
+                    {items.map((item: any) => {
+                      const globalIdx = sorted.indexOf(item)
+                      return (
+                        <div key={globalIdx} className="bg-gray-50 rounded-lg p-3 mb-1.5 flex gap-2 items-start">
+                          <span className="text-xs font-black text-gray-400 w-5 shrink-0 pt-0.5">{globalIdx + 1}</span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className="font-semibold text-gray-800 text-sm">{item.company}</span>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${gradeStyle}`}>{item.probability}</span>
+                            </div>
+                            {item.content && <p className="text-xs text-gray-600">{item.content}</p>}
+                            {item.reason && <p className="text-xs text-gray-400 mt-0.5">사유: {item.reason}</p>}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })
+            })()
         }
       </Section>
 
