@@ -7,6 +7,7 @@ import { signOut } from 'next-auth/react'
 import ReportTab from './ReportTab'
 import CustomerCard, { Customer, CustomerDetails, CardTabType } from './CustomerCard'
 import InCallForm, { InCallData } from './InCallForm'
+import InCallTableView from './InCallTableView'
 import {
   getBusinessDaysInMonth,
   getElapsedBusinessDays,
@@ -125,6 +126,10 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
     await fetch(`/api/customers/${id}`, { method: 'DELETE' })
     setCustomers(prev => prev.filter(c => c.id !== id))
   }, [])
+
+  const updateCustomer = useCallback(async (id: string, patch: Record<string, any>) => {
+    await patchCustomer(id, patch)
+  }, [patchCustomer])
 
   const transferToOps = useCallback(async (customer: Customer) => {
     const details = customer.details || {}
@@ -553,18 +558,17 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
                 010 DB가 없습니다.
               </div>
-            ) : db010List.map(c => (
-              <CustomerCard
-                key={c.id}
-                customer={c}
+            ) : (
+              <InCallTableView
+                customers={db010List}
                 tabType="db010"
-                userName={userName}
                 salesUsers={SALES_USERS}
-                onStatusChange={async (newStatus) => moveCustomer(c.id, newStatus)}
-                onUpdate={async (patch) => patchCustomer(c.id, patch)}
-                onDelete={async () => deleteCustomer(c.id)}
+                userName={userName}
+                onUpdate={updateCustomer}
+                onStatusChange={async (id, status) => moveCustomer(id, status as any)}
+                onDelete={async (id) => deleteCustomer(id)}
               />
-            ))}
+            )}
           </div>
         )}
 
@@ -597,18 +601,17 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
                 신규 고객이 없습니다.
               </div>
-            ) : activeCustomers.map(c => (
-              <CustomerCard
-                key={c.id}
-                customer={c}
+            ) : (
+              <InCallTableView
+                customers={activeCustomers}
                 tabType="lead"
-                userName={userName}
                 salesUsers={SALES_USERS}
-                onStatusChange={async (newStatus) => moveCustomer(c.id, newStatus)}
-                onUpdate={async (patch) => patchCustomer(c.id, patch)}
-                onDelete={async () => deleteCustomer(c.id)}
+                userName={userName}
+                onUpdate={updateCustomer}
+                onStatusChange={async (id, status) => moveCustomer(id, status as any)}
+                onDelete={async (id) => deleteCustomer(id)}
               />
-            ))}
+            )}
           </div>
         )}
 

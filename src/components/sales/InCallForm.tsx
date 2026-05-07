@@ -45,6 +45,8 @@ interface Props {
   title: string
   salesUsers: string[]
   submitting: boolean
+  initialData?: Partial<InCallData>
+  submitLabel?: string
   onSubmit: (data: InCallData) => Promise<void>
   onCancel: () => void
 }
@@ -61,8 +63,10 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   )
 }
 
-export default function InCallForm({ title, salesUsers, submitting, onSubmit, onCancel }: Props) {
-  const [d, setD] = useState<InCallData>(emptyInCallData())
+export default function InCallForm({ title, salesUsers, submitting, initialData, submitLabel, onSubmit, onCancel }: Props) {
+  const [d, setD] = useState<InCallData>(() =>
+    initialData ? { ...emptyInCallData(), ...initialData } : emptyInCallData()
+  )
 
   function f<K extends keyof InCallData>(key: K, val: InCallData[K]) {
     setD(prev => ({ ...prev, [key]: val }))
@@ -260,7 +264,7 @@ export default function InCallForm({ title, salesUsers, submitting, onSubmit, on
           </button>
           <button type="submit" disabled={submitting}
             className="flex-1 py-2 rounded-lg bg-[#1B2A45] hover:bg-[#253B5E] disabled:opacity-50 text-white text-xs font-semibold transition-colors">
-            {submitting ? '등록 중...' : '✓ 등록'}
+            {submitting ? '등록 중...' : (submitLabel ?? '✓ 등록')}
           </button>
         </div>
       </form>

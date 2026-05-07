@@ -16,7 +16,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   // 본인 고객만 수정 가능 (ceo는 모두 가능)
   const { data: existing } = await supabaseAdmin
     .from('customers')
-    .select('sales_user_id, status, name, company')
+    .select('sales_user_id, status, name, company, details')
     .eq('id', id)
     .single()
 
@@ -25,9 +25,14 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
 
+  // details JSONB 필드는 덮어쓰지 않고 기존 값에 머지
+  const updateBody = body.details && typeof body.details === 'object'
+    ? { ...body, details: { ...(existing.details || {}), ...body.details } }
+    : body
+
   const { data, error } = await supabaseAdmin
     .from('customers')
-    .update(body)
+    .update(updateBody)
     .eq('id', id)
     .select()
     .single()
