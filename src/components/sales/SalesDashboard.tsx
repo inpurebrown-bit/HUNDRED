@@ -392,8 +392,6 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             className="text-white/50 hover:text-white text-[10px] px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors whitespace-nowrap hidden md:block">
             🏠 홈
           </button>
-          <button onClick={() => signOut({ callbackUrl: '/login' })}
-            className="text-white/40 hover:text-white/80 text-xs transition-colors">로그아웃</button>
           <button onClick={() => setMenuOpen(!menuOpen)} aria-label="메뉴"
             className={`flex flex-col gap-[5px] p-2 rounded-lg transition-colors ${menuOpen ? 'bg-white/20' : 'hover:bg-white/10'}`}>
             <span className={`block w-5 h-0.5 bg-white/80 transition-all origin-center ${menuOpen ? 'rotate-45 translate-y-[7px]' : ''}`} />
@@ -407,7 +405,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 {/* 사용자 카드 */}
                 <div className="px-4 py-3 border-b border-[#E8E2D4] mb-1">
                   <p className="text-[10px] text-[#C5A258] font-bold tracking-wide uppercase mb-0.5">영업팀</p>
-                  <p className="text-sm font-bold text-[#1B2A45]">{userName}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-bold text-[#1B2A45]">{userName}</p>
+                    <button
+                      onClick={() => signOut({ callbackUrl: '/login' })}
+                      className="text-[10px] text-gray-400 hover:text-red-500 transition-colors font-medium"
+                    >로그아웃</button>
+                  </div>
                   {installable && (
                     <button
                       onClick={() => { handleInstall(); setMenuOpen(false) }}
