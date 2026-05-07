@@ -59,6 +59,21 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [installPrompt, setInstallPrompt] = useState<any>(null)
+  const [installable, setInstallable] = useState(false)
+
+  useEffect(() => {
+    const handler = (e: any) => { e.preventDefault(); setInstallPrompt(e); setInstallable(true) }
+    window.addEventListener('beforeinstallprompt', handler)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  async function handleInstall() {
+    if (!installPrompt) return
+    installPrompt.prompt()
+    const { outcome } = await installPrompt.userChoice
+    if (outcome === 'accepted') { setInstallable(false); setInstallPrompt(null) }
+  }
 
   // 토스트 알림
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
@@ -389,6 +404,19 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             <>
               <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
               <div className="absolute top-full right-0 mt-2 bg-white border border-[#E8E2D4] rounded-2xl shadow-2xl z-50 py-2 min-w-[200px]">
+                {/* 사용자 카드 */}
+                <div className="px-4 py-3 border-b border-[#E8E2D4] mb-1">
+                  <p className="text-[10px] text-[#C5A258] font-bold tracking-wide uppercase mb-0.5">영업팀</p>
+                  <p className="text-sm font-bold text-[#1B2A45]">{userName}</p>
+                  {installable && (
+                    <button
+                      onClick={() => { handleInstall(); setMenuOpen(false) }}
+                      className="mt-2 w-full flex items-center justify-center gap-1.5 text-xs border border-[#1B2A45]/20 hover:border-[#C5A258]/60 text-[#1B2A45]/60 hover:text-[#C5A258] font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      📲 앱 설치
+                    </button>
+                  )}
+                </div>
                 {tabs.map(tab => (
                   <button key={tab.key}
                     onClick={() => { setActiveTab(tab.key); setMenuOpen(false) }}
