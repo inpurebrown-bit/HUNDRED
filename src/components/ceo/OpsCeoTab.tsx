@@ -51,23 +51,13 @@ const INSTITUTION_OPTIONS = [
   { value: 'foundation',  label: '재단' },
 ]
 
-const STAGE_OPTIONS = [
-  '서류받는중', '접수준비완료', '신청완료', '반려', '실사중',
-  '승인', '부결', '수수료입금전', '홀딩', '환불', '종료',
-]
+const STAGE_OPTIONS = ['검토중', '접수', '진행중', '완료']
 
 const STAGE_COLORS: Record<string, string> = {
-  '서류받는중':  'bg-slate-100 text-slate-700',
-  '접수준비완료':'bg-blue-100 text-blue-700',
-  '신청완료':    'bg-violet-100 text-violet-700',
-  '반려':        'bg-red-100 text-red-700',
-  '실사중':      'bg-amber-100 text-amber-700',
-  '승인':        'bg-emerald-100 text-emerald-700',
-  '부결':        'bg-red-100 text-red-700',
-  '수수료입금전':'bg-orange-100 text-orange-700',
-  '홀딩':        'bg-gray-100 text-gray-600',
-  '환불':        'bg-rose-100 text-rose-700',
-  '종료':        'bg-green-100 text-green-700',
+  '검토중': 'bg-slate-100 text-slate-700',
+  '접수':   'bg-blue-100 text-blue-700',
+  '진행중': 'bg-violet-100 text-violet-700',
+  '완료':   'bg-emerald-100 text-emerald-700',
 }
 
 function fmt(n: number) {

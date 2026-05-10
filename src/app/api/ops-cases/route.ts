@@ -3,7 +3,34 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
-// GET: 내 담당 케이스 목록
+/**
+ * 실제 ops_cases 컬럼:
+ *   id, contract_id, owner_id, customer_name, phone,
+ *   institution, institution_type, solution, stage, memo,
+ *   revenue, visit_date, script_delivered, next_plan,
+ *   required_checks, fund_solution, tax_invoice_requested,
+ *   is_refund, is_completed, approved_amount, commission_amount, created_at
+ *
+ * 프론트 호환용 alias (GET 응답에서 추가):
+ *   progress_stage = stage
+ *   progress_memo  = memo
+ *   ops_user_name  = owner_id에서 조회 or stored
+ */
+function normalize(c: any) {
+  return {
+    ...c,
+    progress_stage: c.stage ?? '',
+    progress_memo:  c.memo  ?? '',
+    // customers 구조 맞추기 (customer_name/phone이 직접 컬럼)
+    customers: {
+      name:    c.customer_name ?? '',
+      phone:   c.phone         ?? '',
+      details: { company: c.customer_name ?? '' },
+    },
+  }
+}
+
+// GET: 케이스 목록
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
@@ -13,38 +40,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
 
-  // ── 1. ops_cases 조회 (customers 조인 없이 — FK 없어도 안전)
-  let casesQuery = supabaseAdmin
-    .from('ops_cases')
-    .select('*')
+  let query = supabaseAdmin.from('ops_cases').select('*')
+  if (user.role === 'ops') query = query.eq('owner_id', user.id) as any
 
-  if (user.role === 'ops') {
-    casesQuery = casesQuery.eq('ops_user_id', user.id) as any
-  }
-
-  const { data: cases, error } = await casesQuery
+  const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  if (!cases || cases.length === 0) return NextResponse.json({ cases: [] })
 
-  // ── 2. 관련 customers 별도 조회 후 수동 병합
-  const customerIds = [...new Set(cases.map((c: any) => c.customer_id).filter(Boolean))]
-  const { data: customers } = await supabaseAdmin
-    .from('customers')
-    .select('id, name, phone, loan_history, memo, details')
-    .in('id', customerIds)
-
-  const customerMap: Record<string, any> = {}
-  for (const c of customers || []) customerMap[c.id] = c
-
-  const merged = cases.map((c: any) => ({
-    ...c,
-    customers: customerMap[c.customer_id] || null,
-  }))
-
-  return NextResponse.json({ cases: merged })
+  return NextResponse.json({ cases: (data || []).map(normalize) })
 }
 
-// POST: 영업팀 → 관리팀 케이스 전송
+// POST: 케이스 등록 (자금팀전송)
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
@@ -55,25 +60,22 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { customer_id, progress_stage, progress_memo, revenue } = body
-
-  if (!customer_id) {
-    return NextResponse.json({ error: 'customer_id 필수' }, { status: 400 })
-  }
+  const { customer_name, phone, stage, memo, revenue, owner_id } = body
 
   const { data, error } = await supabaseAdmin
     .from('ops_cases')
     .insert({
-      customer_id,
-      progress_stage: progress_stage ?? 'assigned',
-      progress_memo: progress_memo ?? '',
-      revenue: revenue ?? 0,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      customer_name: customer_name ?? '',
+      phone:         phone         ?? '',
+      owner_id:      owner_id      ?? null,
+      stage:         stage         ?? '서류받는중',
+      memo:          memo          ?? '',
+      revenue:       revenue       ?? 0,
+      institution_type: 'new',
     })
     .select()
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ case: data }, { status: 201 })
+  return NextResponse.json({ case: normalize(data) }, { status: 201 })
 }
