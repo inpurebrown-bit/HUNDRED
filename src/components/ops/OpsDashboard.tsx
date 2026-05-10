@@ -114,7 +114,7 @@ function OpsDetailPanel({ c, onSave }: { c: OpsCase; onSave: (id: string, patch:
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: `[방문] ${c.customers?.company || c.customers?.name} — ${selectedInst.join(', ') || '기관미정'}`,
+          title: `[방문] ${c.customers?.details?.company || c.customers?.name || c.customers?.name} — ${selectedInst.join(', ') || '기관미정'}`,
           start_date: val,
           end_date: val,
           start_time: local.details?.visit_time || null,
@@ -253,7 +253,7 @@ function OpsDetailPanel({ c, onSave }: { c: OpsCase; onSave: (id: string, patch:
                 type="button"
                 onClick={() => {
                   const script = d.indirect_script || INDIRECT_SCRIPT_TEMPLATE(
-                    c.customers?.company || '', c.customers?.name || '',
+                    c.customers?.details?.company || c.customers?.name || '', c.customers?.name || '',
                     indirectList.join(', '), d.visit_date || '', d.visit_time || ''
                   )
                   navigator.clipboard?.writeText(script)
@@ -264,7 +264,7 @@ function OpsDetailPanel({ c, onSave }: { c: OpsCase; onSave: (id: string, patch:
             </div>
             <textarea
               value={d.indirect_script || INDIRECT_SCRIPT_TEMPLATE(
-                c.customers?.company || '', c.customers?.name || '',
+                c.customers?.details?.company || c.customers?.name || '', c.customers?.name || '',
                 indirectList.join(', '), d.visit_date || '', d.visit_time || ''
               )}
               onChange={e => detailField('indirect_script', e.target.value)}
@@ -348,7 +348,7 @@ function OpsDetailPanel({ c, onSave }: { c: OpsCase; onSave: (id: string, patch:
         </div>
         <div className="grid grid-cols-4 gap-x-3 gap-y-1.5 bg-gray-50 rounded-lg p-3">
           {[
-            ['업체명', c.customers?.company],
+            ['업체명', c.customers?.details?.company || c.customers?.name],
             ['대표자명', c.customers?.name],
             ['연락처', c.customers?.phone],
             ['지역', cd.region],
@@ -411,7 +411,7 @@ function OpsTableRow({ c, onSave }: { c: OpsCase; onSave: (id: string, patch: Re
         {/* 업체명 */}
         <td className="px-3 py-2.5">
           <span className="font-semibold text-gray-800 text-xs truncate block max-w-[150px]">
-            {c.customers?.company || c.customers?.name}
+            {c.customers?.details?.company || c.customers?.name || c.customers?.name}
           </span>
           <span className="text-[10px] text-gray-400">{c.customers?.name}</span>
         </td>
@@ -523,7 +523,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
   const q = searchQuery.trim().toLowerCase()
   const filteredCases = q.length >= 1
     ? cases.filter(c =>
-        c.customers?.company?.toLowerCase().includes(q) ||
+        c.customers?.details?.company || c.customers?.name?.toLowerCase().includes(q) ||
         c.customers?.name?.toLowerCase().includes(q) ||
         c.customers?.phone?.replace(/-/g, '').includes(q.replace(/-/g, '')) ||
         c.institution?.toLowerCase().includes(q)

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { normalizeCustomers, toDbRow } from '@/lib/customerUtils'
 
 // GET: 내 고객 목록 조회
 export async function GET(req: NextRequest) {
@@ -18,15 +19,15 @@ export async function GET(req: NextRequest) {
     .select('*')
     .order('created_at', { ascending: false })
 
-  // 영업팀은 본인 고객만
+  // 영업팀은 본인 고객만 (DB 실제 컬럼: owner_id)
   const finalQuery = user.role === 'sales'
-    ? query.eq('sales_user_id', user.id)
+    ? query.eq('owner_id', user.id)
     : query
 
   const { data, error } = await finalQuery
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ customers: data })
+  return NextResponse.json({ customers: normalizeCustomers(data) })
 }
 
 // POST: 신규 고객 등록
@@ -40,44 +41,26 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { name, phone, company, loan_history, notes, status, details, sales_user_id, sales_user_name } = body
+  const { name, sales_user_id } = body
 
   if (!name || !name.trim()) {
     return NextResponse.json({ error: '고객명(대표자)은 필수입니다' }, { status: 400 })
   }
 
-  // CEO는 특정 영업팀 직원에게 배정 가능, 아니면 본인 id로
+  // CEO는 특정 영업팀 직원에게 배정 가능
   let assignedUserId = user.id
   let assignedUserName = user.name
 
   if (user.role === 'ceo' && sales_user_id) {
-    // CEO가 특정 영업사원에게 배정
     const { data: salesUser } = await supabaseAdmin
-      .from('users')
-      .select('id, name')
-      .eq('id', sales_user_id)
-      .single()
+      .from('users').select('id, name').eq('id', sales_user_id).single()
     if (salesUser) {
       assignedUserId = salesUser.id
-      assignedUserName = sales_user_name || salesUser.name
+      assignedUserName = body.sales_user_name || salesUser.name
     }
   }
 
-  const insertRow: Record<string, any> = {
-    name: name.trim(),
-    phone: phone || '',
-    company: company || '',
-    loan_history: loan_history || '',
-    notes: notes || '',
-    status: status || 'lead',
-    sales_user_id: assignedUserId,
-    sales_user_name: assignedUserName,
-  }
-
-  // details JSONB 필드 저장 (인콜일지 모든 항목 포함)
-  if (details && typeof details === 'object') {
-    insertRow.details = details
-  }
+  const insertRow = toDbRow(body, assignedUserId, assignedUserName)
 
   const { data, error } = await supabaseAdmin
     .from('customers')
@@ -86,5 +69,5 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ customer: data }, { status: 201 })
+  return NextResponse.json({ customer: normalizeCustomers([data])[0] }, { status: 201 })
 }
