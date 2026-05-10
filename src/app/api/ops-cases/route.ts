@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
   const query = supabaseAdmin
     .from('ops_cases')
-    .select('id, customer_id, ops_user_id, ops_user_name, contract_id, institution, solution_type, progress_stage, progress_memo, revenue, details, created_at, updated_at, customers(name, phone, loan_history, memo, details)')
+    .select('*, customers(name, phone, loan_history, memo, details)')
     .order('updated_at', { ascending: false })
 
   // 관리팀은 본인 담당 케이스만

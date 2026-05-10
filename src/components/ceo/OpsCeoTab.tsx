@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 
@@ -7,7 +7,7 @@ interface OpsCase {
   id: string
   customer_id: string
   ops_user_name: string
-  institution_type: string | null
+  institution: string | null
   progress_stage: string
   progress_memo: string
   in_call_manager: string
@@ -23,7 +23,7 @@ interface OpsCase {
   updated_at: string
   customers: {
     name: string
-    company: string
+    details?: Record<string, any>
     phone: string
   }
 }
@@ -86,13 +86,13 @@ interface CaseCardProps {
 function CaseCard({ c, onUpdate }: CaseCardProps) {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [localInstitution, setLocalInstitution] = useState(c.institution_type ?? 'new')
+  const [localInstitution, setLocalInstitution] = useState(c.institution ?? 'new')
   const [localStage, setLocalStage] = useState(c.progress_stage ?? '')
 
   async function handleInstitutionChange(val: string) {
     setLocalInstitution(val)
     setSaving(true)
-    await onUpdate(c.id, { institution_type: val })
+    await onUpdate(c.id, { institution: val })
     setSaving(false)
   }
 
@@ -117,8 +117,8 @@ function CaseCard({ c, onUpdate }: CaseCardProps) {
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-semibold text-[#1B2A45] text-sm">{c.customers?.name || '-'}</span>
-                {c.customers?.company && (
-                  <span className="text-xs text-[#1B2A45]/50">{c.customers.company}</span>
+                {(c.customers?.details?.company || c.customers?.name) && (
+                  <span className="text-xs text-[#1B2A45]/50">{(c.customers?.details?.company || c.customers?.name)}</span>
                 )}
                 {c.ops_user_name && (
                   <span className="text-xs text-[#1B2A45]/40">{c.ops_user_name}</span>
@@ -247,7 +247,7 @@ function InstitutionSection({ cases, onUpdate }: InstitutionSectionProps) {
       <div className="space-y-4">
         {INSTITUTION_SECTIONS.map(sec => {
           const sectionCases = cases.filter(c => {
-            const it = c.institution_type
+            const it = c.institution
             if (sec.key === 'new') {
               return !it || it === '' || it === 'new'
             }
@@ -320,8 +320,8 @@ function RefundSection({ cases, onUpdate }: RefundSectionProps) {
         <div className="flex items-center justify-between">
           <div>
             <span className="font-semibold text-[#1B2A45] text-sm">{c.customers?.name || '-'}</span>
-            {c.customers?.company && (
-              <span className="text-xs text-[#1B2A45]/50 ml-2">{c.customers.company}</span>
+            {(c.customers?.details?.company || c.customers?.name) && (
+              <span className="text-xs text-[#1B2A45]/50 ml-2">{(c.customers?.details?.company || c.customers?.name)}</span>
             )}
             {c.ops_user_name && (
               <span className="text-xs text-[#1B2A45]/40 ml-2">{c.ops_user_name}</span>
@@ -436,8 +436,8 @@ function CompletedSection({ cases }: CompletedSectionProps) {
                   <tr key={c.id} className="border-b border-[#E8E2D4]/60 hover:bg-[#FAF8F3] transition-colors">
                     <td className="py-2.5 px-3">
                       <span className="font-medium text-[#1B2A45]">{c.customers?.name || '-'}</span>
-                      {c.customers?.company && (
-                        <span className="text-xs text-[#1B2A45]/50 ml-2">{c.customers.company}</span>
+                      {(c.customers?.details?.company || c.customers?.name) && (
+                        <span className="text-xs text-[#1B2A45]/50 ml-2">{(c.customers?.details?.company || c.customers?.name)}</span>
                       )}
                     </td>
                     <td className="py-2.5 px-3 text-[#1B2A45]/70">{c.ops_user_name || '-'}</td>
@@ -571,3 +571,4 @@ export default function OpsCeoTab() {
     </div>
   )
 }
+

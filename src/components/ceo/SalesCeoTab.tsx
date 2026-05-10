@@ -1,407 +1,197 @@
-'use client'
+﻿'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
+import InCallTableView from '@/components/sales/InCallTableView'
+import type { Customer } from '@/components/sales/InCallTableView'
 
-// ─── Types ────────────────────────────────────────────────
-interface Customer {
-  id: string
-  name: string
-  company: string
-  phone: string
-  status: string
-  sales_user_id: string
-  sales_user_name: string
-  notes: string
-  loan_history: string
-  created_at: string
-  details?: Record<string, any>
-}
+type StatusKey = 'lead' | 'db010' | 'contracted' | 'emotional' | 'trash'
 
-interface Contract {
-  id: string
-  customer_id: string
-  sales_user_name: string
-  contract_amount: number
-  status: string
-  created_at: string
-  customers: { name: string; company: string; phone: string }
-}
+const STATUS_TABS = [
+  { key: 'lead' as StatusKey,       label: '고객 DB',   color: 'text-sky-600',     bg: 'bg-sky-500' },
+  { key: 'db010' as StatusKey,      label: '010 DB',    color: 'text-violet-600',  bg: 'bg-violet-500' },
+  { key: 'contracted' as StatusKey, label: '계약 업체', color: 'text-emerald-600', bg: 'bg-emerald-500' },
+  { key: 'emotional' as StatusKey,  label: '감성톡',    color: 'text-pink-600',    bg: 'bg-pink-500' },
+  { key: 'trash' as StatusKey,      label: '자체거절',  color: 'text-gray-500',    bg: 'bg-gray-400' },
+]
 
-// ─── Helpers ──────────────────────────────────────────────
-const thisMonth = () => new Date().toISOString().slice(0, 7)
-
-const STATUS_COLOR: Record<string, string> = {
-  lead:       'bg-sky-100 text-sky-700',
-  consulting: 'bg-amber-100 text-amber-700',
-  contracted: 'bg-emerald-100 text-emerald-700',
-  db010:      'bg-violet-100 text-violet-700',
-  emotional:  'bg-pink-100 text-pink-700',
-  trash:      'bg-gray-100 text-gray-500',
-}
-const STATUS_KO: Record<string, string> = {
-  lead: '신규', consulting: '상담중', contracted: '계약', db010: '010DB',
-  emotional: '감성관리', trash: '휴지통',
-}
-
-function StatCard({ label, value, sub, color = 'bg-white' }: {
-  label: string; value: string | number; sub?: string; color?: string
-}) {
-  return (
-    <div className={`${color} rounded-2xl p-4 border border-[#E8E2D4] shadow-sm`}>
-      <p className="text-xs text-gray-500 mb-1">{label}</p>
-      <p className="text-2xl font-black text-[#1B2A45]">{value}</p>
-      {sub && <p className="text-[11px] text-gray-400 mt-0.5">{sub}</p>}
-    </div>
-  )
-}
-
-// ─── Main ────────────────────────────────────────────────
 export default function SalesCeoTab() {
   const [customers, setCustomers] = useState<Customer[]>([])
-  const [contracts, setContracts] = useState<Contract[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeFilter, setActiveFilter] = useState<string>('all')
-  const [personFilter, setPersonFilter] = useState<string>('all')
-  const [searchQ, setSearchQ] = useState('')
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [personTab, setPersonTab] = useState<string>('all')
+  const [statusTab, setStatusTab] = useState<StatusKey>('lead')
 
   useEffect(() => {
     async function load() {
       setLoading(true)
       try {
-        const [cRes, conRes] = await Promise.all([
-          fetch('/api/customers'),
-          fetch('/api/contracts'),
-        ])
-        const [cData, conData] = await Promise.all([cRes.json(), conRes.json()])
-        setCustomers(cData.customers || [])
-        setContracts(conData.contracts || [])
+        const res = await fetch('/api/customers')
+        const data = await res.json()
+        setCustomers(data.customers || [])
       } catch {}
       setLoading(false)
     }
     load()
   }, [])
 
-  const mon = thisMonth()
-
-  // ── 전체 통계 ──
-  const totalCustomers  = customers.length
-  const leads           = customers.filter(c => c.status === 'lead').length
-  const consulting      = customers.filter(c => c.status === 'consulting').length
-  const contracted      = customers.filter(c => c.status === 'contracted').length
-  const db010           = customers.filter(c => c.status === 'db010').length
-  const monthContracts  = contracts.filter(c => c.created_at?.slice(0, 7) === mon).length
-  const monthAmount     = contracts
-    .filter(c => c.created_at?.slice(0, 7) === mon)
-    .reduce((s, c) => s + (c.contract_amount || 0), 0)
-
-  // ── 영업사원 목록 ──
   const salesPeople = useMemo(() => {
-    const names = Array.from(new Set(customers.map(c => c.sales_user_name).filter(Boolean)))
-    return names.sort()
+    const names = Array.from(
+      new Set(customers.map((c: any) => c.details?.sales_user_name || c.sales_user_name).filter(Boolean))
+    ).sort() as string[]
+    return names
   }, [customers])
 
-  // ── 영업사원별 통계 ──
+  const personCustomers = useMemo(() => {
+    if (personTab === 'all') return customers
+    return customers.filter((c: any) => (c.details?.sales_user_name || c.sales_user_name) === personTab)
+  }, [customers, personTab])
+
+  const statusCustomers = useMemo(() => {
+    if (statusTab === 'lead') return personCustomers.filter(c => ['lead', 'consulting'].includes(c.status))
+    return personCustomers.filter(c => c.status === statusTab)
+  }, [personCustomers, statusTab])
+
   const personStats = useMemo(() => salesPeople.map(name => {
-    const mine = customers.filter(c => c.sales_user_name === name)
-    const myContracts = contracts.filter(c => c.sales_user_name === name)
-    const myMonthContracts = myContracts.filter(c => c.created_at?.slice(0, 7) === mon)
+    const mine = customers.filter((c: any) => (c.details?.sales_user_name || c.sales_user_name) === name)
     return {
       name,
       total: mine.length,
-      lead: mine.filter(c => c.status === 'lead').length,
-      consulting: mine.filter(c => c.status === 'consulting').length,
-      contracted: mine.filter(c => c.status === 'contracted').length,
-      db010: mine.filter(c => c.status === 'db010').length,
-      allContracts: myContracts.length,
-      monthContracts: myMonthContracts.length,
-      monthAmount: myMonthContracts.reduce((s, c) => s + (c.contract_amount || 0), 0),
+      lead: mine.filter((c: any) => ['lead', 'consulting'].includes(c.status)).length,
+      db010: mine.filter((c: any) => c.status === 'db010').length,
+      contracted: mine.filter((c: any) => c.status === 'contracted').length,
     }
-  }), [customers, contracts, salesPeople, mon])
+  }), [customers, salesPeople])
 
-  // ── 고객 목록 필터 ──
-  const filtered = useMemo(() => {
-    let list = customers
-    if (activeFilter !== 'all') list = list.filter(c => c.status === activeFilter)
-    if (personFilter !== 'all') list = list.filter(c => c.sales_user_name === personFilter)
-    if (searchQ.trim()) {
-      const q = searchQ.trim().toLowerCase()
-      list = list.filter(c =>
-        c.company?.toLowerCase().includes(q) ||
-        c.name?.toLowerCase().includes(q) ||
-        c.phone?.replace(/-/g,'').includes(q.replace(/-/g,''))
-      )
-    }
-    return list
-  }, [customers, activeFilter, personFilter, searchQ])
+  const counts = useMemo(() => ({
+    lead:       personCustomers.filter(c => ['lead', 'consulting'].includes(c.status)).length,
+    db010:      personCustomers.filter(c => c.status === 'db010').length,
+    contracted: personCustomers.filter(c => c.status === 'contracted').length,
+    emotional:  personCustomers.filter(c => c.status === 'emotional').length,
+    trash:      personCustomers.filter(c => c.status === 'trash').length,
+  }), [personCustomers])
 
-  if (loading) {
-    return (
-      <div className="space-y-4 animate-pulse">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[1,2,3,4].map(i => <div key={i} className="h-24 rounded-2xl bg-gray-100" />)}
-        </div>
-        <div className="h-40 rounded-2xl bg-gray-100" />
-      </div>
-    )
+  async function updateCustomer(id: string, patch: Record<string, any>) {
+    const existing = customers.find(c => c.id === id)
+    const mergedPatch = { ...patch }
+    if (patch.details) mergedPatch.details = { ...(existing?.details || {}), ...patch.details }
+    await fetch('/api/customers/' + id, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(mergedPatch),
+    })
+    setCustomers(prev => prev.map(c => {
+      if (c.id !== id) return c
+      if (patch.details) return { ...c, details: { ...(c.details || {}), ...patch.details } }
+      return { ...c, ...patch }
+    }))
   }
 
+  async function changeStatus(id: string, status: string) {
+    await fetch('/api/customers/' + id, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    })
+    setCustomers(prev => prev.map(c => c.id === id ? { ...c, status } : c))
+  }
+
+  async function deleteCustomer(id: string) {
+    await fetch('/api/customers/' + id, { method: 'DELETE' })
+    setCustomers(prev => prev.filter(c => c.id !== id))
+  }
+
+  if (loading) return (
+    <div className="space-y-3 py-8 animate-pulse">
+      {[1,2,3].map(i => <div key={i} className="h-20 rounded-2xl bg-gray-100" />)}
+    </div>
+  )
+
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-4 pb-12">
 
-      {/* ── 통합 통계 카드 ── */}
+      {/* 영업사원 탭 */}
       <div>
-        <h2 className="text-sm font-bold text-gray-500 mb-3">📊 영업팀 전체 현황</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard label="전체 고객" value={totalCustomers} sub={`신규 ${leads} · 상담 ${consulting}`} />
-          <StatCard label="010DB" value={db010} sub="공급 DB" color="bg-violet-50" />
-          <StatCard label="이달 계약" value={monthContracts} sub={`총 ${contracts.length}건`} color="bg-emerald-50" />
-          <StatCard
-            label="이달 계약금액"
-            value={monthAmount >= 10000 ? `${(monthAmount/10000).toFixed(0)}만` : `${monthAmount.toLocaleString()}원`}
-            sub={`계약 완료 ${contracted}건`}
-            color="bg-amber-50"
-          />
-        </div>
-      </div>
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">영업사원</p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setPersonTab('all')}
+            className={"flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-semibold transition-all border " + (
+              personTab === 'all'
+                ? 'bg-[#1B2A45] text-white border-[#1B2A45] shadow'
+                : 'bg-white text-gray-600 border-[#E8E2D4] hover:border-[#1B2A45]/40'
+            )}
+          >
+            📊 전체
+            <span className={"text-xs px-1.5 py-0.5 rounded-full font-bold " + (
+              personTab === 'all' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+            )}>{customers.length}</span>
+          </button>
 
-      {/* ── 영업사원별 실적 카드 ── */}
-      <div>
-        <h2 className="text-sm font-bold text-gray-500 mb-3">👤 영업사원별 실적</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {personStats.map(p => (
-            <div key={p.name} className="bg-white rounded-2xl border border-[#E8E2D4] p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-[#1B2A45] flex items-center justify-center text-white text-sm font-bold">
-                    {p.name.charAt(0)}
-                  </div>
-                  <span className="font-bold text-[#1B2A45] text-sm">{p.name}</span>
-                </div>
-                <span className="text-xs bg-[#1B2A45]/8 text-[#1B2A45] px-2 py-0.5 rounded-full font-semibold">
-                  총 {p.total}명
-                </span>
-              </div>
-
-              {/* 상태 분포 바 */}
-              {p.total > 0 && (
-                <div className="flex rounded-full overflow-hidden h-2 mb-3 gap-px">
-                  {p.db010 > 0     && <div style={{ width: `${p.db010/p.total*100}%` }}     className="bg-violet-400" title={`010DB ${p.db010}`} />}
-                  {p.lead > 0      && <div style={{ width: `${p.lead/p.total*100}%` }}      className="bg-sky-400"    title={`신규 ${p.lead}`} />}
-                  {p.consulting > 0 && <div style={{ width: `${p.consulting/p.total*100}%` }} className="bg-amber-400"  title={`상담 ${p.consulting}`} />}
-                  {p.contracted > 0 && <div style={{ width: `${p.contracted/p.total*100}%` }} className="bg-emerald-400" title={`계약 ${p.contracted}`} />}
-                </div>
-              )}
-
-              {/* 수치 그리드 */}
-              <div className="grid grid-cols-4 gap-1 text-center">
-                <div>
-                  <p className="text-xs font-bold text-violet-600">{p.db010}</p>
-                  <p className="text-[10px] text-gray-400">010DB</p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-sky-600">{p.lead}</p>
-                  <p className="text-[10px] text-gray-400">신규</p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-amber-600">{p.consulting}</p>
-                  <p className="text-[10px] text-gray-400">상담중</p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-emerald-600">{p.contracted}</p>
-                  <p className="text-[10px] text-gray-400">계약</p>
-                </div>
-              </div>
-
-              <div className="border-t border-gray-100 mt-3 pt-2 flex justify-between text-xs">
-                <span className="text-gray-500">이달 계약 <strong className="text-[#1B2A45]">{p.monthContracts}건</strong></span>
-                <span className="text-gray-500">전체 <strong className="text-[#1B2A45]">{p.allContracts}건</strong></span>
-              </div>
-            </div>
-          ))}
-          {personStats.length === 0 && (
-            <div className="col-span-3 text-center text-sm text-gray-400 py-8">등록된 고객 없음</div>
-          )}
-        </div>
-      </div>
-
-      {/* ── 고객 목록 ── */}
-      <div>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-          <h2 className="text-sm font-bold text-gray-500">📋 고객 목록</h2>
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* 담당자 필터 */}
-            <select
-              value={personFilter}
-              onChange={e => setPersonFilter(e.target.value)}
-              className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none"
-            >
-              <option value="all">전체 담당자</option>
-              {salesPeople.map(n => <option key={n} value={n}>{n}</option>)}
-            </select>
-            {/* 검색 */}
-            <div className="relative">
-              <input
-                value={searchQ}
-                onChange={e => setSearchQ(e.target.value)}
-                placeholder="업체명·이름·연락처"
-                className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs w-36 focus:outline-none focus:ring-2 focus:ring-[#C5A258]/40"
-              />
-              {searchQ && (
-                <button onClick={() => setSearchQ('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">✕</button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* 상태 탭 */}
-        <div className="flex gap-1.5 flex-wrap mb-3">
-          {[
-            { key: 'all',        label: `전체 ${customers.length}` },
-            { key: 'db010',      label: `010DB ${db010}` },
-            { key: 'lead',       label: `신규 ${leads}` },
-            { key: 'consulting', label: `상담중 ${consulting}` },
-            { key: 'contracted', label: `계약 ${contracted}` },
-          ].map(t => (
             <button
-              key={t.key}
-              onClick={() => setActiveFilter(t.key)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
-                activeFilter === t.key
-                  ? 'bg-[#1B2A45] text-white'
-                  : 'bg-white border border-[#E8E2D4] text-gray-500 hover:border-gray-300'
-              }`}
+              key={p.name}
+              type="button"
+              onClick={() => setPersonTab(p.name)}
+              className={"flex flex-col items-start px-4 py-2.5 rounded-2xl text-sm font-semibold transition-all border min-w-[150px] " + (
+                personTab === p.name
+                  ? 'bg-[#1B2A45] text-white border-[#1B2A45] shadow'
+                  : 'bg-white text-[#1B2A45] border-[#E8E2D4] hover:border-[#1B2A45]/40'
+              )}
             >
-              {t.label}
+              <div className="flex items-center gap-2 w-full justify-between">
+                <div className="flex items-center gap-1.5">
+                  <div className={"w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold " + (
+                    personTab === p.name ? 'bg-white/20' : 'bg-[#1B2A45] text-white'
+                  )}>{p.name.charAt(0)}</div>
+                  <span>{p.name.replace(' 수석팀장', '')}</span>
+                </div>
+                <span className={"text-xs px-1.5 py-0.5 rounded-full font-bold " + (
+                  personTab === p.name ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+                )}>{p.total}</span>
+              </div>
+              <div className={"flex gap-2 mt-1.5 text-[10px] " + (personTab === p.name ? 'text-white/70' : 'text-gray-400')}>
+                <span>DB {p.lead}</span><span>·</span>
+                <span>계약 {p.contracted}</span><span>·</span>
+                <span>010 {p.db010}</span>
+              </div>
             </button>
           ))}
         </div>
-
-        {/* 고객 카드 리스트 */}
-        {filtered.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-[#E8E2D4] p-10 text-center text-sm text-gray-400">
-            {searchQ ? `"${searchQ}" 검색 결과 없음` : '해당 고객 없음'}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <p className="text-xs text-gray-400">{filtered.length}건</p>
-            {filtered.map(c => {
-              const isOpen = expandedId === c.id
-              return (
-                <div key={c.id} className="bg-white rounded-xl border border-[#E8E2D4] overflow-hidden">
-                  <button
-                    onClick={() => setExpandedId(isOpen ? null : c.id)}
-                    className="w-full text-left px-4 py-3 hover:bg-[#FAF8F3] transition-colors"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_COLOR[c.status] ?? 'bg-gray-100 text-gray-500'}`}>
-                          {STATUS_KO[c.status] ?? c.status}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-[#1B2A45] truncate">{c.company || c.name}</p>
-                          <p className="text-[11px] text-gray-400">{c.name} · {c.phone || '-'}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        <span className="text-xs text-gray-400 hidden sm:block">{c.sales_user_name}</span>
-                        <span className="text-gray-300 text-xs">{isOpen ? '▲' : '▼'}</span>
-                      </div>
-                    </div>
-                  </button>
-
-                  {isOpen && (
-                    <div className="border-t border-[#E8E2D4] bg-[#FAF8F3] px-4 py-3">
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs mb-3">
-                        <div><span className="text-gray-400">담당자: </span><span className="font-medium">{c.sales_user_name || '-'}</span></div>
-                        <div><span className="text-gray-400">연락처: </span><span className="font-medium">{c.phone || '-'}</span></div>
-                        <div><span className="text-gray-400">등록일: </span><span className="font-medium">{c.created_at?.slice(0,10) || '-'}</span></div>
-                        {c.loan_history && <div className="col-span-full"><span className="text-gray-400">기대출: </span><span>{c.loan_history}</span></div>}
-                      </div>
-                      {/* 인콜일지 details */}
-                      {c.details && (
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs border-t border-gray-200 pt-3">
-                          {c.details.corp_type      && <div><span className="text-gray-400">법인형태: </span>{c.details.corp_type}</div>}
-                          {c.details.region         && <div><span className="text-gray-400">지역: </span>{c.details.region}</div>}
-                          {c.details.business_type  && <div><span className="text-gray-400">업종: </span>{c.details.business_type}</div>}
-                          {c.details.years_in_business && <div><span className="text-gray-400">업력: </span>{c.details.years_in_business}년</div>}
-                          {c.details.employee_count && <div><span className="text-gray-400">직원수: </span>{c.details.employee_count}명</div>}
-                          {c.details.revenue_2025   && <div><span className="text-gray-400">25년매출: </span>{c.details.revenue_2025}만원</div>}
-                          {c.details.revenue_2024   && <div><span className="text-gray-400">24년매출: </span>{c.details.revenue_2024}만원</div>}
-                          {c.details.credit_score   && <div><span className="text-gray-400">신용점수: </span>{c.details.credit_score}</div>}
-                          {c.details.loan_credit    && <div><span className="text-gray-400">기대출: </span>{c.details.loan_credit}</div>}
-                          {c.details.required_funds && <div><span className="text-gray-400">필요자금: </span>{c.details.required_funds}만원</div>}
-                          {c.details.sensitivity    && <div><span className="text-gray-400">감도: </span>
-                            <span className={c.details.sensitivity==='상'?'text-emerald-600 font-bold':c.details.sensitivity==='중'?'text-amber-600 font-bold':'text-gray-500'}>
-                              {c.details.sensitivity}
-                            </span>
-                          </div>}
-                          {c.details.notes && (
-                            <div className="col-span-full"><span className="text-gray-400">상담메모: </span><span className="whitespace-pre-wrap">{c.details.notes}</span></div>
-                          )}
-                        </div>
-                      )}
-                      {!c.details && c.notes && (
-                        <p className="text-xs text-gray-600 whitespace-pre-wrap">{c.notes}</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
       </div>
 
-      {/* ── 계약 현황 ── */}
-      <div>
-        <h2 className="text-sm font-bold text-gray-500 mb-3">📑 계약 현황 ({contracts.length}건)</h2>
-        {contracts.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-[#E8E2D4] p-8 text-center text-sm text-gray-400">
-            등록된 계약이 없습니다.
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl border border-[#E8E2D4] overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[#E8E2D4] bg-[#FAF8F3]">
-                    {['고객·회사', '담당', '계약금액', '상태', '계약일'].map(h => (
-                      <th key={h} className="text-left py-2.5 px-3 text-xs text-gray-500 font-medium whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {contracts.map(c => (
-                    <tr key={c.id} className="border-b border-[#E8E2D4]/60 hover:bg-[#FAF8F3]">
-                      <td className="py-2.5 px-3">
-                        <p className="font-semibold text-[#1B2A45] text-sm">{c.customers?.company || c.customers?.name || '-'}</p>
-                        <p className="text-[11px] text-gray-400">{c.customers?.name}</p>
-                      </td>
-                      <td className="py-2.5 px-3 text-sm text-gray-600">{c.sales_user_name || '-'}</td>
-                      <td className="py-2.5 px-3 font-semibold text-[#1B2A45]">
-                        {c.contract_amount ? `${c.contract_amount.toLocaleString()}만원` : '-'}
-                      </td>
-                      <td className="py-2.5 px-3">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          c.status === 'pending_assign' ? 'bg-amber-100 text-amber-700' :
-                          c.status === 'assigned' ? 'bg-emerald-100 text-emerald-700' :
-                          'bg-gray-100 text-gray-600'
-                        }`}>
-                          {c.status === 'pending_assign' ? '배정대기' : c.status === 'assigned' ? '배정완료' : c.status}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-xs text-gray-400">
-                        {c.created_at?.slice(0, 10) || '-'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+      {/* 상태 탭 */}
+      <div className="flex gap-1.5 flex-wrap">
+        {STATUS_TABS.map(t => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setStatusTab(t.key)}
+            className={"px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors " + (
+              statusTab === t.key
+                ? t.bg + ' text-white shadow-sm'
+                : 'bg-white border border-[#E8E2D4] ' + t.color + ' hover:border-gray-300'
+            )}
+          >
+            {t.label} <span className={statusTab === t.key ? 'text-white/80' : 'text-gray-400'}>{counts[t.key]}</span>
+          </button>
+        ))}
       </div>
+
+      {/* 고객 테이블 */}
+      {statusCustomers.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-[#E8E2D4] p-12 text-center text-sm text-gray-400">
+          해당하는 고객 데이터가 없습니다
+        </div>
+      ) : (
+        <InCallTableView
+          customers={statusCustomers}
+          tabType={statusTab}
+          salesUsers={salesPeople}
+          userName="ceo"
+          showOwner={personTab === 'all'}
+          onUpdate={updateCustomer}
+          onStatusChange={changeStatus}
+          onDelete={deleteCustomer}
+        />
+      )}
     </div>
   )
 }

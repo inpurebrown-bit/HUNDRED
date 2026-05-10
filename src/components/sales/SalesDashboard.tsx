@@ -214,7 +214,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
       const json = await res.json()
       if (res.ok) {
         setShowNewForm(false)
-        showToast(`✅ "${data.company || data.name}" 신규고객 등록 완료!`)
+        showToast(`✅ "${data.company || data.name}" 고객 DB 등록 완료!`)
         loadAll()
       } else {
         showToast(`❌ 등록 실패: ${json.error || '알 수 없는 오류'}`, 'error')
@@ -609,17 +609,17 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-gray-700">
-                신규 고객 <span className="text-gray-400 font-normal">({activeCustomers.length}건)</span>
+                고객 DB <span className="text-gray-400 font-normal">({activeCustomers.length}건)</span>
               </h2>
               <button onClick={() => setShowNewForm(v => !v)}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                {showNewForm ? '✕ 취소' : '+ 신규 고객 등록'}
+                {showNewForm ? '✕ 취소' : '+ 고객 등록'}
               </button>
             </div>
 
             {showNewForm && (
               <InCallForm
-                title="신규 고객 인콜일지 등록"
+                title="고객 DB 인콜일지 등록"
                 salesUsers={SALES_USERS}
                 submitting={submitting}
                 onSubmit={submitNew}
@@ -631,7 +631,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
             ) : activeCustomers.length === 0 ? (
               <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
-                신규 고객이 없습니다.
+                고객 DB가 없습니다.
               </div>
             ) : (
               <InCallTableView
