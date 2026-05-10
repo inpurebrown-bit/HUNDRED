@@ -13,19 +13,36 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
 
+  // ── 1. ops_cases 조회 (customers 조인 없이 — FK 없어도 안전)
   const query = supabaseAdmin
     .from('ops_cases')
-    .select('*, customers(name, phone, loan_history, memo, details)')
+    .select('*')
     .order('updated_at', { ascending: false })
 
-  // 관리팀은 본인 담당 케이스만
   const finalQuery = user.role === 'ops'
     ? query.eq('ops_user_id', user.id)
     : query
 
-  const { data, error } = await finalQuery
+  const { data: cases, error } = await finalQuery
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ cases: data })
+  if (!cases || cases.length === 0) return NextResponse.json({ cases: [] })
+
+  // ── 2. 관련 customers 별도 조회 후 수동 병합
+  const customerIds = [...new Set(cases.map((c: any) => c.customer_id).filter(Boolean))]
+  const { data: customers } = await supabaseAdmin
+    .from('customers')
+    .select('id, name, phone, loan_history, memo, details')
+    .in('id', customerIds)
+
+  const customerMap: Record<string, any> = {}
+  for (const c of customers || []) customerMap[c.id] = c
+
+  const merged = cases.map((c: any) => ({
+    ...c,
+    customers: customerMap[c.customer_id] || null,
+  }))
+
+  return NextResponse.json({ cases: merged })
 }
 
 // POST: 영업팀 → 관리팀 케이스 전송
