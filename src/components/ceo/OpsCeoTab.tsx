@@ -504,11 +504,14 @@ export default function OpsCeoTab() {
     setError(null)
     try {
       const res = await fetch('/api/ops-cases')
-      if (!res.ok) throw new Error('데이터 로드 실패')
       const data = await res.json()
+      if (!res.ok) {
+        setError(`API 오류: ${data.error || res.status}`)
+        return
+      }
       setCases(data.cases || [])
-    } catch (e) {
-      setError('케이스 데이터를 불러오지 못했습니다.')
+    } catch (e: any) {
+      setError(`네트워크 오류: ${e?.message || e}`)
     } finally {
       setLoading(false)
     }
@@ -571,4 +574,5 @@ export default function OpsCeoTab() {
     </div>
   )
 }
+
 

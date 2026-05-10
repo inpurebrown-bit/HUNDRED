@@ -14,16 +14,15 @@ export async function GET(req: NextRequest) {
   }
 
   // ── 1. ops_cases 조회 (customers 조인 없이 — FK 없어도 안전)
-  const query = supabaseAdmin
+  let casesQuery = supabaseAdmin
     .from('ops_cases')
     .select('*')
-    .order('updated_at', { ascending: false })
 
-  const finalQuery = user.role === 'ops'
-    ? query.eq('ops_user_id', user.id)
-    : query
+  if (user.role === 'ops') {
+    casesQuery = casesQuery.eq('ops_user_id', user.id) as any
+  }
 
-  const { data: cases, error } = await finalQuery
+  const { data: cases, error } = await casesQuery
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!cases || cases.length === 0) return NextResponse.json({ cases: [] })
 
