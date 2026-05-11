@@ -23,27 +23,41 @@ interface GcalEntry {
 }
 
 const COLORS = [
-  { key: 'blue',   bg: 'bg-blue-500',    light: 'bg-blue-100 text-blue-700' },
-  { key: 'red',    bg: 'bg-red-500',     light: 'bg-red-100 text-red-700' },
-  { key: 'green',  bg: 'bg-emerald-500', light: 'bg-emerald-100 text-emerald-700' },
-  { key: 'amber',  bg: 'bg-amber-400',   light: 'bg-amber-100 text-amber-700' },
-  { key: 'violet', bg: 'bg-violet-500',  light: 'bg-violet-100 text-violet-700' },
-  { key: 'pink',   bg: 'bg-pink-500',    light: 'bg-pink-100 text-pink-700' },
-  { key: 'gray',   bg: 'bg-gray-400',    light: 'bg-gray-100 text-gray-700' },
+  { key: 'blue',   bg: 'bg-blue-500',    light: 'bg-blue-100 text-blue-700',    dot: 'bg-blue-500' },
+  { key: 'red',    bg: 'bg-red-500',     light: 'bg-red-100 text-red-700',      dot: 'bg-red-500' },
+  { key: 'green',  bg: 'bg-emerald-500', light: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' },
+  { key: 'amber',  bg: 'bg-amber-400',   light: 'bg-amber-100 text-amber-700',  dot: 'bg-amber-400' },
+  { key: 'violet', bg: 'bg-violet-500',  light: 'bg-violet-100 text-violet-700', dot: 'bg-violet-500' },
+  { key: 'pink',   bg: 'bg-pink-500',    light: 'bg-pink-100 text-pink-700',    dot: 'bg-pink-500' },
+  { key: 'gray',   bg: 'bg-gray-400',    light: 'bg-gray-100 text-gray-700',    dot: 'bg-gray-400' },
 ]
 
 const KO_DAYS = ['월', '화', '수', '목', '금', '토', '일']
 const KO_MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월']
 
-function dot(color: string) { return COLORS.find(c => c.key === color)?.bg || 'bg-blue-500' }
-function chip(color: string) { return COLORS.find(c => c.key === color)?.light || 'bg-blue-100 text-blue-700' }
+function colorBg(c: string) { return COLORS.find(x => x.key === c)?.bg || 'bg-blue-500' }
+function colorLight(c: string) { return COLORS.find(x => x.key === c)?.light || 'bg-blue-100 text-blue-700' }
+
+function toDateStr(year: number, month: number, day: number) {
+  return `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`
+}
+function formatDate(ds: string) {
+  const [y, m, d] = ds.split('-')
+  return `${y}년 ${Number(m)}월 ${Number(d)}일`
+}
+function getDow(ds: string) {
+  return ['일','월','화','수','목','금','토'][new Date(ds).getDay()]
+}
 
 export default function CalendarTab() {
   const now = new Date()
+  const todayStr = now.toISOString().slice(0, 10)
+
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [events, setEvents] = useState<CalEvent[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedDay, setSelectedDay] = useState<string>(todayStr)
   const [showForm, setShowForm] = useState(false)
   const [showGcal, setShowGcal] = useState(false)
   const [detailEvent, setDetailEvent] = useState<CalEvent | null>(null)
@@ -51,14 +65,12 @@ export default function CalendarTab() {
   const [autoSyncing, setAutoSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState('')
 
-  // 이벤트 추가 폼
   const [form, setForm] = useState({
-    title: '', start_date: '', end_date: '',
+    title: '', start_date: todayStr, end_date: todayStr,
     start_time: '', end_time: '',
     description: '', color: 'blue', is_allday: true,
   })
 
-  // Google 캘린더 설정 (여러 개)
   const [apiKey, setApiKey] = useState('')
   const [gcalList, setGcalList] = useState<GcalEntry[]>([
     { id: '', color: 'green', label: '회사 캘린더' },
@@ -73,7 +85,6 @@ export default function CalendarTab() {
     setLoading(false)
   }
 
-  // 마운트 시 저장된 설정 불러오고 자동 동기화
   useEffect(() => {
     async function init() {
       const res = await fetch('/api/settings')
@@ -82,7 +93,6 @@ export default function CalendarTab() {
         setApiKey(data.settings.api_key)
         setGcalList(data.settings.calendars || [{ id: '', color: 'green', label: '회사 캘린더' }])
         setGcalSaved(true)
-        // 자동 동기화
         setAutoSyncing(true)
         await fetch('/api/events/gcal', {
           method: 'POST',
@@ -96,11 +106,7 @@ export default function CalendarTab() {
   }, [])
 
   useEffect(() => { load() }, [year, month])
-
-  // 자동 동기화 끝나면 다시 로드
-  useEffect(() => {
-    if (!autoSyncing) load()
-  }, [autoSyncing])
+  useEffect(() => { if (!autoSyncing) load() }, [autoSyncing])
 
   async function submitEvent(e: FormEvent) {
     e.preventDefault()
@@ -110,7 +116,7 @@ export default function CalendarTab() {
       body: JSON.stringify(form),
     })
     setShowForm(false)
-    setForm({ title: '', start_date: '', end_date: '', start_time: '', end_time: '', description: '', color: 'blue', is_allday: true })
+    setForm(f => ({ ...f, title: '', description: '', start_time: '', end_time: '', is_allday: true }))
     load()
   }
 
@@ -130,15 +136,12 @@ export default function CalendarTab() {
     if (!apiKey || validCals.length === 0) return alert('API 키와 캘린더 ID를 입력하세요')
     setSyncing(true)
     setSyncMsg('')
-
-    // 설정 저장
     await fetch('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ api_key: apiKey, calendars: gcalList }),
     })
     setGcalSaved(true)
-
     const res = await fetch('/api/events/gcal', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -146,7 +149,7 @@ export default function CalendarTab() {
     })
     const data = await res.json()
     if (res.ok) {
-      setSyncMsg(`✅ ${data.synced}개 동기화 완료${data.errors ? ' (일부 오류: ' + data.errors.join(', ') + ')' : ''}`)
+      setSyncMsg(`✅ ${data.synced}개 동기화 완료`)
       load()
     } else {
       setSyncMsg(`❌ ${data.error}`)
@@ -154,7 +157,7 @@ export default function CalendarTab() {
     setSyncing(false)
   }
 
-  // ── 캘린더 그리드 (월요일 시작) ──────────────────────
+  // ── 캘린더 계산 (월요일 시작) ──────────────────────────
   const firstDow = (new Date(year, month - 1, 1).getDay() + 6) % 7
   const totalDays = new Date(year, month, 0).getDate()
   const cells: (number | null)[] = [
@@ -163,49 +166,67 @@ export default function CalendarTab() {
   ]
   while (cells.length % 7 !== 0) cells.push(null)
 
-  const todayStr = new Date().toISOString().slice(0, 10)
-  function ds(day: number) {
-    return `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`
-  }
   function eventsForDay(day: number) {
-    const d = ds(day)
+    const d = toDateStr(year, month, day)
     return events.filter(e => e.start_date <= d && e.end_date >= d)
   }
 
-  function prevMonth() { month === 1 ? (setYear(y=>y-1), setMonth(12)) : setMonth(m=>m-1) }
-  function nextMonth() { month === 12 ? (setYear(y=>y+1), setMonth(1)) : setMonth(m=>m+1) }
+  function prevMonth() { month === 1 ? (setYear(y => y - 1), setMonth(12)) : setMonth(m => m - 1) }
+  function nextMonth() { month === 12 ? (setYear(y => y + 1), setMonth(1)) : setMonth(m => m + 1) }
 
-  const upcoming = events
+  // 선택된 날 이벤트
+  const selectedEvents = events.filter(e => e.start_date <= selectedDay && e.end_date >= selectedDay)
+    .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))
+
+  // 이번 달 남은 일정 (오늘 이후)
+  const upcomingThisMonth = events
     .filter(e => e.start_date >= todayStr)
-    .sort((a,b) => a.start_date.localeCompare(b.start_date))
-    .slice(0, 8)
+    .sort((a, b) => a.start_date.localeCompare(b.start_date))
+    .slice(0, 6)
+
+  function openAddForm(day: string) {
+    setForm(f => ({ ...f, title: '', start_date: day, end_date: day, start_time: '', end_time: '', is_allday: true, description: '' }))
+    setShowForm(true)
+  }
 
   return (
     <div className="space-y-4 pb-8">
       {/* 헤더 */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
+      <div className="bg-[#1B2A45] rounded-xl px-5 py-4 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <button onClick={prevMonth} className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-600 text-lg">‹</button>
-          <h2 className="text-lg font-black text-gray-900">{year}년 {KO_MONTHS[month-1]}</h2>
-          <button onClick={nextMonth} className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-600 text-lg">›</button>
-          <button onClick={() => { setYear(now.getFullYear()); setMonth(now.getMonth()+1) }}
-            className="text-xs text-gray-500 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50">오늘</button>
+          <button onClick={prevMonth}
+            className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white text-lg transition-colors">
+            ‹
+          </button>
+          <h2 className="text-white font-black text-lg min-w-[100px] text-center">{year}년 {KO_MONTHS[month - 1]}</h2>
+          <button onClick={nextMonth}
+            className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white text-lg transition-colors">
+            ›
+          </button>
+          <button
+            onClick={() => { setYear(now.getFullYear()); setMonth(now.getMonth() + 1); setSelectedDay(todayStr) }}
+            className="text-xs text-white/70 border border-white/20 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors">
+            오늘
+          </button>
           {autoSyncing && (
-            <span className="text-xs text-emerald-600 flex items-center gap-1.5">
-              <span className="w-3 h-3 border-2 border-emerald-300 border-t-emerald-600 rounded-full animate-spin" />
-              구글 캘린더 동기화 중...
+            <span className="text-xs text-emerald-300 flex items-center gap-1.5">
+              <span className="w-3 h-3 border-2 border-emerald-400/50 border-t-emerald-300 rounded-full animate-spin" />
+              Google 동기화 중...
             </span>
           )}
         </div>
         <div className="flex gap-2">
           <button onClick={() => setShowGcal(!showGcal)}
             className={`flex items-center gap-1.5 text-xs border px-3 py-2 rounded-lg transition-colors ${
-              gcalSaved ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-gray-200 hover:bg-gray-50 text-gray-600'
+              gcalSaved
+                ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300'
+                : 'border-white/20 bg-white/10 text-white/70 hover:bg-white/20'
             }`}>
             🗓 {gcalSaved ? 'Google 연동됨 ✓' : 'Google 캘린더 연동'}
           </button>
-          <button onClick={() => { setForm(f=>({...f, start_date:todayStr, end_date:todayStr})); setShowForm(true) }}
-            className="flex items-center gap-1.5 text-xs bg-gray-900 text-white px-3 py-2 rounded-lg hover:bg-gray-700">
+          <button
+            onClick={() => openAddForm(selectedDay)}
+            className="flex items-center gap-1.5 text-xs bg-white text-[#1B2A45] font-semibold px-3 py-2 rounded-lg hover:bg-white/90 transition-colors">
             + 일정 추가
           </button>
         </div>
@@ -213,63 +234,65 @@ export default function CalendarTab() {
 
       {/* Google 캘린더 연동 패널 */}
       {showGcal && (
-        <div className="bg-white rounded-xl border border-gray-100 p-5 space-y-4">
+        <div className="bg-white rounded-xl border border-[#E8E2D4] p-5 space-y-4">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-gray-800">🗓 Google 캘린더 설정</span>
-            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">여러 캘린더 동시 연동 가능</span>
+            <span className="text-sm font-semibold text-gray-800">🗓 Google 캘린더 연동 설정</span>
           </div>
-
+          <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-700 space-y-1">
+            <p className="font-semibold">설정 방법</p>
+            <p>1. <a href="https://console.cloud.google.com" target="_blank" rel="noopener" className="underline">Google Cloud Console</a>에서 API 키 발급</p>
+            <p>2. Calendar API 활성화</p>
+            <p>3. 연동할 캘린더를 <span className="font-semibold">공개(공개 URL 공유)</span>로 설정</p>
+            <p>4. 캘린더 ID 입력 (Gmail 주소 또는 캘린더 설정 → 통합 섹션에서 확인)</p>
+          </div>
           <div>
-            <label className="text-xs text-gray-500 mb-1 block">Google Calendar API Key</label>
+            <label className="text-xs text-gray-500 mb-1 block font-medium">Google Calendar API Key</label>
             <input value={apiKey} onChange={e => setApiKey(e.target.value)} type="password"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               placeholder="AIza..." />
           </div>
-
-          {/* 캘린더 목록 */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-xs text-gray-500 font-medium">캘린더 목록</label>
+              <label className="text-xs text-gray-500 font-medium">연동할 캘린더</label>
               <button type="button"
-                onClick={() => setGcalList(p => [...p, { id: '', color: 'pink', label: '개인 캘린더' }])}
+                onClick={() => setGcalList(p => [...p, { id: '', color: 'pink', label: '캘린더' }])}
                 className="text-xs text-blue-600 bg-blue-50 border border-blue-100 px-3 py-1 rounded-lg hover:bg-blue-100">
                 + 캘린더 추가
               </button>
             </div>
             {gcalList.map((cal, i) => (
               <div key={i} className="flex items-center gap-2 bg-gray-50 rounded-lg p-3">
-                <input value={cal.label} onChange={e => setGcalList(p => p.map((c,j)=>j===i?{...c,label:e.target.value}:c))}
-                  className="w-24 border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-400"
+                <input value={cal.label}
+                  onChange={e => setGcalList(p => p.map((c, j) => j === i ? { ...c, label: e.target.value } : c))}
+                  className="w-20 border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none"
                   placeholder="이름" />
-                <input value={cal.id} onChange={e => setGcalList(p => p.map((c,j)=>j===i?{...c,id:e.target.value}:c))}
-                  className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-400"
-                  placeholder="캘린더 ID (예: name@gmail.com)" />
+                <input value={cal.id}
+                  onChange={e => setGcalList(p => p.map((c, j) => j === i ? { ...c, id: e.target.value } : c))}
+                  className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none"
+                  placeholder="캘린더 ID (예: yourname@gmail.com)" />
                 <div className="flex gap-1">
                   {COLORS.map(c => (
-                    <button key={c.key} type="button" onClick={() => setGcalList(p => p.map((ci,j)=>j===i?{...ci,color:c.key}:ci))}
-                      className={`w-5 h-5 rounded-full ${c.bg} transition-transform ${cal.color===c.key?'scale-125 ring-2 ring-offset-1 ring-gray-400':'hover:scale-110'}`} />
+                    <button key={c.key} type="button"
+                      onClick={() => setGcalList(p => p.map((ci, j) => j === i ? { ...ci, color: c.key } : ci))}
+                      className={`w-5 h-5 rounded-full ${c.bg} transition-transform ${cal.color === c.key ? 'scale-125 ring-2 ring-offset-1 ring-gray-400' : 'hover:scale-110'}`} />
                   ))}
                 </div>
                 {gcalList.length > 1 && (
-                  <button onClick={() => setGcalList(p => p.filter((_,j)=>j!==i))}
+                  <button onClick={() => setGcalList(p => p.filter((_, j) => j !== i))}
                     className="text-red-400 hover:text-red-600 text-xs">✕</button>
                 )}
               </div>
             ))}
           </div>
-
           {syncMsg && (
             <p className={`text-sm px-3 py-2 rounded-lg ${syncMsg.startsWith('✅') ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
               {syncMsg}
             </p>
           )}
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-400">
-              캘린더는 <span className="text-gray-600 font-medium">공개로 설정</span>되어 있어야 동기화됩니다
-            </p>
+          <div className="flex justify-end">
             <button onClick={syncGcal} disabled={syncing}
-              className="bg-gray-900 hover:bg-gray-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-colors">
-              {syncing ? '동기화 중...' : '동기화 저장'}
+              className="bg-[#1B2A45] hover:bg-[#243552] disabled:opacity-50 text-white px-5 py-2 rounded-lg text-sm font-semibold transition-colors">
+              {syncing ? '동기화 중...' : '저장 및 동기화'}
             </button>
           </div>
         </div>
@@ -277,34 +300,38 @@ export default function CalendarTab() {
 
       {/* 일정 추가 폼 */}
       {showForm && (
-        <form onSubmit={submitEvent} className="bg-white rounded-xl border border-blue-100 p-5 space-y-3">
+        <form onSubmit={submitEvent} className="bg-white rounded-xl border border-blue-200 p-5 space-y-3 shadow-sm">
           <div className="flex items-center justify-between mb-1">
-            <h3 className="font-semibold text-gray-800 text-sm">새 일정 추가</h3>
-            <button type="button" onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-700">✕</button>
+            <h3 className="font-semibold text-gray-800 text-sm">
+              ✏️ 새 일정 — {formatDate(form.start_date)} ({getDow(form.start_date)})
+            </h3>
+            <button type="button" onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-700 text-lg">✕</button>
           </div>
           <div>
-            <label className="text-xs text-gray-500 mb-1 block">제목 *</label>
-            <input required value={form.title} onChange={e => setForm(p=>({...p,title:e.target.value}))}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="일정 제목" />
+            <label className="text-xs text-gray-500 mb-1 block">일정 제목 *</label>
+            <input required value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
+              autoFocus
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder="예: 팀 회의, 고객 미팅" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-gray-500 mb-1 block">시작일 *</label>
               <input type="date" required value={form.start_date}
-                onChange={e => setForm(p=>({...p,start_date:e.target.value,end_date:e.target.value}))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                onChange={e => setForm(p => ({ ...p, start_date: e.target.value, end_date: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
             </div>
             <div>
               <label className="text-xs text-gray-500 mb-1 block">종료일</label>
-              <input type="date" value={form.end_date} onChange={e => setForm(p=>({...p,end_date:e.target.value}))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <input type="date" value={form.end_date}
+                onChange={e => setForm(p => ({ ...p, end_date: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => setForm(p=>({...p,is_allday:!p.is_allday}))}
-              className={`w-10 h-5 rounded-full transition-colors relative ${form.is_allday?'bg-blue-500':'bg-gray-200'}`}>
-              <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${form.is_allday?'left-5':'left-0.5'}`} />
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={() => setForm(p => ({ ...p, is_allday: !p.is_allday }))}
+              className={`w-10 h-5 rounded-full transition-colors relative flex-shrink-0 ${form.is_allday ? 'bg-blue-500' : 'bg-gray-200'}`}>
+              <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${form.is_allday ? 'left-5' : 'left-0.5'}`} />
             </button>
             <span className="text-xs text-gray-600">종일 일정</span>
           </div>
@@ -312,27 +339,32 @@ export default function CalendarTab() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">시작 시간</label>
-                <input type="time" value={form.start_time} onChange={e => setForm(p=>({...p,start_time:e.target.value}))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <input type="time" value={form.start_time}
+                  onChange={e => setForm(p => ({ ...p, start_time: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">종료 시간</label>
-                <input type="time" value={form.end_time} onChange={e => setForm(p=>({...p,end_time:e.target.value}))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <input type="time" value={form.end_time}
+                  onChange={e => setForm(p => ({ ...p, end_time: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
               </div>
             </div>
           )}
           <div>
-            <label className="text-xs text-gray-500 mb-1 block">메모</label>
-            <textarea value={form.description} onChange={e => setForm(p=>({...p,description:e.target.value}))}
-              rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+            <label className="text-xs text-gray-500 mb-1 block">메모 (선택)</label>
+            <textarea value={form.description}
+              onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+              rows={2}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+              placeholder="장소, 참석자 등..." />
           </div>
           <div>
             <label className="text-xs text-gray-500 mb-1.5 block">색상</label>
             <div className="flex gap-2">
               {COLORS.map(c => (
-                <button key={c.key} type="button" onClick={() => setForm(p=>({...p,color:c.key}))}
-                  className={`w-7 h-7 rounded-full ${c.bg} transition-transform ${form.color===c.key?'scale-125 ring-2 ring-offset-1 ring-gray-400':'hover:scale-110'}`} />
+                <button key={c.key} type="button" onClick={() => setForm(p => ({ ...p, color: c.key }))}
+                  className={`w-7 h-7 rounded-full ${c.bg} transition-transform ${form.color === c.key ? 'scale-125 ring-2 ring-offset-1 ring-gray-400' : 'hover:scale-110'}`} />
               ))}
             </div>
           </div>
@@ -340,51 +372,71 @@ export default function CalendarTab() {
             <button type="button" onClick={() => setShowForm(false)}
               className="flex-1 border border-gray-200 text-gray-600 py-2 rounded-lg text-sm hover:bg-gray-50">취소</button>
             <button type="submit"
-              className="flex-1 bg-gray-900 text-white py-2 rounded-lg text-sm font-medium hover:bg-gray-700">저장</button>
+              className="flex-1 bg-[#1B2A45] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#243552]">저장</button>
           </div>
         </form>
       )}
 
-      {/* 캘린더 그리드 + 사이드 */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        <div className="lg:col-span-3 bg-white rounded-xl border border-gray-100 overflow-hidden">
+      {/* 메인 레이아웃: 캘린더 + 오른쪽 패널 */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
+
+        {/* ── 캘린더 그리드 ── */}
+        <div className="bg-white rounded-xl border border-[#E8E2D4] overflow-hidden">
           {/* 요일 헤더 */}
-          <div className="grid grid-cols-7 border-b border-gray-100">
-            {KO_DAYS.map((d,i) => (
-              <div key={d} className={`py-2.5 text-center text-xs font-semibold ${
-                i===5?'text-blue-500':i===6?'text-red-500':'text-gray-500'
+          <div className="grid grid-cols-7 border-b border-[#E8E2D4] bg-gray-50/50">
+            {KO_DAYS.map((d, i) => (
+              <div key={d} className={`py-2.5 text-center text-xs font-bold ${
+                i === 5 ? 'text-blue-500' : i === 6 ? 'text-red-500' : 'text-gray-400'
               }`}>{d}</div>
             ))}
           </div>
+
           {loading ? (
-            <div className="p-10 text-center text-gray-400 text-sm">불러오는 중...</div>
+            <div className="p-12 text-center text-gray-400 text-sm">불러오는 중...</div>
           ) : (
             <div className="grid grid-cols-7">
               {cells.map((day, idx) => {
-                if (!day) return <div key={idx} className="min-h-[90px] border-b border-r border-gray-50 bg-gray-50/30" />
-                const d = ds(day)
+                if (!day) return (
+                  <div key={idx} className="min-h-[88px] border-b border-r border-gray-50 bg-gray-50/20" />
+                )
+                const d = toDateStr(year, month, day)
                 const dayEvs = eventsForDay(day)
                 const isToday = d === todayStr
+                const isSelected = d === selectedDay
                 const dow = idx % 7
                 return (
                   <div key={idx}
-                    onClick={() => { setForm(f=>({...f,start_date:d,end_date:d})); setShowForm(true) }}
-                    className="min-h-[90px] border-b border-r border-gray-50 p-1.5 cursor-pointer hover:bg-blue-50/20 transition-colors">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold mb-1 ${
-                      isToday?'bg-gray-900 text-white':
-                      dow===5?'text-blue-500':dow===6?'text-red-500':'text-gray-700'
+                    onClick={() => setSelectedDay(d)}
+                    className={`min-h-[88px] border-b border-r border-gray-50 p-1.5 cursor-pointer transition-colors ${
+                      isSelected ? 'bg-blue-50/60' : 'hover:bg-gray-50/60'
+                    }`}>
+                    {/* 날짜 숫자 */}
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold mb-1 ${
+                      isToday
+                        ? 'bg-[#1B2A45] text-white'
+                        : isSelected
+                          ? 'bg-blue-100 text-blue-700'
+                          : dow === 5 ? 'text-blue-500'
+                          : dow === 6 ? 'text-red-500'
+                          : 'text-gray-700'
                     }`}>{day}</div>
+
+                    {/* 이벤트 칩 */}
                     <div className="space-y-0.5">
-                      {dayEvs.slice(0,3).map(ev => (
+                      {dayEvs.slice(0, 3).map(ev => (
                         <div key={ev.id}
                           onClick={e => { e.stopPropagation(); setDetailEvent(ev) }}
-                          className={`text-[10px] px-1.5 py-0.5 rounded font-medium truncate cursor-pointer hover:opacity-80 ${chip(ev.color)}`}>
-                          {!ev.is_allday && ev.start_time && <span className="opacity-50 mr-0.5">{ev.start_time.slice(0,5)}</span>}
-                          {ev.source==='google' && <span className="opacity-40 mr-0.5">G</span>}
+                          className={`text-[10px] px-1.5 py-0.5 rounded font-medium truncate cursor-pointer hover:opacity-80 ${colorLight(ev.color)}`}>
+                          {!ev.is_allday && ev.start_time && (
+                            <span className="opacity-50 mr-0.5">{ev.start_time.slice(0, 5)}</span>
+                          )}
+                          {ev.source === 'google' && <span className="opacity-40 mr-0.5">G</span>}
                           {ev.title}
                         </div>
                       ))}
-                      {dayEvs.length > 3 && <p className="text-[10px] text-gray-400 pl-1">+{dayEvs.length-3}개</p>}
+                      {dayEvs.length > 3 && (
+                        <p className="text-[10px] text-gray-400 pl-1">+{dayEvs.length - 3}개</p>
+                      )}
                     </div>
                   </div>
                 )
@@ -393,45 +445,93 @@ export default function CalendarTab() {
           )}
         </div>
 
-        {/* 사이드 패널 */}
+        {/* ── 오른쪽 패널 ── */}
         <div className="space-y-3">
-          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-50">
-              <p className="text-xs font-semibold text-gray-500">다가오는 일정</p>
+
+          {/* 선택된 날짜 이벤트 */}
+          <div className="bg-white rounded-xl border border-[#E8E2D4] overflow-hidden">
+            <div className="px-4 py-3 bg-gray-50/50 border-b border-[#E8E2D4] flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-gray-700">{formatDate(selectedDay)}</p>
+                <p className="text-[10px] text-gray-400">{getDow(selectedDay)}요일{selectedDay === todayStr ? ' · 오늘' : ''}</p>
+              </div>
+              <button
+                onClick={() => openAddForm(selectedDay)}
+                className="text-[10px] bg-[#1B2A45] text-white px-2.5 py-1 rounded-lg font-medium hover:bg-[#243552] transition-colors">
+                + 추가
+              </button>
             </div>
-            {upcoming.length === 0 ? (
-              <div className="p-5 text-center text-gray-400 text-xs">예정된 일정 없음</div>
+
+            {selectedEvents.length === 0 ? (
+              <div className="px-4 py-6 text-center">
+                <p className="text-xs text-gray-400">이 날 일정 없음</p>
+                <button onClick={() => openAddForm(selectedDay)}
+                  className="mt-2 text-xs text-blue-500 hover:text-blue-700 underline">
+                  일정 추가하기
+                </button>
+              </div>
             ) : (
               <div className="divide-y divide-gray-50">
-                {upcoming.map(ev => (
-                  <button key={ev.id} onClick={() => setDetailEvent(ev)}
-                    className="w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                {selectedEvents.map(ev => (
+                  <button key={ev.id}
+                    onClick={() => setDetailEvent(ev)}
+                    className="w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors group">
                     <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${dot(ev.color)}`} />
-                      <span className="text-xs font-medium text-gray-800 truncate">{ev.title}</span>
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${colorBg(ev.color)}`} />
+                      <span className="text-xs font-semibold text-gray-800 flex-1 truncate">{ev.title}</span>
+                      {ev.source === 'google' && <span className="text-[10px] text-gray-300">G</span>}
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5 pl-4">
-                      {ev.start_date}{!ev.is_allday && ev.start_time && ` ${ev.start_time.slice(0,5)}`}
-                      {ev.source==='google' && ' 🗓'}
-                      {ev.gcal_label && <span className="ml-1 opacity-60">({ev.gcal_label})</span>}
-                    </p>
+                    {!ev.is_allday && ev.start_time && (
+                      <p className="text-[10px] text-gray-400 mt-0.5 pl-4">
+                        ⏰ {ev.start_time.slice(0, 5)}{ev.end_time && ` ~ ${ev.end_time.slice(0, 5)}`}
+                      </p>
+                    )}
+                    {ev.description && (
+                      <p className="text-[10px] text-gray-400 mt-0.5 pl-4 truncate">{ev.description}</p>
+                    )}
                   </button>
                 ))}
               </div>
             )}
           </div>
 
-          {/* 범례 */}
-          {gcalSaved && gcalList.filter(c=>c.id).length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-100 p-4">
-              <p className="text-xs font-semibold text-gray-500 mb-2">연동된 캘린더</p>
+          {/* 다가오는 일정 */}
+          {upcomingThisMonth.length > 0 && (
+            <div className="bg-white rounded-xl border border-[#E8E2D4] overflow-hidden">
+              <div className="px-4 py-3 border-b border-[#E8E2D4]">
+                <p className="text-xs font-bold text-gray-500">📅 다가오는 일정</p>
+              </div>
+              <div className="divide-y divide-gray-50">
+                {upcomingThisMonth.map(ev => (
+                  <button key={ev.id}
+                    onClick={() => { setSelectedDay(ev.start_date); setDetailEvent(ev) }}
+                    className="w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${colorBg(ev.color)}`} />
+                      <span className="text-xs font-medium text-gray-800 flex-1 truncate">{ev.title}</span>
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-0.5 pl-4">
+                      {ev.start_date.slice(5).replace('-', '/')} ({getDow(ev.start_date)})
+                      {!ev.is_allday && ev.start_time && ` ${ev.start_time.slice(0, 5)}`}
+                      {ev.source === 'google' && ' 🗓'}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 연동 캘린더 범례 */}
+          {gcalSaved && gcalList.filter(c => c.id).length > 0 && (
+            <div className="bg-white rounded-xl border border-[#E8E2D4] p-4">
+              <p className="text-xs font-bold text-gray-400 mb-2">연동된 캘린더</p>
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <span className="w-2 h-2 rounded-full bg-blue-500" />직접 추가 일정
+                  <span className="w-2 h-2 rounded-full bg-blue-500" />직접 추가
                 </div>
-                {gcalList.filter(c=>c.id).map((c,i) => (
+                {gcalList.filter(c => c.id).map((c, i) => (
                   <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
-                    <span className={`w-2 h-2 rounded-full ${dot(c.color)}`} />{c.label}
+                    <span className={`w-2 h-2 rounded-full ${colorBg(c.color)}`} />{c.label}
                   </div>
                 ))}
               </div>
@@ -444,41 +544,46 @@ export default function CalendarTab() {
       {detailEvent && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4"
           onClick={() => setDetailEvent(null)}>
-          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl" onClick={e=>e.stopPropagation()}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-2">
-                <span className={`w-3 h-3 rounded-full ${dot(detailEvent.color)}`} />
-                <h3 className="font-bold text-gray-900">{detailEvent.title}</h3>
+                <span className={`w-3 h-3 rounded-full ${colorBg(detailEvent.color)}`} />
+                <h3 className="font-bold text-gray-900 text-base">{detailEvent.title}</h3>
               </div>
-              <button onClick={() => setDetailEvent(null)} className="text-gray-400 hover:text-gray-700">✕</button>
+              <button onClick={() => setDetailEvent(null)} className="text-gray-400 hover:text-gray-700 text-lg">✕</button>
             </div>
             <div className="space-y-2 text-sm text-gray-600">
               <div className="flex items-center gap-2">
                 <span className="text-gray-400">📅</span>
-                <span>{detailEvent.start_date}{detailEvent.end_date!==detailEvent.start_date&&` ~ ${detailEvent.end_date}`}</span>
+                <span>
+                  {formatDate(detailEvent.start_date)} ({getDow(detailEvent.start_date)})
+                  {detailEvent.end_date !== detailEvent.start_date && ` ~ ${formatDate(detailEvent.end_date)}`}
+                </span>
               </div>
               {!detailEvent.is_allday && detailEvent.start_time && (
                 <div className="flex items-center gap-2">
                   <span className="text-gray-400">⏰</span>
-                  <span>{detailEvent.start_time.slice(0,5)}{detailEvent.end_time&&` ~ ${detailEvent.end_time.slice(0,5)}`}</span>
+                  <span>{detailEvent.start_time.slice(0, 5)}{detailEvent.end_time && ` ~ ${detailEvent.end_time.slice(0, 5)}`}</span>
                 </div>
               )}
-              {detailEvent.source==='google' && (
+              {detailEvent.source === 'google' && (
                 <div className="flex items-center gap-2">
                   <span className="text-gray-400">🗓</span>
                   <span className="text-emerald-600 text-xs font-medium">
-                    Google 캘린더{detailEvent.gcal_label&&` · ${detailEvent.gcal_label}`}
+                    Google 캘린더{detailEvent.gcal_label && ` · ${detailEvent.gcal_label}`}
                   </span>
                 </div>
               )}
               {detailEvent.description && (
-                <div className="mt-3 bg-gray-50 rounded-lg p-3 text-xs leading-relaxed">{detailEvent.description}</div>
+                <div className="mt-3 bg-gray-50 rounded-lg p-3 text-xs leading-relaxed whitespace-pre-wrap">
+                  {detailEvent.description}
+                </div>
               )}
             </div>
-            {detailEvent.source==='local' && (
+            {detailEvent.source === 'local' && (
               <button onClick={() => deleteEvent(detailEvent.id)}
                 className="mt-4 w-full text-red-400 hover:text-red-600 text-sm border border-red-100 hover:border-red-200 py-2 rounded-lg transition-colors">
-                일정 삭제
+                🗑 일정 삭제
               </button>
             )}
           </div>

@@ -10,6 +10,7 @@ import CalendarTab from './CalendarTab'
 import PayRateTab from './PayRateTab'
 import PayrollTab from './PayrollTab'
 import PayslipTab from './PayslipTab'
+import FreelancerTab from './FreelancerTab'
 import AssignBoard from './AssignBoard'
 import OverviewTabNew from './OverviewTabNew'
 import SalesCeoTab from './SalesCeoTab'
@@ -64,7 +65,7 @@ interface OpsUser {
 export default function CeoDashboard() {
   const { data: session } = useSession()
   const ceoName = session?.user?.name ?? '대표'
-  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'payslip' | 'reports' | 'minutes' | 'calendar' | 'ailogs'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'payslip' | 'freelancer' | 'reports' | 'minutes' | 'calendar' | 'ailogs'>('overview')
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
@@ -106,8 +107,9 @@ export default function CeoDashboard() {
     { key: 'sales',     label: '👥 영업팀' },
     { key: 'ops',       label: '⚙️ 관리팀' },
     { key: 'analytics', label: '💰 매출·손익·결제율' },
-    { key: 'payslip',   label: '📋 급여명세서' },
-    { key: 'reports',   label: '📝 보고함' },
+    { key: 'payslip',    label: '📋 급여명세서' },
+    { key: 'freelancer', label: '👤 프리랜서 관리대장' },
+    { key: 'reports',    label: '📝 보고함' },
     { key: 'minutes',   label: '📒 회의록' },
     { key: 'calendar',  label: '📅 일정관리' },
     { key: 'ailogs',    label: '🔍 AI 질문 로그' },
@@ -228,7 +230,8 @@ export default function CeoDashboard() {
         {activeTab === 'sales'     && <SalesCeoTab />}
         {activeTab === 'ops'       && <OpsCeoTab />}
         {activeTab === 'analytics' && <AnalyticsTab />}
-        {activeTab === 'payslip'   && <PayslipTab />}
+        {activeTab === 'payslip'    && <PayslipTab />}
+        {activeTab === 'freelancer' && <FreelancerTab />}
         {activeTab === 'reports'   && <ReportsTab isCeo={true} />}
         {activeTab === 'minutes'   && <MinutesTab />}
         {activeTab === 'calendar'  && <CalendarTab />}
