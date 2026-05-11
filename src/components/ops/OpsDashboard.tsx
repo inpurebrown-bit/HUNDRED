@@ -17,6 +17,10 @@ interface OpsCase {
   progress_stage: string
   progress_memo: string
   revenue: number
+  is_refund?: boolean
+  is_completed?: boolean
+  timeline?: any[]
+  institution_credentials?: Record<string, any>
   details?: Record<string, any>
   updated_at: string
   created_at: string
@@ -31,16 +35,30 @@ interface OpsCase {
 
 // ── Pipeline stages ────────────────────────────────────────────────────
 const PIPELINE_STAGES = [
-  { key: 'assigned',    label: '신규배정',  color: 'bg-slate-500',   light: 'bg-slate-50 border-slate-200' },
-  { key: 'absorbed',    label: '흡수완료',  color: 'bg-indigo-500',  light: 'bg-indigo-50 border-indigo-200' },
-  { key: 'doc_collect', label: '서류진행',  color: 'bg-blue-500',    light: 'bg-blue-50 border-blue-200' },
-  { key: 'reviewing',   label: '심사중',    color: 'bg-amber-500',   light: 'bg-amber-50 border-amber-200' },
-  { key: 'approved',    label: '승인완료',  color: 'bg-violet-500',  light: 'bg-violet-50 border-violet-200' },
-  { key: 'executing',   label: '자금집행',  color: 'bg-cyan-500',    light: 'bg-cyan-50 border-cyan-200' },
-  { key: 'completed',   label: '종료',      color: 'bg-emerald-500', light: 'bg-emerald-50 border-emerald-200' },
-  { key: 'refunded',    label: '환불',      color: 'bg-orange-400',  light: 'bg-orange-50 border-orange-200' },
-  { key: 'rejected',    label: '거절/보류', color: 'bg-red-400',     light: 'bg-red-50 border-red-200' },
+  { key: '서류받는중', label: '서류받는중', color: 'bg-gray-500',   light: 'bg-gray-50 border-gray-200' },
+  { key: '접수전',     label: '접수전',     color: 'bg-sky-500',    light: 'bg-sky-50 border-sky-200' },
+  { key: '신청완료',   label: '신청완료',   color: 'bg-blue-500',   light: 'bg-blue-50 border-blue-200' },
+  { key: '반려보정',   label: '반려보정',   color: 'bg-orange-500', light: 'bg-orange-50 border-orange-200' },
+  { key: '실사대기',   label: '실사대기',   color: 'bg-amber-500',  light: 'bg-amber-50 border-amber-200' },
+  { key: '실사완료',   label: '실사완료',   color: 'bg-yellow-500', light: 'bg-yellow-50 border-yellow-200' },
+  { key: '승인대기',   label: '승인대기',   color: 'bg-violet-500', light: 'bg-violet-50 border-violet-200' },
+  { key: '승인',       label: '승인',       color: 'bg-emerald-500',light: 'bg-emerald-50 border-emerald-200' },
+  { key: '부결',       label: '부결',       color: 'bg-red-500',    light: 'bg-red-50 border-red-200' },
+  { key: '입금전',     label: '입금전',     color: 'bg-teal-500',   light: 'bg-teal-50 border-teal-200' },
+  { key: '홀딩',       label: '홀딩',       color: 'bg-slate-400',  light: 'bg-slate-50 border-slate-200' },
+  // 기존 호환
+  { key: '검토중',     label: '검토중',     color: 'bg-gray-400',   light: 'bg-gray-50 border-gray-200' },
+  { key: '접수',       label: '접수',       color: 'bg-sky-400',    light: 'bg-sky-50 border-sky-200' },
+  { key: '진행중',     label: '진행중',     color: 'bg-blue-400',   light: 'bg-blue-50 border-blue-200' },
 ]
+
+const ACTIVE_STAGE_KEYS = new Set([
+  '서류받는중','접수전','신청완료','반려보정','실사대기','실사완료',
+  '승인대기','승인','부결','입금전','홀딩','검토중','접수','진행중',
+  'assigned','absorbed','doc_collect','reviewing','approved','executing','rejected',
+])
+const REFUND_STAGE_KEYS = new Set(['환불', 'refunded'])
+const COMPLETED_STAGE_KEYS = new Set(['종료', '완료', 'completed'])
 
 // ── 기관 목록 ──────────────────────────────────────────────────────────
 const INST_DIRECT = ['중진공', '소진공(혁신)', '소진공(신취)', '소진공(재도전)', '서민금융(미소)']
@@ -167,7 +185,9 @@ function OpsDetailPanel({ c, onSave }: { c: OpsCase; onSave: (id: string, patch:
           <div>
             <label className={lbl}>진행 단계</label>
             <select value={local.progress_stage} onChange={e => field('progress_stage', e.target.value)} className={inp}>
-              {PIPELINE_STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+              {[...PIPELINE_STAGES, { key: '환불', label: '환불' }, { key: '종료', label: '종료' }].map(s => (
+                <option key={s.key} value={s.key}>{s.label}</option>
+              ))}
             </select>
           </div>
           <div className="col-span-3">
@@ -389,9 +409,65 @@ function OpsDetailPanel({ c, onSave }: { c: OpsCase; onSave: (id: string, patch:
         />
       </div>
 
+      {/* 타임라인 */}
+      <div>
+        <div className="flex items-center gap-1.5 mb-2">
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">타임라인</span>
+          <div className="flex-1 h-px bg-gray-100" />
+        </div>
+        <TimelineSection initialTimeline={local.timeline || []} onSchedule={schedule} />
+      </div>
+
       <p className="text-[10px] text-gray-300 text-right">
         마지막 수정: {new Date(c.updated_at).toLocaleString('ko-KR')}
       </p>
+    </div>
+  )
+}
+
+// ── Timeline Section ────────────────────────────────────────────────────
+function TimelineSection({ initialTimeline, onSchedule }: {
+  initialTimeline: any[]
+  onSchedule: (patch: Record<string, any>) => void
+}) {
+  const [tl, setTl] = useState<any[]>(initialTimeline || [])
+  const [text, setText] = useState('')
+
+  function add() {
+    if (!text.trim()) return
+    const entry = { date: new Date().toISOString().slice(0, 10), text: text.trim() }
+    const updated = [...tl, entry]
+    setTl(updated)
+    onSchedule({ timeline: updated })
+    setText('')
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-1">
+        <input
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && add()}
+          placeholder="타임라인 내용 입력..."
+          className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400/50" />
+        <button onClick={add}
+          className="text-xs bg-violet-500 text-white px-2 py-1 rounded hover:bg-violet-600">
+          추가
+        </button>
+      </div>
+      {tl.length === 0 ? (
+        <p className="text-[10px] text-gray-300 text-center py-1">타임라인이 없습니다</p>
+      ) : (
+        <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
+          {[...tl].reverse().map((entry: any, i: number) => (
+            <div key={i} className="flex gap-2 text-xs bg-gray-50 rounded px-2 py-1">
+              <span className="text-gray-400 shrink-0">{entry.date}</span>
+              <span className="text-gray-700 flex-1">{entry.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -530,18 +606,30 @@ export default function OpsDashboard({ userId, userName }: Props) {
       )
     : cases
 
+  // View filter state
+  const [caseView, setCaseView] = useState<'active' | 'refund' | 'completed'>('active')
+
   // Stats
   const totalApproval = cases.reduce((sum, c) => {
     const amt = parseFloat((c.details?.approval_amount || '0').replace(/[^0-9.]/g, ''))
     return sum + (isNaN(amt) ? 0 : amt)
   }, 0)
-  const completedCount = cases.filter(c => c.progress_stage === 'completed').length
-  const inProgressCount = cases.filter(c => !['completed', 'rejected'].includes(c.progress_stage)).length
+  const completedCount = cases.filter(c => COMPLETED_STAGE_KEYS.has(c.progress_stage)).length
+  const refundCount = cases.filter(c => REFUND_STAGE_KEYS.has(c.progress_stage) || c.is_refund).length
+  const inProgressCount = cases.filter(c => ACTIVE_STAGE_KEYS.has(c.progress_stage)).length
+
+  // Filter by view
+  const viewCases = filteredCases.filter(c => {
+    if (caseView === 'refund') return REFUND_STAGE_KEYS.has(c.progress_stage) || c.is_refund
+    if (caseView === 'completed') return COMPLETED_STAGE_KEYS.has(c.progress_stage) || c.is_completed
+    return ACTIVE_STAGE_KEYS.has(c.progress_stage) ||
+      (!REFUND_STAGE_KEYS.has(c.progress_stage) && !COMPLETED_STAGE_KEYS.has(c.progress_stage) && !c.is_refund && !c.is_completed)
+  })
 
   // Group by pipeline stage
   const groupedCases = PIPELINE_STAGES.map(stage => ({
     stage,
-    items: filteredCases.filter(c => c.progress_stage === stage.key),
+    items: viewCases.filter(c => c.progress_stage === stage.key),
   })).filter(g => g.items.length > 0)
 
   return (
@@ -634,6 +722,26 @@ export default function OpsDashboard({ userId, userName }: Props) {
         {/* Cases tab */}
         {activeTab === 'cases' && (
           <div className="space-y-5">
+            {/* View selector */}
+            <div className="flex gap-2">
+              {[
+                { key: 'active',    label: '진행업체',   count: inProgressCount },
+                { key: 'refund',    label: '환불업체',   count: refundCount },
+                { key: 'completed', label: '종료업체',   count: completedCount },
+              ].map(m => (
+                <button key={m.key} onClick={() => setCaseView(m.key as any)}
+                  className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors border ${
+                    caseView === m.key
+                      ? 'bg-[#1B2A45] text-white border-[#1B2A45]'
+                      : 'bg-white text-gray-600 border-[#E8E2D4] hover:border-[#1B2A45]/30'
+                  }`}>
+                  {m.label}
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                    caseView === m.key ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
+                  }`}>{m.count}</span>
+                </button>
+              ))}
+            </div>
             {/* Stats bar */}
             <div className="grid grid-cols-4 gap-3">
               {[

@@ -11,6 +11,12 @@ function toDbPatch(body: Record<string, any>) {
     'memo','revenue','visit_date','script_delivered','next_plan',
     'required_checks','fund_solution','tax_invoice_requested',
     'is_refund','is_completed','approved_amount','commission_amount','owner_id',
+    // 신규 필드
+    'timeline','institution_credentials','deposit_date',
+    'contract_fee','paid_amount','invoice_issued','payment_cash','payment_card',
+    'absorbed','sojin_cert_youth','sojin_cert_general','sojin_cert_disabled',
+    'concurrent_institutions','contract_notes','customer_type','commission_rate',
+    'stage',
   ]
   for (const k of ALLOWED) {
     if (body[k] !== undefined) patch[k] = body[k]
