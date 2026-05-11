@@ -54,23 +54,23 @@ export interface Props {
 
 // ── Badge configs ──────────────────────────────────────────────────────
 const CALL_RESULTS = [
-  { key: '기달리는중', color: 'bg-yellow-400 text-gray-800' },
-  { key: '방문대기',   color: 'bg-blue-500 text-white' },
-  { key: '설명중',     color: 'bg-indigo-500 text-white' },
-  { key: '부결',       color: 'bg-red-500 text-white' },
-  { key: '생각필요',   color: 'bg-orange-400 text-white' },
-  { key: '내일통화',   color: 'bg-sky-400 text-white' },
-  { key: '진행',       color: 'bg-emerald-500 text-white' },
+  { key: '원콜클로징', color: 'bg-emerald-500 text-white' },
+  { key: '심사요청',   color: 'bg-violet-500 text-white' },
+  { key: '고민중',     color: 'bg-orange-400 text-white' },
+  { key: '클로징대기', color: 'bg-blue-500 text-white' },
+  { key: '부재',       color: 'bg-slate-400 text-white' },
+  { key: '대기',       color: 'bg-yellow-400 text-gray-800' },
+  { key: '거절',       color: 'bg-red-500 text-white' },
+  { key: '자체거절',   color: 'bg-gray-400 text-white' },
   { key: '',           color: 'bg-gray-100 text-gray-400' },
 ]
 
 const CLOSING_RESULTS = [
-  { key: '계약의향',   color: 'bg-emerald-500 text-white' },
-  { key: '검토중',     color: 'bg-blue-500 text-white' },
+  { key: '결정업체',   color: 'bg-emerald-500 text-white' },
   { key: '고민중',     color: 'bg-orange-400 text-white' },
-  { key: '부결',       color: 'bg-red-500 text-white' },
-  { key: '내일재통화', color: 'bg-sky-400 text-white' },
-  { key: '보류',       color: 'bg-amber-400 text-gray-800' },
+  { key: '부재',       color: 'bg-slate-400 text-white' },
+  { key: '재통화',     color: 'bg-sky-400 text-white' },
+  { key: '거절',       color: 'bg-red-500 text-white' },
   { key: '자체거절',   color: 'bg-gray-400 text-white' },
   { key: '',           color: 'bg-gray-100 text-gray-400' },
 ]
@@ -173,6 +173,8 @@ function ContractModal({ company, onClose, onConfirm }: ContractModalProps) {
   const [myRevenue, setMyRevenue] = useState('')
   const [cumulativeRevenue, setCumulativeRevenue] = useState('')
   const [opsMemo, setOpsMemo] = useState('')
+  const [groupChatInvited, setGroupChatInvited] = useState(false)
+  const [coopRequestSent, setCoopRequestSent] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const feeNum  = parseFloat(contractFee.replace(/[^0-9.]/g, '')) || 0
@@ -183,13 +185,15 @@ function ContractModal({ company, onClose, onConfirm }: ContractModalProps) {
   async function handleConfirm() {
     setSaving(true)
     await onConfirm({
-      contract_fee:       contractFee,
-      payment_amount:     paidAmount,
-      unpaid_amount:      unpaid > 0 ? unpaid.toLocaleString() + '원' : '0',
-      vat_included:       vatIncluded,
-      my_revenue:         myRevenue,
-      cumulative_revenue: cumulativeRevenue,
-      ops_memo:           opsMemo,
+      contract_fee:        contractFee,
+      payment_amount:      paidAmount,
+      unpaid_amount:       unpaid > 0 ? unpaid.toLocaleString() + '원' : '0',
+      vat_included:        vatIncluded,
+      my_revenue:          myRevenue,
+      cumulative_revenue:  cumulativeRevenue,
+      ops_memo:            opsMemo,
+      group_chat_invited:  groupChatInvited,
+      coop_request_sent:   coopRequestSent,
     })
     setSaving(false)
   }
@@ -269,6 +273,27 @@ function ContractModal({ company, onClose, onConfirm }: ContractModalProps) {
               rows={3}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/50 resize-none"
               placeholder="자금팀에 전달할 내용..." />
+          </div>
+
+          {/* 체크리스트 */}
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 space-y-2.5">
+            <p className="text-[10px] font-bold text-amber-700 mb-1">📋 계약 후 체크리스트</p>
+            <label className="flex items-center gap-2.5 cursor-pointer">
+              <input type="checkbox" checked={groupChatInvited} onChange={e => setGroupChatInvited(e.target.checked)}
+                className="w-4 h-4 rounded accent-emerald-500" />
+              <span className={`text-xs font-medium ${groupChatInvited ? 'text-emerald-700 line-through' : 'text-gray-700'}`}>
+                단톡방 초대 완료
+              </span>
+              {groupChatInvited && <span className="text-[10px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full font-semibold">✓ 완료</span>}
+            </label>
+            <label className="flex items-center gap-2.5 cursor-pointer">
+              <input type="checkbox" checked={coopRequestSent} onChange={e => setCoopRequestSent(e.target.checked)}
+                className="w-4 h-4 rounded accent-emerald-500" />
+              <span className={`text-xs font-medium ${coopRequestSent ? 'text-emerald-700 line-through' : 'text-gray-700'}`}>
+                업무협조 요청서 발송 완료
+              </span>
+              {coopRequestSent && <span className="text-[10px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full font-semibold">✓ 완료</span>}
+            </label>
           </div>
         </div>
 
@@ -378,21 +403,23 @@ function InCallTableRow({ customer, index, salesUsers, userName, tabType, showOw
         {/* # */}
         <td className="px-3 py-2.5 text-gray-300 text-[11px] w-8 font-mono">{index + 1}</td>
 
-        {/* 업체명 */}
-        <td className="px-3 py-2.5">
-          <button
-            type="button"
-            onClick={() => setExpanded(v => !v)}
-            className="font-semibold text-[#1B2A45] hover:text-blue-600 text-left truncate block max-w-[160px] text-xs"
-          >
-            {expanded ? '▾ ' : '▸ '}{c.company || c.name}
-          </button>
+        {/* 업체명 — 칸 전체 클릭 */}
+        <td
+          className="px-3 py-2.5 cursor-pointer select-none"
+          onClick={() => setExpanded(v => !v)}
+        >
+          <div className="flex items-center gap-1 min-w-0">
+            <span className="text-gray-400 text-[10px] shrink-0">{expanded ? '▾' : '▸'}</span>
+            <span className="font-semibold text-[#1B2A45] text-xs truncate max-w-[150px]">
+              {c.company || c.name}
+            </span>
+          </div>
           {c.name && (c.company && c.company !== c.name) && (
-            <p className="text-[10px] text-gray-400 ml-4">{c.name}</p>
+            <p className="text-[10px] text-gray-400 ml-3.5 truncate max-w-[150px]">{c.name}</p>
           )}
           {/* 직가/공가 배지 */}
           {leadType && (
-            <span className={`ml-4 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+            <span className={`ml-3.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
               leadType === '직가' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
             }`}>{leadType}</span>
           )}
