@@ -171,6 +171,7 @@ function ContractModal({ company, onClose, onConfirm }: ContractModalProps) {
   const [paidAmount, setPaidAmount] = useState('')
   const [vatIncluded, setVatIncluded] = useState(false)
   const [myRevenue, setMyRevenue] = useState('')
+  const [cumulativeRevenue, setCumulativeRevenue] = useState('')
   const [opsMemo, setOpsMemo] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -182,12 +183,13 @@ function ContractModal({ company, onClose, onConfirm }: ContractModalProps) {
   async function handleConfirm() {
     setSaving(true)
     await onConfirm({
-      contract_fee:    contractFee,
-      payment_amount:  paidAmount,
-      unpaid_amount:   unpaid > 0 ? unpaid.toLocaleString() + '원' : '0',
-      vat_included:    vatIncluded,
-      my_revenue:      myRevenue,
-      ops_memo:        opsMemo,
+      contract_fee:       contractFee,
+      payment_amount:     paidAmount,
+      unpaid_amount:      unpaid > 0 ? unpaid.toLocaleString() + '원' : '0',
+      vat_included:       vatIncluded,
+      my_revenue:         myRevenue,
+      cumulative_revenue: cumulativeRevenue,
+      ops_memo:           opsMemo,
     })
     setSaving(false)
   }
@@ -246,11 +248,19 @@ function ContractModal({ company, onClose, onConfirm }: ContractModalProps) {
             <span className="text-xs text-gray-600">부가세 포함 (계약금의 1/11 자동계산)</span>
           </label>
 
-          <div>
-            <label className="text-[10px] text-gray-400 mb-1 block font-medium">본인 매출</label>
-            <input type="text" value={myRevenue} onChange={e => setMyRevenue(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
-              placeholder="수수료율 또는 금액 (예: 15%, 375,000)" />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] text-gray-400 mb-1 block font-medium">본인 매출</label>
+              <input type="text" value={myRevenue} onChange={e => setMyRevenue(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
+                placeholder="예: 15%, 375,000" />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-400 mb-1 block font-medium">누적 매출</label>
+              <input type="text" value={cumulativeRevenue} onChange={e => setCumulativeRevenue(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
+                placeholder="예: 5,000,000" />
+            </div>
           </div>
 
           <div>
@@ -295,6 +305,7 @@ function InCallTableRow({ customer, index, salesUsers, tabType, showOwner, onUpd
   const [expanded, setExpanded] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [contractModalOpen, setContractModalOpen] = useState(false)
+  const [tlText, setTlText] = useState('')
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -323,6 +334,18 @@ function InCallTableRow({ customer, index, salesUsers, tabType, showOwner, onUpd
         inspection_date: new Date().toISOString().slice(0, 10),
       },
     })
+  }
+
+  async function addTimelineEntry() {
+    if (!tlText.trim()) return
+    const entry = {
+      user: '영업팀',
+      content: tlText.trim(),
+      created_at: new Date().toISOString(),
+    }
+    const updated = [...(c.call_timeline || []), entry]
+    setTlText('')
+    await onUpdate(c.id, { call_timeline: updated })
   }
 
   const inspectionStatus = c.details?.inspection_status
@@ -561,6 +584,19 @@ function InCallTableRow({ customer, index, salesUsers, tabType, showOwner, onUpd
                 <div className="p-4 overflow-y-auto max-h-[520px] space-y-4">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">📞 인콜결과</p>
 
+                  {/* 담당자 */}
+                  <div>
+                    <label className="text-[10px] text-gray-400 mb-1 block font-medium">담당자</label>
+                    <select
+                      value={c.details?.assignee || ''}
+                      onChange={e => onUpdate(c.id, { details: { assignee: e.target.value } })}
+                      className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50"
+                    >
+                      <option value="">-- 선택 --</option>
+                      {salesUsers.map(u => <option key={u} value={u}>{u}</option>)}
+                    </select>
+                  </div>
+
                   {/* 직가/공가 */}
                   <div>
                     <label className="text-[10px] text-gray-400 mb-1.5 block font-medium">직가 / 공가</label>
@@ -629,6 +665,34 @@ function InCallTableRow({ customer, index, salesUsers, tabType, showOwner, onUpd
                     />
                   </div>
 
+                  {/* 체크박스 그룹: A/S 체크 + 환불없이 진행 + 내일도 계속 */}
+                  <div className="bg-gray-50 rounded-xl px-3 py-2.5 space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={c.details?.as_checked || false}
+                        onChange={e => onUpdate(c.id, { details: { as_checked: e.target.checked } })}
+                        className="w-4 h-4 rounded accent-orange-500"
+                      />
+                      <span className="text-xs text-gray-700 font-medium">A/S 체크</span>
+                      {c.details?.as_checked && (
+                        <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full font-medium">A/S 진행중</span>
+                      )}
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={c.details?.no_refund || false}
+                        onChange={e => onUpdate(c.id, { details: { no_refund: e.target.checked } })}
+                        className="w-4 h-4 rounded accent-red-500"
+                      />
+                      <span className="text-xs text-gray-700 font-medium">환불없이 진행</span>
+                      {c.details?.no_refund && (
+                        <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-medium">환불불가</span>
+                      )}
+                    </label>
+                  </div>
+
                   {/* 내일도 계속 + 심사요청 */}
                   <div className="flex items-center justify-between gap-3 py-2 px-3 bg-gray-50 rounded-xl">
                     <label className="flex items-center gap-2 cursor-pointer">
@@ -678,11 +742,30 @@ function InCallTableRow({ customer, index, salesUsers, tabType, showOwner, onUpd
                   </div>
 
                   {/* 타임라인 */}
-                  {c.call_timeline && c.call_timeline.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-bold text-gray-400 mb-1.5">업데이트 히스토리</p>
-                      <div className="space-y-2">
-                        {(c.call_timeline as any[]).map((entry: any, i: number) => (
+                  <div>
+                    <p className="text-[10px] font-bold text-gray-400 mb-1.5">📝 타임라인</p>
+                    {/* 추가 입력 */}
+                    <div className="flex gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={tlText}
+                        onChange={e => setTlText(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTimelineEntry() } }}
+                        placeholder="메모 입력 후 Enter"
+                        className="flex-1 border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50"
+                      />
+                      <button
+                        type="button"
+                        onClick={addTimelineEntry}
+                        disabled={!tlText.trim()}
+                        className="shrink-0 bg-blue-500 hover:bg-blue-600 disabled:opacity-40 text-white px-2.5 py-1.5 rounded text-[11px] font-semibold transition-colors"
+                      >
+                        추가
+                      </button>
+                    </div>
+                    {c.call_timeline && c.call_timeline.length > 0 ? (
+                      <div className="space-y-1.5">
+                        {(c.call_timeline as any[]).slice().reverse().map((entry: any, i: number) => (
                           <div key={i} className="bg-white border border-gray-100 rounded p-2.5">
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-[10px] font-semibold text-[#1B2A45]">{entry.user}</span>
@@ -692,8 +775,10 @@ function InCallTableRow({ customer, index, salesUsers, tabType, showOwner, onUpd
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      <p className="text-[11px] text-gray-300 italic text-center py-2">타임라인 없음</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
