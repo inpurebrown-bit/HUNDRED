@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, RefObject } from 'react'
+import { useState, useEffect, useRef, RefObject, FormEvent } from 'react'
 import {
   BarChart,
   Bar,
@@ -686,7 +686,10 @@ export default function OverviewTabNew() {
         </section>
       </div>
 
-      {/* ═══ 6. 공급기준표 ══════════════════════════════════ */}
+      {/* ═══ 6. 공지사항 ════════════════════════════════════ */}
+      <NoticeSection />
+
+      {/* ═══ 7. 공급기준표 ══════════════════════════════════ */}
       <div className="bg-white rounded-xl border border-[#E8E2D4] overflow-hidden">
         <div className="px-5 py-3 border-b border-[#E8E2D4] flex items-center justify-between">
           <h2 className="font-semibold text-[#1B2A45] text-base">📊 결제율 공급기준표</h2>
@@ -723,6 +726,113 @@ export default function OverviewTabNew() {
         </div>
       </div>
 
+    </div>
+  )
+}
+
+// ─── 공지사항 인라인 섹션 ────────────────────────────────────
+function NoticeSection() {
+  const [notices, setNotices]   = useState<any[]>([])
+  const [title, setTitle]       = useState('')
+  const [content, setContent]   = useState('')
+  const [target, setTarget]     = useState<'all'|'sales'|'ops'>('all')
+  const [posting, setPosting]   = useState(false)
+  const [toast, setToast]       = useState<string|null>(null)
+  const [showForm, setShowForm] = useState(false)
+
+  useEffect(() => { load() }, [])
+
+  async function load() {
+    try {
+      const r = await fetch('/api/notices')
+      const d = await r.json()
+      setNotices((d.notices || []).filter((n: any) => n.notice_type !== 'supply_count').slice(0, 10))
+    } catch {}
+  }
+
+  function toast_(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000) }
+
+  async function handlePost(e: FormEvent) {
+    e.preventDefault()
+    if (!title.trim()) return
+    setPosting(true)
+    const r = await fetch('/api/notices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title.trim(), content: content.trim(), notice_type: 'general', target_team: target, is_active: true }),
+    })
+    if (r.ok) {
+      setTitle(''); setContent(''); setShowForm(false)
+      toast_('✅ 공지 등록 완료!')
+      load()
+    } else toast_('❌ 등록 실패')
+    setPosting(false)
+  }
+
+  async function del(id: string) {
+    if (!confirm('삭제할까요?')) return
+    await fetch(`/api/notices?id=${id}`, { method: 'DELETE' })
+    load()
+  }
+
+  const teamLabel = (t: string) => t === 'sales' ? '영업팀' : t === 'ops' ? '관리팀' : '전체'
+  const teamColor = (t: string) => t === 'sales' ? 'bg-blue-100 text-blue-700' : t === 'ops' ? 'bg-violet-100 text-violet-700' : 'bg-amber-100 text-amber-700'
+
+  return (
+    <div className="bg-white rounded-xl border border-[#E8E2D4] overflow-hidden">
+      {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] px-5 py-3 rounded-xl shadow-2xl text-sm font-semibold text-white bg-emerald-500">{toast}</div>}
+      <div className="px-5 py-3 border-b border-[#E8E2D4] flex items-center justify-between">
+        <h2 className="font-semibold text-[#1B2A45] text-base">📢 공지사항</h2>
+        <button onClick={() => setShowForm(v => !v)}
+          className="text-xs bg-[#1B2A45] hover:bg-[#1B2A45]/80 text-white px-3 py-1.5 rounded-lg font-medium transition-colors">
+          {showForm ? '취소' : '+ 공지 작성'}
+        </button>
+      </div>
+
+      {showForm && (
+        <form onSubmit={handlePost} className="px-5 py-4 border-b border-[#E8E2D4] bg-[#FAF8F3] space-y-3">
+          <input value={title} onChange={e => setTitle(e.target.value)} placeholder="공지 제목 *" required
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A258]" />
+          <textarea value={content} onChange={e => setContent(e.target.value)} placeholder="내용 (선택)" rows={3}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A258] resize-none" />
+          <div className="flex gap-2 items-center">
+            <div className="flex gap-1 flex-1">
+              {(['all','sales','ops'] as const).map(t => (
+                <button key={t} type="button" onClick={() => setTarget(t)}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${target===t ? 'bg-[#1B2A45] text-white border-[#1B2A45]' : 'border-gray-200 text-gray-500 hover:border-gray-400'}`}>
+                  {t==='all'?'전체':t==='sales'?'영업팀':'관리팀'}
+                </button>
+              ))}
+            </div>
+            <button type="submit" disabled={posting || !title.trim()}
+              className="bg-[#C5A258] hover:bg-[#C5A258]/80 disabled:opacity-40 text-white px-5 py-1.5 rounded-lg text-xs font-bold transition-colors">
+              {posting ? '등록 중...' : '등록'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {notices.length === 0 ? (
+        <div className="px-5 py-6 text-center text-sm text-gray-400">등록된 공지가 없습니다</div>
+      ) : (
+        <div className="divide-y divide-[#E8E2D4]/50">
+          {notices.map(n => (
+            <div key={n.id} className="px-5 py-3 flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2 min-w-0">
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 mt-0.5 ${teamColor(n.target_team)}`}>
+                  {teamLabel(n.target_team)}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-[#1B2A45] truncate">{n.title}</p>
+                  {n.content && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.content}</p>}
+                  <p className="text-[10px] text-gray-300 mt-1">{new Date(n.created_at).toLocaleString('ko-KR', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</p>
+                </div>
+              </div>
+              <button onClick={() => del(n.id)} className="text-gray-300 hover:text-red-400 transition-colors shrink-0 text-xs mt-0.5">✕</button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

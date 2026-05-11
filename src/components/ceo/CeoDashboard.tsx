@@ -15,6 +15,32 @@ import OverviewTabNew from './OverviewTabNew'
 import SalesCeoTab from './SalesCeoTab'
 import OpsCeoTab from './OpsCeoTab'
 
+// 매출·손익·결제율 통합 탭
+function AnalyticsTab() {
+  const [sub, setSub] = useState<'revenue' | 'payroll' | 'payrate'>('revenue')
+  return (
+    <div>
+      <div className="flex gap-2 mb-5">
+        {([
+          { key: 'revenue', label: '💰 매출 관리' },
+          { key: 'payroll', label: '💼 급여·손익' },
+          { key: 'payrate', label: '📈 결제율' },
+        ] as const).map(t => (
+          <button key={t.key} onClick={() => setSub(t.key)}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors border ${
+              sub === t.key ? 'bg-[#1B2A45] text-white border-[#1B2A45]' : 'bg-white text-[#1B2A45]/60 border-[#E8E2D4] hover:border-[#1B2A45]/30'
+            }`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {sub === 'revenue' && <RevenueTab />}
+      {sub === 'payroll' && <PayrollTab />}
+      {sub === 'payrate' && <PayRateTab />}
+    </div>
+  )
+}
+
 interface Message {
   role: 'user' | 'model'
   parts: { text: string }[]
@@ -38,7 +64,7 @@ interface OpsUser {
 export default function CeoDashboard() {
   const { data: session } = useSession()
   const ceoName = session?.user?.name ?? '대표'
-  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'revenue' | 'payrate' | 'payroll' | 'payslip' | 'reports' | 'notices' | 'minutes' | 'calendar' | 'ai' | 'ailogs'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'payslip' | 'reports' | 'minutes' | 'calendar' | 'ailogs'>('overview')
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
@@ -75,20 +101,16 @@ export default function CeoDashboard() {
   }
 
   const tabs = [
-    { key: 'overview', label: '📊 전체 현황' },
-    { key: 'assign', label: '🔀 계약 배정' },
-    { key: 'sales', label: '👥 영업팀' },
-    { key: 'ops', label: '⚙️ 관리팀' },
-    { key: 'revenue', label: '💰 매출 관리' },
-    { key: 'payrate', label: '📈 결제율' },
-    { key: 'payroll', label: '💼 급여·손익' },
-    { key: 'payslip', label: '📋 급여명세서' },
-    { key: 'reports', label: '📝 보고함' },
-    { key: 'notices', label: '📢 공지사항' },
-    { key: 'minutes', label: '📒 회의록' },
-    { key: 'calendar', label: '📅 일정관리' },
-    { key: 'ai', label: '✦ AI 비서' },
-    { key: 'ailogs', label: '🔍 AI 질문 로그' },
+    { key: 'overview',  label: '📊 전체 현황' },
+    { key: 'assign',    label: '🔀 계약 배정' },
+    { key: 'sales',     label: '👥 영업팀' },
+    { key: 'ops',       label: '⚙️ 관리팀' },
+    { key: 'analytics', label: '💰 매출·손익·결제율' },
+    { key: 'payslip',   label: '📋 급여명세서' },
+    { key: 'reports',   label: '📝 보고함' },
+    { key: 'minutes',   label: '📒 회의록' },
+    { key: 'calendar',  label: '📅 일정관리' },
+    { key: 'ailogs',    label: '🔍 AI 질문 로그' },
   ]
 
   return (
@@ -201,20 +223,16 @@ export default function CeoDashboard() {
 
       <div className="px-4 md:px-6 pt-6">
 
-        {activeTab === 'overview' && <OverviewTabNew />}
-        {activeTab === 'assign' && <AssignBoard />}
-        {activeTab === 'sales' && <SalesCeoTab />}
-        {activeTab === 'ops' && <OpsCeoTab />}
-        {activeTab === 'revenue' && <RevenueTab />}
-        {activeTab === 'payrate' && <PayRateTab />}
-        {activeTab === 'payroll' && <PayrollTab />}
-        {activeTab === 'payslip' && <PayslipTab />}
-        {activeTab === 'reports' && <ReportsTab isCeo={true} />}
-        {activeTab === 'notices' && <NoticesTab />}
-        {activeTab === 'minutes' && <MinutesTab />}
-        {activeTab === 'calendar' && <CalendarTab />}
-        {activeTab === 'ai' && <AiTab />}
-        {activeTab === 'ailogs' && <AiLogsTab />}
+        {activeTab === 'overview'  && <OverviewTabNew />}
+        {activeTab === 'assign'    && <AssignBoard />}
+        {activeTab === 'sales'     && <SalesCeoTab />}
+        {activeTab === 'ops'       && <OpsCeoTab />}
+        {activeTab === 'analytics' && <AnalyticsTab />}
+        {activeTab === 'payslip'   && <PayslipTab />}
+        {activeTab === 'reports'   && <ReportsTab isCeo={true} />}
+        {activeTab === 'minutes'   && <MinutesTab />}
+        {activeTab === 'calendar'  && <CalendarTab />}
+        {activeTab === 'ailogs'    && <AiLogsTab />}
       </div>
     </div>
   )
@@ -722,7 +740,7 @@ function RevenueTab() {
 function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
   const [reports, setReports] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'morning' | 'daily'>('morning')
+  const [filter, setFilter] = useState<'all' | 'morning' | 'daily'>('all')
   const [viewReport, setViewReport] = useState<any | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [deleting, setDeleting] = useState(false)
@@ -737,12 +755,21 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
 
   useEffect(() => { loadReports() }, [])
 
-  const filtered = reports.filter(r => r.report_type === filter)
   const morningReports = reports.filter(r => r.report_type === 'morning')
-  const dailyReports = reports.filter(r => r.report_type === 'daily')
+  const dailyReports   = reports.filter(r => r.report_type === 'daily')
+  const filtered = filter === 'all' ? reports : reports.filter(r => r.report_type === filter)
   const todayStr = new Date().toISOString().slice(0, 10)
   const todayMorning = morningReports.filter(r => r.report_date === todayStr)
-  const todayDaily = dailyReports.filter(r => r.report_date === todayStr)
+  const todayDaily   = dailyReports.filter(r => r.report_date === todayStr)
+
+  // 날짜별 그룹핑
+  const groupedByDate = filtered.reduce((acc: Record<string, any[]>, r: any) => {
+    const d = r.report_date || r.created_at?.slice(0,10) || '날짜없음'
+    if (!acc[d]) acc[d] = []
+    acc[d].push(r)
+    return acc
+  }, {})
+  const sortedDates = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a))
 
   const pct = (n: number, d: number) => d === 0 ? '—' : (n / d * 100).toFixed(1) + '%'
 
@@ -821,14 +848,15 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
       </div>
 
       {/* 탭 */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         {[
+          { key: 'all',     label: `전체 (${reports.length})` },
           { key: 'morning', label: `☀️ 오전보고 (${morningReports.length})` },
           { key: 'daily',   label: `📋 마감보고 (${dailyReports.length})` },
         ].map(f => (
           <button key={f.key} onClick={() => { setFilter(f.key as any); setSelected(new Set()) }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === f.key ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 border border-gray-200'
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+              filter === f.key ? 'bg-[#1B2A45] text-white' : 'bg-white text-[#1B2A45]/60 border border-[#E8E2D4]'
             }`}>
             {f.label}
           </button>
@@ -897,56 +925,107 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
         </div>
       )}
 
-      {/* 목록 */}
+      {/* 목록 — 날짜별 그룹핑 */}
       {loading ? (
         <div className="text-center py-10 text-gray-400 text-sm">불러오는 중...</div>
       ) : filtered.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
+        <div className="bg-white rounded-xl border border-[#E8E2D4] p-12 text-center text-gray-400 text-sm">
           제출된 보고가 없습니다.
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-          <div className="px-5 py-2.5 border-b border-gray-50 flex items-center justify-between">
-            <span className="text-xs text-gray-500 font-medium">누적 보고 (최대 50건)</span>
-            <span className="text-xs text-gray-400">{filtered.length}건</span>
-          </div>
-          <div className="divide-y divide-gray-50">
-            {filtered.slice(0, 50).map(r => {
-              const tc = Number(r.data?.total_calls || 0)
-              const cn = Number(r.data?.connected || 0)
-              const connRate = tc > 0 ? (cn / tc * 100).toFixed(0) + '%' : '—'
-              const dbRate = tc > 0 ? (Number(r.data?.db_secured || 0) / tc * 100).toFixed(0) + '%' : '—'
-              const ctRate = tc > 0 ? (Number(r.data?.outbound_contracts || 0) / tc * 100).toFixed(0) + '%' : '—'
-              return (
-              <div key={r.id} className={`px-5 py-3.5 flex items-center gap-3 hover:bg-gray-50 transition-colors ${selected.has(r.id) ? 'bg-red-50' : ''}`}>
-                {isCeo && (
-                  <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggleSelect(r.id)}
-                    className="w-4 h-4 rounded shrink-0" />
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-900">{r.user_name}</span>
-                    <span className="text-xs text-gray-400">{r.report_date}</span>
+        <div className="space-y-3">
+          {sortedDates.map(date => {
+            const dayItems = groupedByDate[date]
+            const isToday = date === todayStr
+            const morning = dayItems.filter((r:any) => r.report_type === 'morning')
+            const daily   = dayItems.filter((r:any) => r.report_type === 'daily')
+            // 전체 직원 이름 (모든 보고자)
+            const names = [...new Set(dayItems.map((r:any) => r.user_name))] as string[]
+            return (
+              <div key={date} className="bg-white rounded-xl border border-[#E8E2D4] overflow-hidden">
+                {/* 날짜 헤더 */}
+                <div className={`px-4 py-2.5 flex items-center justify-between ${isToday ? 'bg-[#1B2A45]' : 'bg-[#FAF8F3]'}`}>
+                  <div className="flex items-center gap-3">
+                    {isToday && <span className="text-xs bg-[#C5A258] text-white px-2 py-0.5 rounded-full font-bold">오늘</span>}
+                    <span className={`text-sm font-bold ${isToday ? 'text-white' : 'text-[#1B2A45]'}`}>
+                      {date} ({['일','월','화','수','목','금','토'][new Date(date).getDay()]})
+                    </span>
+                    <div className="flex gap-1">
+                      {morning.length > 0 && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">오전 {morning.length}건</span>}
+                      {daily.length > 0   && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">마감 {daily.length}건</span>}
+                    </div>
                   </div>
-                  {r.report_type === 'morning' && (
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      총콜 {tc}건 · 연결 {cn}건 <span className="text-amber-500 font-semibold">({connRate} 연결율)</span> · DB확보 {r.data?.db_secured || 0}건 <span className="text-amber-400">({dbRate})</span> · 계약 {r.data?.outbound_contracts || 0}건 <span className="text-green-500 font-semibold">({ctRate})</span>
-                    </p>
-                  )}
-                  {r.report_type === 'daily' && (
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      당일계약 {r.data?.today_contracts || 0}건 · 월누적 {r.data?.month_contracts || 0}건 · 목표 {r.data?.goal || 0}건
-                    </p>
+                  {isCeo && (
+                    <label className={`flex items-center gap-1.5 text-xs cursor-pointer ${isToday ? 'text-white/60' : 'text-gray-400'}`}>
+                      <input type="checkbox"
+                        checked={dayItems.every((r:any) => selected.has(r.id))}
+                        onChange={() => {
+                          const allSelected = dayItems.every((r:any) => selected.has(r.id))
+                          setSelected(prev => {
+                            const n = new Set(prev)
+                            dayItems.forEach((r:any) => allSelected ? n.delete(r.id) : n.add(r.id))
+                            return n
+                          })
+                        }}
+                        className="w-3.5 h-3.5 rounded" />
+                      전체
+                    </label>
                   )}
                 </div>
-                <button onClick={() => setViewReport(r)}
-                  className="text-xs text-blue-500 hover:text-blue-700 font-medium shrink-0">
-                  상세보기
-                </button>
+                {/* 직원별 요약 행 */}
+                <div className="divide-y divide-[#E8E2D4]/40">
+                  {names.map(name => {
+                    const mr = morning.find((r:any) => r.user_name === name)
+                    const dr = daily.find((r:any) => r.user_name === name)
+                    const tc = Number(mr?.data?.total_calls || 0)
+                    const cn = Number(mr?.data?.connected || 0)
+                    const oc = Number(mr?.data?.outbound_contracts || 0)
+                    const db = Number(mr?.data?.db_secured || 0)
+                    return (
+                      <div key={name} className={`px-4 py-3 flex items-center gap-2 ${selected.has(mr?.id||'') || selected.has(dr?.id||'') ? 'bg-red-50' : 'hover:bg-[#FAF8F3]'} transition-colors`}>
+                        {isCeo && (
+                          <div className="flex gap-1 shrink-0">
+                            {mr && <input type="checkbox" checked={selected.has(mr.id)} onChange={() => toggleSelect(mr.id)} className="w-3.5 h-3.5 rounded" />}
+                            {dr && <input type="checkbox" checked={selected.has(dr.id)} onChange={() => toggleSelect(dr.id)} className="w-3.5 h-3.5 rounded" />}
+                          </div>
+                        )}
+                        {/* 이름 */}
+                        <div className="w-20 shrink-0">
+                          <span className="text-sm font-bold text-[#1B2A45]">{name}</span>
+                        </div>
+                        {/* 오전보고 요약 */}
+                        <div className="flex-1 min-w-0">
+                          {mr ? (
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <span className="text-[10px] text-amber-600 font-bold">☀️오전</span>
+                              <span className="text-xs text-gray-600">콜 <b>{tc}</b></span>
+                              <span className="text-xs text-gray-600">연결 <b className="text-amber-600">{cn}</b>{tc>0&&<span className="text-gray-400">({(cn/tc*100).toFixed(0)}%)</span>}</span>
+                              <span className="text-xs text-gray-600">DB <b>{db}</b></span>
+                              <span className="text-xs text-gray-600">계약 <b className="text-emerald-600">{oc}</b></span>
+                              <button onClick={() => setViewReport(mr)} className="text-[10px] text-blue-500 hover:underline ml-auto shrink-0">상세</button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-300 italic">오전보고 미제출</span>
+                          )}
+                          {dr ? (
+                            <div className="flex items-center gap-3 flex-wrap mt-0.5">
+                              <span className="text-[10px] text-blue-600 font-bold">📋마감</span>
+                              <span className="text-xs text-gray-600">당일 <b className="text-blue-600">{dr.data?.today_contracts||0}</b>건</span>
+                              <span className="text-xs text-gray-600">월누적 <b>{dr.data?.month_contracts||0}</b>건</span>
+                              <span className="text-xs text-gray-600">목표 <b>{dr.data?.goal||0}</b>건</span>
+                              <button onClick={() => setViewReport(dr)} className="text-[10px] text-blue-500 hover:underline ml-auto shrink-0">상세</button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-300 italic mt-0.5 block">마감보고 미제출</span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-              )
-            })}
-          </div>
+            )
+          })}
         </div>
       )}
 
