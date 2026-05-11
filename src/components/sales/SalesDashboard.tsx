@@ -593,6 +593,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             ) : (
               <InCallTableView
                 customers={db010List}
+                allCustomers={customers}
                 tabType="db010"
                 salesUsers={SALES_USERS}
                 userName={userName}
@@ -636,6 +637,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             ) : (
               <InCallTableView
                 customers={activeCustomers}
+                allCustomers={customers}
                 tabType="lead"
                 salesUsers={SALES_USERS}
                 userName={userName}

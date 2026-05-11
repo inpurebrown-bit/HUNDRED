@@ -305,6 +305,7 @@ export default function SalesCeoTab() {
       ) : (
         <InCallTableView
           customers={statusCustomers}
+          allCustomers={customers}
           tabType={statusTab}
           salesUsers={salesPeople}
           userName="ceo"

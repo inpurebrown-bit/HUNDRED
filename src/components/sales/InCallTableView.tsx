@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import NumberInput, { parseNumber, formatNumber } from '@/components/ui/NumberInput'
 
 export interface Customer {
   id: string
@@ -42,6 +43,7 @@ function ResultMemoField({ value, onChange }: { value: string; onChange: (v: str
 
 export interface Props {
   customers: Customer[]
+  allCustomers?: Customer[]   // 누적매출 계산용 (전체 고객)
   tabType: 'db010' | 'lead' | 'contracted' | 'emotional' | 'trash'
   salesUsers: string[]
   userName: string
@@ -50,6 +52,18 @@ export interface Props {
   onDelete: (id: string) => Promise<void>
   onTransferToOps?: (customer: Customer) => Promise<void>
   showOwner?: boolean
+}
+
+/** 이번달 특정 영업사원의 기존 누적매출 합산 */
+function calcMonthlyRevenue(allCustomers: Customer[], salesUserName: string): number {
+  const currentMonth = new Date().toISOString().slice(0, 7) // 'YYYY-MM'
+  return allCustomers
+    .filter(c =>
+      c.status === 'contracted' &&
+      (c.sales_user_name === salesUserName || c.details?.sales_user_name === salesUserName) &&
+      (c.details?.contract_date || c.created_at || '').slice(0, 7) === currentMonth
+    )
+    .reduce((sum, c) => sum + parseNumber(c.details?.my_revenue || '0'), 0)
 }
 
 // ── Badge configs ──────────────────────────────────────────────────────
@@ -162,38 +176,49 @@ function BadgeDropdown({ value, options, onChange }: BadgeDropdownProps) {
 // ── ContractModal ──────────────────────────────────────────────────────
 interface ContractModalProps {
   company: string
+  cumulativeBase: number   // 이번달 기존 누적 (새 계약 전)
   onClose: () => void
   onConfirm: (data: Record<string, any>) => Promise<void>
 }
 
-function ContractModal({ company, onClose, onConfirm }: ContractModalProps) {
-  const [contractFee, setContractFee] = useState('')
-  const [paidAmount, setPaidAmount] = useState('')
+const INP = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/50'
+
+function ContractModal({ company, cumulativeBase, onClose, onConfirm }: ContractModalProps) {
+  // 원화 금액은 raw 숫자 문자열 (콤마 없음) 로 관리
+  const [contractFee, setContractFee] = useState('')   // 계약금 (VAT 미포함)
+  const [paidAmount,  setPaidAmount]  = useState('')   // 실제 입금액 (VAT 포함 가능)
   const [vatIncluded, setVatIncluded] = useState(false)
-  const [myRevenue, setMyRevenue] = useState('')
-  const [cumulativeRevenue, setCumulativeRevenue] = useState('')
-  const [opsMemo, setOpsMemo] = useState('')
+  const [myRevenue,   setMyRevenue]   = useState('')   // 본인 매출 (수동 입력)
+  const [opsMemo,     setOpsMemo]     = useState('')
   const [groupChatInvited, setGroupChatInvited] = useState(false)
-  const [coopRequestSent, setCoopRequestSent] = useState(false)
+  const [coopRequestSent,  setCoopRequestSent]  = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const feeNum  = parseFloat(contractFee.replace(/[^0-9.]/g, '')) || 0
-  const paidNum = parseFloat(paidAmount.replace(/[^0-9.]/g, '')) || 0
-  const unpaid  = Math.max(0, feeNum - paidNum)
-  const vat     = vatIncluded ? Math.round(feeNum / 11) : 0
+  const feeNum  = parseNumber(contractFee)
+  const paidNum = parseNumber(paidAmount)
+  const myRevNum = parseNumber(myRevenue)
+
+  // 부가세: 입금액 ÷ 11 (10% 부가세 포함 기준)
+  const vat    = vatIncluded && paidNum > 0 ? Math.round(paidNum / 11) : 0
+  // 미입금: 계약금 - 입금액
+  const unpaid = Math.max(0, feeNum - paidNum)
+  // 누적 매출: 이번달 기존 합 + 이번 본인 매출
+  const cumulative = cumulativeBase + myRevNum
 
   async function handleConfirm() {
     setSaving(true)
     await onConfirm({
-      contract_fee:        contractFee,
-      payment_amount:      paidAmount,
-      unpaid_amount:       unpaid > 0 ? unpaid.toLocaleString() + '원' : '0',
+      contract_fee:        formatNumber(feeNum),
+      payment_amount:      formatNumber(paidNum),
+      unpaid_amount:       unpaid > 0 ? formatNumber(unpaid) : '0',
       vat_included:        vatIncluded,
-      my_revenue:          myRevenue,
-      cumulative_revenue:  cumulativeRevenue,
+      vat_amount:          vat > 0 ? formatNumber(vat) : '0',
+      my_revenue:          formatNumber(myRevNum),
+      cumulative_revenue:  formatNumber(cumulative),
       ops_memo:            opsMemo,
       group_chat_invited:  groupChatInvited,
       coop_request_sent:   coopRequestSent,
+      contract_date:       new Date().toISOString().slice(0, 10),
     })
     setSaving(false)
   }
@@ -203,7 +228,7 @@ function ContractModal({ company, onClose, onConfirm }: ContractModalProps) {
       className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-y-auto max-h-[90vh]">
         {/* Header */}
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
@@ -215,58 +240,68 @@ function ContractModal({ company, onClose, onConfirm }: ContractModalProps) {
 
         {/* Body */}
         <div className="px-5 py-4 space-y-3">
+
+          {/* 계약금 / 입금액 */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] text-blue-700 mb-1 block font-bold">계약금</label>
-              <input type="text" value={contractFee} onChange={e => setContractFee(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
-                placeholder="2,500,000" />
+              <label className="text-[10px] text-blue-700 mb-1 block font-bold">계약금 <span className="text-gray-400 font-normal">(VAT 별도)</span></label>
+              <NumberInput value={contractFee} onChange={setContractFee} className={INP} placeholder="500,000" />
             </div>
             <div>
               <label className="text-[10px] text-blue-700 mb-1 block font-bold">입금액</label>
-              <input type="text" value={paidAmount} onChange={e => setPaidAmount(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
-                placeholder="1,000,000" />
+              <NumberInput value={paidAmount} onChange={setPaidAmount} className={INP} placeholder="550,000" />
             </div>
           </div>
 
+          {/* 부가세 포함 토글 */}
+          <label className="flex items-center gap-2 cursor-pointer bg-blue-50 rounded-lg px-3 py-2">
+            <input type="checkbox" checked={vatIncluded} onChange={e => setVatIncluded(e.target.checked)}
+              className="w-4 h-4 rounded accent-blue-500" />
+            <span className="text-xs text-blue-800 font-medium">부가세 포함 (입금액의 1/11 자동계산)</span>
+          </label>
+
           {/* 자동계산 행 */}
-          <div className="bg-gray-50 rounded-xl px-4 py-3 grid grid-cols-2 gap-3 text-center">
+          <div className="bg-gray-50 rounded-xl px-4 py-3 grid grid-cols-3 gap-2 text-center">
+            <div>
+              <p className="text-[10px] text-gray-400 mb-0.5">부가세</p>
+              <p className={`text-sm font-bold ${vatIncluded && vat > 0 ? 'text-blue-600' : 'text-gray-300'}`}>
+                {vatIncluded && vat > 0 ? vat.toLocaleString() + '원' : '—'}
+              </p>
+            </div>
             <div>
               <p className="text-[10px] text-gray-400 mb-0.5">미입금액</p>
-              <p className={`text-sm font-bold ${unpaid > 0 ? 'text-red-500' : 'text-gray-400'}`}>
+              <p className={`text-sm font-bold ${unpaid > 0 ? 'text-red-500' : 'text-gray-300'}`}>
                 {unpaid > 0 ? unpaid.toLocaleString() + '원' : '없음'}
               </p>
             </div>
             <div>
-              <p className="text-[10px] text-gray-400 mb-0.5">부가세 {vatIncluded ? '(포함)' : '(미포함)'}</p>
-              <p className={`text-sm font-bold ${vatIncluded && vat > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
-                {vatIncluded && vat > 0 ? vat.toLocaleString() + '원' : '—'}
+              <p className="text-[10px] text-gray-400 mb-0.5">순계약금</p>
+              <p className="text-sm font-bold text-emerald-600">
+                {vatIncluded && vat > 0
+                  ? (paidNum - vat).toLocaleString() + '원'
+                  : feeNum > 0 ? feeNum.toLocaleString() + '원' : '—'}
               </p>
             </div>
           </div>
 
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={vatIncluded} onChange={e => setVatIncluded(e.target.checked)}
-              className="w-4 h-4 rounded accent-blue-500" />
-            <span className="text-xs text-gray-600">부가세 포함 (계약금의 1/11 자동계산)</span>
-          </label>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[10px] text-blue-700 mb-1 block font-bold">본인 매출</label>
-              <input type="text" value={myRevenue} onChange={e => setMyRevenue(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
-                placeholder="예: 15%, 375,000" />
-            </div>
-            <div>
-              <label className="text-[10px] text-blue-700 mb-1 block font-bold">누적 매출</label>
-              <input type="text" value={cumulativeRevenue} onChange={e => setCumulativeRevenue(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
-                placeholder="예: 5,000,000" />
-            </div>
+          {/* 본인 매출 */}
+          <div>
+            <label className="text-[10px] text-blue-700 mb-1 block font-bold">본인 매출</label>
+            <NumberInput value={myRevenue} onChange={setMyRevenue} className={INP} placeholder="500,000" />
           </div>
 
+          {/* 누적 매출 (자동계산 읽기전용) */}
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-bold text-emerald-700">📈 이번달 누적 매출 (자동계산)</p>
+              <p className="text-[10px] text-emerald-600 mt-0.5">기존 {cumulativeBase.toLocaleString()}원 + 이번 {myRevNum.toLocaleString()}원</p>
+            </div>
+            <p className="text-base font-bold text-emerald-700">
+              {cumulative > 0 ? cumulative.toLocaleString() + '원' : '—'}
+            </p>
+          </div>
+
+          {/* 자금팀 메모 */}
           <div>
             <label className="text-[10px] text-blue-700 mb-1 block font-bold">자금팀 전달 메모</label>
             <textarea value={opsMemo} onChange={e => setOpsMemo(e.target.value)}
@@ -277,14 +312,14 @@ function ContractModal({ company, onClose, onConfirm }: ContractModalProps) {
 
           {/* 체크리스트 */}
           <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 space-y-2.5">
-            <p className="text-[10px] font-bold text-amber-700 mb-1">📋 계약 후 체크리스트</p>
+            <p className="text-[10px] font-bold text-amber-700">📋 계약 후 체크리스트</p>
             <label className="flex items-center gap-2.5 cursor-pointer">
               <input type="checkbox" checked={groupChatInvited} onChange={e => setGroupChatInvited(e.target.checked)}
                 className="w-4 h-4 rounded accent-emerald-500" />
               <span className={`text-xs font-medium ${groupChatInvited ? 'text-emerald-700 line-through' : 'text-gray-700'}`}>
                 단톡방 초대 완료
               </span>
-              {groupChatInvited && <span className="text-[10px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full font-semibold">✓ 완료</span>}
+              {groupChatInvited && <span className="text-[10px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full font-semibold">✓</span>}
             </label>
             <label className="flex items-center gap-2.5 cursor-pointer">
               <input type="checkbox" checked={coopRequestSent} onChange={e => setCoopRequestSent(e.target.checked)}
@@ -292,7 +327,7 @@ function ContractModal({ company, onClose, onConfirm }: ContractModalProps) {
               <span className={`text-xs font-medium ${coopRequestSent ? 'text-emerald-700 line-through' : 'text-gray-700'}`}>
                 업무협조 요청서 발송 완료
               </span>
-              {coopRequestSent && <span className="text-[10px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full font-semibold">✓ 완료</span>}
+              {coopRequestSent && <span className="text-[10px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full font-semibold">✓</span>}
             </label>
           </div>
         </div>
@@ -321,13 +356,14 @@ interface RowProps {
   userName: string
   tabType: Props['tabType']
   showOwner?: boolean
+  cumulativeBase: number
   onUpdate: Props['onUpdate']
   onStatusChange: Props['onStatusChange']
   onDelete: Props['onDelete']
   onTransferToOps?: Props['onTransferToOps']
 }
 
-function InCallTableRow({ customer, index, salesUsers, userName, tabType, showOwner, onUpdate, onStatusChange, onDelete, onTransferToOps }: RowProps) {
+function InCallTableRow({ customer, index, salesUsers, userName, tabType, showOwner, cumulativeBase, onUpdate, onStatusChange, onDelete, onTransferToOps }: RowProps) {
   const [expanded, setExpanded] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [contractModalOpen, setContractModalOpen] = useState(false)
@@ -394,6 +430,7 @@ function InCallTableRow({ customer, index, salesUsers, userName, tabType, showOw
       {contractModalOpen && (
         <ContractModal
           company={c.company || c.name}
+          cumulativeBase={cumulativeBase}
           onClose={() => setContractModalOpen(false)}
           onConfirm={handleContractConfirm}
         />
@@ -856,6 +893,7 @@ function groupByDate(customers: Customer[]): { date: string; items: Customer[] }
 // ── Main InCallTableView ───────────────────────────────────────────────
 export default function InCallTableView({
   customers,
+  allCustomers = [],
   tabType,
   salesUsers,
   userName,
@@ -901,6 +939,8 @@ export default function InCallTableView({
                   <DateGroupHeader key={`hdr-${date}`} date={date} count={items.length} colSpan={colSpan} />
                   {items.map((c) => {
                     const idx = globalIndex++
+                    const ownerName = c.sales_user_name || c.details?.sales_user_name || userName
+                    const cumBase = calcMonthlyRevenue(allCustomers, ownerName)
                     return (
                       <InCallTableRow
                         key={c.id}
@@ -910,6 +950,7 @@ export default function InCallTableView({
                         userName={userName}
                         tabType={tabType}
                         showOwner={showOwner}
+                        cumulativeBase={cumBase}
                         onUpdate={onUpdate}
                         onStatusChange={onStatusChange}
                         onDelete={onDelete}
