@@ -68,6 +68,7 @@ interface DailyData {
   decided: DecidedItem[] | null
   meetings: MeetingItem[] | null
   payment_waiting: PaymentItem[] | null
+  continue_tomorrow: string[] | null    // 내일도 계속 업체명 목록
 }
 
 interface Props {
@@ -166,6 +167,7 @@ export default function ReportTab({ userId, userName }: Props) {
     decided: [],
     meetings: [],
     payment_waiting: [],
+    continue_tomorrow: [],
   })
 
   useEffect(() => {
@@ -182,6 +184,7 @@ export default function ReportTab({ userId, userName }: Props) {
       setDaily({
         supply_db: [], outbound: [], today_contracts: '', month_contracts: '',
         goal: '', worried: [], decided: [], meetings: [], payment_waiting: [],
+        continue_tomorrow: [],
         ...r.data,
       })
       setActiveReport('daily')
@@ -593,6 +596,56 @@ export default function ReportTab({ userId, userName }: Props) {
                   onUnlock={() => updateItem('payment_waiting', i, '_locked', false)} />
               ))}
             </Section>
+
+            {/* 내일도 계속 */}
+            <div className="bg-white rounded-xl border border-gray-100 p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-semibold text-gray-800 text-sm">📅 내일도 계속</h4>
+                <div className="flex gap-2">
+                  <button type="button"
+                    onClick={() => setDaily(p => ({ ...p, continue_tomorrow: p.continue_tomorrow === null ? [] : null }))}
+                    className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors border ${
+                      daily.continue_tomorrow === null
+                        ? 'bg-gray-900 text-white border-gray-900'
+                        : 'text-gray-500 border-gray-200 hover:bg-gray-50'
+                    }`}>없음</button>
+                  {daily.continue_tomorrow !== null && (
+                    <button type="button"
+                      onClick={() => setDaily(p => ({ ...p, continue_tomorrow: [...(p.continue_tomorrow || []), ''] }))}
+                      className="text-xs px-3 py-1.5 rounded-lg font-medium bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100 transition-colors">
+                      + 추가
+                    </button>
+                  )}
+                </div>
+              </div>
+              {daily.continue_tomorrow === null ? (
+                <p className="text-xs text-gray-400 text-center py-2">해당 없음으로 표시됩니다</p>
+              ) : daily.continue_tomorrow.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-2">+ 추가를 눌러 업체명을 입력하세요</p>
+              ) : (
+                <div className="space-y-2">
+                  {daily.continue_tomorrow.map((company, i) => (
+                    <div key={i} className="flex gap-2 items-center">
+                      <input
+                        className={inp}
+                        value={company}
+                        placeholder="업체명"
+                        onChange={e => setDaily(p => ({
+                          ...p,
+                          continue_tomorrow: (p.continue_tomorrow || []).map((c, j) => j === i ? e.target.value : c),
+                        }))}
+                      />
+                      <button type="button"
+                        onClick={() => setDaily(p => ({
+                          ...p,
+                          continue_tomorrow: (p.continue_tomorrow || []).filter((_, j) => j !== i),
+                        }))}
+                        className="shrink-0 text-red-400 hover:text-red-600 font-bold text-sm">✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <button type="submit" disabled={loading}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-3 rounded-xl text-sm font-semibold transition-colors">

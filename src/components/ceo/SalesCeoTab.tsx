@@ -10,7 +10,7 @@ const STATUS_TABS = [
   { key: 'lead' as StatusKey,       label: '고객 DB',   color: 'text-sky-600',     bg: 'bg-sky-500' },
   { key: 'db010' as StatusKey,      label: '010 DB',    color: 'text-violet-600',  bg: 'bg-violet-500' },
   { key: 'contracted' as StatusKey, label: '계약 업체', color: 'text-emerald-600', bg: 'bg-emerald-500' },
-  { key: 'emotional' as StatusKey,  label: '감성톡',    color: 'text-pink-600',    bg: 'bg-pink-500' },
+  { key: 'emotional' as StatusKey,  label: '감성톡(거절업체)',    color: 'text-pink-600',    bg: 'bg-pink-500' },
   { key: 'trash' as StatusKey,      label: '자체거절',  color: 'text-gray-500',    bg: 'bg-gray-400' },
 ]
 
@@ -54,6 +54,15 @@ export default function SalesCeoTab() {
   const pendingInspections = useMemo(() =>
     customers.filter(c => c.details?.inspection_status === 'pending'),
   [customers])
+
+  // A/S 요청 대기 중인 업체
+  const pendingAsRequests = useMemo(() =>
+    customers.filter(c => c.details?.as_requested === true && !c.details?.as_resolved),
+  [customers])
+
+  async function resolveAsRequest(id: string) {
+    await updateCustomer(id, { details: { as_resolved: true, as_resolve_date: new Date().toISOString().slice(0, 10) } })
+  }
 
   const personStats = useMemo(() => salesPeople.map(name => {
     const mine = customers.filter((c: any) => (c.details?.sales_user_name || c.sales_user_name) === name)
@@ -120,6 +129,46 @@ export default function SalesCeoTab() {
 
   return (
     <div className="space-y-5 pb-12">
+
+      {/* ── A/S 요청 섹션 ── */}
+      {pendingAsRequests.length > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-2xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-orange-200 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-orange-800">🔧 A/S 요청 대기</span>
+              <span className="bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                {pendingAsRequests.length}건
+              </span>
+            </div>
+            <p className="text-[10px] text-orange-600">영업팀에서 A/S 요청한 업체입니다</p>
+          </div>
+          <div className="divide-y divide-orange-100">
+            {pendingAsRequests.map(c => {
+              const owner = (c as any).details?.sales_user_name || (c as any).sales_user_name || '—'
+              return (
+                <div key={c.id} className="px-5 py-3 flex items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold text-gray-800 text-sm">{c.company || c.name}</p>
+                      <span className="text-[10px] text-gray-400">{c.name}</span>
+                      <span className="text-[10px] text-gray-400 font-mono">{c.phone}</span>
+                      <span className="text-[10px] bg-white border border-orange-200 text-orange-700 px-1.5 py-0.5 rounded-full font-medium">{owner}</span>
+                    </div>
+                    <p className="text-[10px] text-gray-500 mt-0.5">요청일: {c.details?.as_request_date || '—'}</p>
+                    {c.details?.result_memo && (
+                      <p className="text-[11px] text-gray-600 mt-1 line-clamp-2">{c.details.result_memo}</p>
+                    )}
+                  </div>
+                  <button type="button" onClick={() => resolveAsRequest(c.id)}
+                    className="shrink-0 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-lg transition-colors">
+                    ✅ 처리완료
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── 심사요청 대기 섹션 ── */}
       {pendingInspections.length > 0 && (

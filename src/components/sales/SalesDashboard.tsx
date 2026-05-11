@@ -314,7 +314,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
     { key: 'db010',      label: '📞 010DB',      count: db010List.length },
     { key: 'customers',  label: '👤 신규 고객',   count: activeCustomers.length },
     { key: 'contracted', label: '✅ 계약 업체',   count: contractedCustomers.length },
-    { key: 'emotional',  label: '💬 감성톡',      count: emotionalCustomers.length },
+    { key: 'emotional',  label: '💬 감성톡(거절업체)',      count: emotionalCustomers.length },
     { key: 'trash',      label: '🗑 자체거절',    count: trashCustomers.length },
     { key: 'revenue',    label: '💰 매출',        count: revenueCustomers.length },
     { key: 'report',     label: '📝 보고' },

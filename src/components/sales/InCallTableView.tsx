@@ -213,13 +213,13 @@ function ContractModal({ company, onClose, onConfirm }: ContractModalProps) {
         <div className="px-5 py-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] text-gray-400 mb-1 block font-medium">계약금</label>
+              <label className="text-[10px] text-blue-700 mb-1 block font-bold">계약금</label>
               <input type="text" value={contractFee} onChange={e => setContractFee(e.target.value)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
                 placeholder="2,500,000" />
             </div>
             <div>
-              <label className="text-[10px] text-gray-400 mb-1 block font-medium">입금액</label>
+              <label className="text-[10px] text-blue-700 mb-1 block font-bold">입금액</label>
               <input type="text" value={paidAmount} onChange={e => setPaidAmount(e.target.value)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
                 placeholder="1,000,000" />
@@ -250,13 +250,13 @@ function ContractModal({ company, onClose, onConfirm }: ContractModalProps) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] text-gray-400 mb-1 block font-medium">본인 매출</label>
+              <label className="text-[10px] text-blue-700 mb-1 block font-bold">본인 매출</label>
               <input type="text" value={myRevenue} onChange={e => setMyRevenue(e.target.value)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
                 placeholder="예: 15%, 375,000" />
             </div>
             <div>
-              <label className="text-[10px] text-gray-400 mb-1 block font-medium">누적 매출</label>
+              <label className="text-[10px] text-blue-700 mb-1 block font-bold">누적 매출</label>
               <input type="text" value={cumulativeRevenue} onChange={e => setCumulativeRevenue(e.target.value)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
                 placeholder="예: 5,000,000" />
@@ -264,7 +264,7 @@ function ContractModal({ company, onClose, onConfirm }: ContractModalProps) {
           </div>
 
           <div>
-            <label className="text-[10px] text-gray-400 mb-1 block font-medium">자금팀 전달 메모</label>
+            <label className="text-[10px] text-blue-700 mb-1 block font-bold">자금팀 전달 메모</label>
             <textarea value={opsMemo} onChange={e => setOpsMemo(e.target.value)}
               rows={3}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/50 resize-none"
@@ -293,6 +293,7 @@ interface RowProps {
   customer: Customer
   index: number
   salesUsers: string[]
+  userName: string
   tabType: Props['tabType']
   showOwner?: boolean
   onUpdate: Props['onUpdate']
@@ -301,12 +302,14 @@ interface RowProps {
   onTransferToOps?: Props['onTransferToOps']
 }
 
-function InCallTableRow({ customer, index, salesUsers, tabType, showOwner, onUpdate, onStatusChange, onDelete, onTransferToOps }: RowProps) {
+function InCallTableRow({ customer, index, salesUsers, userName, tabType, showOwner, onUpdate, onStatusChange, onDelete, onTransferToOps }: RowProps) {
   const [expanded, setExpanded] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [contractModalOpen, setContractModalOpen] = useState(false)
   const [tlText, setTlText] = useState('')
-  const menuRef = useRef<HTMLDivElement>(null)
+  const [tradeOpen, setTradeOpen] = useState(false)
+  const menuRef  = useRef<HTMLDivElement>(null)
+  const tradeRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!menuOpen) return
@@ -316,6 +319,15 @@ function InCallTableRow({ customer, index, salesUsers, tabType, showOwner, onUpd
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [menuOpen])
+
+  useEffect(() => {
+    if (!tradeOpen) return
+    function handler(e: MouseEvent) {
+      if (tradeRef.current && !tradeRef.current.contains(e.target as Node)) setTradeOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [tradeOpen])
 
   const c = customer
   const rowBg = index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
@@ -466,7 +478,7 @@ function InCallTableRow({ customer, index, salesUsers, tabType, showOwner, onUpd
                 {tabType !== 'emotional' && (
                   <button type="button" onClick={() => { onStatusChange(c.id, 'emotional'); setMenuOpen(false) }}
                     className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-violet-600 font-medium">
-                    💬 감성톡
+                    💬 감성톡(거절업체)
                   </button>
                 )}
                 {tabType !== 'trash' && (
@@ -519,7 +531,7 @@ function InCallTableRow({ customer, index, salesUsers, tabType, showOwner, onUpd
                 {tabType !== 'emotional' && (
                   <button type="button" onClick={() => { onStatusChange(c.id, 'emotional'); setExpanded(false) }}
                     className="px-2.5 py-1 rounded text-[11px] font-semibold bg-violet-500 text-white">
-                    💬 감성톡
+                    💬 감성톡(거절업체)
                   </button>
                 )}
                 {tabType !== 'trash' && (
@@ -540,6 +552,35 @@ function InCallTableRow({ customer, index, salesUsers, tabType, showOwner, onUpd
                     📤 자금팀 전송
                   </button>
                 )}
+                {/* DB 트레이드 */}
+                <div className="relative" ref={tradeRef}>
+                  <button type="button" onClick={() => setTradeOpen(v => !v)}
+                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-sky-500 hover:bg-sky-600 text-white">
+                    🔄 DB 트레이드
+                  </button>
+                  {tradeOpen && (
+                    <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 py-1 z-50 min-w-[160px]">
+                      <p className="text-[10px] text-gray-400 px-3 py-1.5 font-semibold border-b border-gray-50">담당자 변경</p>
+                      {salesUsers.filter(u => u !== (c.sales_user_name || c.details?.sales_user_name)).map(u => (
+                        <button key={u} type="button"
+                          onClick={() => {
+                            onUpdate(c.id, { details: {
+                              sales_user_name: u,
+                              trade_from: c.sales_user_name || c.details?.sales_user_name || '',
+                              trade_date: new Date().toISOString().slice(0, 10),
+                            }})
+                            setTradeOpen(false)
+                          }}
+                          className="w-full text-left px-3 py-2.5 text-xs hover:bg-sky-50 text-sky-700 font-semibold flex items-center gap-2">
+                          <span className="text-gray-300 text-[10px]">→</span> {u}
+                        </button>
+                      ))}
+                      {salesUsers.filter(u => u !== (c.sales_user_name || c.details?.sales_user_name)).length === 0 && (
+                        <p className="text-[11px] text-gray-400 px-3 py-2 italic">다른 영업사원 없음</p>
+                      )}
+                    </div>
+                  )}
+                </div>
                 <button type="button" onClick={() => { if (confirm('삭제?')) { onDelete(c.id); setExpanded(false) } }}
                   className="px-2.5 py-1 rounded text-[11px] font-semibold bg-red-50 text-red-500 ml-auto">
                   🗑 삭제
@@ -553,23 +594,40 @@ function InCallTableRow({ customer, index, salesUsers, tabType, showOwner, onUpd
 
                 {/* ── 좌측: 인콜일지 ── */}
                 <div className="p-4 overflow-y-auto max-h-[520px]">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-3">📋 인콜일지</p>
-                  <div className="divide-y divide-gray-50">
+                  <p className="text-[10px] font-bold text-[#1B2A45] uppercase tracking-wide mb-3">📋 인콜일지</p>
+                  <div className="grid grid-cols-1 gap-1">
                     {buildLogFields(c).map(({ label, value }) => {
                       const isEmpty = !value || !String(value).trim()
                       return (
-                        <div key={label} className="flex items-start py-1.5 gap-2">
-                          <span className="w-20 shrink-0 text-[10px] text-gray-400 pt-0.5 font-medium">{label}</span>
-                          <span className={`text-xs flex-1 break-words ${isEmpty ? 'text-gray-300 italic' : 'text-gray-800'}`}>
+                        <div key={label} className="flex items-start gap-2 bg-white border border-gray-100 rounded-lg px-2.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                          <span className="w-20 shrink-0 text-[10px] text-blue-700 font-bold pt-0.5">{label}</span>
+                          <span className={`text-xs flex-1 break-words ${isEmpty ? 'text-gray-300 italic' : 'text-gray-800 font-medium'}`}>
                             {isEmpty ? '—' : String(value)}
                           </span>
                         </div>
                       )
                     })}
                   </div>
+
+                  {/* 직가/공가 — 인콜일지 내 */}
+                  <div className="flex items-center gap-2 bg-white border border-gray-100 rounded-lg px-2.5 py-2 mt-1 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                    <span className="w-20 shrink-0 text-[10px] text-blue-700 font-bold">직가/공가</span>
+                    <div className="flex gap-1.5">
+                      {['직가', '공가'].map(opt => (
+                        <button key={opt} type="button"
+                          onClick={() => onUpdate(c.id, { details: { lead_type: leadType === opt ? '' : opt } })}
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border transition-colors ${
+                            leadType === opt
+                              ? opt === '직가' ? 'bg-blue-500 text-white border-blue-500' : 'bg-amber-500 text-white border-amber-500'
+                              : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                          }`}>{opt}</button>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* 통화내용 */}
-                  <div className="pt-3 mt-2 border-t border-gray-100">
-                    <p className="text-[10px] font-bold text-gray-400 mb-1.5">통화내용</p>
+                  <div className="bg-white border border-gray-100 rounded-lg px-2.5 py-2 mt-1 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                    <p className="text-[10px] font-bold text-blue-700 mb-1.5">통화내용</p>
                     {(c.memo || c.notes || c.details?.notes) ? (
                       <p className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">
                         {c.memo || c.notes || c.details?.notes}
@@ -582,49 +640,17 @@ function InCallTableRow({ customer, index, salesUsers, tabType, showOwner, onUpd
 
                 {/* ── 우측: 인콜결과 ── */}
                 <div className="p-4 overflow-y-auto max-h-[520px] space-y-4">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">📞 인콜결과</p>
-
-                  {/* 담당자 */}
-                  <div>
-                    <label className="text-[10px] text-gray-400 mb-1 block font-medium">담당자</label>
-                    <select
-                      value={c.details?.assignee || ''}
-                      onChange={e => onUpdate(c.id, { details: { assignee: e.target.value } })}
-                      className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50"
-                    >
-                      <option value="">-- 선택 --</option>
-                      {salesUsers.map(u => <option key={u} value={u}>{u}</option>)}
-                    </select>
-                  </div>
-
-                  {/* 직가/공가 */}
-                  <div>
-                    <label className="text-[10px] text-gray-400 mb-1.5 block font-medium">직가 / 공가</label>
-                    <div className="flex gap-2">
-                      {['직가', '공가'].map(opt => (
-                        <button
-                          key={opt}
-                          type="button"
-                          onClick={() => onUpdate(c.id, { details: { lead_type: opt } })}
-                          className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                            leadType === opt
-                              ? opt === '직가'
-                                ? 'bg-blue-500 text-white border-blue-500'
-                                : 'bg-amber-500 text-white border-amber-500'
-                              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                          }`}
-                        >{opt}</button>
-                      ))}
-                      {leadType && (
-                        <button type="button" onClick={() => onUpdate(c.id, { details: { lead_type: '' } })}
-                          className="px-2 text-gray-300 hover:text-gray-500 text-xs">✕</button>
-                      )}
-                    </div>
+                  {/* 담당자 (자동 - 읽기 전용) */}
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">📞 인콜결과</p>
+                    <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
+                      담당: {c.sales_user_name || c.details?.sales_user_name || userName}
+                    </span>
                   </div>
 
                   {/* 결정전 결과 */}
-                  <div>
-                    <label className="text-[10px] text-gray-400 mb-1 block font-medium">결정전 결과</label>
+                  <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                    <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">결정전 결과</label>
                     <BadgeDropdown
                       value={c.details?.call_result || ''}
                       options={CALL_RESULTS}
@@ -633,8 +659,8 @@ function InCallTableRow({ customer, index, salesUsers, tabType, showOwner, onUpd
                   </div>
 
                   {/* 클로징 결과 */}
-                  <div>
-                    <label className="text-[10px] text-gray-400 mb-1 block font-medium">클로징 결과</label>
+                  <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                    <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">클로징 결과</label>
                     <BadgeDropdown
                       value={c.details?.closing_result || ''}
                       options={CLOSING_RESULTS}
@@ -643,42 +669,18 @@ function InCallTableRow({ customer, index, salesUsers, tabType, showOwner, onUpd
                   </div>
 
                   {/* 재통화 일정 */}
-                  <div>
-                    <label className="text-[10px] text-gray-400 mb-1 block font-medium">재통화 일정</label>
+                  <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                    <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">재통화 일정</label>
                     <input
                       type="date"
                       value={c.details?.follow_up_date || ''}
                       onChange={e => onUpdate(c.id, { details: { follow_up_date: e.target.value } })}
-                      className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50"
+                      className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50 text-gray-800"
                     />
                   </div>
 
-                  {/* 심사원 배정 */}
-                  <div>
-                    <label className="text-[10px] text-gray-400 mb-1 block font-medium">심사원 배정</label>
-                    <input
-                      type="text"
-                      value={c.details?.inspector || ''}
-                      onChange={e => onUpdate(c.id, { details: { inspector: e.target.value } })}
-                      placeholder="심사원 이름"
-                      className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50"
-                    />
-                  </div>
-
-                  {/* 체크박스 그룹: A/S 체크 + 환불없이 진행 + 내일도 계속 */}
-                  <div className="bg-gray-50 rounded-xl px-3 py-2.5 space-y-2">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={c.details?.as_checked || false}
-                        onChange={e => onUpdate(c.id, { details: { as_checked: e.target.checked } })}
-                        className="w-4 h-4 rounded accent-orange-500"
-                      />
-                      <span className="text-xs text-gray-700 font-medium">A/S 체크</span>
-                      {c.details?.as_checked && (
-                        <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full font-medium">A/S 진행중</span>
-                      )}
-                    </label>
+                  {/* 환불없이 진행 체크박스 */}
+                  <div className="bg-gray-50 rounded-xl px-3 py-2.5">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
@@ -693,48 +695,52 @@ function InCallTableRow({ customer, index, salesUsers, tabType, showOwner, onUpd
                     </label>
                   </div>
 
-                  {/* 내일도 계속 + 심사요청 */}
-                  <div className="flex items-center justify-between gap-3 py-2 px-3 bg-gray-50 rounded-xl">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={c.details?.continue_tomorrow || false}
-                        onChange={e => onUpdate(c.id, { details: { continue_tomorrow: e.target.checked } })}
-                        className="w-4 h-4 rounded accent-blue-500"
-                      />
-                      <span className="text-xs text-gray-700 font-medium">내일도 계속</span>
-                    </label>
+                  {/* A/S 요청 + 심사 요청 */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* A/S 요청 → 대표에게 */}
+                    {c.details?.as_requested ? (
+                      <span className="inline-flex items-center gap-1 bg-orange-100 text-orange-700 border border-orange-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
+                        🔧 A/S 요청됨 {c.details.as_request_date ? `(${c.details.as_request_date})` : ''}
+                      </span>
+                    ) : (
+                      <button type="button"
+                        onClick={() => onUpdate(c.id, { details: {
+                          as_requested: true,
+                          as_request_date: new Date().toISOString().slice(0, 10),
+                        }})}
+                        className="inline-flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors"
+                      >
+                        🔧 A/S 요청
+                      </button>
+                    )}
 
+                    {/* 심사 요청 → 대표에게 */}
                     {(tabType === 'lead' || tabType === 'db010') && (
-                      <>
-                        {inspectionStatus === 'pending' ? (
-                          <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-full text-[11px] font-semibold">
-                            ⏳ 심사요청 중
-                          </span>
-                        ) : inspectionStatus === 'approved' ? (
-                          <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full text-[11px] font-semibold">
-                            ✅ 심사 승인
-                          </span>
-                        ) : inspectionStatus === 'rejected' ? (
-                          <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 border border-red-200 px-2.5 py-1 rounded-full text-[11px] font-semibold">
-                            ❌ 심사 반려
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={handleInspectionRequest}
-                            className="inline-flex items-center gap-1 bg-violet-500 hover:bg-violet-600 text-white px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors"
-                          >
-                            🔍 심사 요청
-                          </button>
-                        )}
-                      </>
+                      inspectionStatus === 'pending' ? (
+                        <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
+                          ⏳ 심사요청 중
+                        </span>
+                      ) : inspectionStatus === 'approved' ? (
+                        <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
+                          ✅ 심사 승인
+                        </span>
+                      ) : inspectionStatus === 'rejected' ? (
+                        <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 border border-red-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
+                          ❌ 심사 반려
+                        </span>
+                      ) : (
+                        <button type="button" onClick={handleInspectionRequest}
+                          className="inline-flex items-center gap-1 bg-violet-500 hover:bg-violet-600 text-white px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors"
+                        >
+                          🔍 심사 요청
+                        </button>
+                      )
                     )}
                   </div>
 
                   {/* 메모 */}
-                  <div>
-                    <label className="text-[10px] text-gray-400 mb-1 block font-medium">메모</label>
+                  <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                    <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">메모</label>
                     <ResultMemoField
                       value={c.details?.result_memo || ''}
                       onChange={(val) => onUpdate(c.id, { details: { result_memo: val } })}
@@ -742,8 +748,8 @@ function InCallTableRow({ customer, index, salesUsers, tabType, showOwner, onUpd
                   </div>
 
                   {/* 타임라인 */}
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 mb-1.5">📝 타임라인</p>
+                  <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                    <p className="text-[10px] font-bold text-blue-700 mb-1.5">📝 타임라인</p>
                     {/* 추가 입력 */}
                     <div className="flex gap-2 mb-2">
                       <input
@@ -874,6 +880,7 @@ export default function InCallTableView({
                         customer={c}
                         index={idx}
                         salesUsers={salesUsers}
+                        userName={userName}
                         tabType={tabType}
                         showOwner={showOwner}
                         onUpdate={onUpdate}
