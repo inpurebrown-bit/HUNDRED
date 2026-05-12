@@ -67,7 +67,7 @@ interface OpsUser {
 export default function CeoDashboard() {
   const { data: session } = useSession()
   const ceoName = session?.user?.name ?? '대표'
-  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'payslip' | 'freelancer' | 'reports' | 'minutes' | 'calendar' | 'ailogs' | 'pin_manage' | 'profile'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'payslip' | 'freelancer' | 'reports' | 'minutes' | 'calendar' | 'ailogs' | 'profile'>('overview')
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
@@ -115,7 +115,6 @@ export default function CeoDashboard() {
     { key: 'minutes',   label: '📒 회의록' },
     { key: 'calendar',  label: '📅 일정관리' },
     { key: 'ailogs',    label: '🔍 AI 질문 로그' },
-    { key: 'pin_manage', label: '🔐 PIN 관리' },
     { key: 'profile',   label: '👤 사원정보' },
   ]
 
@@ -240,8 +239,12 @@ export default function CeoDashboard() {
         {activeTab === 'minutes'   && <MinutesTab />}
         {activeTab === 'calendar'  && <CalendarTab />}
         {activeTab === 'ailogs'    && <AiLogsTab />}
-        {activeTab === 'pin_manage' && <PinManageTab />}
-        {activeTab === 'profile'   && <MyProfileTab />}
+        {activeTab === 'profile'   && (
+          <div className="space-y-8">
+            <MyProfileTab />
+            <PinManageTab />
+          </div>
+        )}
       </div>
     </div>
   )
