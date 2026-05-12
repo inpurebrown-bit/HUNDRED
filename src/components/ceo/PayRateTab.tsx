@@ -48,6 +48,44 @@ const BAD_CLS = 'bg-red-500 text-white text-xs px-2 py-0.5 rounded font-bold'
 
 const todayStr = (): string => new Date().toISOString().slice(0, 10)
 
+// ─── 영업일 계산 헬퍼 ─────────────────────────────────────
+function calcWorkingDays(dateStr: string): { total: number; elapsed: number } {
+  const d = new Date(dateStr)
+  const year = d.getFullYear()
+  const month = d.getMonth()
+  const today = new Date(d)
+
+  let total = 0
+  let elapsed = 0
+  const firstDay = new Date(year, month, 1)
+  const lastDay = new Date(year, month + 1, 0)
+
+  for (let day = new Date(firstDay); day <= lastDay; day.setDate(day.getDate() + 1)) {
+    const dow = day.getDay()
+    if (dow !== 0 && dow !== 6) {
+      total++
+      if (day <= today) elapsed++
+    }
+  }
+  return { total, elapsed }
+}
+
+// ─── 점수 계산 (1-10) ─────────────────────────────────────
+function calcScore(actual: number, actualDays: number, target: number, totalDays: number): number {
+  if (actualDays === 0 || totalDays === 0 || target === 0) return 0
+  const pace = (actual / actualDays) / (target / totalDays)
+  return Math.min(10, Math.max(1, Math.round(pace * 5)))
+}
+
+function ScoreBadge({ score }: { score: number }) {
+  if (score === 0) return <span className="text-gray-400 text-xs">-</span>
+  const color = score >= 9 ? 'bg-emerald-500 text-white' :
+                score >= 7 ? 'bg-blue-500 text-white' :
+                score >= 4 ? 'bg-amber-400 text-white' :
+                             'bg-red-500 text-white'
+  return <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${color}`}>{score}</span>
+}
+
 // ─── 결제율 서브뷰 ────────────────────────────────────────
 
 function PayRateSubView() {
@@ -175,11 +213,39 @@ function PayRateSubView() {
     setLoading(false)
   }
 
-  // 날짜 변경 시 자동 로드
+  // 날짜 변경 시 자동 로드 + 영업일 자동계산
   useEffect(() => {
     handleLoad()
+    if (date) {
+      const { total, elapsed } = calcWorkingDays(date)
+      setSummary(prev => ({ ...prev, working_days_elapsed: elapsed, total_working_days: total }))
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date])
+
+  // FreelancerTab에서 영업사원 수 자동 가져오기
+  useEffect(() => {
+    fetch('/api/payslip-settings')
+      .then(r => r.json())
+      .then(d => {
+        const emps: any[] = d.settings?.employees || []
+        const salesCount = emps.filter(e => (e.team || 'sales') === 'sales' && e.name?.trim()).length
+        if (salesCount > 0) {
+          setSummary(prev => ({ ...prev, employee_count: salesCount }))
+        }
+        // 이름 자동 채우기 (데이터 없을 때만)
+        if (emps.length > 0) {
+          setEmployees(prev => {
+            const hasData = prev.some(e => e.name.trim() && (e.supply_count > 0 || e.direct_count > 0))
+            if (hasData) return prev
+            const salesEmps = emps.filter(e => (e.team || 'sales') === 'sales' && e.name?.trim())
+            if (salesEmps.length === 0) return prev
+            return salesEmps.map(e => ({ name: e.name, target: 0, supply_count: 0, supply_payment: 0, direct_count: 0, direct_payment: 0 }))
+          })
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   // 이번달 계약 자동집계
   useEffect(() => {
@@ -197,6 +263,9 @@ function PayRateSubView() {
             if (name) byPerson[name] = (byPerson[name] || 0) + 1
           })
         setAutoStats(Object.entries(byPerson).map(([name, contracted]) => ({ name, contracted, target: 0 })))
+        // 총 계약건수를 payment_count에 자동 반영
+        const totalContracted = Object.values(byPerson).reduce((s, v) => s + v, 0)
+        setSummary(prev => ({ ...prev, payment_count: totalContracted }))
       })
       .catch(() => {/* 무시 */})
   }, [])
@@ -258,33 +327,72 @@ function PayRateSubView() {
           <table className="min-w-max w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
-                {['인원수','목표개수','결제개수','진행된영업일수','이달의영업일','잔여영업일','예상개수','예상인당이번달결제','예상인당하루결제','목표인당이번달결제','목표인당하루결제','진행상태'].map(h => (
-                  <th key={h} className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100 last:border-0">{h}</th>
-                ))}
+                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">인원수</th>
+                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">목표개수</th>
+                <th className="px-3 py-2 text-xs font-semibold text-center whitespace-nowrap border-r border-gray-100 bg-emerald-50 text-emerald-700">결제개수</th>
+                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">진행된영업일수</th>
+                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">이달의영업일</th>
+                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">잔여영업일</th>
+                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">예상개수</th>
+                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">예상인당이번달결제</th>
+                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">예상인당하루결제</th>
+                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">목표인당이번달결제</th>
+                <th className="px-3 py-2 text-xs font-semibold text-center whitespace-nowrap border-r border-gray-100 bg-blue-50 text-blue-700">목표인당하루결제</th>
+                <th className="px-3 py-2 text-xs font-semibold text-center whitespace-nowrap border-r border-gray-100 bg-amber-50 text-amber-700">진행상태</th>
               </tr>
             </thead>
             <tbody>
               <tr className="bg-white">
-                {(['employee_count','target_count','payment_count','working_days_elapsed','total_working_days'] as (keyof SummaryRow)[]).map(field => (
-                  <td key={field} className="px-2 py-1 border-r border-gray-100">
-                    <input
-                      type="number"
-                      value={summary[field]}
-                      onChange={e => setSummary(prev => ({ ...prev, [field]: Number(e.target.value) }))}
-                      className={INPUT_CLS}
-                      min="0"
-                    />
-                  </td>
-                ))}
+                {/* 인원수 — 자동 */}
+                <td className="px-2 py-1 border-r border-gray-100">
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm font-medium text-gray-700 min-w-[2rem] text-center">{summary.employee_count}</span>
+                    <span className="text-[10px] bg-blue-100 text-blue-600 rounded px-1 py-0.5 font-semibold">자동</span>
+                  </div>
+                </td>
+                {/* 목표개수 — 수동 입력 */}
+                <td className="px-2 py-1 border-r border-gray-100">
+                  <input
+                    type="number"
+                    value={summary.target_count}
+                    onChange={e => setSummary(prev => ({ ...prev, target_count: Number(e.target.value) }))}
+                    className={INPUT_CLS}
+                    min="0"
+                  />
+                </td>
+                {/* 결제개수 — 자동, 강조 */}
+                <td className="px-2 py-1 border-r border-gray-100 bg-emerald-50">
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm font-bold text-emerald-700 min-w-[2rem] text-center">{summary.payment_count}</span>
+                    <span className="text-[10px] bg-emerald-200 text-emerald-700 rounded px-1 py-0.5 font-semibold">자동</span>
+                  </div>
+                </td>
+                {/* 진행된영업일수 — 자동 */}
+                <td className="px-2 py-1 border-r border-gray-100">
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm font-medium text-gray-700 min-w-[2rem] text-center">{summary.working_days_elapsed}</span>
+                    <span className="text-[10px] bg-blue-100 text-blue-600 rounded px-1 py-0.5 font-semibold">자동</span>
+                  </div>
+                </td>
+                {/* 이달의영업일 — 자동 */}
+                <td className="px-2 py-1 border-r border-gray-100">
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm font-medium text-gray-700 min-w-[2rem] text-center">{summary.total_working_days}</span>
+                    <span className="text-[10px] bg-blue-100 text-blue-600 rounded px-1 py-0.5 font-semibold">자동</span>
+                  </div>
+                </td>
                 <td className={CALC_CLS + ' border-r border-gray-100'}>{fmtNum(remaining)}</td>
                 <td className={CALC_CLS + ' border-r border-gray-100'}>{fmtNum(expected)}</td>
                 <td className={CALC_CLS + ' border-r border-gray-100'}>{fmtNum(expectedPerPersonMonth)}</td>
                 <td className={CALC_CLS + ' border-r border-gray-100'}>{fmtNum(expectedPerPersonDay)}</td>
                 <td className={CALC_CLS + ' border-r border-gray-100'}>{fmtNum(targetPerPersonMonth)}</td>
-                <td className={CALC_CLS + ' border-r border-gray-100'}>{fmtNum(targetPerPersonDay)}</td>
-                <td className="px-2 py-1 text-center">
-                  {statusA === '-' ? <span className="text-gray-400 text-xs">-</span> :
-                    <span className={statusA === 'GOOD' ? GOOD_CLS : BAD_CLS}>{statusA}</span>}
+                <td className={CALC_CLS + ' bg-blue-50 border-r border-gray-100'}>{fmtNum(targetPerPersonDay)}</td>
+                <td className="px-2 py-2 text-center bg-amber-50">
+                  <div className="flex items-center justify-center gap-1.5">
+                    {statusA === '-' ? <span className="text-gray-400 text-xs">-</span> :
+                      <span className={statusA === 'GOOD' ? GOOD_CLS : BAD_CLS}>{statusA}</span>}
+                    <ScoreBadge score={calcScore(pc, we, tc, tw)} />
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -299,14 +407,27 @@ function PayRateSubView() {
           <table className="min-w-max w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
-                {['연번','직원명','목표개수','공급개수','공급결제개수','직접(소개)개수','직접결제개수','총결제개수','공급대비결제율','직접대비결제율','총결제율','목표까지필요개수','목표까지필요결제율','진행상태'].map(h => (
-                  <th key={h} className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100 last:border-0">{h}</th>
-                ))}
+                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">연번</th>
+                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">직원명</th>
+                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">목표개수</th>
+                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">공급개수</th>
+                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">공급결제개수</th>
+                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">직접(소개)개수</th>
+                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">직접결제개수</th>
+                <th className="px-3 py-2 text-xs font-semibold text-center whitespace-nowrap border-r border-gray-100 bg-emerald-50 text-emerald-700">총결제개수</th>
+                <th className="px-3 py-2 text-xs font-semibold text-center whitespace-nowrap border-r border-gray-100 bg-blue-50 text-blue-700">공급대비결제율</th>
+                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">직접대비결제율</th>
+                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">총결제율</th>
+                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">목표까지필요개수</th>
+                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">목표까지필요결제율</th>
+                <th className="px-3 py-2 text-xs font-semibold text-center whitespace-nowrap border-r border-gray-100 bg-amber-50 text-amber-700">진행상태</th>
+                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap"></th>
               </tr>
             </thead>
             <tbody>
               {employees.map((row, i) => {
                 const calc = calcEmployee(row)
+                const empScore = calcScore(calc.total, we, Number(row.target), tw)
                 return (
                   <tr key={i} className="border-t border-gray-100 bg-white hover:bg-gray-50">
                     <td className="px-3 py-1 text-center text-gray-500 border-r border-gray-100">{i + 1}</td>
@@ -318,15 +439,18 @@ function PayRateSubView() {
                         <input type="number" value={row[field] as number} onChange={e => updateEmployee(i, field, e.target.value)} className={INPUT_CLS} min="0" />
                       </td>
                     ))}
-                    <td className={CALC_CLS + ' border-r border-gray-100'}>{calc.total.toLocaleString('ko-KR')}</td>
-                    <td className={CALC_CLS + ' border-r border-gray-100'}>{calc.supplyRate}</td>
+                    <td className="bg-emerald-50 px-2 py-1 text-right text-sm font-bold text-emerald-700 border-r border-gray-100 whitespace-nowrap">{calc.total.toLocaleString('ko-KR')}</td>
+                    <td className="bg-blue-50 px-2 py-1 text-right text-sm text-blue-700 border-r border-gray-100 whitespace-nowrap">{calc.supplyRate}</td>
                     <td className={CALC_CLS + ' border-r border-gray-100'}>{calc.directRate}</td>
                     <td className={CALC_CLS + ' border-r border-gray-100'}>{calc.totalRate}</td>
                     <td className={CALC_CLS + ' border-r border-gray-100'}>{calc.needed.toLocaleString('ko-KR')}</td>
                     <td className={CALC_CLS + ' border-r border-gray-100'}>{calc.neededRate}</td>
-                    <td className="px-2 py-1 text-center">
-                      {calc.status === '-' ? <span className="text-gray-400 text-xs">-</span> :
-                        <span className={calc.status === 'GOOD' ? GOOD_CLS : BAD_CLS}>{calc.status}</span>}
+                    <td className="px-2 py-1 text-center bg-amber-50 border-r border-gray-100">
+                      <div className="flex items-center justify-center gap-1.5">
+                        {calc.status === '-' ? <span className="text-gray-400 text-xs">-</span> :
+                          <span className={calc.status === 'GOOD' ? GOOD_CLS : BAD_CLS}>{calc.status}</span>}
+                        <ScoreBadge score={empScore} />
+                      </div>
                     </td>
                     <td className="px-2 py-1 border-l border-gray-100">
                       <button onClick={() => setEmployees(prev => prev.filter((_, idx) => idx !== i))}
@@ -344,13 +468,13 @@ function PayRateSubView() {
                 <td className={CALC_CLS + ' border-r border-gray-100'}>{totalSupplyPay.toLocaleString('ko-KR')}</td>
                 <td className={CALC_CLS + ' border-r border-gray-100'}>{totalDirectCount.toLocaleString('ko-KR')}</td>
                 <td className={CALC_CLS + ' border-r border-gray-100'}>{totalDirectPay.toLocaleString('ko-KR')}</td>
-                <td className={CALC_CLS + ' border-r border-gray-100'}>{totalPayment.toLocaleString('ko-KR')}</td>
-                <td className={CALC_CLS + ' border-r border-gray-100'}>{totalSupplyRate}</td>
+                <td className="bg-emerald-50 text-emerald-700 text-sm px-2 py-1 text-right font-bold whitespace-nowrap border-r border-gray-100">{totalPayment.toLocaleString('ko-KR')}</td>
+                <td className="bg-blue-50 text-blue-700 text-sm px-2 py-1 text-right whitespace-nowrap border-r border-gray-100">{totalSupplyRate}</td>
                 <td className={CALC_CLS + ' border-r border-gray-100'}>{totalDirectRate}</td>
                 <td className={CALC_CLS + ' border-r border-gray-100'}>{totalTotalRate}</td>
                 <td className={CALC_CLS + ' border-r border-gray-100'}>{totalNeeded.toLocaleString('ko-KR')}</td>
                 <td className={CALC_CLS + ' border-r border-gray-100'}>{totalNeededRate}</td>
-                <td />
+                <td className="bg-amber-50 border-r border-gray-100" />
                 <td />
               </tr>
             </tbody>
