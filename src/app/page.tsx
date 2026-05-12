@@ -522,6 +522,98 @@ export default function HomePage() {
         </div>
       </div>
 
+      {/* ── 3단계 간편 프로세스 ── */}
+      <section className="py-14 px-4 bg-white border-b border-[#E8E2D4]">
+        <div className="max-w-4xl mx-auto">
+          <Reveal>
+            <p className="text-center text-xs text-[#C5A258] font-bold tracking-[0.3em] uppercase mb-2">HOW IT WORKS</p>
+            <h2 className="text-center text-xl md:text-2xl font-black text-[#1B2A45] mb-10">상담부터 승인까지, 딱 3단계</h2>
+          </Reveal>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-0 relative">
+            {/* 연결선 (데스크톱) */}
+            <div className="hidden md:block absolute top-8 left-[16.5%] right-[16.5%] h-0.5 bg-[#E8E2D4] z-0" />
+            {[
+              {
+                step: '01',
+                icon: '📞',
+                title: '무료 상담 신청',
+                desc: '이름과 연락처만 남겨주세요. 담당자가 당일 연락드립니다.',
+                color: 'bg-[#C5A258]',
+              },
+              {
+                step: '02',
+                icon: '🔍',
+                title: '사업체 분석',
+                desc: '업종·매출·신용·대출현황을 종합분석해 최적 정책자금을 찾아드립니다.',
+                color: 'bg-[#1B2A45]',
+              },
+              {
+                step: '03',
+                icon: '🎉',
+                title: '자금 승인',
+                desc: '서류 준비부터 기관 제출까지 전담 처리. 승인 완료까지 함께합니다.',
+                color: 'bg-[#4A9B6F]',
+              },
+            ].map((s, i) => (
+              <Reveal key={s.step} from="bottom" delay={i * 100} className="relative z-10 flex flex-col items-center text-center px-6 pb-6 md:pb-0">
+                <div className={`w-16 h-16 rounded-full ${s.color} flex items-center justify-center shadow-lg mb-4`}>
+                  <span className="text-2xl">{s.icon}</span>
+                </div>
+                <span className={`text-xs font-black tracking-widest ${s.color === 'bg-[#C5A258]' ? 'text-[#C5A258]' : s.color === 'bg-[#1B2A45]' ? 'text-[#1B2A45]' : 'text-[#4A9B6F]'} mb-1`}>STEP {s.step}</span>
+                <h3 className="text-sm font-black text-[#1B2A45] mb-2">{s.title}</h3>
+                <p className="text-xs text-[#1B2A45]/50 leading-relaxed">{s.desc}</p>
+              </Reveal>
+            ))}
+          </div>
+          <Reveal>
+            <div className="mt-10 text-center">
+              <a href="#문의하기"
+                className="inline-flex items-center gap-2 bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-8 py-3.5 rounded-xl text-sm transition-all shadow-lg shadow-[#C5A258]/25 hover:scale-[1.02]">
+                지금 무료 상담 신청하기 →
+              </a>
+              <p className="text-[11px] text-[#1B2A45]/30 mt-3">신청 후 평균 2시간 내 연락 · 상담비용 0원</p>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ── 자격 확인 배너 ── */}
+      <section className="py-10 px-4 bg-gradient-to-r from-[#1B2A45] to-[#2A3D5E]">
+        <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center gap-6 md:gap-12">
+          <Reveal from="left" className="flex-1 text-white">
+            <p className="text-xs text-[#C5A258] font-bold tracking-widest uppercase mb-2">내 사업, 정책자금 받을 수 있을까?</p>
+            <h3 className="text-xl md:text-2xl font-black leading-snug mb-3">
+              아래 하나라도 해당되면<br />
+              <span className="text-[#C5A258]">받을 수 있습니다</span>
+            </h3>
+            <ul className="space-y-1.5">
+              {[
+                '사업자 등록 후 1년 이상',
+                '직원 있거나 4대보험 가입 중',
+                '기존 대출 있어도 상관없음',
+                '세금 납부 중이거나 납부 예정',
+                '매출 연 1억 이상 (업종 무관)',
+              ].map(item => (
+                <li key={item} className="flex items-center gap-2 text-sm text-white/80">
+                  <span className="text-[#C5A258] font-bold shrink-0">✓</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </Reveal>
+          <Reveal from="right" className="shrink-0 flex flex-col items-center gap-4">
+            <div className="bg-white/10 border border-white/20 rounded-2xl px-8 py-6 text-center">
+              <p className="text-4xl font-black text-[#C5A258] mb-1">94<span className="text-2xl">%</span></p>
+              <p className="text-xs text-white/60">헌드레드 고객 승인율</p>
+            </div>
+            <a href="#문의하기"
+              className="inline-flex items-center gap-2 bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-7 py-3.5 rounded-xl text-sm transition-all hover:scale-[1.02] shadow-lg shadow-[#C5A258]/30">
+              3분 자격 확인하기 →
+            </a>
+          </Reveal>
+        </div>
+      </section>
+
       {/* ── 수상 / 표창 섹션 (실제 증서 스타일) ── */}
       <section className="py-16 md:py-20 px-4 bg-[#FAF8F3]">
         <div className="max-w-5xl mx-auto">
