@@ -4,14 +4,23 @@ import { useSession } from 'next-auth/react'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Image from 'next/image'
 
-const PIN_KEY = 'pin_verified_at'
-const PIN_TTL = 5 * 60 * 1000 // 5분
+const PIN_KEY = 'pin_verified'          // '1' or absent
+const ACTIVITY_KEY = 'pin_last_activity' // timestamp of last user action
+const INACTIVITY_LIMIT = 30 * 60 * 1000 // 30분 무활동 시 잠금
 
-function isPinValid(): boolean {
+function isPinVerified(): boolean {
   try {
-    const ts = sessionStorage.getItem(PIN_KEY)
+    return sessionStorage.getItem(PIN_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function isActivityFresh(): boolean {
+  try {
+    const ts = sessionStorage.getItem(ACTIVITY_KEY)
     if (!ts) return false
-    return Date.now() - Number(ts) < PIN_TTL
+    return Date.now() - Number(ts) < INACTIVITY_LIMIT
   } catch {
     return false
   }
@@ -19,7 +28,21 @@ function isPinValid(): boolean {
 
 function markPinVerified() {
   try {
-    sessionStorage.setItem(PIN_KEY, String(Date.now()))
+    sessionStorage.setItem(PIN_KEY, '1')
+    sessionStorage.setItem(ACTIVITY_KEY, String(Date.now()))
+  } catch {}
+}
+
+function bumpActivity() {
+  try {
+    sessionStorage.setItem(ACTIVITY_KEY, String(Date.now()))
+  } catch {}
+}
+
+function clearPin() {
+  try {
+    sessionStorage.removeItem(PIN_KEY)
+    sessionStorage.removeItem(ACTIVITY_KEY)
   } catch {}
 }
 
@@ -39,14 +62,24 @@ export default function PinGate({ children }: PinGateProps) {
 
   // 초기 PIN 유효성 확인
   useEffect(() => {
-    if (isPinValid()) setVerified(true)
+    if (isPinVerified() && isActivityFresh()) setVerified(true)
   }, [])
 
-  // 1분마다 TTL 재확인
+  // 사용자 활동 감지 → 타임스탬프 갱신
+  useEffect(() => {
+    if (!verified) return
+    const events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click']
+    const onActivity = () => bumpActivity()
+    events.forEach(e => window.addEventListener(e, onActivity, { passive: true }))
+    return () => events.forEach(e => window.removeEventListener(e, onActivity))
+  }, [verified])
+
+  // 1분마다 무활동 시간 체크
   useEffect(() => {
     if (!verified) return
     const id = setInterval(() => {
-      if (!isPinValid()) {
+      if (!isActivityFresh()) {
+        clearPin()
         setVerified(false)
         setDigits('')
         setError('')
