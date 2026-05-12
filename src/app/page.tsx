@@ -877,11 +877,11 @@ export default function HomePage() {
                         const prevSameType = mi > 0 && c.messages[mi - 1].type === msg.type
                         const t = msgTimes[mi]
 
-                        /* 받은 메시지 (왼쪽, 흰색) */
-                        if (msg.type === 'recv') {
+                        /* ── 고객 메시지: sent = 고객이 우리한테 보낸 것 → 왼쪽 흰색 ── */
+                        if (msg.type === 'sent') {
                           return (
                             <div key={mi} className="flex items-start gap-1.5">
-                              {/* 프로필 */}
+                              {/* 고객 프로필 */}
                               <div className="shrink-0 mt-0.5">
                                 {!prevSameType ? (
                                   <div className="w-9 h-9 flex items-center justify-center shadow-sm"
@@ -899,6 +899,7 @@ export default function HomePage() {
                                   </p>
                                 )}
                                 <div className="flex items-end gap-1.5">
+                                  {/* 흰색 말풍선 — 좌상단 꺾임 */}
                                   <div className="px-3 py-2 text-[12px] leading-relaxed text-[#111] bg-white shadow-sm"
                                     style={{ borderRadius: '2px 13px 13px 13px', wordBreak: 'break-word', maxWidth: '100%' }}>
                                     {msg.text}
@@ -910,10 +911,11 @@ export default function HomePage() {
                           )
                         }
 
-                        /* 보낸 메시지 (오른쪽, 노란색) */
+                        /* ── 우리(헌드레드) 메시지: recv = 우리가 보낸 것 → 오른쪽 노란색 ── */
                         return (
                           <div key={mi} className="flex justify-end items-end gap-1.5">
                             <span className="text-[10px] text-[#5A5A5A]/75 shrink-0 pb-0.5 whitespace-nowrap">{t}</span>
+                            {/* 노란 말풍선 — 우상단 꺾임 */}
                             <div className="max-w-[78%] px-3 py-2 text-[12px] leading-relaxed text-[#111] shadow-sm"
                               style={{ background: '#FAE300', borderRadius: '13px 2px 13px 13px', wordBreak: 'break-word' }}>
                               {msg.text}
