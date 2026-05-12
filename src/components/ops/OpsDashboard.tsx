@@ -840,20 +840,20 @@ function OpsCard({
       }`}
       onClick={() => onToggle(c.id)}
     >
-      {/* 업체명 */}
-      <p className="font-bold text-[#1B2A45] text-[11px] leading-tight break-keep">{companyName}</p>
+      {/* 업체명 — 긴 이름 줄바꿈 */}
+      <p className="font-bold text-[#1B2A45] text-[11px] leading-snug pr-4"
+        style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
+        {companyName}
+      </p>
+      {/* 대표자 */}
       <p className="text-[10px] text-gray-400 mt-0.5">{c.customers?.name}</p>
-
-      {/* 담당자 */}
-      <div className="mt-1.5 flex items-center justify-center gap-1 text-[9px]">
-        <span className="font-bold text-violet-500 bg-violet-50 px-1 rounded">자</span>
-        <span className="text-gray-600 font-medium">{c.ops_user_name || '-'}</span>
-      </div>
+      {/* 전화번호 */}
+      <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{c.customers?.phone}</p>
 
       {/* 현재 기관 + 단계 */}
       <div className="mt-1.5 space-y-1">
         {c.institution ? (
-          <div className="text-[9px] text-gray-500 font-medium truncate">
+          <div className="text-[9px] text-gray-500 font-medium" style={{ wordBreak: 'break-all' }}>
             🏦 {c.institution}
           </div>
         ) : (
@@ -864,11 +864,19 @@ function OpsCard({
         </span>
       </div>
 
-      {/* 다음 기관 + 날짜 */}
+      {/* 다음 기관 + 날짜 — 가로로 */}
       {(nextInst || nextDate) && (
-        <div className="mt-1.5 bg-amber-50 rounded-lg px-1.5 py-1 text-[9px] text-amber-700">
-          {nextInst && <p className="font-semibold">→ {nextInst}</p>}
-          {nextDate && <p className="text-amber-500">{nextDate.slice(5)}</p>}
+        <div className="mt-1.5 flex items-center justify-center gap-1 flex-wrap">
+          {nextInst && (
+            <span className="text-[9px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+              → {nextInst}
+            </span>
+          )}
+          {nextDate && (
+            <span className="text-[9px] text-sky-500 font-medium">
+              📅 {nextDate.slice(5)}
+            </span>
+          )}
         </div>
       )}
 

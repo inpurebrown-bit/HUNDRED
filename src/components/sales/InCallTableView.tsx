@@ -648,22 +648,15 @@ function CustomerCard({
           </div>
         )}
 
-        {/* 업체명 */}
-        <p className="font-bold text-[#1B2A45] text-[11px] leading-tight pr-4 break-keep">{c.company || c.name}</p>
+        {/* 업체명 — 긴 이름 줄바꿈 */}
+        <p className="font-bold text-[#1B2A45] text-[11px] leading-snug pr-4 break-all word-break-all"
+          style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
+          {c.company || c.name}
+        </p>
         {/* 대표자 */}
         <p className="text-[10px] text-gray-400 mt-0.5">{c.name}</p>
-
-        {/* 영업담당자 / 자금담당자 */}
-        <div className="mt-1.5 space-y-0.5">
-          <div className="flex items-center justify-center gap-1 text-[9px]">
-            <span className="font-bold text-blue-500 bg-blue-50 px-1 rounded">영</span>
-            <span className="text-gray-600 font-medium">{ownerName || '-'}</span>
-          </div>
-          <div className="flex items-center justify-center gap-1 text-[9px]">
-            <span className="font-bold text-emerald-500 bg-emerald-50 px-1 rounded">자</span>
-            <span className="text-gray-500">{opsUserName || '-'}</span>
-          </div>
-        </div>
+        {/* 전화번호 */}
+        <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{c.phone}</p>
 
         {/* 감도 */}
         {c.details?.sensitivity && (
@@ -676,8 +669,8 @@ function CustomerCard({
           </div>
         )}
 
-        {/* 결정전 결과 + 클로징 결과 */}
-        <div className="mt-1.5 space-y-1" onClick={e => e.stopPropagation()}>
+        {/* 결정전 결과 + 클로징 결과 — 가로 나란히 */}
+        <div className="mt-1.5 flex gap-1 justify-center flex-wrap" onClick={e => e.stopPropagation()}>
           <BadgeDropdown
             value={c.details?.call_result || ''}
             options={CALL_RESULTS}
@@ -687,13 +680,13 @@ function CustomerCard({
             value={c.details?.closing_result || ''}
             options={CLOSING_RESULTS}
             onChange={(val) => onUpdate(c.id, { details: { closing_result: val } })}
-            placeholder="클로징결과"
+            placeholder="클로징"
           />
         </div>
 
         {/* 재통화 일정 */}
         {c.details?.follow_up_date && (
-          <p className="text-[9px] text-sky-600 mt-1 font-medium">📅 {c.details.follow_up_date.slice(5)}</p>
+          <p className="text-[9px] text-sky-500 mt-1.5 font-medium">📅 {c.details.follow_up_date.slice(5)}</p>
         )}
       </div>
 

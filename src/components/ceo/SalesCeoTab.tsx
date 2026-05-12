@@ -135,7 +135,7 @@ export default function SalesCeoTab() {
   )
 
   return (
-    <div className="space-y-5 pb-12">
+    <div className="space-y-5 pb-12 max-w-5xl mx-auto">
 
       {/* ── 상단 뷰 탭 ── */}
       <div className="flex gap-2 flex-wrap">

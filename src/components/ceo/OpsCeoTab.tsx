@@ -668,7 +668,7 @@ export default function OpsCeoTab() {
   ] as const
 
   return (
-    <div className="space-y-4 pb-8">
+    <div className="space-y-4 pb-8 max-w-5xl mx-auto">
       {/* 헤더 */}
       <div className="bg-[#1B2A45] rounded-xl px-5 py-4">
         <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
