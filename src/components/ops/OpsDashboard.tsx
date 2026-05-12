@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, FormEvent } from 'react'
 import { signOut } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
+import MyProfileTab from '@/components/MyProfileTab'
 
 // ── KST Utils ──────────────────────────────────────────────────────────
 function nowKST() {
@@ -108,6 +109,7 @@ interface Props {
 const opsTabs = [
   { key: 'cases', label: '📋 담당 케이스' },
   { key: 'report', label: '📝 보고' },
+  { key: 'profile', label: '👤 사원정보' },
 ]
 
 const inp = 'w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400/50 bg-white'
@@ -881,7 +883,7 @@ function OpsTableRow({
 
 // ── Main OpsDashboard ──────────────────────────────────────────────────
 export default function OpsDashboard({ userId, userName }: Props) {
-  const [activeTab, setActiveTab] = useState<'cases' | 'report'>('cases')
+  const [activeTab, setActiveTab] = useState<'cases' | 'report' | 'profile'>('cases')
   const [menuOpen, setMenuOpen] = useState(false)
   const [cases, setCases] = useState<OpsCase[]>([])
   const [loading, setLoading] = useState(true)
@@ -1215,6 +1217,11 @@ export default function OpsDashboard({ userId, userName }: Props) {
           </div>
         )
       })}
+
+        {/* ══════════ 사원정보 ══════════ */}
+        {activeTab === 'profile' && (
+          <MyProfileTab />
+        )}
     </div>
   )
 }

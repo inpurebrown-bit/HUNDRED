@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { signOut } from 'next-auth/react'
 import ReportTab from './ReportTab'
+import MyProfileTab from '@/components/MyProfileTab'
 import CustomerCard, { Customer, CustomerDetails, CardTabType } from './CustomerCard'
 import InCallForm, { InCallData } from './InCallForm'
 import InCallTableView from './InCallTableView'
@@ -48,7 +49,7 @@ const MONTHLY_GOALS: Record<string, number> = {
 // All sales users for assignee dropdown
 const SALES_USERS = ['hd-sales1', 'hd-sales2', 'hd-sales3']
 
-type SalesTab = 'board' | 'db010' | 'customers' | 'contracted' | 'emotional' | 'trash' | 'revenue' | 'report'
+type SalesTab = 'board' | 'db010' | 'customers' | 'contracted' | 'emotional' | 'trash' | 'revenue' | 'report' | 'profile'
 
 // ── Component ──────────────────────────────────────────────────────────
 export default function SalesDashboard({ userId, userName, username }: Props) {
@@ -318,6 +319,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
     { key: 'trash',      label: '🗑 자체거절',    count: trashCustomers.length },
     { key: 'revenue',    label: '💰 매출',        count: revenueCustomers.length },
     { key: 'report',     label: '📝 보고' },
+    { key: 'profile',    label: '👤 사원정보' },
   ]
 
   // ── Render ────────────────────────────────────────────────────────
@@ -836,6 +838,11 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         {/* ══════════ 보고 ══════════ */}
         {activeTab === 'report' && (
           <ReportTab userId={userId} userName={userName} />
+        )}
+
+        {/* ══════════ 사원정보 ══════════ */}
+        {activeTab === 'profile' && (
+          <MyProfileTab />
         )}
 
       </div>
