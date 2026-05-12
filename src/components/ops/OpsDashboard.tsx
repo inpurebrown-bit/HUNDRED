@@ -815,69 +815,83 @@ function TimelineSection({ initialTimeline, onSchedule }: {
   )
 }
 
-// ── OpsTableRow ────────────────────────────────────────────────────────
-function OpsTableRow({
+// ── OpsCard ────────────────────────────────────────────────────────────
+function OpsCard({
   c,
   isOpen,
   onToggle,
+  onScriptToggle,
 }: {
   c: OpsCase
   isOpen: boolean
   onToggle: (id: string) => void
+  onScriptToggle: (id: string, val: boolean) => void
 }) {
   const stage = PIPELINE_STAGES.find(s => s.key === c.progress_stage) || PIPELINE_STAGES[0]
+  const companyName = c.customers?.details?.company || c.customers?.name || '—'
+  const scriptSent = c.details?.script_sent || false
+  const nextInst = c.details?.next_institution || ''
+  const nextDate = c.details?.next_date || ''
 
   return (
-    <tr
-      className={`hover:bg-gray-50/60 transition-colors cursor-pointer border-b border-gray-50 ${isOpen ? 'bg-violet-50/40' : ''}`}
+    <div
+      className={`bg-white border rounded-xl p-2.5 cursor-pointer hover:shadow-md transition-all text-center relative ${
+        isOpen ? 'ring-2 ring-violet-400 border-violet-300' : 'border-gray-200 hover:border-violet-300'
+      }`}
       onClick={() => onToggle(c.id)}
     >
       {/* 업체명 */}
-      <td className="px-3 py-2.5">
-        <span className="font-semibold text-gray-800 text-xs truncate block max-w-[150px]">
-          {c.customers?.details?.company || c.customers?.name}
-        </span>
-        <span className="text-[10px] text-gray-400">{c.customers?.name}</span>
-      </td>
-      {/* 지역 */}
-      <td className="px-3 py-2.5 text-[11px] text-gray-500">
-        {c.customers?.details?.region || '—'}
-      </td>
-      {/* 업종 */}
-      <td className="px-3 py-2.5 text-[11px] text-gray-500 truncate max-w-[100px]">
-        {c.customers?.details?.business_type || '—'}
-      </td>
-      {/* 기관 */}
-      <td className="px-3 py-2.5 text-[11px] text-gray-600 truncate max-w-[120px]">
-        {c.institution || '—'}
-      </td>
-      {/* 현재상태 */}
-      <td className="px-3 py-2.5">
-        <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold text-white ${stage.color}`}>
+      <p className="font-bold text-[#1B2A45] text-[11px] leading-tight break-keep">{companyName}</p>
+      <p className="text-[10px] text-gray-400 mt-0.5">{c.customers?.name}</p>
+
+      {/* 담당자 */}
+      <div className="mt-1.5 flex items-center justify-center gap-1 text-[9px]">
+        <span className="font-bold text-violet-500 bg-violet-50 px-1 rounded">자</span>
+        <span className="text-gray-600 font-medium">{c.ops_user_name || '-'}</span>
+      </div>
+
+      {/* 현재 기관 + 단계 */}
+      <div className="mt-1.5 space-y-1">
+        {c.institution ? (
+          <div className="text-[9px] text-gray-500 font-medium truncate">
+            🏦 {c.institution}
+          </div>
+        ) : (
+          <div className="text-[9px] text-gray-300">기관 미배정</div>
+        )}
+        <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold text-white ${stage.color}`}>
           {stage.label}
         </span>
-      </td>
-      {/* 승인금액 */}
-      <td className="px-3 py-2.5 text-[11px] text-gray-700 font-medium">
-        {c.details?.approval_amount || '—'}
-      </td>
-      {/* 수수료% */}
-      <td className="px-3 py-2.5 text-[11px] text-gray-500">
-        {c.details?.fee_rate || '—'}
-      </td>
-      {/* 재통화/메모 */}
-      <td className="px-3 py-2.5 text-[11px] text-gray-400 truncate max-w-[150px]">
-        {c.details?.contract_date || (c.progress_memo ? c.progress_memo.slice(0, 30) + (c.progress_memo.length > 30 ? '…' : '') : '—')}
-      </td>
-      {/* 업데이트 */}
-      <td className="px-3 py-2.5 text-[10px] text-gray-300 whitespace-nowrap">
-        {new Date(c.updated_at).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}
-      </td>
-      {/* 화살표 */}
-      <td className="px-3 py-2.5 text-gray-300 text-sm w-6">
-        {isOpen ? '◀' : '▶'}
-      </td>
-    </tr>
+      </div>
+
+      {/* 다음 기관 + 날짜 */}
+      {(nextInst || nextDate) && (
+        <div className="mt-1.5 bg-amber-50 rounded-lg px-1.5 py-1 text-[9px] text-amber-700">
+          {nextInst && <p className="font-semibold">→ {nextInst}</p>}
+          {nextDate && <p className="text-amber-500">{nextDate.slice(5)}</p>}
+        </div>
+      )}
+
+      {/* 스크립트 발송 체크 */}
+      <div
+        className="mt-1.5 flex items-center justify-center gap-1"
+        onClick={e => e.stopPropagation()}
+      >
+        <input
+          type="checkbox"
+          id={`script-${c.id}`}
+          checked={scriptSent}
+          onChange={e => onScriptToggle(c.id, e.target.checked)}
+          className="w-3 h-3 accent-violet-500 cursor-pointer"
+        />
+        <label
+          htmlFor={`script-${c.id}`}
+          className={`text-[9px] cursor-pointer select-none ${scriptSent ? 'text-violet-600 font-semibold line-through' : 'text-gray-400'}`}
+        >
+          스크립트 발송
+        </label>
+      </div>
+    </div>
   )
 }
 
@@ -1130,41 +1144,27 @@ export default function OpsDashboard({ userId, userName }: Props) {
               <div className="space-y-4">
                 {groupedCases.map(({ stage, items }) => {
                   return (
-                    <div key={stage.key} className={`rounded-xl border overflow-hidden ${stage.light}`}>
-                      {/* Group header */}
-                      <div className={`px-4 py-2.5 flex items-center gap-3 border-b ${stage.light}`}>
-                        <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${stage.color}`} />
-                        <span className="font-bold text-sm text-gray-700">{stage.label}</span>
-                        <span className="text-xs text-gray-400 font-medium">{items.length}건</span>
+                    <div key={stage.key}>
+                      {/* 그룹 헤더 */}
+                      <div className="flex items-center gap-2 px-1 mb-2">
+                        <div className={`w-2 h-2 rounded-full shrink-0 ${stage.color}`} />
+                        <span className="text-[10px] font-bold text-[#1B2A45]/60 tracking-wide">{stage.label}</span>
+                        <span className="text-[10px] text-gray-400">{items.length}건</span>
+                        <div className="flex-1 h-px bg-gray-200" />
                       </div>
-                      {/* Table */}
-                      <div className="overflow-x-auto bg-white">
-                        <table className="w-full text-xs min-w-[900px]">
-                          <thead>
-                            <tr className="bg-gray-50 border-b border-gray-100">
-                              <th className="px-3 py-2 text-left text-gray-500 font-semibold">업체명</th>
-                              <th className="px-3 py-2 text-left text-gray-500 font-semibold">지역</th>
-                              <th className="px-3 py-2 text-left text-gray-500 font-semibold">업종</th>
-                              <th className="px-3 py-2 text-left text-gray-500 font-semibold">기관</th>
-                              <th className="px-3 py-2 text-left text-gray-500 font-semibold">현재상태</th>
-                              <th className="px-3 py-2 text-left text-gray-500 font-semibold">승인금액</th>
-                              <th className="px-3 py-2 text-left text-gray-500 font-semibold">수수료%</th>
-                              <th className="px-3 py-2 text-left text-gray-500 font-semibold">재통화/메모</th>
-                              <th className="px-3 py-2 text-left text-gray-500 font-semibold">수정일</th>
-                              <th className="px-3 py-2 w-6"></th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-50">
-                            {items.map(c => (
-                              <OpsTableRow
-                                key={c.id}
-                                c={c}
-                                isOpen={openPanelIds.includes(c.id)}
-                                onToggle={togglePanel}
-                              />
-                            ))}
-                          </tbody>
-                        </table>
+                      {/* 8열 카드 그리드 */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                        {items.map(c => (
+                          <OpsCard
+                            key={c.id}
+                            c={c}
+                            isOpen={openPanelIds.includes(c.id)}
+                            onToggle={togglePanel}
+                            onScriptToggle={(id, val) =>
+                              handleSave(id, { details: { ...(cases.find(x => x.id === id)?.details || {}), script_sent: val } })
+                            }
+                          />
+                        ))}
                       </div>
                     </div>
                   )

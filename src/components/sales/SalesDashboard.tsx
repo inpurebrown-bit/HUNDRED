@@ -23,6 +23,7 @@ interface Contract {
   contract_amount: number
   memo: string
   status: string
+  ops_user_name?: string
   created_at: string
   customers: { name: string; phone: string; company: string }
 }
@@ -640,6 +641,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               <InCallTableView
                 customers={activeCustomers}
                 allCustomers={customers}
+                opsContracts={contracts}
                 tabType="lead"
                 salesUsers={SALES_USERS}
                 userName={userName}

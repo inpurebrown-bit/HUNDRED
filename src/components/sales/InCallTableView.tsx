@@ -121,6 +121,7 @@ function ResultMemoField({ value, onChange }: { value: string; onChange: (v: str
 export interface Props {
   customers: Customer[]
   allCustomers?: Customer[]   // 누적매출 계산용 (전체 고객)
+  opsContracts?: { customer_id: string; ops_user_name?: string }[] // 자금담당자 표시용
   tabType: 'db010' | 'lead' | 'contracted' | 'emotional' | 'trash'
   salesUsers: string[]
   userName: string
@@ -206,9 +207,10 @@ interface BadgeDropdownProps {
   value: string
   options: { key: string; color: string }[]
   onChange: (key: string) => void
+  placeholder?: string
 }
 
-function BadgeDropdown({ value, options, onChange }: BadgeDropdownProps) {
+function BadgeDropdown({ value, options, onChange, placeholder }: BadgeDropdownProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const current = options.find(o => o.key === value) || options[options.length - 1]
@@ -229,7 +231,7 @@ function BadgeDropdown({ value, options, onChange }: BadgeDropdownProps) {
         onClick={() => setOpen(v => !v)}
         className={`px-2 py-0.5 rounded text-[11px] font-semibold cursor-pointer select-none whitespace-nowrap ${current.color}`}
       >
-        {current.key || '—'}
+        {current.key || placeholder || '—'}
       </button>
       {open && (
         <div className="absolute z-50 top-full left-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[110px] py-1">
@@ -477,6 +479,7 @@ interface CardProps {
   userName: string
   tabType: Props['tabType']
   showOwner?: boolean
+  opsUserName?: string   // 자금담당자
   cumulativeBase: number
   expandedId: string | null
   onExpand: (id: string | null) => void
@@ -492,6 +495,7 @@ function CustomerCard({
   userName,
   tabType,
   showOwner,
+  opsUserName,
   cumulativeBase,
   expandedId,
   onExpand,
@@ -575,14 +579,14 @@ function CustomerCard({
 
       {/* 카드 본체 */}
       <div
-        className={`bg-white border rounded-xl p-3 cursor-pointer hover:shadow-md transition-all relative ${
+        className={`bg-white border rounded-xl p-2.5 cursor-pointer hover:shadow-md transition-all relative text-center ${
           expanded ? 'ring-2 ring-blue-400 border-blue-300' : 'border-gray-200 hover:border-blue-300'
         }`}
         onClick={() => onExpand(expanded ? null : c.id)}
       >
         {/* 3-dot 메뉴 — 우상단 */}
         <div
-          className="absolute top-2 right-2"
+          className="absolute top-1.5 right-1.5"
           ref={menuRef}
           onClick={e => e.stopPropagation()}
         >
@@ -635,37 +639,61 @@ function CustomerCard({
           )}
         </div>
 
-        {/* 업체명 */}
-        <p className="font-bold text-[#1B2A45] text-xs truncate pr-5">{c.company || c.name}</p>
-        {/* 대표자 */}
-        <p className="text-[10px] text-gray-400 truncate">{c.name}</p>
-
-        {/* 직가/공가 + 담당자 */}
-        <div className="flex gap-1 mt-1 flex-wrap">
-          {leadType && (
-            <span className={`text-[9px] font-bold px-1 rounded ${leadType === '직가' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+        {/* 직가/공가 뱃지 */}
+        {leadType && (
+          <div className="mb-1">
+            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${leadType === '직가' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
               {leadType}
             </span>
-          )}
-          {showOwner && (
-            <span className="text-[9px] bg-gray-100 text-gray-500 px-1 rounded truncate max-w-[60px]">
-              {ownerName}
-            </span>
-          )}
+          </div>
+        )}
+
+        {/* 업체명 */}
+        <p className="font-bold text-[#1B2A45] text-[11px] leading-tight pr-4 break-keep">{c.company || c.name}</p>
+        {/* 대표자 */}
+        <p className="text-[10px] text-gray-400 mt-0.5">{c.name}</p>
+
+        {/* 영업담당자 / 자금담당자 */}
+        <div className="mt-1.5 space-y-0.5">
+          <div className="flex items-center justify-center gap-1 text-[9px]">
+            <span className="font-bold text-blue-500 bg-blue-50 px-1 rounded">영</span>
+            <span className="text-gray-600 font-medium">{ownerName || '-'}</span>
+          </div>
+          <div className="flex items-center justify-center gap-1 text-[9px]">
+            <span className="font-bold text-emerald-500 bg-emerald-50 px-1 rounded">자</span>
+            <span className="text-gray-500">{opsUserName || '-'}</span>
+          </div>
         </div>
 
-        {/* 결정전 결과 배지 */}
-        <div className="mt-1.5" onClick={e => e.stopPropagation()}>
+        {/* 감도 */}
+        {c.details?.sensitivity && (
+          <div className="mt-1.5 flex justify-center">
+            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+              c.details.sensitivity === '상' ? 'bg-red-100 text-red-600' :
+              c.details.sensitivity === '중' ? 'bg-orange-100 text-orange-600' :
+              'bg-gray-100 text-gray-500'
+            }`}>감도 {c.details.sensitivity}</span>
+          </div>
+        )}
+
+        {/* 결정전 결과 + 클로징 결과 */}
+        <div className="mt-1.5 space-y-1" onClick={e => e.stopPropagation()}>
           <BadgeDropdown
             value={c.details?.call_result || ''}
             options={CALL_RESULTS}
             onChange={(val) => onUpdate(c.id, { details: { call_result: val } })}
           />
+          <BadgeDropdown
+            value={c.details?.closing_result || ''}
+            options={CLOSING_RESULTS}
+            onChange={(val) => onUpdate(c.id, { details: { closing_result: val } })}
+            placeholder="클로징결과"
+          />
         </div>
 
-        {/* 재통화 일정 (있으면) */}
+        {/* 재통화 일정 */}
         {c.details?.follow_up_date && (
-          <p className="text-[9px] text-sky-600 mt-1">📅 {c.details.follow_up_date.slice(5)}</p>
+          <p className="text-[9px] text-sky-600 mt-1 font-medium">📅 {c.details.follow_up_date.slice(5)}</p>
         )}
       </div>
 
@@ -968,6 +996,7 @@ function CustomerCard({
 export default function InCallTableView({
   customers,
   allCustomers = [],
+  opsContracts = [],
   tabType,
   salesUsers,
   userName,
@@ -1004,11 +1033,13 @@ export default function InCallTableView({
               <div className="flex-1 h-px bg-gray-200" />
             </div>
 
-            {/* 6열 카드 그리드 */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+            {/* 8열 카드 그리드 */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
               {items.map(c => {
                 const ownerName = c.sales_user_name || c.details?.sales_user_name || userName
                 const cumBase = calcMonthlyRevenue(allCustomers, ownerName)
+                const opsContract = opsContracts?.find(ct => ct.customer_id === c.id)
+                const opsUserName = opsContract?.ops_user_name
                 return (
                   <CustomerCard
                     key={c.id}
@@ -1017,6 +1048,7 @@ export default function InCallTableView({
                     userName={userName}
                     tabType={tabType}
                     showOwner={showOwner}
+                    opsUserName={opsUserName}
                     cumulativeBase={cumBase}
                     expandedId={expandedId}
                     onExpand={setExpandedId}
