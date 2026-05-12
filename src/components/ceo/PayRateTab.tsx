@@ -372,6 +372,7 @@ function PayRateSubView() {
 interface SalesEmp {
   name: string
   sales_vat_incl: number
+  contracts: number
 }
 
 interface OpsEmp {
@@ -395,13 +396,8 @@ function PnlSubView() {
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState('')
 
-  const [salesEmps, setSalesEmps] = useState<SalesEmp[]>([
-    { name: '', sales_vat_incl: 0 },
-    { name: '', sales_vat_incl: 0 },
-  ])
-  const [opsEmps, setOpsEmps] = useState<OpsEmp[]>([
-    { name: '', fee_vat_incl: 0, contract_vat_incl: 0 },
-  ])
+  const [salesEmps, setSalesEmps] = useState<SalesEmp[]>([])
+  const [opsEmps, setOpsEmps] = useState<OpsEmp[]>([])
   const [otherCosts, setOtherCosts] = useState<OtherCost>({
     ad_marketing: 0,
     db: 0,
@@ -421,9 +417,28 @@ function PnlSubView() {
   // 총 매출
   const totalRevenue = salesTotal + opsFeeTotal + opsContractTotal
 
+  // 프로모션 급여 계산
+  function calcPromo(revenue: number, contracts: number): { baseRate: number; bonus: number; promoWage: number } {
+    const c = Number(contracts)
+    const baseRate = c >= 12 ? 0.30 : 0.25
+    const bonus = c >= 40 ? 1500000 : c >= 30 ? 1000000 : c >= 23 ? 700000 : c >= 20 ? 500000 : 0
+    const promoWage = revenue * baseRate + bonus
+    return { baseRate, bonus, promoWage }
+  }
+
   // 매입 — 영업팀
-  const salesTax = salesTotal * 0.15
-  const salesWage = salesTotal * 0.30
+  const salesTax = salesTotal * 0.10
+  // salesWage = sum of individual promoWage; fallback to 30% if no contracts entered
+  const salesWage = salesEmps.length > 0
+    ? salesEmps.reduce((s, e) => {
+        const hasContracts = Number(e.contracts) > 0
+        const revenue = Number(e.sales_vat_incl)
+        if (hasContracts) {
+          return s + calcPromo(revenue, e.contracts).promoWage
+        }
+        return s + revenue * 0.30
+      }, 0)
+    : salesTotal * 0.30
   // 매입 — 관리팀 (고정급은 별도 입력 없이 0 기본)
   // 기타 운영비 합계
   const otherTotal = Object.values(otherCosts).reduce((s, v) => s + Number(v), 0)
@@ -437,7 +452,7 @@ function PnlSubView() {
   const [dbUnitPrice, setDbUnitPrice] = useState(0)
   const [dbPurchaseCost, setDbPurchaseCost] = useState(0)
   const ifRevenue = Number(dbCount) * Number(dbUnitPrice)
-  const ifTax = ifRevenue * 0.15
+  const ifTax = ifRevenue * 0.10
   const ifProfit = ifRevenue - ifTax - Number(dbPurchaseCost) - Number(ceoSalary)
   const personalProfit = netProfit - Number(ceoSalary)
 
@@ -486,6 +501,7 @@ function PnlSubView() {
     })
   }
 
+
   function updateOpsEmp(i: number, field: keyof OpsEmp, value: string) {
     setOpsEmps(prev => {
       const next = [...prev]
@@ -515,65 +531,89 @@ function PnlSubView() {
           <h3 className="text-sm font-bold text-gray-700">매출</h3>
 
           {/* 영업팀 */}
-          <div className="bg-white rounded-xl border border-gray-100 p-4">
-            <h4 className="text-xs font-semibold text-gray-500 mb-3">영업팀</h4>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-xs text-gray-400">
-                  <th className="text-left pb-1">직원명</th>
-                  <th className="text-right pb-1">매출 (부가세 제외)</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody className="space-y-1">
-                {salesEmps.map((e, i) => (
-                  <tr key={i}>
-                    <td className="pr-2 py-0.5">
-                      <input type="text" value={e.name} onChange={ev => updateSalesEmp(i, 'name', ev.target.value)}
-                        className={INPUT_CLS} placeholder="직원명" />
-                    </td>
-                    <td className="pr-2 py-0.5">
-                      <input type="number" value={e.sales_vat_incl} onChange={ev => updateSalesEmp(i, 'sales_vat_incl', ev.target.value)}
-                        className={INPUT_CLS} min="0" placeholder="0" />
-                    </td>
-                    <td>
-                      <button onClick={() => setSalesEmps(prev => prev.filter((_, idx) => idx !== i))}
-                        className="text-red-400 hover:text-red-600 text-xs ml-1">✕</button>
-                    </td>
+          <div className="bg-white rounded-xl border border-gray-100 p-3">
+            <h4 className="text-xs font-semibold text-gray-500 mb-2">영업팀</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-gray-400">
+                    <th className="text-left pb-1 pr-1">직원명</th>
+                    <th className="text-right pb-1 pr-1">매출(부가세제외)</th>
+                    <th className="text-right pb-1 pr-1">계약수</th>
+                    <th className="text-right pb-1 pr-1">기본율</th>
+                    <th className="text-right pb-1 pr-1">보너스</th>
+                    <th className="text-right pb-1 pr-1">프로모급여</th>
+                    <th />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            <button onClick={() => setSalesEmps(prev => [...prev, { name: '', sales_vat_incl: 0 }])}
+                </thead>
+                <tbody>
+                  {salesEmps.map((e, i) => {
+                    const promo = calcPromo(Number(e.sales_vat_incl), e.contracts)
+                    const hasContracts = Number(e.contracts) > 0
+                    return (
+                      <tr key={i} className="border-t border-gray-50">
+                        <td className="pr-1 py-0.5">
+                          <input type="text" value={e.name} onChange={ev => updateSalesEmp(i, 'name', ev.target.value)}
+                            className="border border-gray-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 w-full" placeholder="직원명" />
+                        </td>
+                        <td className="pr-1 py-0.5">
+                          <input type="number" value={e.sales_vat_incl} onChange={ev => updateSalesEmp(i, 'sales_vat_incl', ev.target.value)}
+                            className="border border-gray-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 w-full" min="0" placeholder="0" />
+                        </td>
+                        <td className="pr-1 py-0.5">
+                          <input type="number" value={e.contracts} onChange={ev => updateSalesEmp(i, 'contracts', ev.target.value)}
+                            className="border border-gray-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 w-16" min="0" placeholder="0" />
+                        </td>
+                        <td className="pr-1 py-0.5 text-right text-gray-500">
+                          {hasContracts ? `${(promo.baseRate * 100).toFixed(0)}%` : '30%*'}
+                        </td>
+                        <td className="pr-1 py-0.5 text-right text-gray-500">
+                          {hasContracts ? promo.bonus.toLocaleString('ko-KR') : '-'}
+                        </td>
+                        <td className="pr-1 py-0.5 text-right font-semibold text-blue-700">
+                          {hasContracts ? Math.round(promo.promoWage).toLocaleString('ko-KR') : Math.round(Number(e.sales_vat_incl) * 0.30).toLocaleString('ko-KR')}
+                        </td>
+                        <td>
+                          <button onClick={() => setSalesEmps(prev => prev.filter((_, idx) => idx !== i))}
+                            className="text-red-400 hover:text-red-600 text-xs ml-1">✕</button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1">* 계약수 미입력시 30% 고정 적용</p>
+            <button onClick={() => setSalesEmps(prev => [...prev, { name: '', sales_vat_incl: 0, contracts: 0 }])}
               className="mt-2 text-xs text-blue-600 hover:text-blue-800">+ 영업팀 직원 추가</button>
           </div>
 
           {/* 관리팀 */}
-          <div className="bg-white rounded-xl border border-gray-100 p-4">
-            <h4 className="text-xs font-semibold text-gray-500 mb-3">관리팀</h4>
-            <table className="w-full text-sm">
+          <div className="bg-white rounded-xl border border-gray-100 p-3">
+            <h4 className="text-xs font-semibold text-gray-500 mb-2">관리팀</h4>
+            <table className="w-full text-xs">
               <thead>
-                <tr className="text-xs text-gray-400">
-                  <th className="text-left pb-1">직원명</th>
-                  <th className="text-right pb-1">수수료 (부가세 제외)</th>
-                  <th className="text-right pb-1">계약 (부가세 제외)</th>
+                <tr className="text-gray-400">
+                  <th className="text-left pb-1 pr-1">직원명</th>
+                  <th className="text-right pb-1 pr-1">수수료(부가세제외)</th>
+                  <th className="text-right pb-1 pr-1">계약(부가세제외)</th>
                   <th />
                 </tr>
               </thead>
               <tbody>
                 {opsEmps.map((e, i) => (
-                  <tr key={i}>
-                    <td className="pr-2 py-0.5">
+                  <tr key={i} className="border-t border-gray-50">
+                    <td className="pr-1 py-0.5">
                       <input type="text" value={e.name} onChange={ev => updateOpsEmp(i, 'name', ev.target.value)}
-                        className={INPUT_CLS} placeholder="직원명" />
+                        className="border border-gray-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 w-full" placeholder="직원명" />
                     </td>
-                    <td className="pr-2 py-0.5">
+                    <td className="pr-1 py-0.5">
                       <input type="number" value={e.fee_vat_incl} onChange={ev => updateOpsEmp(i, 'fee_vat_incl', ev.target.value)}
-                        className={INPUT_CLS} min="0" placeholder="0" />
+                        className="border border-gray-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 w-full" min="0" placeholder="0" />
                     </td>
-                    <td className="pr-2 py-0.5">
+                    <td className="pr-1 py-0.5">
                       <input type="number" value={e.contract_vat_incl} onChange={ev => updateOpsEmp(i, 'contract_vat_incl', ev.target.value)}
-                        className={INPUT_CLS} min="0" placeholder="0" />
+                        className="border border-gray-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 w-full" min="0" placeholder="0" />
                     </td>
                     <td>
                       <button onClick={() => setOpsEmps(prev => prev.filter((_, idx) => idx !== i))}
@@ -593,31 +633,34 @@ function PnlSubView() {
           <h3 className="text-sm font-bold text-gray-700">매입 / 비용</h3>
 
           {/* 영업팀 매입 */}
-          <div className="bg-white rounded-xl border border-gray-100 p-4">
-            <h4 className="text-xs font-semibold text-gray-500 mb-3">영업팀 매입</h4>
-            <table className="w-full text-sm">
+          <div className="bg-white rounded-xl border border-gray-100 p-3">
+            <h4 className="text-xs font-semibold text-gray-500 mb-2">영업팀 매입</h4>
+            <table className="w-full text-xs">
               <thead>
-                <tr className="text-xs text-gray-400">
-                  <th className="text-left pb-1">직원명</th>
-                  <th className="text-right pb-1">세금 (15%)</th>
-                  <th className="text-right pb-1">월급 (30%)</th>
+                <tr className="text-gray-400">
+                  <th className="text-left pb-1 pr-1">직원명</th>
+                  <th className="text-right pb-1 pr-1">세금 (10%)</th>
+                  <th className="text-right pb-1 pr-1">프로모급여</th>
                 </tr>
               </thead>
               <tbody>
                 {salesEmps.map((e, i) => {
                   const amt = Number(e.sales_vat_incl)
+                  const hasContracts = Number(e.contracts) > 0
+                  const promo = calcPromo(amt, e.contracts)
+                  const wage = hasContracts ? promo.promoWage : amt * 0.30
                   return (
-                    <tr key={i}>
-                      <td className="pr-2 py-0.5 text-gray-600 text-xs">{e.name || `직원${i+1}`}</td>
-                      <td className={CALC_CLS}>{Math.round(amt * 0.15).toLocaleString('ko-KR')}</td>
-                      <td className={CALC_CLS}>{Math.round(amt * 0.30).toLocaleString('ko-KR')}</td>
+                    <tr key={i} className="border-t border-gray-50">
+                      <td className="pr-1 py-0.5 text-gray-600">{e.name || `직원${i+1}`}</td>
+                      <td className="bg-gray-50 text-gray-600 px-1 py-0.5 text-right whitespace-nowrap">{Math.round(amt * 0.10).toLocaleString('ko-KR')}</td>
+                      <td className="bg-gray-50 text-gray-600 px-1 py-0.5 text-right whitespace-nowrap">{Math.round(wage).toLocaleString('ko-KR')}</td>
                     </tr>
                   )
                 })}
-                <tr className="border-t border-gray-100 font-semibold">
-                  <td className="pr-2 py-1 text-xs text-gray-500">소계</td>
-                  <td className={CALC_CLS}>{Math.round(salesTax).toLocaleString('ko-KR')}</td>
-                  <td className={CALC_CLS}>{Math.round(salesWage).toLocaleString('ko-KR')}</td>
+                <tr className="border-t border-gray-200 font-semibold">
+                  <td className="pr-1 py-1 text-gray-500">소계</td>
+                  <td className="bg-gray-50 text-gray-600 px-1 py-0.5 text-right whitespace-nowrap">{Math.round(salesTax).toLocaleString('ko-KR')}</td>
+                  <td className="bg-gray-50 text-gray-600 px-1 py-0.5 text-right whitespace-nowrap">{Math.round(salesWage).toLocaleString('ko-KR')}</td>
                 </tr>
               </tbody>
             </table>
@@ -708,7 +751,7 @@ function PnlSubView() {
           ))}
           <div className="border-t border-gray-100 pt-2 space-y-1 text-sm">
             <div className="flex justify-between"><span className="text-gray-500">IF 매출</span><span>{ifRevenue.toLocaleString('ko-KR')}원</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">세금 (15%)</span><span>{Math.round(ifTax).toLocaleString('ko-KR')}원</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">세금 (10%)</span><span>{Math.round(ifTax).toLocaleString('ko-KR')}원</span></div>
             <div className="flex justify-between font-semibold"><span>IF 수익</span><span className={ifProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}>{Math.round(ifProfit).toLocaleString('ko-KR')}원</span></div>
             <div className="flex justify-between font-semibold"><span>개인 수익</span><span className={personalProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}>{Math.round(personalProfit).toLocaleString('ko-KR')}원</span></div>
           </div>

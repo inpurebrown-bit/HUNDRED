@@ -142,7 +142,7 @@ export default function MinutesTab() {
                   </div>
                 </div>
 
-                <div className="p-5 grid md:grid-cols-2 gap-5">
+                <div className="p-5 grid md:grid-cols-2 print:grid-cols-1 gap-5">
                   {/* 오전보고 */}
                   <div>
                     <p className="text-xs font-bold text-amber-600 mb-3">☀️ 오전보고</p>
@@ -228,9 +228,14 @@ export default function MinutesTab() {
                         {(dr.data?.payment_waiting || []).length > 0 && (
                           <div>
                             <p className="text-[10px] font-bold text-gray-500 mb-1">💰 입금대기 업체</p>
-                            <div className="flex flex-wrap gap-1">
+                            <div className="flex flex-wrap gap-1.5">
                               {(dr.data.payment_waiting as any[]).map((p: any, idx: number) => (
-                                <span key={idx} className="text-[11px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{p.company}</span>
+                                <span key={idx} className="text-[11px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg flex flex-col">
+                                  <span className="font-bold">{p.company}</span>
+                                  {(p.memo || p.notes) && (
+                                    <span className="text-[9px] text-amber-600 font-normal">{p.memo || p.notes}</span>
+                                  )}
+                                </span>
                               ))}
                             </div>
                           </div>

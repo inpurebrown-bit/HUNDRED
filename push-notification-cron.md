@@ -23,6 +23,7 @@
 | 흡수 미처리 알림 | 관리팀 | 매일 10:00 | `GET /api/push/cron?target=ops&title=📥 흡수 확인 필요&body=흡수 처리가 필요한 업체를 확인해주세요.&url=/dashboard` |
 | 마감보고 알림 | 관리팀 | 매일 17:50 | `GET /api/push/cron?target=ops&title=📋 마감보고 시간&body=마감보고를 제출해주세요!&url=/dashboard` |
 | 마감보고 독촉(1차) | 관리팀 | 매일 18:50 | `GET /api/push/check-reports?type=daily` |
+| 오늘의 명언 | 전 직원 | 매일 09:50 | `GET /api/push/daily-quote` |
 
 ---
 

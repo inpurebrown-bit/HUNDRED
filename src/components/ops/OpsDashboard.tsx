@@ -88,7 +88,17 @@ ${inst} 보증서 심사를 위해 고객님이 직접 방문하셔야 합니다
 방문 전 미리 연락 주시면 감사하겠습니다.`
 
 // ── 기관ID/PW 목록 ─────────────────────────────────────────────────────
-const CRED_INSTITUTIONS = ['소진공', '중진공', '기보', '신보', '재단', '크래딧포유', '아이핀', '소진공지식배움터']
+const CRED_TYPES = [
+  { key: 'cert_personal', label: '공동인증서 개인PW', hasId: false, hasPw: true,  hasPw2: false },
+  { key: 'corp_pw',       label: '법인PW',           hasId: false, hasPw: true,  hasPw2: false },
+  { key: 'jinjin',        label: '중진공',            hasId: true,  hasPw: true,  hasPw2: false },
+  { key: 'sojin',         label: '소진공',            hasId: true,  hasPw: true,  hasPw2: false },
+  { key: 'sojin_edu',     label: '소진공지식배움터',   hasId: true,  hasPw: true,  hasPw2: false },
+  { key: 'kibo',          label: '기보',              hasId: true,  hasPw: true,  hasPw2: false },
+  { key: 'sinbo',         label: '신보',              hasId: true,  hasPw: true,  hasPw2: false },
+  { key: 'creditforyou',  label: '크래딧포유',        hasId: true,  hasPw: true,  hasPw2: false },
+  { key: 'ipin',          label: '아이핀',            hasId: true,  hasPw: true,  hasPw2: true  },
+]
 
 interface Props {
   userId: string
@@ -507,43 +517,71 @@ function OpsDetailPanel({ c, onSave }: { c: OpsCase; onSave: (id: string, patch:
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">기관별 ID / PW</span>
             <div className="flex-1 h-px bg-gray-100" />
           </div>
-          {CRED_INSTITUTIONS.map(inst => {
-            const idKey = `cred_${inst}_id`
-            const pwKey = `cred_${inst}_pw`
-            const isPwVisible = pwVisible[inst] || false
+          {CRED_TYPES.map(cred => {
+            const idKey  = `cred_${cred.key}_id`
+            const pwKey  = `cred_${cred.key}_pw`
+            const pw2Key = `cred_${cred.key}_pw2`
+            const isPwVisible  = pwVisible[`${cred.key}_pw`]  || false
+            const isPw2Visible = pwVisible[`${cred.key}_pw2`] || false
+            const colCount = [cred.hasId, cred.hasPw, cred.hasPw2].filter(Boolean).length
             return (
-              <div key={inst} className="bg-gray-50 rounded-lg p-3">
-                <p className="text-[11px] font-bold text-gray-600 mb-2">{inst}</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className={lbl}>ID</label>
-                    <input
-                      type="text"
-                      value={d[idKey] || ''}
-                      onChange={e => detailField(idKey, e.target.value)}
-                      className={inp}
-                      placeholder={`${inst} 아이디`}
-                    />
-                  </div>
-                  <div>
-                    <label className={lbl}>PW</label>
-                    <div className="relative">
+              <div key={cred.key} className="bg-gray-50 rounded-lg p-3">
+                <p className="text-[11px] font-bold text-gray-600 mb-2">{cred.label}</p>
+                <div className={`grid grid-cols-${colCount} gap-2`}>
+                  {cred.hasId && (
+                    <div>
+                      <label className={lbl}>ID</label>
                       <input
-                        type={isPwVisible ? 'text' : 'password'}
-                        value={d[pwKey] || ''}
-                        onChange={e => detailField(pwKey, e.target.value)}
-                        className={inp + ' pr-7'}
-                        placeholder={`${inst} 비밀번호`}
+                        type="text"
+                        value={d[idKey] || ''}
+                        onChange={e => detailField(idKey, e.target.value)}
+                        className={inp}
+                        placeholder={`${cred.label} 아이디`}
                       />
-                      <button
-                        type="button"
-                        onClick={() => setPwVisible(prev => ({ ...prev, [inst]: !isPwVisible }))}
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-[11px]"
-                      >
-                        {isPwVisible ? '🙈' : '👁'}
-                      </button>
                     </div>
-                  </div>
+                  )}
+                  {cred.hasPw && (
+                    <div>
+                      <label className={lbl}>PW</label>
+                      <div className="relative">
+                        <input
+                          type={isPwVisible ? 'text' : 'password'}
+                          value={d[pwKey] || ''}
+                          onChange={e => detailField(pwKey, e.target.value)}
+                          className={inp + ' pr-7'}
+                          placeholder={`${cred.label} 비밀번호`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setPwVisible(prev => ({ ...prev, [`${cred.key}_pw`]: !isPwVisible }))}
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-[11px]"
+                        >
+                          {isPwVisible ? '🙈' : '👁'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {cred.hasPw2 && (
+                    <div>
+                      <label className={lbl}>2차PW</label>
+                      <div className="relative">
+                        <input
+                          type={isPw2Visible ? 'text' : 'password'}
+                          value={d[pw2Key] || ''}
+                          onChange={e => detailField(pw2Key, e.target.value)}
+                          className={inp + ' pr-7'}
+                          placeholder={`${cred.label} 2차 비밀번호`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setPwVisible(prev => ({ ...prev, [`${cred.key}_pw2`]: !isPw2Visible }))}
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-[11px]"
+                        >
+                          {isPw2Visible ? '🙈' : '👁'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )
