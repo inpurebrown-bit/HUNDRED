@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const model = genAI.getGenerativeModel({
-      model: 'gemini-3.1-flash-lite-preview',
+      model: 'gemini-2.0-flash-lite',
       systemInstruction: `당신은 헌드레드 지원센터의 AI 비서 '헌드레드비서'입니다.
 정책자금 상담 전문가로서 다음 역할을 수행합니다:
 - 중소기업·소상공인 대상 정책자금 종류 및 조건 안내

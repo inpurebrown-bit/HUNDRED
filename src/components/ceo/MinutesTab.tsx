@@ -87,6 +87,12 @@ export default function MinutesTab() {
           >
             🔄 새로고침
           </button>
+          <button
+            onClick={() => window.print()}
+            className="bg-[#C5A258] hover:bg-[#D4B568] text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+          >
+            🖨️ 출력
+          </button>
         </div>
       </div>
 
