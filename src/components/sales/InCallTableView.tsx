@@ -3,6 +3,83 @@
 import { useState, useRef, useEffect } from 'react'
 import NumberInput, { parseNumber, formatNumber } from '@/components/ui/NumberInput'
 
+// ── KST 시간 유틸 ──────────────────────────────────────────
+function nowKST(): string {
+  return new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(' ', 'T') + '+09:00'
+}
+function formatKST(isoStr: string): { date: string; time: string } {
+  if (!isoStr) return { date: '', time: '' }
+  const d = new Date(isoStr)
+  const date = d.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: '2-digit', day: '2-digit' }).replace('. ', '/').replace('.', '')
+  const time = d.toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false })
+  return { date, time }
+}
+
+// ── 혁신요건 옵션 ──────────────────────────────────────────
+const INNOVATION_GROUPS = [
+  {
+    group: '혁신형',
+    color: 'bg-violet-100 text-violet-800 border-violet-300',
+    options: ['매출신장', '수출', '직접대출 성실상환'],
+  },
+  {
+    group: '일반형',
+    color: 'bg-sky-100 text-sky-800 border-sky-300',
+    options: ['3D', 'AI', '키오스크', '디지털오더', '무인판매기', '로봇', '디지털메뉴', '전자칠판', '고객관리S/W', '매출관리S/W', '재고관리S/W', '통합관리시스템', '온라인예약관리', '육가공공정시스템'],
+  },
+]
+
+function InnovationSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const selected = value ? value.split(',').map(v => v.trim()).filter(Boolean) : []
+
+  useEffect(() => {
+    if (!open) return
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [open])
+
+  function toggle(opt: string) {
+    const next = selected.includes(opt) ? selected.filter(s => s !== opt) : [...selected, opt]
+    onChange(next.join(', '))
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" onClick={() => setOpen(v => !v)}
+        className="w-full text-left bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none min-h-[32px] flex flex-wrap gap-1 items-center">
+        {selected.length > 0
+          ? selected.map(s => <span key={s} className="bg-violet-100 text-violet-800 px-1.5 py-0.5 rounded text-[10px] font-semibold">{s}</span>)
+          : <span className="text-gray-300 text-[10px]">클릭하여 선택</span>}
+        <span className="ml-auto text-gray-300 text-[10px]">▾</span>
+      </button>
+      {open && (
+        <div className="absolute z-50 top-full left-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 p-3 w-72">
+          {INNOVATION_GROUPS.map(({ group, color, options }) => (
+            <div key={group} className="mb-3 last:mb-0">
+              <p className="text-[10px] font-bold text-gray-500 mb-1.5">{group}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {options.map(opt => (
+                  <button key={opt} type="button" onClick={() => toggle(opt)}
+                    className={`px-2 py-1 rounded-full text-[10px] font-semibold border transition-colors ${
+                      selected.includes(opt) ? color : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+                    }`}>{opt}</button>
+                ))}
+              </div>
+            </div>
+          ))}
+          {selected.length > 0 && (
+            <button type="button" onClick={() => onChange('')}
+              className="mt-2 text-[10px] text-red-400 hover:text-red-600 w-full text-right">전체 해제</button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export interface Customer {
   id: string
   name: string
@@ -89,7 +166,8 @@ const CLOSING_RESULTS = [
   { key: '',           color: 'bg-gray-100 text-gray-400' },
 ]
 
-// 인콜일지 필드 목록
+// 인콜일지 필드 목록 (혁신요건은 별도 컴포넌트로 처리)
+const KEY_LABELS = new Set(['업체명','대표자','연락처','업종','실제업무','25년매출','NICE점수','필요자금'])
 function buildLogFields(c: Customer) {
   return [
     { label: '업체명',    value: c.details?.company || c.company },
@@ -101,7 +179,7 @@ function buildLogFields(c: Customer) {
     { label: '실제업무',  value: c.details?.real_work },
     { label: '업력',      value: c.details?.years_in_business || c.details?.biz_size },
     { label: '직원수',    value: c.details?.employee_count },
-    { label: '혁신요건',  value: c.details?.innovation },
+    // 혁신요건은 InnovationSelect 컴포넌트로 처리
     { label: '특허',      value: c.details?.patent },
     { label: '26년매출',  value: c.details?.revenue_2026 },
     { label: '25년매출',  value: c.details?.revenue_2025 },
@@ -176,20 +254,23 @@ function BadgeDropdown({ value, options, onChange }: BadgeDropdownProps) {
 // ── ContractModal ──────────────────────────────────────────────────────
 interface ContractModalProps {
   company: string
-  cumulativeBase: number   // 이번달 기존 누적 (새 계약 전)
+  cumulativeBase: number
+  initialMemo?: string     // 통화내용/메모 미러링용 초기값
+  initialNoRefund?: boolean
   onClose: () => void
   onConfirm: (data: Record<string, any>) => Promise<void>
 }
 
 const INP = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/50'
 
-function ContractModal({ company, cumulativeBase, onClose, onConfirm }: ContractModalProps) {
-  // 원화 금액은 raw 숫자 문자열 (콤마 없음) 로 관리
-  const [contractFee, setContractFee] = useState('')   // 계약금 (VAT 미포함)
-  const [paidAmount,  setPaidAmount]  = useState('')   // 실제 입금액 (VAT 포함 가능)
+function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRefund = false, onClose, onConfirm }: ContractModalProps) {
+  const [contractFee, setContractFee] = useState('')
+  const [paidAmount,  setPaidAmount]  = useState('')
   const [vatIncluded, setVatIncluded] = useState(false)
-  const [myRevenue,   setMyRevenue]   = useState('')   // 본인 매출 (수동 입력)
-  const [opsMemo,     setOpsMemo]     = useState('')
+  const [myRevenue,   setMyRevenue]   = useState('')
+  // 메모 미러링: 통화내용/메모와 동일 필드 (initialMemo로 pre-fill)
+  const [opsMemo,     setOpsMemo]     = useState(initialMemo)
+  const [noRefund,    setNoRefund]    = useState(initialNoRefund)
   const [groupChatInvited, setGroupChatInvited] = useState(false)
   const [coopRequestSent,  setCoopRequestSent]  = useState(false)
   const [saving, setSaving] = useState(false)
@@ -210,15 +291,16 @@ function ContractModal({ company, cumulativeBase, onClose, onConfirm }: Contract
   async function handleConfirm() {
     setSaving(true)
     await onConfirm({
-      contract_fee:        formatNumber(feeNum),      // 총합의금(VAT별도)
-      payment_amount:      formatNumber(paidNum),     // 입금액(VAT포함 가능)
-      net_paid:            formatNumber(netPaid),     // 순입금(VAT제외)
+      contract_fee:        formatNumber(feeNum),
+      payment_amount:      formatNumber(paidNum),
+      net_paid:            formatNumber(netPaid),
       vat_included:        vatIncluded,
       vat_amount:          vat > 0 ? formatNumber(vat) : '0',
-      unpaid_amount:       unpaid > 0 ? formatNumber(unpaid) : '0', // 잔금
+      unpaid_amount:       unpaid > 0 ? formatNumber(unpaid) : '0',
       my_revenue:          formatNumber(myRevNum),
       cumulative_revenue:  formatNumber(cumulative),
-      ops_memo:            opsMemo,
+      result_memo:         opsMemo,   // 미러링: 메모와 같은 필드
+      no_refund:           noRefund,
       group_chat_invited:  groupChatInvited,
       coop_request_sent:   coopRequestSent,
       contract_date:       new Date().toISOString().slice(0, 10),
@@ -244,17 +326,17 @@ function ContractModal({ company, cumulativeBase, onClose, onConfirm }: Contract
         {/* Body */}
         <div className="px-5 py-4 space-y-3">
 
-          {/* ① 총 합의금 (VAT 별도) */}
+          {/* ① 계약금 */}
           <div>
             <label className="text-[10px] text-blue-700 mb-1 block font-bold">
-              총 합의금 <span className="text-gray-400 font-normal">(VAT 별도 순금액)</span>
+              계약금 <span className="text-gray-400 font-normal">(계약서 작성 시 기입한 금액, VAT 별도)</span>
             </label>
             <NumberInput value={contractFee} onChange={setContractFee} className={INP} placeholder="500,000" />
           </div>
 
-          {/* ② 이번 입금액 + 부가세 포함 토글 */}
+          {/* ② 이번 입금액 */}
           <div>
-            <label className="text-[10px] text-blue-700 mb-1 block font-bold">이번 입금액</label>
+            <label className="text-[10px] text-blue-700 mb-1 block font-bold">이번 입금액 <span className="text-gray-400 font-normal">(VAT 포함)</span></label>
             <NumberInput value={paidAmount} onChange={setPaidAmount} className={INP} placeholder="330,000" />
           </div>
 
@@ -312,14 +394,27 @@ function ContractModal({ company, cumulativeBase, onClose, onConfirm }: Contract
             </p>
           </div>
 
-          {/* 자금팀 메모 */}
+          {/* 자금팀 전달 메모 (통화내용/메모와 미러링) */}
           <div>
-            <label className="text-[10px] text-blue-700 mb-1 block font-bold">자금팀 전달 메모</label>
+            <label className="text-[10px] text-blue-700 mb-1 block font-bold">
+              자금팀 전달 메모
+              <span className="ml-1 text-[9px] text-emerald-600 font-normal">↔ 인콜일지 메모와 연동</span>
+            </label>
             <textarea value={opsMemo} onChange={e => setOpsMemo(e.target.value)}
-              rows={3}
+              rows={4}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/50 resize-none"
-              placeholder="자금팀에 전달할 내용..." />
+              placeholder="통화내용, 특이사항, 자금팀 전달 내용..." />
           </div>
+
+          {/* 환불없이 진행 */}
+          <label className="flex items-center gap-2.5 cursor-pointer bg-red-50 border border-red-100 rounded-lg px-3 py-2.5">
+            <input type="checkbox" checked={noRefund} onChange={e => setNoRefund(e.target.checked)}
+              className="w-4 h-4 rounded accent-red-500" />
+            <span className={`text-xs font-semibold ${noRefund ? 'text-red-700' : 'text-gray-600'}`}>
+              환불없이 진행
+            </span>
+            {noRefund && <span className="text-[10px] bg-red-500 text-white px-2 py-0.5 rounded-full font-bold ml-auto">환불불가</span>}
+          </label>
 
           {/* 체크리스트 */}
           <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 space-y-2.5">
@@ -423,9 +518,9 @@ function InCallTableRow({ customer, index, salesUsers, userName, tabType, showOw
   async function addTimelineEntry() {
     if (!tlText.trim()) return
     const entry = {
-      user: '영업팀',
+      user: userName,
       content: tlText.trim(),
-      created_at: new Date().toISOString(),
+      created_at: nowKST(),
     }
     const updated = [...(c.call_timeline || []), entry]
     setTlText('')
@@ -442,6 +537,8 @@ function InCallTableRow({ customer, index, salesUsers, userName, tabType, showOw
         <ContractModal
           company={c.company || c.name}
           cumulativeBase={cumulativeBase}
+          initialMemo={c.details?.result_memo || c.notes || c.memo || ''}
+          initialNoRefund={c.details?.no_refund || false}
           onClose={() => setContractModalOpen(false)}
           onConfirm={handleContractConfirm}
         />
@@ -669,47 +766,65 @@ function InCallTableRow({ customer, index, salesUsers, userName, tabType, showOw
 
                 {/* ── 좌측: 인콜일지 ── */}
                 <div className="p-4 overflow-y-auto max-h-[520px]">
-                  <p className="text-[10px] font-bold text-[#1B2A45] uppercase tracking-wide mb-3">📋 인콜일지</p>
-                  <div className="grid grid-cols-1 gap-1">
-                    {buildLogFields(c).map(({ label, value }) => {
-                      const isEmpty = !value || !String(value).trim()
-                      return (
-                        <div key={label} className="flex items-start gap-2 bg-white border border-gray-100 rounded-lg px-2.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                          <span className="w-20 shrink-0 text-[10px] text-blue-700 font-bold pt-0.5">{label}</span>
-                          <span className={`text-xs flex-1 break-words ${isEmpty ? 'text-gray-300 italic' : 'text-gray-800 font-medium'}`}>
-                            {isEmpty ? '—' : String(value)}
-                          </span>
-                        </div>
-                      )
-                    })}
-                  </div>
+                  <p className="text-[10px] font-bold text-[#1B2A45] uppercase tracking-wide mb-2">📋 인콜일지</p>
 
-                  {/* 직가/공가 — 인콜일지 내 */}
-                  <div className="flex items-center gap-2 bg-white border border-gray-100 rounded-lg px-2.5 py-2 mt-1 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                    <span className="w-20 shrink-0 text-[10px] text-blue-700 font-bold">직가/공가</span>
+                  {/* ① 직가/공가 — 최상단 */}
+                  <div className="flex items-center gap-2 bg-[#1B2A45] border border-[#1B2A45] rounded-lg px-2.5 py-2 mb-2 shadow-sm">
+                    <span className="w-20 shrink-0 text-[10px] text-white font-bold">직가/공가</span>
                     <div className="flex gap-1.5">
                       {['직가', '공가'].map(opt => (
                         <button key={opt} type="button"
                           onClick={() => onUpdate(c.id, { details: { lead_type: leadType === opt ? '' : opt } })}
                           className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border transition-colors ${
                             leadType === opt
-                              ? opt === '직가' ? 'bg-blue-500 text-white border-blue-500' : 'bg-amber-500 text-white border-amber-500'
-                              : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                              ? opt === '직가' ? 'bg-blue-400 text-white border-blue-400' : 'bg-amber-400 text-white border-amber-400'
+                              : 'bg-white/10 text-white/60 border-white/20 hover:bg-white/20'
                           }`}>{opt}</button>
                       ))}
                     </div>
                   </div>
 
-                  {/* 통화내용 */}
+                  {/* ② 필드 목록 (key 필드 강조) */}
+                  <div className="grid grid-cols-1 gap-1">
+                    {buildLogFields(c).map(({ label, value }) => {
+                      const isEmpty = !value || !String(value).trim()
+                      const isKey = KEY_LABELS.has(label)
+                      return (
+                        <div key={label} className={`flex items-start gap-2 rounded-lg px-2.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${
+                          isKey
+                            ? 'bg-blue-50 border border-blue-200'
+                            : 'bg-white border border-gray-100'
+                        }`}>
+                          <span className={`w-20 shrink-0 text-[10px] font-bold pt-0.5 ${isKey ? 'text-blue-800' : 'text-blue-600'}`}>{label}</span>
+                          <span className={`text-xs flex-1 break-words ${isEmpty ? 'text-gray-300 italic' : isKey ? 'text-gray-900 font-semibold' : 'text-gray-700 font-medium'}`}>
+                            {isEmpty ? '—' : String(value)}
+                          </span>
+                        </div>
+                      )
+                    })}
+
+                    {/* 혁신요건 — 인터랙티브 */}
+                    <div className="flex items-start gap-2 bg-violet-50 border border-violet-200 rounded-lg px-2.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                      <span className="w-20 shrink-0 text-[10px] text-violet-800 font-bold pt-1">혁신요건</span>
+                      <div className="flex-1">
+                        <InnovationSelect
+                          value={c.details?.innovation || ''}
+                          onChange={v => onUpdate(c.id, { details: { innovation: v } })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 통화내용 + 메모 미러링 */}
                   <div className="bg-white border border-gray-100 rounded-lg px-2.5 py-2 mt-1 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                    <p className="text-[10px] font-bold text-blue-700 mb-1.5">통화내용</p>
-                    {(c.memo || c.notes || c.details?.notes) ? (
-                      <p className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">
-                        {c.memo || c.notes || c.details?.notes}
-                      </p>
-                    ) : (
-                      <p className="text-xs text-gray-300 italic">—</p>
-                    )}
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-[10px] font-bold text-blue-700">통화내용 / 메모</p>
+                      <span className="text-[9px] text-emerald-600">↔ 자금팀 전달메모와 연동</span>
+                    </div>
+                    <ResultMemoField
+                      value={c.details?.result_memo || c.notes || c.memo || ''}
+                      onChange={(val) => onUpdate(c.id, { details: { result_memo: val } })}
+                    />
                   </div>
                 </div>
 
@@ -752,22 +867,6 @@ function InCallTableRow({ customer, index, salesUsers, userName, tabType, showOw
                       onChange={e => onUpdate(c.id, { details: { follow_up_date: e.target.value } })}
                       className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50 text-gray-800"
                     />
-                  </div>
-
-                  {/* 환불없이 진행 체크박스 */}
-                  <div className="bg-gray-50 rounded-xl px-3 py-2.5">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={c.details?.no_refund || false}
-                        onChange={e => onUpdate(c.id, { details: { no_refund: e.target.checked } })}
-                        className="w-4 h-4 rounded accent-red-500"
-                      />
-                      <span className="text-xs text-gray-700 font-medium">환불없이 진행</span>
-                      {c.details?.no_refund && (
-                        <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-medium">환불불가</span>
-                      )}
-                    </label>
                   </div>
 
                   {/* A/S 요청 + 심사 요청 */}
@@ -824,40 +923,53 @@ function InCallTableRow({ customer, index, salesUsers, userName, tabType, showOw
 
                   {/* 타임라인 */}
                   <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                    <p className="text-[10px] font-bold text-blue-700 mb-1.5">📝 타임라인</p>
+                    <p className="text-[10px] font-bold text-blue-700 mb-2">📝 타임라인</p>
                     {/* 추가 입력 */}
-                    <div className="flex gap-2 mb-2">
+                    <div className="flex gap-2 mb-3">
                       <input
                         type="text"
                         value={tlText}
                         onChange={e => setTlText(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTimelineEntry() } }}
-                        placeholder="메모 입력 후 Enter"
-                        className="flex-1 border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50"
+                        placeholder="기록 입력 후 Enter…"
+                        className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50"
                       />
                       <button
                         type="button"
                         onClick={addTimelineEntry}
                         disabled={!tlText.trim()}
-                        className="shrink-0 bg-blue-500 hover:bg-blue-600 disabled:opacity-40 text-white px-2.5 py-1.5 rounded text-[11px] font-semibold transition-colors"
+                        className="shrink-0 bg-[#1B2A45] hover:bg-[#243959] disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors"
                       >
                         추가
                       </button>
                     </div>
                     {c.call_timeline && c.call_timeline.length > 0 ? (
-                      <div className="space-y-1.5">
-                        {(c.call_timeline as any[]).slice().reverse().map((entry: any, i: number) => (
-                          <div key={i} className="bg-white border border-gray-100 rounded p-2.5">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-[10px] font-semibold text-[#1B2A45]">{entry.user}</span>
-                              <span className="text-[10px] text-gray-400">{entry.created_at?.slice(0, 16)}</span>
+                      <div className="space-y-2">
+                        {(c.call_timeline as any[]).slice().reverse().map((entry: any, i: number) => {
+                          const { date, time } = formatKST(entry.created_at || '')
+                          const initials = entry.user ? entry.user.slice(-2) : '??'
+                          return (
+                            <div key={i} className="flex gap-2.5">
+                              {/* 아바타 */}
+                              <div className="shrink-0 w-6 h-6 rounded-full bg-[#1B2A45] flex items-center justify-center mt-0.5">
+                                <span className="text-[9px] font-bold text-white">{initials}</span>
+                              </div>
+                              {/* 내용 */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-baseline gap-1.5 flex-wrap">
+                                  <span className="text-[10px] font-bold text-[#1B2A45]">{entry.user || '—'}</span>
+                                  <span className="text-[9px] text-gray-300">·</span>
+                                  <span className="text-[9px] font-mono text-gray-400">{date}</span>
+                                  <span className="text-[9px] font-mono text-gray-400">{time}</span>
+                                </div>
+                                <p className="text-[11px] text-gray-600 whitespace-pre-wrap leading-relaxed mt-0.5">{entry.content}</p>
+                              </div>
                             </div>
-                            <p className="text-xs text-gray-600 whitespace-pre-wrap">{entry.content}</p>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     ) : (
-                      <p className="text-[11px] text-gray-300 italic text-center py-2">타임라인 없음</p>
+                      <p className="text-[11px] text-gray-300 italic text-center py-3">기록 없음</p>
                     )}
                   </div>
                 </div>

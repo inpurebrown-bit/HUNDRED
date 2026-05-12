@@ -35,14 +35,18 @@ export default function SalesCeoTab() {
 
   const salesPeople = useMemo(() => {
     const names = Array.from(
-      new Set(customers.map((c: any) => c.details?.sales_user_name || c.sales_user_name).filter(Boolean))
+      new Set(
+        customers
+          .map((c: any) => (c.details?.sales_user_name || c.sales_user_name || '').trim())
+          .filter(Boolean)
+      )
     ).sort() as string[]
     return names
   }, [customers])
 
   const personCustomers = useMemo(() => {
     if (personTab === 'all') return customers
-    return customers.filter((c: any) => (c.details?.sales_user_name || c.sales_user_name) === personTab)
+    return customers.filter((c: any) => (c.details?.sales_user_name || c.sales_user_name || '').trim() === personTab)
   }, [customers, personTab])
 
   const statusCustomers = useMemo(() => {
@@ -65,7 +69,7 @@ export default function SalesCeoTab() {
   }
 
   const personStats = useMemo(() => salesPeople.map(name => {
-    const mine = customers.filter((c: any) => (c.details?.sales_user_name || c.sales_user_name) === name)
+    const mine = customers.filter((c: any) => (c.details?.sales_user_name || c.sales_user_name || '').trim() === name)
     return {
       name,
       total: mine.length,
