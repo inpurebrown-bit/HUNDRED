@@ -813,32 +813,128 @@ export default function HomePage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[0, 1].map(offset => {
                 const c = successCases[(caseIdx + offset) % successCases.length]
+                // 메시지별 가짜 시각 (연속된 분단위)
+                const baseMin = 17 + (caseIdx * 7)
+                const msgTimes = c.messages.map((_, mi) => {
+                  const totalMin = baseMin + mi * 3
+                  const h = Math.floor(totalMin / 60) % 12 || 12
+                  const m = String(totalMin % 60).padStart(2, '0')
+                  const ampm = totalMin < 60 || (totalMin >= 720 && totalMin < 780) ? '오전' : '오후'
+                  return `${ampm} ${h}:${m}`
+                })
+                // 프로필 색상 (bg- 클래스에서 hex 추출)
+                const profileBg: Record<string, string> = {
+                  'bg-[#4A9B6F]': '#4A9B6F', 'bg-[#3B7AB5]': '#3B7AB5',
+                  'bg-[#7B5EA7]': '#7B5EA7', 'bg-[#D4872F]': '#D4872F',
+                }
+                const pfColor = profileBg[c.color] ?? '#4A9B6F'
+
                 return (
-                  <div key={`${caseIdx}-${offset}`} className="rounded-2xl overflow-hidden shadow-lg transition-all duration-500">
-                    <div className={`${c.color} px-4 py-3 flex items-center gap-2`}>
-                      <div className="w-7 h-7 rounded-full bg-[#FAE300] flex items-center justify-center shrink-0">
-                        <span className="text-xs font-black text-[#3C1E1E]">K</span>
+                  <div key={`${caseIdx}-${offset}`}
+                    className="rounded-2xl overflow-hidden shadow-xl transition-all duration-500 border border-black/8"
+                    style={{ fontFamily: "'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif" }}>
+
+                    {/* ── 카카오톡 헤더 ── */}
+                    <div className="flex items-center gap-2.5 px-4 py-3 border-b border-[#D8D8D8]"
+                      style={{ background: '#F5F5F5' }}>
+                      {/* 프로필 사각형 (카톡 스타일 rounded-square) */}
+                      <div className="w-10 h-10 shrink-0 flex items-center justify-center shadow-sm"
+                        style={{ background: pfColor, borderRadius: 10 }}>
+                        <span className="text-[13px] font-black text-white leading-none">
+                          {c.contact.replace('대표 ', '').charAt(0)}
+                        </span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold text-white">{c.contact}</p>
-                        <p className="text-[10px] text-white/70">{c.institution}</p>
-                      </div>
-                      <span className="text-[10px] text-white/50 shrink-0">{c.date}</span>
-                    </div>
-                    <div className="bg-[#B2C7D9] px-3 py-4 space-y-2 min-h-[160px]">
-                      {c.messages.map((msg, mi) => (
-                        <div key={mi} className={`flex ${msg.type === 'sent' ? 'justify-end' : 'justify-start'}`}>
-                          {msg.type === 'recv' && (
-                            <div className="w-6 h-6 rounded-full bg-[#4A9B6F] flex items-center justify-center mr-2 shrink-0 mt-0.5">
-                              <span className="text-[9px] font-bold text-white">H</span>
-                            </div>
-                          )}
-                          <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-xs leading-relaxed shadow-sm
-                            ${msg.type === 'sent' ? 'bg-[#FAE300] text-[#1a1a1a] rounded-tr-sm' : 'bg-white text-gray-800 rounded-tl-sm'}`}>
-                            {msg.text}
-                          </div>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-[13.5px] font-bold text-[#111] truncate leading-tight">
+                            {c.contact}
+                          </p>
+                          {/* 1:1 채팅 인원 표시 */}
+                          <span className="text-[11px] text-[#999] shrink-0 leading-tight">1</span>
                         </div>
-                      ))}
+                        <p className="text-[10.5px] text-[#999] leading-tight truncate">{c.institution}</p>
+                      </div>
+                      {/* 우측 아이콘 (SVG) */}
+                      <div className="flex items-center gap-3.5 shrink-0 text-[#666]">
+                        {/* 검색 */}
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                          <circle cx="11" cy="11" r="7.5"/><line x1="20" y1="20" x2="15.5" y2="15.5"/>
+                        </svg>
+                        {/* 전화 */}
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M22 16.92v3a2 2 0 01-2.18 2 19.8 19.8 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.8 19.8 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.36 1.9.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0122 16.92z"/>
+                        </svg>
+                        {/* 점 3개 메뉴 */}
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
+                          <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+                        </svg>
+                      </div>
+                    </div>
+
+                    {/* ── 채팅 배경 ── */}
+                    <div className="px-3 py-4 space-y-2.5" style={{ background: '#B2C7D9', minHeight: 190 }}>
+                      {c.messages.map((msg, mi) => {
+                        const prevSameType = mi > 0 && c.messages[mi - 1].type === msg.type
+                        const t = msgTimes[mi]
+
+                        /* 받은 메시지 (왼쪽, 흰색) */
+                        if (msg.type === 'recv') {
+                          return (
+                            <div key={mi} className="flex items-start gap-1.5">
+                              {/* 프로필 */}
+                              <div className="shrink-0 mt-0.5">
+                                {!prevSameType ? (
+                                  <div className="w-9 h-9 flex items-center justify-center shadow-sm"
+                                    style={{ background: pfColor, borderRadius: 9 }}>
+                                    <span className="text-[11px] font-black text-white leading-none">
+                                      {c.contact.replace('대표 ', '').charAt(0)}
+                                    </span>
+                                  </div>
+                                ) : <div className="w-9" />}
+                              </div>
+                              <div className="flex flex-col gap-0.5 max-w-[78%]">
+                                {!prevSameType && (
+                                  <p className="text-[11.5px] font-semibold text-[#333] leading-none mb-0.5 ml-0.5">
+                                    {c.contact}
+                                  </p>
+                                )}
+                                <div className="flex items-end gap-1.5">
+                                  <div className="px-3 py-2 text-[12px] leading-relaxed text-[#111] bg-white shadow-sm"
+                                    style={{ borderRadius: '2px 13px 13px 13px', wordBreak: 'break-word', maxWidth: '100%' }}>
+                                    {msg.text}
+                                  </div>
+                                  <span className="text-[10px] text-[#5A5A5A]/75 shrink-0 pb-0.5 whitespace-nowrap">{t}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        }
+
+                        /* 보낸 메시지 (오른쪽, 노란색) */
+                        return (
+                          <div key={mi} className="flex justify-end items-end gap-1.5">
+                            <span className="text-[10px] text-[#5A5A5A]/75 shrink-0 pb-0.5 whitespace-nowrap">{t}</span>
+                            <div className="max-w-[78%] px-3 py-2 text-[12px] leading-relaxed text-[#111] shadow-sm"
+                              style={{ background: '#FAE300', borderRadius: '13px 2px 13px 13px', wordBreak: 'break-word' }}>
+                              {msg.text}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* ── 입력창 (장식용) ── */}
+                    <div className="flex items-center gap-2 px-3 py-2.5 border-t border-[#D8D8D8]"
+                      style={{ background: '#F5F5F5' }}>
+                      <span className="text-[22px] text-[#777] leading-none select-none">+</span>
+                      <div className="flex-1 bg-white border border-[#E0E0E0] rounded-full px-4 py-1.5 text-[12px] text-[#BDBDBD] select-none">
+                        메시지 입력
+                      </div>
+                      <span className="text-[20px] select-none">😊</span>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#777" strokeWidth="2" strokeLinecap="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+                        <polyline points="21 15 16 10 5 21"/>
+                      </svg>
                     </div>
                   </div>
                 )
