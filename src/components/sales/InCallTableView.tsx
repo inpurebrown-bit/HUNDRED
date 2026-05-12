@@ -194,25 +194,28 @@ function ContractModal({ company, cumulativeBase, onClose, onConfirm }: Contract
   const [coopRequestSent,  setCoopRequestSent]  = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const feeNum  = parseNumber(contractFee)
-  const paidNum = parseNumber(paidAmount)
+  const feeNum   = parseNumber(contractFee)
+  const paidNum  = parseNumber(paidAmount)
   const myRevNum = parseNumber(myRevenue)
 
-  // 부가세: 입금액 ÷ 11 (10% 부가세 포함 기준)
-  const vat    = vatIncluded && paidNum > 0 ? Math.round(paidNum / 11) : 0
-  // 미입금: 계약금 - 입금액
-  const unpaid = Math.max(0, feeNum - paidNum)
+  // 부가세: 입금액 ÷ 11
+  const vat     = vatIncluded && paidNum > 0 ? Math.round(paidNum / 11) : 0
+  // 순입금 = 입금액 - 부가세 (VAT 제외 실금액)
+  const netPaid = paidNum - vat
+  // 잔금 = 총합의금(VAT별도) - 순입금
+  const unpaid  = feeNum > 0 ? Math.max(0, feeNum - netPaid) : 0
   // 누적 매출: 이번달 기존 합 + 이번 본인 매출
   const cumulative = cumulativeBase + myRevNum
 
   async function handleConfirm() {
     setSaving(true)
     await onConfirm({
-      contract_fee:        formatNumber(feeNum),
-      payment_amount:      formatNumber(paidNum),
-      unpaid_amount:       unpaid > 0 ? formatNumber(unpaid) : '0',
+      contract_fee:        formatNumber(feeNum),      // 총합의금(VAT별도)
+      payment_amount:      formatNumber(paidNum),     // 입금액(VAT포함 가능)
+      net_paid:            formatNumber(netPaid),     // 순입금(VAT제외)
       vat_included:        vatIncluded,
       vat_amount:          vat > 0 ? formatNumber(vat) : '0',
+      unpaid_amount:       unpaid > 0 ? formatNumber(unpaid) : '0', // 잔금
       my_revenue:          formatNumber(myRevNum),
       cumulative_revenue:  formatNumber(cumulative),
       ops_memo:            opsMemo,
@@ -241,47 +244,55 @@ function ContractModal({ company, cumulativeBase, onClose, onConfirm }: Contract
         {/* Body */}
         <div className="px-5 py-4 space-y-3">
 
-          {/* 계약금 / 입금액 */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[10px] text-blue-700 mb-1 block font-bold">계약금 <span className="text-gray-400 font-normal">(VAT 별도)</span></label>
-              <NumberInput value={contractFee} onChange={setContractFee} className={INP} placeholder="500,000" />
-            </div>
-            <div>
-              <label className="text-[10px] text-blue-700 mb-1 block font-bold">입금액</label>
-              <NumberInput value={paidAmount} onChange={setPaidAmount} className={INP} placeholder="550,000" />
-            </div>
+          {/* ① 총 합의금 (VAT 별도) */}
+          <div>
+            <label className="text-[10px] text-blue-700 mb-1 block font-bold">
+              총 합의금 <span className="text-gray-400 font-normal">(VAT 별도 순금액)</span>
+            </label>
+            <NumberInput value={contractFee} onChange={setContractFee} className={INP} placeholder="500,000" />
           </div>
 
-          {/* 부가세 포함 토글 */}
+          {/* ② 이번 입금액 + 부가세 포함 토글 */}
+          <div>
+            <label className="text-[10px] text-blue-700 mb-1 block font-bold">이번 입금액</label>
+            <NumberInput value={paidAmount} onChange={setPaidAmount} className={INP} placeholder="330,000" />
+          </div>
+
           <label className="flex items-center gap-2 cursor-pointer bg-blue-50 rounded-lg px-3 py-2">
             <input type="checkbox" checked={vatIncluded} onChange={e => setVatIncluded(e.target.checked)}
               className="w-4 h-4 rounded accent-blue-500" />
-            <span className="text-xs text-blue-800 font-medium">부가세 포함 (입금액의 1/11 자동계산)</span>
+            <span className="text-xs text-blue-800 font-medium">입금액에 부가세 포함 (÷11 자동계산)</span>
           </label>
 
-          {/* 자동계산 행 */}
-          <div className="bg-gray-50 rounded-xl px-4 py-3 grid grid-cols-3 gap-2 text-center">
-            <div>
-              <p className="text-[10px] text-gray-400 mb-0.5">부가세</p>
-              <p className={`text-sm font-bold ${vatIncluded && vat > 0 ? 'text-blue-600' : 'text-gray-300'}`}>
-                {vatIncluded && vat > 0 ? vat.toLocaleString() + '원' : '—'}
-              </p>
+          {/* ③ 자동계산 박스 */}
+          <div className="bg-gray-50 rounded-xl px-4 py-3 space-y-2">
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div>
+                <p className="text-[10px] text-gray-400 mb-0.5">부가세</p>
+                <p className={`text-sm font-bold ${vat > 0 ? 'text-blue-600' : 'text-gray-300'}`}>
+                  {vat > 0 ? vat.toLocaleString() + '원' : '—'}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-400 mb-0.5">순입금</p>
+                <p className={`text-sm font-bold ${netPaid > 0 ? 'text-emerald-600' : 'text-gray-300'}`}>
+                  {netPaid > 0 ? netPaid.toLocaleString() + '원' : '—'}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-400 mb-0.5">잔금</p>
+                <p className={`text-sm font-bold ${unpaid > 0 ? 'text-red-500' : unpaid === 0 && feeNum > 0 ? 'text-emerald-500' : 'text-gray-300'}`}>
+                  {feeNum > 0
+                    ? unpaid > 0 ? unpaid.toLocaleString() + '원' : '완납 ✓'
+                    : '—'}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-[10px] text-gray-400 mb-0.5">미입금액</p>
-              <p className={`text-sm font-bold ${unpaid > 0 ? 'text-red-500' : 'text-gray-300'}`}>
-                {unpaid > 0 ? unpaid.toLocaleString() + '원' : '없음'}
+            {feeNum > 0 && paidNum > 0 && (
+              <p className="text-[10px] text-gray-400 text-center border-t border-gray-200 pt-2">
+                {feeNum.toLocaleString()}원 (합의) − {netPaid.toLocaleString()}원 (순입금) = <span className={unpaid > 0 ? 'text-red-500 font-semibold' : 'text-emerald-600 font-semibold'}>{unpaid > 0 ? unpaid.toLocaleString() + '원 잔금' : '완납'}</span>
               </p>
-            </div>
-            <div>
-              <p className="text-[10px] text-gray-400 mb-0.5">순계약금</p>
-              <p className="text-sm font-bold text-emerald-600">
-                {vatIncluded && vat > 0
-                  ? (paidNum - vat).toLocaleString() + '원'
-                  : feeNum > 0 ? feeNum.toLocaleString() + '원' : '—'}
-              </p>
-            </div>
+            )}
           </div>
 
           {/* 본인 매출 */}

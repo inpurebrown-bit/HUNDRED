@@ -150,6 +150,8 @@ export default function ReportTab({ userId, userName }: Props) {
   const [editDate, setEditDate] = useState<string | null>(null)
   // 오전보고 필드 잠금
   const [lockedMorning, setLockedMorning] = useState<Record<string, boolean>>({})
+  // 계약 자동집계용 고객 데이터
+  const [allCustomers, setAllCustomers] = useState<any[]>([])
 
   // 오전보고 상태
   const [morning, setMorning] = useState<MorningData>({
@@ -173,6 +175,31 @@ export default function ReportTab({ userId, userName }: Props) {
   useEffect(() => {
     fetch('/api/reports').then(r => r.json()).then(d => setPastReports(d.reports || []))
   }, [submitted])
+
+  // 고객 데이터 로드 (계약 자동집계)
+  useEffect(() => {
+    fetch('/api/customers').then(r => r.json()).then(d => setAllCustomers(d.customers || []))
+  }, [])
+
+  // ── 이번달/오늘 계약 자동집계 ───────────────────────────
+  const todayStr   = today()
+  const monthStr   = todayStr.slice(0, 7)
+  const myContracts = allCustomers.filter((c: any) => {
+    const owner = c.details?.sales_user_name || c.sales_user_name || ''
+    return c.status === 'contracted' && owner === userName
+  })
+  const autoTodayContracts = myContracts.filter((c: any) =>
+    (c.details?.contract_date || '').startsWith(todayStr)
+  ).length
+  const autoMonthContracts = myContracts.filter((c: any) =>
+    (c.details?.contract_date || '').startsWith(monthStr)
+  ).length
+  const autoMonthRevenue = myContracts
+    .filter((c: any) => (c.details?.contract_date || '').startsWith(monthStr))
+    .reduce((sum: number, c: any) => {
+      const r = parseFloat((c.details?.my_revenue || '0').replace(/[^0-9.]/g, ''))
+      return sum + (isNaN(r) ? 0 : r)
+    }, 0)
 
   // ── 과거 보고 수정하기 ────────────────────────────────
   function loadForEdit(r: any) {
@@ -259,7 +286,6 @@ export default function ReportTab({ userId, userName }: Props) {
     )
   )).sort()
 
-  const todayStr = new Date().toISOString().slice(0, 10)
   const pct = (n: number, d: number) => d === 0 ? '—' : (n / d * 100).toFixed(1) + '%'
   const morningStats = {
     total_calls: morningReports.reduce((s, r) => s + Number(r.data?.total_calls || 0), 0),
@@ -470,19 +496,57 @@ export default function ReportTab({ userId, userName }: Props) {
                 <span className="text-xs text-gray-400">{editDate || today()} · {userName}</span>
               </div>
 
-              {/* 계약 현황 */}
+              {/* 계약 현황 — 자동집계 배너 */}
+              <div className="bg-gradient-to-r from-emerald-50 to-blue-50 border border-emerald-200 rounded-xl px-4 py-3 mb-3 flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-emerald-600 font-bold">🤖 DB 자동집계</span>
+                  <span className="text-[10px] text-gray-400">(계약완료 처리된 내 업체 기준)</span>
+                </div>
+                <div className="flex flex-wrap gap-3 text-[11px]">
+                  <span className="bg-white border border-emerald-200 rounded-full px-2.5 py-1 font-semibold text-emerald-700">
+                    오늘 계약 {autoTodayContracts}건
+                  </span>
+                  <span className="bg-white border border-blue-200 rounded-full px-2.5 py-1 font-semibold text-blue-700">
+                    이번달 {autoMonthContracts}건
+                  </span>
+                  <span className="bg-white border border-violet-200 rounded-full px-2.5 py-1 font-semibold text-violet-700">
+                    이번달 매출 {autoMonthRevenue > 0 ? autoMonthRevenue.toLocaleString() + '원' : '—'}
+                  </span>
+                </div>
+                <button type="button"
+                  onClick={() => setDaily(p => ({
+                    ...p,
+                    today_contracts: String(autoTodayContracts),
+                    month_contracts: String(autoMonthContracts),
+                  }))}
+                  className="ml-auto shrink-0 text-[11px] bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-semibold transition-colors">
+                  ↓ 자동입력
+                </button>
+              </div>
+
+              {/* 계약 현황 입력 */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
                 <div>
                   <label className={label}>당일 계약 개수</label>
-                  <input type="number" className={inp} placeholder="0"
-                    value={daily.today_contracts}
-                    onChange={e => setDaily(p => ({ ...p, today_contracts: e.target.value }))} />
+                  <div className="relative">
+                    <input type="number" className={inp} placeholder="0"
+                      value={daily.today_contracts}
+                      onChange={e => setDaily(p => ({ ...p, today_contracts: e.target.value }))} />
+                    {daily.today_contracts === '' && autoTodayContracts > 0 && (
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-emerald-400 pointer-events-none">{autoTodayContracts}</span>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className={label}>이번달 총 계약</label>
-                  <input type="number" className={inp} placeholder="0"
-                    value={daily.month_contracts}
-                    onChange={e => setDaily(p => ({ ...p, month_contracts: e.target.value }))} />
+                  <div className="relative">
+                    <input type="number" className={inp} placeholder="0"
+                      value={daily.month_contracts}
+                      onChange={e => setDaily(p => ({ ...p, month_contracts: e.target.value }))} />
+                    {daily.month_contracts === '' && autoMonthContracts > 0 && (
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-blue-400 pointer-events-none">{autoMonthContracts}</span>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className={label}>월 목표 개수</label>
@@ -492,8 +556,12 @@ export default function ReportTab({ userId, userName }: Props) {
                 </div>
                 <div>
                   <label className={label}>목표까지 남은 수</label>
-                  <div className={`${inp} bg-gray-50 text-gray-600 font-semibold`}>
-                    {remaining !== null ? remaining + '개' : '-'}
+                  <div className={`${inp} bg-gray-50 font-semibold ${remaining !== null && remaining > 0 ? 'text-orange-600' : 'text-emerald-600'}`}>
+                    {remaining !== null
+                      ? remaining > 0
+                        ? `${remaining}개 남음`
+                        : '🎉 목표달성!'
+                      : '-'}
                   </div>
                 </div>
               </div>
