@@ -5,6 +5,18 @@ import { signOut } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
 
+// ── KST Utils ──────────────────────────────────────────────────────────
+function nowKST() {
+  return new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(' ', 'T') + '+09:00'
+}
+function formatKST(isoStr: string) {
+  if (!isoStr) return { date: '', time: '' }
+  const d = new Date(isoStr)
+  const date = d.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: '2-digit', day: '2-digit' }).replace('. ', '/').replace('.', '')
+  const time = d.toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false })
+  return { date, time }
+}
+
 // ── Types ──────────────────────────────────────────────────────────────
 interface OpsCase {
   id: string
@@ -75,6 +87,9 @@ ${inst} 보증서 심사를 위해 고객님이 직접 방문하셔야 합니다
 
 방문 전 미리 연락 주시면 감사하겠습니다.`
 
+// ── 기관ID/PW 목록 ─────────────────────────────────────────────────────
+const CRED_INSTITUTIONS = ['소진공', '중진공', '기보', '신보', '재단', '크래딧포유', '아이핀', '소진공지식배움터']
+
 interface Props {
   userId: string
   userName: string
@@ -88,13 +103,32 @@ const opsTabs = [
 const inp = 'w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400/50 bg-white'
 const lbl = 'text-[10px] text-gray-400 mb-0.5 block font-medium'
 
+// ── Detail Tab Types ────────────────────────────────────────────────────
+const DETAIL_TABS = ['진행현황', '고객정보', '기관ID/PW', '인콜일지', '💰 입금/계약'] as const
+type DetailTab = typeof DETAIL_TABS[number]
+
 // ── OpsDetailPanel ─────────────────────────────────────────────────────
 function OpsDetailPanel({ c, onSave }: { c: OpsCase; onSave: (id: string, patch: Record<string, any>) => void }) {
   const [local, setLocal] = useState<OpsCase>({ ...c })
+  const [activeDetailTab, setActiveDetailTab] = useState<DetailTab>('진행현황')
+  const [incallData, setIncallData] = useState<any>(null)
+  const [incallLoading, setIncallLoading] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [pwVisible, setPwVisible] = useState<Record<string, boolean>>({})
 
-  // sync from parent if c changes (e.g. re-fetch)
+  // sync from parent if c changes
   useEffect(() => { setLocal({ ...c }) }, [c.id])
+
+  // 인콜일지 탭 클릭 시 데이터 로드
+  useEffect(() => {
+    if (activeDetailTab === '인콜일지' && !incallData && c.customer_id) {
+      setIncallLoading(true)
+      fetch(`/api/customers/${c.customer_id}`)
+        .then(r => r.json())
+        .then(d => { setIncallData(d.customer || d); setIncallLoading(false) })
+        .catch(() => setIncallLoading(false))
+    }
+  }, [activeDetailTab, c.customer_id])
 
   function field<K extends keyof OpsCase>(key: K, val: OpsCase[K]) {
     const next = { ...local, [key]: val }
@@ -125,14 +159,13 @@ function OpsDetailPanel({ c, onSave }: { c: OpsCase; onSave: (id: string, patch:
   async function handleVisitDate(val: string) {
     detailField('visit_date', val)
     if (!val) return
-    // 방문일정 → 캘린더 자동 등록
     const selectedInst = (local.institution || '').split(',').map((s: string) => s.trim()).filter(Boolean)
     try {
       await fetch('/api/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: `[방문] ${c.customers?.details?.company || c.customers?.name || c.customers?.name} — ${selectedInst.join(', ') || '기관미정'}`,
+          title: `[방문] ${c.customers?.details?.company || c.customers?.name} — ${selectedInst.join(', ') || '기관미정'}`,
           start_date: val,
           end_date: val,
           start_time: local.details?.visit_time || null,
@@ -142,6 +175,20 @@ function OpsDetailPanel({ c, onSave }: { c: OpsCase; onSave: (id: string, patch:
         }),
       })
     } catch (e) { /* 무시 */ }
+  }
+
+  // 진행단계 변경 → 타임라인 자동기록
+  function handleStageChange(nextStage: string) {
+    const prevStage = local.progress_stage
+    const autoEntry = {
+      user: '자동기록',
+      content: `단계 변경: ${prevStage} → ${nextStage}`,
+      created_at: nowKST(),
+    }
+    const updatedTimeline = [...(local.timeline || []), autoEntry]
+    const next = { ...local, progress_stage: nextStage, timeline: updatedTimeline }
+    setLocal(next)
+    schedule({ progress_stage: nextStage, timeline: updatedTimeline })
   }
 
   function schedule(patch: Record<string, any>) {
@@ -158,185 +205,484 @@ function OpsDetailPanel({ c, onSave }: { c: OpsCase; onSave: (id: string, patch:
   const indirectList = selectedInstitutions.filter((i: string) => INDIRECT_SET.has(i))
 
   return (
-    <div className="space-y-4">
-
-      {/* ── 흡수 버튼 (신규배정일 때만) ── */}
-      {local.progress_stage === 'assigned' && (
-        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-bold text-indigo-800">📥 신규 배정 업체</p>
-            <p className="text-xs text-indigo-600 mt-0.5">내용 확인 및 고객과 통화 후 흡수 처리해주세요</p>
-          </div>
+    <div className="space-y-3">
+      {/* 탭 네비게이션 */}
+      <div className="flex border-b border-gray-100 overflow-x-auto">
+        {DETAIL_TABS.map(tab => (
           <button
-            onClick={() => field('progress_stage', 'absorbed')}
-            className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">
-            ✅ 흡수 완료
+            key={tab}
+            onClick={() => setActiveDetailTab(tab)}
+            className={`px-3 py-2 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
+              activeDetailTab === tab
+                ? 'border-violet-500 text-violet-600'
+                : 'border-transparent text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            {tab}
           </button>
+        ))}
+      </div>
+
+      {/* ── 탭: 진행현황 ── */}
+      {activeDetailTab === '진행현황' && (
+        <div className="space-y-4">
+          {/* 흡수 버튼 (신규배정일 때만) */}
+          {local.progress_stage === 'assigned' && (
+            <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold text-indigo-800">📥 신규 배정 업체</p>
+                <p className="text-xs text-indigo-600 mt-0.5">내용 확인 및 고객과 통화 후 흡수 처리해주세요</p>
+              </div>
+              <button
+                onClick={() => field('progress_stage', 'absorbed')}
+                className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">
+                ✅ 흡수 완료
+              </button>
+            </div>
+          )}
+
+          {/* 진행 현황 */}
+          <div>
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">진행 현황</span>
+              <div className="flex-1 h-px bg-gray-100" />
+            </div>
+            <div className="grid grid-cols-4 gap-x-2 gap-y-2">
+              <div>
+                <label className={lbl}>진행 단계</label>
+                <select
+                  value={local.progress_stage}
+                  onChange={e => handleStageChange(e.target.value)}
+                  className={inp}
+                >
+                  {[...PIPELINE_STAGES, { key: '환불', label: '환불' }, { key: '종료', label: '종료' }].map(s => (
+                    <option key={s.key} value={s.key}>{s.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-span-3">
+                <label className={lbl}>담당 기관 (복수 선택 가능)</label>
+                <div className="space-y-1.5">
+                  <div className="flex flex-wrap gap-1 items-center">
+                    <span className="text-[10px] text-blue-500 font-medium w-12">직접자금</span>
+                    {INST_DIRECT.map(inst => (
+                      <button key={inst} type="button"
+                        onClick={() => toggleInstitution(inst)}
+                        className={`px-2 py-0.5 rounded text-xs font-medium border transition-colors ${
+                          selectedInstitutions.includes(inst)
+                            ? 'bg-blue-500 text-white border-blue-500'
+                            : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                        }`}>
+                        {inst}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-1 items-center">
+                    <span className="text-[10px] text-violet-500 font-medium w-12">간접자금</span>
+                    {INST_INDIRECT.map(inst => (
+                      <button key={inst} type="button"
+                        onClick={() => toggleInstitution(inst)}
+                        className={`px-2 py-0.5 rounded text-xs font-medium border transition-colors ${
+                          selectedInstitutions.includes(inst)
+                            ? 'bg-violet-500 text-white border-violet-500'
+                            : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                        }`}>
+                        {inst}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className={lbl}>이후 진행 예정</label>
+                <input type="text" value={d.next_inst || ''} onChange={e => detailField('next_inst', e.target.value)} className={inp} placeholder="다음 기관" />
+              </div>
+              <div>
+                <label className={lbl}>현재 진행 상태</label>
+                <input type="text" value={d.current_status || ''} onChange={e => detailField('current_status', e.target.value)} className={inp} placeholder="상태 메모" />
+              </div>
+              <div>
+                <label className={lbl}>신청 필수 확인</label>
+                <input type="text" value={d.required_checks || ''} onChange={e => detailField('required_checks', e.target.value)} className={inp} placeholder="필수 체크사항" />
+              </div>
+              <div>
+                <label className={lbl}>자금 디테일</label>
+                <input type="text" value={d.fund_detail || ''} onChange={e => detailField('fund_detail', e.target.value)} className={inp} placeholder="자금 상세" />
+              </div>
+              {/* 방문 일정 */}
+              <div>
+                <label className={lbl}>방문 일정 📅</label>
+                <div className="flex gap-1">
+                  <input type="date" value={d.visit_date || ''}
+                    onChange={e => handleVisitDate(e.target.value)}
+                    className={inp + ' flex-1'} />
+                  <input type="time" value={d.visit_time || ''}
+                    onChange={e => detailField('visit_time', e.target.value)}
+                    className={inp + ' w-20'} />
+                </div>
+                {d.visit_date && (
+                  <p className="text-[10px] text-emerald-600 mt-0.5">✅ 캘린더에 자동 등록됨</p>
+                )}
+              </div>
+              <div>
+                <label className={lbl}>계약 날짜</label>
+                <input type="date" value={d.contract_date || ''} onChange={e => detailField('contract_date', e.target.value)} className={inp} />
+              </div>
+              <div className="col-span-2">
+                <label className={lbl}>계약 특이사항</label>
+                <input type="text" value={d.contract_notes || ''} onChange={e => detailField('contract_notes', e.target.value)} className={inp} placeholder="계약 관련 특이사항" />
+              </div>
+            </div>
+
+            {/* 간접자금 스크립트 */}
+            {hasIndirect && (
+              <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[11px] font-bold text-amber-700">📜 간접자금 방문 안내 스크립트 ({indirectList.join(', ')})</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const script = d.indirect_script || INDIRECT_SCRIPT_TEMPLATE(
+                        c.customers?.details?.company || c.customers?.name || '', c.customers?.name || '',
+                        indirectList.join(', '), d.visit_date || '', d.visit_time || ''
+                      )
+                      navigator.clipboard?.writeText(script)
+                    }}
+                    className="text-xs text-amber-700 font-semibold px-2 py-0.5 rounded border border-amber-300 hover:bg-amber-100 transition-colors">
+                    📋 복사
+                  </button>
+                </div>
+                <textarea
+                  value={d.indirect_script || INDIRECT_SCRIPT_TEMPLATE(
+                    c.customers?.details?.company || c.customers?.name || '', c.customers?.name || '',
+                    indirectList.join(', '), d.visit_date || '', d.visit_time || ''
+                  )}
+                  onChange={e => detailField('indirect_script', e.target.value)}
+                  rows={6}
+                  className="w-full text-xs bg-white border border-amber-200 rounded p-2 resize-none focus:outline-none focus:ring-1 focus:ring-amber-400"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* 재무 */}
+          <div>
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">재무</span>
+              <div className="flex-1 h-px bg-gray-100" />
+            </div>
+            <div className="grid grid-cols-4 gap-x-2 gap-y-2">
+              <div>
+                <label className={lbl}>승인금액</label>
+                <input type="text" value={d.approval_amount || ''} onChange={e => detailField('approval_amount', e.target.value)} className={inp} placeholder="0원" />
+              </div>
+              <div>
+                <label className={lbl}>수수료%</label>
+                <input type="text" value={d.fee_rate || ''} onChange={e => detailField('fee_rate', e.target.value)} className={inp} placeholder="%" />
+              </div>
+              <div>
+                <label className={lbl}>수수료</label>
+                <input type="text" value={d.fee_amount || ''} onChange={e => detailField('fee_amount', e.target.value)} className={inp} placeholder="0원" />
+              </div>
+              <div>
+                <label className={lbl}>미입금액</label>
+                <input type="text" value={d.unpaid_amount || ''} onChange={e => detailField('unpaid_amount', e.target.value)} className={inp} placeholder="0원" />
+              </div>
+              <div>
+                <label className={lbl}>계약금(VAT포함)</label>
+                <input type="text" value={d.contract_amount_vat || ''} onChange={e => detailField('contract_amount_vat', e.target.value)} className={inp} placeholder="0원" />
+              </div>
+              <div>
+                <label className={lbl}>계약금(VAT제외)</label>
+                <input type="text" value={d.contract_amount || ''} onChange={e => detailField('contract_amount', e.target.value)} className={inp} placeholder="0원" />
+              </div>
+              <div>
+                <label className={lbl}>입금액(VAT포함)</label>
+                <input type="text" value={d.deposit_amount_vat || ''} onChange={e => detailField('deposit_amount_vat', e.target.value)} className={inp} placeholder="0원" />
+              </div>
+              <div>
+                <label className={lbl}>입금액(VAT제외)</label>
+                <input type="text" value={d.deposit_amount || ''} onChange={e => detailField('deposit_amount', e.target.value)} className={inp} placeholder="0원" />
+              </div>
+              <div className="col-span-2">
+                <label className={lbl}>소진공 확인서</label>
+                <input type="text" value={d.sojin_confirmation || ''} onChange={e => detailField('sojin_confirmation', e.target.value)} className={inp} placeholder="소진공 확인서 내용" />
+              </div>
+              <div className="col-span-4">
+                <label className={lbl}>결제방식</label>
+                <div className="flex gap-2">
+                  {[
+                    { key: 'has_invoice', label: '계산서' },
+                    { key: 'has_cash', label: '현금' },
+                    { key: 'has_card', label: '카드' },
+                  ].map(opt => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => toggleDetail(opt.key)}
+                      className={`px-3 py-1 rounded text-xs font-medium border transition-colors ${
+                        d[opt.key]
+                          ? 'bg-violet-500 text-white border-violet-500'
+                          : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 처리 메모 */}
+          <div>
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">처리 메모</span>
+              <div className="flex-1 h-px bg-gray-100" />
+            </div>
+            <textarea
+              value={local.progress_memo || ''}
+              onChange={e => field('progress_memo', e.target.value)}
+              rows={3}
+              placeholder="진행 상황, 특이사항, 다음 액션 등"
+              className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400/50 bg-white resize-none"
+            />
+          </div>
+
+          {/* 타임라인 */}
+          <div>
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">타임라인</span>
+              <div className="flex-1 h-px bg-gray-100" />
+            </div>
+            <TimelineSection initialTimeline={local.timeline || []} onSchedule={schedule} />
+          </div>
+
+          <p className="text-[10px] text-gray-300 text-right">
+            마지막 수정: {new Date(c.updated_at).toLocaleString('ko-KR')}
+          </p>
         </div>
       )}
 
-      {/* 진행 현황 */}
-      <div>
-        <div className="flex items-center gap-1.5 mb-2">
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">진행 현황</span>
-          <div className="flex-1 h-px bg-gray-100" />
-        </div>
-        <div className="grid grid-cols-4 gap-x-2 gap-y-2">
-          <div>
-            <label className={lbl}>진행 단계</label>
-            <select value={local.progress_stage} onChange={e => field('progress_stage', e.target.value)} className={inp}>
-              {[...PIPELINE_STAGES, { key: '환불', label: '환불' }, { key: '종료', label: '종료' }].map(s => (
-                <option key={s.key} value={s.key}>{s.label}</option>
-              ))}
-            </select>
+      {/* ── 탭: 고객정보 ── */}
+      {activeDetailTab === '고객정보' && (
+        <div>
+          <div className="flex items-center gap-1.5 mb-2">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">고객 기본 정보</span>
+            <div className="flex-1 h-px bg-gray-100" />
           </div>
-          <div className="col-span-3">
-            <label className={lbl}>담당 기관 (복수 선택 가능)</label>
-            <div className="space-y-1.5">
-              <div className="flex flex-wrap gap-1 items-center">
-                <span className="text-[10px] text-blue-500 font-medium w-12">직접자금</span>
-                {INST_DIRECT.map(inst => (
-                  <button key={inst} type="button"
-                    onClick={() => toggleInstitution(inst)}
-                    className={`px-2 py-0.5 rounded text-xs font-medium border transition-colors ${
-                      selectedInstitutions.includes(inst)
-                        ? 'bg-blue-500 text-white border-blue-500'
-                        : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
-                    }`}>
-                    {inst}
-                  </button>
-                ))}
+          <div className="grid grid-cols-3 gap-x-3 gap-y-2 bg-gray-50 rounded-lg p-3">
+            {[
+              ['업체명', c.customers?.details?.company || c.customers?.name],
+              ['대표자명', c.customers?.name],
+              ['연락처', c.customers?.phone],
+              ['지역', cd.region],
+              ['업종', cd.business_type],
+              ['업력', cd.years_in_business],
+              ['직원수', cd.employee_count],
+              ['기대출(정책)', cd.loan_policy],
+              ['기대출(신용)', cd.loan_credit],
+              ['매출2026', cd.revenue_2026],
+              ['매출2025', cd.revenue_2025],
+              ['매출2024', cd.revenue_2024],
+              ['매출2023', cd.revenue_2023],
+              ['신용점수', cd.credit_score],
+              ['세금체납', cd.tax_delinquency],
+              ['자산', cd.assets],
+              ['필요자금', cd.required_funds],
+            ].map(([label, val]) => (
+              <div key={label as string}>
+                <p className="text-[10px] text-gray-400">{label}</p>
+                <p className="text-xs text-gray-700 font-medium">{val || '—'}</p>
               </div>
-              <div className="flex flex-wrap gap-1 items-center">
-                <span className="text-[10px] text-violet-500 font-medium w-12">간접자금</span>
-                {INST_INDIRECT.map(inst => (
-                  <button key={inst} type="button"
-                    onClick={() => toggleInstitution(inst)}
-                    className={`px-2 py-0.5 rounded text-xs font-medium border transition-colors ${
-                      selectedInstitutions.includes(inst)
-                        ? 'bg-violet-500 text-white border-violet-500'
-                        : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
-                    }`}>
-                    {inst}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div>
-            <label className={lbl}>이후 진행 예정</label>
-            <input type="text" value={d.next_inst || ''} onChange={e => detailField('next_inst', e.target.value)} className={inp} placeholder="다음 기관" />
-          </div>
-          <div>
-            <label className={lbl}>현재 진행 상태</label>
-            <input type="text" value={d.current_status || ''} onChange={e => detailField('current_status', e.target.value)} className={inp} placeholder="상태 메모" />
-          </div>
-          <div>
-            <label className={lbl}>신청 필수 확인</label>
-            <input type="text" value={d.required_checks || ''} onChange={e => detailField('required_checks', e.target.value)} className={inp} placeholder="필수 체크사항" />
-          </div>
-          <div>
-            <label className={lbl}>자금 디테일</label>
-            <input type="text" value={d.fund_detail || ''} onChange={e => detailField('fund_detail', e.target.value)} className={inp} placeholder="자금 상세" />
-          </div>
-          {/* 방문 일정 (캘린더 자동 등록) */}
-          <div>
-            <label className={lbl}>방문 일정 📅</label>
-            <div className="flex gap-1">
-              <input type="date" value={d.visit_date || ''}
-                onChange={e => handleVisitDate(e.target.value)}
-                className={inp + ' flex-1'} />
-              <input type="time" value={d.visit_time || ''}
-                onChange={e => detailField('visit_time', e.target.value)}
-                className={inp + ' w-20'} />
-            </div>
-            {d.visit_date && (
-              <p className="text-[10px] text-emerald-600 mt-0.5">✅ 캘린더에 자동 등록됨</p>
-            )}
-          </div>
-          <div>
-            <label className={lbl}>계약 날짜</label>
-            <input type="date" value={d.contract_date || ''} onChange={e => detailField('contract_date', e.target.value)} className={inp} />
-          </div>
-          <div className="col-span-2">
-            <label className={lbl}>계약 특이사항</label>
-            <input type="text" value={d.contract_notes || ''} onChange={e => detailField('contract_notes', e.target.value)} className={inp} placeholder="계약 관련 특이사항" />
+            ))}
           </div>
         </div>
+      )}
 
-        {/* ── 간접자금 스크립트 ── */}
-        {hasIndirect && (
-          <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[11px] font-bold text-amber-700">📜 간접자금 방문 안내 스크립트 ({indirectList.join(', ')})</p>
-              <button
-                type="button"
-                onClick={() => {
-                  const script = d.indirect_script || INDIRECT_SCRIPT_TEMPLATE(
-                    c.customers?.details?.company || c.customers?.name || '', c.customers?.name || '',
-                    indirectList.join(', '), d.visit_date || '', d.visit_time || ''
-                  )
-                  navigator.clipboard?.writeText(script)
-                }}
-                className="text-xs text-amber-700 font-semibold px-2 py-0.5 rounded border border-amber-300 hover:bg-amber-100 transition-colors">
-                📋 복사
-              </button>
-            </div>
-            <textarea
-              value={d.indirect_script || INDIRECT_SCRIPT_TEMPLATE(
-                c.customers?.details?.company || c.customers?.name || '', c.customers?.name || '',
-                indirectList.join(', '), d.visit_date || '', d.visit_time || ''
+      {/* ── 탭: 기관ID/PW ── */}
+      {activeDetailTab === '기관ID/PW' && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-1.5 mb-2">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">기관별 ID / PW</span>
+            <div className="flex-1 h-px bg-gray-100" />
+          </div>
+          {CRED_INSTITUTIONS.map(inst => {
+            const idKey = `cred_${inst}_id`
+            const pwKey = `cred_${inst}_pw`
+            const isPwVisible = pwVisible[inst] || false
+            return (
+              <div key={inst} className="bg-gray-50 rounded-lg p-3">
+                <p className="text-[11px] font-bold text-gray-600 mb-2">{inst}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className={lbl}>ID</label>
+                    <input
+                      type="text"
+                      value={d[idKey] || ''}
+                      onChange={e => detailField(idKey, e.target.value)}
+                      className={inp}
+                      placeholder={`${inst} 아이디`}
+                    />
+                  </div>
+                  <div>
+                    <label className={lbl}>PW</label>
+                    <div className="relative">
+                      <input
+                        type={isPwVisible ? 'text' : 'password'}
+                        value={d[pwKey] || ''}
+                        onChange={e => detailField(pwKey, e.target.value)}
+                        className={inp + ' pr-7'}
+                        placeholder={`${inst} 비밀번호`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setPwVisible(prev => ({ ...prev, [inst]: !isPwVisible }))}
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-[11px]"
+                      >
+                        {isPwVisible ? '🙈' : '👁'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ── 탭: 인콜일지 ── */}
+      {activeDetailTab === '인콜일지' && (
+        <div className="space-y-4">
+          {incallLoading ? (
+            <div className="text-center py-8 text-gray-400 text-xs">불러오는 중...</div>
+          ) : incallData ? (
+            <>
+              {/* 고객 details 읽기전용 그리드 */}
+              {incallData.details && (
+                <div>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">고객 상세정보</span>
+                    <div className="flex-1 h-px bg-gray-100" />
+                  </div>
+                  <div className="grid grid-cols-3 gap-x-3 gap-y-1.5 bg-gray-50 rounded-lg p-3">
+                    {Object.entries(incallData.details as Record<string, any>).map(([key, val]) => (
+                      <div key={key}>
+                        <p className="text-[10px] text-gray-400">{key}</p>
+                        <p className="text-xs text-gray-700 font-medium">{String(val || '—')}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
-              onChange={e => detailField('indirect_script', e.target.value)}
-              rows={6}
-              className="w-full text-xs bg-white border border-amber-200 rounded p-2 resize-none focus:outline-none focus:ring-1 focus:ring-amber-400"
-            />
-          </div>
-        )}
-      </div>
 
-      {/* 재무 */}
-      <div>
-        <div className="flex items-center gap-1.5 mb-2">
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">재무</span>
-          <div className="flex-1 h-px bg-gray-100" />
+              {/* 메모(result_memo) */}
+              {incallData.result_memo && (
+                <div>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">메모</span>
+                    <div className="flex-1 h-px bg-gray-100" />
+                  </div>
+                  <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-3 text-xs text-gray-700 whitespace-pre-wrap">
+                    {incallData.result_memo}
+                  </div>
+                </div>
+              )}
+
+              {/* call_timeline 읽기전용 */}
+              {incallData.call_timeline && incallData.call_timeline.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">콜 타임라인</span>
+                    <div className="flex-1 h-px bg-gray-100" />
+                  </div>
+                  <div className="space-y-1.5">
+                    {[...incallData.call_timeline].reverse().map((entry: any, i: number) => {
+                      const kst = formatKST(entry.created_at || entry.date || '')
+                      const user = entry.user || entry.author || ''
+                      const content = entry.content || entry.text || ''
+                      const avatar = user ? user.slice(-2) : '기록'
+                      return (
+                        <div key={i} className="flex gap-2 items-start bg-gray-50 rounded-lg px-2 py-1.5">
+                          <div className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-[9px] font-bold text-white shrink-0">
+                            {avatar}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-semibold text-gray-600">{user || '—'}</span>
+                              <span className="text-[10px] text-gray-300">{kst.date} {kst.time}</span>
+                            </div>
+                            <p className="text-xs text-gray-700 mt-0.5">{content}</p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-8 text-gray-400 text-xs">인콜일지 데이터가 없습니다.</div>
+          )}
         </div>
-        <div className="grid grid-cols-4 gap-x-2 gap-y-2">
-          <div>
-            <label className={lbl}>승인금액</label>
-            <input type="text" value={d.approval_amount || ''} onChange={e => detailField('approval_amount', e.target.value)} className={inp} placeholder="0원" />
+      )}
+
+      {/* ── 탭: 입금/계약 ── */}
+      {activeDetailTab === '💰 입금/계약' && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-1.5 mb-2">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">입금 / 계약 정보</span>
+            <div className="flex-1 h-px bg-gray-100" />
+          </div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+            <div>
+              <label className={lbl}>승인금액</label>
+              <input type="text" value={d.approval_amount || ''} onChange={e => detailField('approval_amount', e.target.value)} className={inp} placeholder="0원" />
+            </div>
+            <div>
+              <label className={lbl}>수수료%</label>
+              <input type="text" value={d.fee_rate || ''} onChange={e => detailField('fee_rate', e.target.value)} className={inp} placeholder="%" />
+            </div>
+            <div>
+              <label className={lbl}>수수료</label>
+              <input type="text" value={d.fee_amount || ''} onChange={e => detailField('fee_amount', e.target.value)} className={inp} placeholder="0원" />
+            </div>
+            <div>
+              <label className={lbl}>미입금액</label>
+              <input type="text" value={d.unpaid_amount || ''} onChange={e => detailField('unpaid_amount', e.target.value)} className={inp} placeholder="0원" />
+            </div>
+            <div>
+              <label className={lbl}>계약금(VAT포함)</label>
+              <input type="text" value={d.contract_amount_vat || ''} onChange={e => detailField('contract_amount_vat', e.target.value)} className={inp} placeholder="0원" />
+            </div>
+            <div>
+              <label className={lbl}>계약금(VAT제외)</label>
+              <input type="text" value={d.contract_amount || ''} onChange={e => detailField('contract_amount', e.target.value)} className={inp} placeholder="0원" />
+            </div>
+            <div>
+              <label className={lbl}>입금액(VAT포함)</label>
+              <input type="text" value={d.deposit_amount_vat || ''} onChange={e => detailField('deposit_amount_vat', e.target.value)} className={inp} placeholder="0원" />
+            </div>
+            <div>
+              <label className={lbl}>입금액(VAT제외)</label>
+              <input type="text" value={d.deposit_amount || ''} onChange={e => detailField('deposit_amount', e.target.value)} className={inp} placeholder="0원" />
+            </div>
+            <div className="col-span-2">
+              <label className={lbl}>소진공 확인서</label>
+              <input type="text" value={d.sojin_confirmation || ''} onChange={e => detailField('sojin_confirmation', e.target.value)} className={inp} placeholder="소진공 확인서 내용" />
+            </div>
+            <div>
+              <label className={lbl}>계약 날짜</label>
+              <input type="date" value={d.contract_date || ''} onChange={e => detailField('contract_date', e.target.value)} className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>계약 특이사항</label>
+              <input type="text" value={d.contract_notes || ''} onChange={e => detailField('contract_notes', e.target.value)} className={inp} placeholder="계약 관련 특이사항" />
+            </div>
           </div>
           <div>
-            <label className={lbl}>수수료%</label>
-            <input type="text" value={d.fee_rate || ''} onChange={e => detailField('fee_rate', e.target.value)} className={inp} placeholder="%" />
-          </div>
-          <div>
-            <label className={lbl}>수수료</label>
-            <input type="text" value={d.fee_amount || ''} onChange={e => detailField('fee_amount', e.target.value)} className={inp} placeholder="0원" />
-          </div>
-          <div>
-            <label className={lbl}>미입금액</label>
-            <input type="text" value={d.unpaid_amount || ''} onChange={e => detailField('unpaid_amount', e.target.value)} className={inp} placeholder="0원" />
-          </div>
-          <div>
-            <label className={lbl}>계약금(VAT포함)</label>
-            <input type="text" value={d.contract_amount_vat || ''} onChange={e => detailField('contract_amount_vat', e.target.value)} className={inp} placeholder="0원" />
-          </div>
-          <div>
-            <label className={lbl}>계약금(VAT제외)</label>
-            <input type="text" value={d.contract_amount || ''} onChange={e => detailField('contract_amount', e.target.value)} className={inp} placeholder="0원" />
-          </div>
-          <div>
-            <label className={lbl}>입금액(VAT포함)</label>
-            <input type="text" value={d.deposit_amount_vat || ''} onChange={e => detailField('deposit_amount_vat', e.target.value)} className={inp} placeholder="0원" />
-          </div>
-          <div>
-            <label className={lbl}>입금액(VAT제외)</label>
-            <input type="text" value={d.deposit_amount || ''} onChange={e => detailField('deposit_amount', e.target.value)} className={inp} placeholder="0원" />
-          </div>
-          <div className="col-span-4">
             <label className={lbl}>결제방식</label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 mt-1">
               {[
                 { key: 'has_invoice', label: '계산서' },
                 { key: 'has_cash', label: '현금' },
@@ -358,69 +704,7 @@ function OpsDetailPanel({ c, onSave }: { c: OpsCase; onSave: (id: string, patch:
             </div>
           </div>
         </div>
-      </div>
-
-      {/* 고객 기본 정보 (read-only) */}
-      <div>
-        <div className="flex items-center gap-1.5 mb-2">
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">고객 기본 정보</span>
-          <div className="flex-1 h-px bg-gray-100" />
-        </div>
-        <div className="grid grid-cols-4 gap-x-3 gap-y-1.5 bg-gray-50 rounded-lg p-3">
-          {[
-            ['업체명', c.customers?.details?.company || c.customers?.name],
-            ['대표자명', c.customers?.name],
-            ['연락처', c.customers?.phone],
-            ['지역', cd.region],
-            ['업종', cd.business_type],
-            ['업력', cd.years_in_business],
-            ['직원수', cd.employee_count],
-            ['기대출(정책)', cd.loan_policy],
-            ['기대출(신용)', cd.loan_credit],
-            ['매출2026', cd.revenue_2026],
-            ['매출2025', cd.revenue_2025],
-            ['매출2024', cd.revenue_2024],
-            ['매출2023', cd.revenue_2023],
-            ['신용점수', cd.credit_score],
-            ['세금체납', cd.tax_delinquency],
-            ['자산', cd.assets],
-            ['필요자금', cd.required_funds],
-          ].map(([label, val]) => (
-            <div key={label as string}>
-              <p className="text-[10px] text-gray-400">{label}</p>
-              <p className="text-xs text-gray-700 font-medium">{val || '—'}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* 처리 메모 */}
-      <div>
-        <div className="flex items-center gap-1.5 mb-2">
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">처리 메모</span>
-          <div className="flex-1 h-px bg-gray-100" />
-        </div>
-        <textarea
-          value={local.progress_memo || ''}
-          onChange={e => field('progress_memo', e.target.value)}
-          rows={3}
-          placeholder="진행 상황, 특이사항, 다음 액션 등"
-          className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400/50 bg-white resize-none"
-        />
-      </div>
-
-      {/* 타임라인 */}
-      <div>
-        <div className="flex items-center gap-1.5 mb-2">
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">타임라인</span>
-          <div className="flex-1 h-px bg-gray-100" />
-        </div>
-        <TimelineSection initialTimeline={local.timeline || []} onSchedule={schedule} />
-      </div>
-
-      <p className="text-[10px] text-gray-300 text-right">
-        마지막 수정: {new Date(c.updated_at).toLocaleString('ko-KR')}
-      </p>
+      )}
     </div>
   )
 }
@@ -435,7 +719,11 @@ function TimelineSection({ initialTimeline, onSchedule }: {
 
   function add() {
     if (!text.trim()) return
-    const entry = { date: new Date().toISOString().slice(0, 10), text: text.trim() }
+    const entry = {
+      user: '수동입력',
+      content: text.trim(),
+      created_at: nowKST(),
+    }
     const updated = [...tl, entry]
     setTl(updated)
     onSchedule({ timeline: updated })
@@ -459,13 +747,28 @@ function TimelineSection({ initialTimeline, onSchedule }: {
       {tl.length === 0 ? (
         <p className="text-[10px] text-gray-300 text-center py-1">타임라인이 없습니다</p>
       ) : (
-        <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
-          {[...tl].reverse().map((entry: any, i: number) => (
-            <div key={i} className="flex gap-2 text-xs bg-gray-50 rounded px-2 py-1">
-              <span className="text-gray-400 shrink-0">{entry.date}</span>
-              <span className="text-gray-700 flex-1">{entry.text}</span>
-            </div>
-          ))}
+        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+          {[...tl].reverse().map((entry: any, i: number) => {
+            const isAuto = entry.user === '자동기록'
+            const kst = formatKST(entry.created_at || entry.date || '')
+            const user = entry.user || entry.author || ''
+            const content = entry.content || entry.text || ''
+            const avatar = user ? user.slice(-2) : '기록'
+            return (
+              <div key={i} className={`flex gap-2 items-start rounded-lg px-2 py-1.5 ${isAuto ? 'bg-violet-50' : 'bg-gray-50'}`}>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0 ${isAuto ? 'bg-violet-400' : 'bg-gray-400'}`}>
+                  {avatar}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-[10px] font-semibold ${isAuto ? 'text-violet-600' : 'text-gray-600'}`}>{user || '—'}</span>
+                    <span className="text-[10px] text-gray-300">{kst.date} {kst.time}</span>
+                  </div>
+                  <p className="text-xs text-gray-700 mt-0.5">{content}</p>
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
@@ -473,73 +776,68 @@ function TimelineSection({ initialTimeline, onSchedule }: {
 }
 
 // ── OpsTableRow ────────────────────────────────────────────────────────
-function OpsTableRow({ c, onSave }: { c: OpsCase; onSave: (id: string, patch: Record<string, any>) => void }) {
-  const [expanded, setExpanded] = useState(false)
-
+function OpsTableRow({
+  c,
+  isOpen,
+  onToggle,
+}: {
+  c: OpsCase
+  isOpen: boolean
+  onToggle: (id: string) => void
+}) {
   const stage = PIPELINE_STAGES.find(s => s.key === c.progress_stage) || PIPELINE_STAGES[0]
 
   return (
-    <>
-      <tr
-        className="hover:bg-gray-50/60 transition-colors cursor-pointer border-b border-gray-50"
-        onClick={() => setExpanded(v => !v)}
-      >
-        {/* 업체명 */}
-        <td className="px-3 py-2.5">
-          <span className="font-semibold text-gray-800 text-xs truncate block max-w-[150px]">
-            {c.customers?.details?.company || c.customers?.name || c.customers?.name}
-          </span>
-          <span className="text-[10px] text-gray-400">{c.customers?.name}</span>
-        </td>
-        {/* 지역 */}
-        <td className="px-3 py-2.5 text-[11px] text-gray-500">
-          {c.customers?.details?.region || '—'}
-        </td>
-        {/* 업종 */}
-        <td className="px-3 py-2.5 text-[11px] text-gray-500 truncate max-w-[100px]">
-          {c.customers?.details?.business_type || '—'}
-        </td>
-        {/* 기관 */}
-        <td className="px-3 py-2.5 text-[11px] text-gray-600 truncate max-w-[120px]">
-          {c.institution || '—'}
-        </td>
-        {/* 현재상태 */}
-        <td className="px-3 py-2.5">
-          <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold text-white ${stage.color}`}>
-            {stage.label}
-          </span>
-        </td>
-        {/* 승인금액 */}
-        <td className="px-3 py-2.5 text-[11px] text-gray-700 font-medium">
-          {c.details?.approval_amount || '—'}
-        </td>
-        {/* 수수료% */}
-        <td className="px-3 py-2.5 text-[11px] text-gray-500">
-          {c.details?.fee_rate || '—'}
-        </td>
-        {/* 재통화/메모 */}
-        <td className="px-3 py-2.5 text-[11px] text-gray-400 truncate max-w-[150px]">
-          {c.details?.contract_date || (c.progress_memo ? c.progress_memo.slice(0, 30) + (c.progress_memo.length > 30 ? '…' : '') : '—')}
-        </td>
-        {/* 업데이트 */}
-        <td className="px-3 py-2.5 text-[10px] text-gray-300 whitespace-nowrap">
-          {new Date(c.updated_at).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}
-        </td>
-        {/* 화살표 */}
-        <td className="px-3 py-2.5 text-gray-300 text-sm w-6">
-          {expanded ? '▲' : '▼'}
-        </td>
-      </tr>
-      {expanded && (
-        <tr>
-          <td colSpan={10} className="p-0">
-            <div className="bg-white border-t border-gray-100 p-4">
-              <OpsDetailPanel c={c} onSave={onSave} />
-            </div>
-          </td>
-        </tr>
-      )}
-    </>
+    <tr
+      className={`hover:bg-gray-50/60 transition-colors cursor-pointer border-b border-gray-50 ${isOpen ? 'bg-violet-50/40' : ''}`}
+      onClick={() => onToggle(c.id)}
+    >
+      {/* 업체명 */}
+      <td className="px-3 py-2.5">
+        <span className="font-semibold text-gray-800 text-xs truncate block max-w-[150px]">
+          {c.customers?.details?.company || c.customers?.name}
+        </span>
+        <span className="text-[10px] text-gray-400">{c.customers?.name}</span>
+      </td>
+      {/* 지역 */}
+      <td className="px-3 py-2.5 text-[11px] text-gray-500">
+        {c.customers?.details?.region || '—'}
+      </td>
+      {/* 업종 */}
+      <td className="px-3 py-2.5 text-[11px] text-gray-500 truncate max-w-[100px]">
+        {c.customers?.details?.business_type || '—'}
+      </td>
+      {/* 기관 */}
+      <td className="px-3 py-2.5 text-[11px] text-gray-600 truncate max-w-[120px]">
+        {c.institution || '—'}
+      </td>
+      {/* 현재상태 */}
+      <td className="px-3 py-2.5">
+        <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold text-white ${stage.color}`}>
+          {stage.label}
+        </span>
+      </td>
+      {/* 승인금액 */}
+      <td className="px-3 py-2.5 text-[11px] text-gray-700 font-medium">
+        {c.details?.approval_amount || '—'}
+      </td>
+      {/* 수수료% */}
+      <td className="px-3 py-2.5 text-[11px] text-gray-500">
+        {c.details?.fee_rate || '—'}
+      </td>
+      {/* 재통화/메모 */}
+      <td className="px-3 py-2.5 text-[11px] text-gray-400 truncate max-w-[150px]">
+        {c.details?.contract_date || (c.progress_memo ? c.progress_memo.slice(0, 30) + (c.progress_memo.length > 30 ? '…' : '') : '—')}
+      </td>
+      {/* 업데이트 */}
+      <td className="px-3 py-2.5 text-[10px] text-gray-300 whitespace-nowrap">
+        {new Date(c.updated_at).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}
+      </td>
+      {/* 화살표 */}
+      <td className="px-3 py-2.5 text-gray-300 text-sm w-6">
+        {isOpen ? '◀' : '▶'}
+      </td>
+    </tr>
   )
 }
 
@@ -553,6 +851,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
   const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const [installPrompt, setInstallPrompt] = useState<any>(null)
   const [installable, setInstallable] = useState(false)
+  const [openPanelIds, setOpenPanelIds] = useState<string[]>([])
 
   useEffect(() => {
     const handler = (e: any) => { e.preventDefault(); setInstallPrompt(e); setInstallable(true) }
@@ -577,6 +876,14 @@ export default function OpsDashboard({ userId, userName }: Props) {
 
   useEffect(() => { loadCases() }, [])
 
+  function togglePanel(id: string) {
+    setOpenPanelIds(prev => {
+      if (prev.includes(id)) return prev.filter(x => x !== id)
+      const next = [...prev, id]
+      return next.length > 2 ? next.slice(1) : next
+    })
+  }
+
   const handleSave = useCallback((id: string, patch: Record<string, any>) => {
     // Optimistic update
     setCases(prev => prev.map(c => {
@@ -584,7 +891,8 @@ export default function OpsDashboard({ userId, userName }: Props) {
       const mergedDetails = patch.details
         ? { ...(c.details || {}), ...patch.details }
         : c.details
-      return { ...c, ...patch, details: mergedDetails }
+      const mergedTimeline = patch.timeline !== undefined ? patch.timeline : c.timeline
+      return { ...c, ...patch, details: mergedDetails, timeline: mergedTimeline }
     }))
     if (autoSaveTimers.current[id]) clearTimeout(autoSaveTimers.current[id])
     autoSaveTimers.current[id] = setTimeout(async () => {
@@ -606,10 +914,8 @@ export default function OpsDashboard({ userId, userName }: Props) {
       )
     : cases
 
-  // View filter state
   const [caseView, setCaseView] = useState<'active' | 'refund' | 'completed'>('active')
 
-  // Stats
   const totalApproval = cases.reduce((sum, c) => {
     const amt = parseFloat((c.details?.approval_amount || '0').replace(/[^0-9.]/g, ''))
     return sum + (isNaN(amt) ? 0 : amt)
@@ -618,7 +924,6 @@ export default function OpsDashboard({ userId, userName }: Props) {
   const refundCount = cases.filter(c => REFUND_STAGE_KEYS.has(c.progress_stage) || c.is_refund).length
   const inProgressCount = cases.filter(c => ACTIVE_STAGE_KEYS.has(c.progress_stage)).length
 
-  // Filter by view
   const viewCases = filteredCases.filter(c => {
     if (caseView === 'refund') return REFUND_STAGE_KEYS.has(c.progress_stage) || c.is_refund
     if (caseView === 'completed') return COMPLETED_STAGE_KEYS.has(c.progress_stage) || c.is_completed
@@ -626,7 +931,6 @@ export default function OpsDashboard({ userId, userName }: Props) {
       (!REFUND_STAGE_KEYS.has(c.progress_stage) && !COMPLETED_STAGE_KEYS.has(c.progress_stage) && !c.is_refund && !c.is_completed)
   })
 
-  // Group by pipeline stage
   const groupedCases = PIPELINE_STAGES.map(stage => ({
     stage,
     items: viewCases.filter(c => c.progress_stage === stage.key),
@@ -674,7 +978,6 @@ export default function OpsDashboard({ userId, userName }: Props) {
             <>
               <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
               <div className="absolute top-full right-0 mt-2 bg-white border border-[#E8E2D4] rounded-2xl shadow-2xl z-50 py-2 min-w-[200px]">
-                {/* 사용자 카드 */}
                 <div className="px-4 py-3 border-b border-[#E8E2D4] mb-1">
                   <p className="text-[10px] text-[#C5A258] font-bold tracking-wide uppercase mb-0.5">자금팀</p>
                   <div className="flex items-center justify-between">
@@ -804,7 +1107,12 @@ export default function OpsDashboard({ userId, userName }: Props) {
                           </thead>
                           <tbody className="divide-y divide-gray-50">
                             {items.map(c => (
-                              <OpsTableRow key={c.id} c={c} onSave={handleSave} />
+                              <OpsTableRow
+                                key={c.id}
+                                c={c}
+                                isOpen={openPanelIds.includes(c.id)}
+                                onToggle={togglePanel}
+                              />
                             ))}
                           </tbody>
                         </table>
@@ -817,6 +1125,49 @@ export default function OpsDashboard({ userId, userName }: Props) {
           </div>
         )}
       </div>
+
+      {/* ── 슬라이드 드로어 패널 (최대 2개) ── */}
+      {openPanelIds.map((id, panelIndex) => {
+        const c = cases.find(x => x.id === id)
+        if (!c) return null
+        const isLast = panelIndex === openPanelIds.length - 1
+        const rightOffset = panelIndex === 0 ? 'right-0 md:right-0' : 'right-0 md:right-[530px]'
+        return (
+          <div
+            key={id}
+            className="fixed inset-0 z-[100]"
+            style={{ pointerEvents: isLast ? 'auto' : 'none' }}
+          >
+            {/* 백드롭 (마지막 드로어에만) */}
+            {isLast && (
+              <div
+                className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"
+                onClick={() => togglePanel(id)}
+              />
+            )}
+            {/* 드로어 패널 */}
+            <div className={`absolute top-0 bottom-0 ${rightOffset} w-full md:w-[520px] bg-white shadow-2xl overflow-y-auto pointer-events-auto`}>
+              {/* 헤더 */}
+              <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-3 flex items-center justify-between z-10">
+                <div>
+                  <p className="font-bold text-[#1B2A45] text-sm">{c.customers?.details?.company || c.customers?.name}</p>
+                  <p className="text-[10px] text-gray-400">{c.customers?.name} · {c.customers?.phone}</p>
+                </div>
+                <button
+                  onClick={() => togglePanel(id)}
+                  className="text-gray-400 hover:text-gray-600 text-xl leading-none px-1"
+                >
+                  ✕
+                </button>
+              </div>
+              {/* 상세 패널 */}
+              <div className="p-4">
+                <OpsDetailPanel c={c} onSave={handleSave} />
+              </div>
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -850,7 +1201,6 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
       .reduce((s: number, r: any) => s + Number(r.data?.today_contracts || 0), 0),
   }
 
-  // 오전보고 폼
   const [morning, setMorning] = useState({
     total_calls: '', no_connect: '', connected: '', db_secured: '', outbound_contracts: '',
   })
@@ -890,7 +1240,6 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
     setSubmitting(false)
   }
 
-  // 마감보고 폼
   const [daily, setDaily] = useState({ today_contracts: '', month_contracts: '', goal: '', memo: '' })
 
   async function submitDaily(e: FormEvent) {
