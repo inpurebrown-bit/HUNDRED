@@ -1131,12 +1131,12 @@ export default function HomePage() {
           </Reveal>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
             {[
-              { photo: '/images/consulting/construction.png', caption: '건설업 대표님과 현장 미팅',    badge: '정책자금 3억 승인',    pos: 'center' },
-              { photo: '/images/consulting/restaurant.jpg',   caption: '요식업 대표님 매장 방문 상담', badge: '소진공 1억 승인',    pos: 'center' },
-              { photo: '/images/consulting/interior.jpg',     caption: '인테리어 업체 사무실 방문',    badge: '기보 2억 승인',    pos: 'center top' },
-              { photo: '/images/consulting/factory.jpg',      caption: '제조업 공장 현장 방문 상담',   badge: '신보 5억 승인',    pos: 'center' },
-              { photo: '/images/consulting/retail.jpg',       caption: '소매업 대표님 직접 방문',      badge: '무상지원금 5천만원', pos: 'center' },
-              { photo: '/images/consulting/startup.jpg',      caption: '스타트업 대표님 사무실 미팅',  badge: '벤처인증 + 정책자금', pos: 'center' },
+              { photo: '/images/consulting/construction.png', caption: '건설업 대표님과 현장 미팅',    badge: '정책자금 3억 승인',    pos: 'center',     size: 'cover' },
+              { photo: '/images/consulting/restaurant.jpg',   caption: '요식업 대표님 매장 방문 상담', badge: '소진공 1억 승인',    pos: 'center',     size: 'cover' },
+              { photo: '/images/consulting/interior.jpg',     caption: '인테리어 업체 사무실 방문',    badge: '기보 2억 승인',    pos: 'center 58%', size: 'cover' },
+              { photo: '/images/consulting/factory.jpg',      caption: '제조업 공장 현장 방문 상담',   badge: '신보 5억 승인',    pos: 'center',     size: 'cover' },
+              { photo: '/images/consulting/retail.jpg',       caption: '소매업 대표님 직접 방문',      badge: '무상지원금 5천만원', pos: 'center',    size: 'cover' },
+              { photo: '/images/consulting/startup.jpg',      caption: '스타트업 대표님 사무실 미팅',  badge: '벤처인증 + 정책자금', pos: 'center 38%', size: '100% auto' },
             ].map((s, i) => (
               <Reveal key={i} from="bottom" delay={i * 70}>
                 <div className="relative rounded-2xl overflow-hidden aspect-[4/3] shadow-lg cursor-default group">
@@ -1145,7 +1145,7 @@ export default function HomePage() {
                     className="absolute inset-0 transition-transform duration-500 ease-out group-hover:scale-105"
                     style={{
                       backgroundImage: `url(${s.photo})`,
-                      backgroundSize: 'cover',
+                      backgroundSize: s.size,
                       backgroundPosition: s.pos,
                     }}
                   />
