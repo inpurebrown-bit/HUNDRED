@@ -59,14 +59,41 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  const customerName = existing.details?.company || existing.name || '고객'
+
   // 계약 완료로 상태 변경 시 대표에게 푸시 알림
   if (body.status === 'contracted' && existing.status !== 'contracted') {
-    const customerName = existing.details?.company || existing.name || '고객'
     await sendPushNotification({
-      title: '🎉 계약 완료!',
-      body: `${customerName} — ${user.name || '영업팀'}이(가) 계약을 완료했습니다.`,
-      url: '/',
+      title: '✅ 계약 완료',
+      body: `${customerName} 계약이 완료되었습니다.`,
+      url: '/dashboard',
       tag: 'contract',
+      target: 'ceo',
+    })
+  }
+
+  // 심사 요청 시 대표에게 푸시 알림
+  const prevInspectionStatus = (existing.details as any)?.inspection_status
+  const newInspectionStatus = body.details?.inspection_status
+  if (newInspectionStatus === 'pending' && prevInspectionStatus !== 'pending') {
+    await sendPushNotification({
+      title: '🔍 심사 요청',
+      body: `${customerName} 심사 요청이 접수되었습니다.`,
+      url: '/dashboard',
+      tag: 'inspection',
+      target: 'ceo',
+    })
+  }
+
+  // A/S 요청 시 대표에게 푸시 알림
+  const prevAsRequested = (existing.details as any)?.as_requested
+  const newAsRequested = body.details?.as_requested
+  if (newAsRequested === true && !prevAsRequested) {
+    await sendPushNotification({
+      title: '🔧 A/S 요청',
+      body: `${customerName} A/S 요청이 접수되었습니다.`,
+      url: '/dashboard',
+      tag: 'as-request',
       target: 'ceo',
     })
   }

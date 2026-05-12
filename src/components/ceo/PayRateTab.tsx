@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 // ─── 타입 정의 ────────────────────────────────────────────
 
@@ -55,6 +55,7 @@ function PayRateSubView() {
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState('')
+  const [autoStats, setAutoStats] = useState<{name: string; contracted: number; target: number}[]>([])
 
   const [summary, setSummary] = useState<SummaryRow>({
     employee_count: 0,
@@ -174,6 +175,32 @@ function PayRateSubView() {
     setLoading(false)
   }
 
+  // 날짜 변경 시 자동 로드
+  useEffect(() => {
+    handleLoad()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date])
+
+  // 이번달 계약 자동집계
+  useEffect(() => {
+    fetch('/api/customers')
+      .then(r => r.json())
+      .then(d => {
+        const customers = d.customers || []
+        const thisMonth = new Date().toISOString().slice(0, 7)
+        const byPerson: Record<string, number> = {}
+        customers
+          .filter((c: any) => c.status === 'contracted' &&
+            (c.details?.contract_date || c.created_at || '').startsWith(thisMonth))
+          .forEach((c: any) => {
+            const name = (c.details?.sales_user_name || c.sales_user_name || '').trim()
+            if (name) byPerson[name] = (byPerson[name] || 0) + 1
+          })
+        setAutoStats(Object.entries(byPerson).map(([name, contracted]) => ({ name, contracted, target: 0 })))
+      })
+      .catch(() => {/* 무시 */})
+  }, [])
+
   async function handleSave() {
     setSaving(true)
     setMsg('')
@@ -193,6 +220,21 @@ function PayRateSubView() {
 
   return (
     <div className="space-y-6 pb-8">
+      {/* 이번달 계약 자동집계 배너 */}
+      {autoStats.length > 0 && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 mb-3">
+          <p className="text-[10px] font-bold text-emerald-700 mb-2">🤖 이번달 계약 자동집계</p>
+          <div className="flex gap-3 flex-wrap">
+            {autoStats.map(s => (
+              <div key={s.name} className="bg-white rounded-lg px-3 py-2 border border-emerald-100 text-center">
+                <p className="text-[10px] text-gray-400">{s.name.replace(' 수석팀장', '')}</p>
+                <p className="text-lg font-black text-emerald-700">{s.contracted}<span className="text-xs font-normal">건</span></p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 날짜 / 버튼 */}
       <div className="flex items-center gap-3 flex-wrap">
         <input
@@ -201,10 +243,7 @@ function PayRateSubView() {
           onChange={e => setDate(e.target.value)}
           className="border border-gray-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
-        <button onClick={handleLoad} disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white px-4 py-1.5 rounded text-sm font-medium">
-          {loading ? '불러오는 중...' : '불러오기'}
-        </button>
+        {loading && <span className="text-xs text-blue-500">불러오는 중...</span>}
         <button onClick={handleSave} disabled={saving}
           className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white px-4 py-1.5 rounded text-sm font-medium">
           {saving ? '저장 중...' : '저장'}
@@ -420,6 +459,12 @@ function PnlSubView() {
     setLoading(false)
   }
 
+  // 날짜 변경 시 자동 로드
+  useEffect(() => {
+    handleLoad()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date])
+
   async function handleSave() {
     setSaving(true)
     setMsg('')
@@ -455,10 +500,7 @@ function PnlSubView() {
       <div className="flex items-center gap-3 flex-wrap">
         <input type="date" value={date} onChange={e => setDate(e.target.value)}
           className="border border-gray-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
-        <button onClick={handleLoad} disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white px-4 py-1.5 rounded text-sm font-medium">
-          {loading ? '불러오는 중...' : '불러오기'}
-        </button>
+        {loading && <span className="text-xs text-blue-500">불러오는 중...</span>}
         <button onClick={handleSave} disabled={saving}
           className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white px-4 py-1.5 rounded text-sm font-medium">
           {saving ? '저장 중...' : '저장'}

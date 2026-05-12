@@ -72,6 +72,61 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ notice: data }, { status: 201 })
 }
 
+// PATCH: CEO only - ?id= 쿼리 파라미터 + body로 수정
+export async function PATCH(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+
+  const user = session.user as any
+  if (user.role !== 'ceo') {
+    return NextResponse.json({ error: '권한 없음' }, { status: 403 })
+  }
+
+  const { searchParams } = new URL(req.url)
+  const id = searchParams.get('id')
+  if (!id) return NextResponse.json({ error: 'id는 필수입니다' }, { status: 400 })
+
+  const body = await req.json()
+  const { title, content, notice_type, target_team, is_active, start_date, end_date } = body
+
+  const updateData: Record<string, any> = {}
+  if (title !== undefined) updateData.title = title
+  if (content !== undefined) updateData.content = content
+  if (notice_type !== undefined) updateData.notice_type = notice_type
+  if (target_team !== undefined) updateData.target_team = target_team
+  if (is_active !== undefined) updateData.is_active = is_active
+  if (start_date !== undefined) updateData.start_date = start_date
+  if (end_date !== undefined) updateData.end_date = end_date
+
+  const { data, error } = await supabaseAdmin
+    .from('notices')
+    .update(updateData)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // 공지사항 수정 시 직원들에게 푸시 알림
+  const noticeTitle = title || data?.title || ''
+  if (noticeTitle && notice_type !== 'supply_count') {
+    const resolvedTargetTeam = target_team || data?.target_team
+    const pushTarget = resolvedTargetTeam === 'sales' ? 'sales'
+      : resolvedTargetTeam === 'ops' ? 'ops'
+      : 'employees'
+
+    await sendPushNotification({
+      title: '📢 공지사항',
+      body: `새 공지사항: ${noticeTitle}`,
+      url: '/dashboard',
+      tag: 'notice',
+      target: pushTarget,
+    })
+  }
+
+  return NextResponse.json({ notice: data })
+}
+
 // DELETE: CEO only - ?id= 쿼리 파라미터 필요
 export async function DELETE(req: NextRequest) {
   const session = await getServerSession(authOptions)

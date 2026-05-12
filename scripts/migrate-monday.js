@@ -400,6 +400,103 @@ function parseASList(filePath) {
 }
 
 // ──────────────────────────────────────────────
+// 타임라인 헬퍼
+// ──────────────────────────────────────────────
+
+/**
+ * 날짜 문자열(YYYY-MM-DD)을 타임라인 created_at 형식으로 변환
+ * 시간 정보 없으면 09:00:00 기본값
+ */
+function dateToTimeline(dateStr) {
+  if (!dateStr) return '';
+  const d = String(dateStr).trim();
+  if (d.match(/^\d{4}-\d{2}-\d{2}$/)) return `${d} 09:00:00`;
+  return d;
+}
+
+/**
+ * 고객 entry에서 타임라인 항목 생성
+ * details에 있는 날짜/내용 기반으로 주요 이벤트 타임라인 생성
+ */
+function buildTimeline(entry) {
+  const timeline = [];
+  const d = entry.details || {};
+  const salesUser = d.sales_user_name || '영업팀';
+
+  // 1. 접수일 (인콜 최초 등록)
+  if (d.reception_date) {
+    timeline.push({
+      user: salesUser,
+      content: `[마이그레이션] 인콜 접수 등록`,
+      created_at: dateToTimeline(d.reception_date),
+    });
+  }
+
+  // 2. 통화내용 / 상담 메모
+  if (entry.notes && entry.notes.trim()) {
+    const noteLines = entry.notes.split('\n---\n');
+    for (const note of noteLines) {
+      const trimmed = note.trim();
+      if (!trimmed) continue;
+      timeline.push({
+        user: salesUser,
+        content: `[마이그레이션] ${trimmed.slice(0, 200)}`,
+        created_at: dateToTimeline(d.reception_date) || '2024-01-01 09:00:00',
+      });
+    }
+  }
+
+  // 3. 인콜 결과 / 클로징 결과
+  if (d.call_result) {
+    timeline.push({
+      user: salesUser,
+      content: `[마이그레이션] 인콜 결과: ${d.call_result}`,
+      created_at: dateToTimeline(d.reception_date) || '2024-01-01 09:00:00',
+    });
+  }
+  if (d.closing_result) {
+    timeline.push({
+      user: salesUser,
+      content: `[마이그레이션] 클로징 결과: ${d.closing_result}`,
+      created_at: dateToTimeline(d.reception_date) || '2024-01-01 09:00:00',
+    });
+  }
+
+  // 4. 재통화 일정
+  if (d.follow_up_date) {
+    timeline.push({
+      user: salesUser,
+      content: `[마이그레이션] 재통화 일정: ${d.follow_up_date}`,
+      created_at: dateToTimeline(d.follow_up_date),
+    });
+  }
+
+  // 5. 계약 완료 (contracted)
+  if (entry.status === 'contracted' && d.contract_fee) {
+    const contractAt = dateToTimeline(d.reception_date) || '2024-01-01 09:00:00';
+    timeline.push({
+      user: salesUser,
+      content: `[마이그레이션] 계약 완료 — 계약금: ${d.contract_fee}원`,
+      created_at: contractAt,
+    });
+  }
+
+  // 6. A/S 요청
+  if (d.as_requested) {
+    timeline.push({
+      user: salesUser,
+      content: `[마이그레이션] A/S 요청 접수`,
+      created_at: '2024-01-01 09:00:00',
+    });
+  }
+
+  // created_at 기준 정렬 (오래된 것부터)
+  timeline.sort((a, b) => (a.created_at > b.created_at ? 1 : -1));
+
+  return timeline;
+}
+
+// ──────────────────────────────────────────────
 // 상태 우선순위
 // ──────────────────────────────────────────────
 const STATUS_PRIORITY = {
@@ -705,8 +802,11 @@ async function main() {
     console.log('\n[DRY-RUN] 실제 API 호출 없음. --upload 플래그를 추가하면 업로드됩니다.');
     console.log('\n샘플 (처음 3건):');
     allCustomers.slice(0, 3).forEach((c, i) => {
+      const tl = buildTimeline(c);
       console.log(`\n  [${i+1}] ${c.company} | ${c.status} | 전화:${c.phone || '-'}`);
       console.log(`       담당:${c.details?.sales_user_name || '-'} | 접수:${c.details?.reception_date || '-'}`);
+      console.log(`       타임라인 ${tl.length}건:`);
+      tl.slice(0, 2).forEach(t => console.log(`         - [${t.created_at}] ${t.content.slice(0, 60)}`));
     });
     return;
   }
@@ -720,13 +820,17 @@ async function main() {
   const errors = [];
 
   for (const c of allCustomers) {
+    const timeline = buildTimeline(c);
     const payload = {
       name:    c.name || c.company,   // 대표자명 없으면 업체명으로
       phone:   c.phone || '',
       company: c.company,
       status:  c.status,
       notes:   c.notes  || '',
-      details: c.details || {},
+      details: {
+        ...(c.details || {}),
+        timeline: timeline.length > 0 ? timeline : undefined,
+      },
     };
 
     try {

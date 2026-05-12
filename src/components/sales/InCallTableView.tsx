@@ -454,23 +454,52 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
   )
 }
 
-// ── InCallTableRow ─────────────────────────────────────────────────────
-interface RowProps {
+// ── 날짜 기준 그룹핑 ───────────────────────────────────────────────────
+function groupByDate(customers: Customer[]): { date: string; items: Customer[] }[] {
+  const map = new Map<string, Customer[]>()
+  for (const c of customers) {
+    const date = c.details?.reception_date?.slice(0, 10) || '__none__'
+    if (!map.has(date)) map.set(date, [])
+    map.get(date)!.push(c)
+  }
+  const entries = Array.from(map.entries()).sort(([a], [b]) => {
+    if (a === '__none__') return 1
+    if (b === '__none__') return -1
+    return b.localeCompare(a)
+  })
+  return entries.map(([date, items]) => ({ date, items }))
+}
+
+// ── CustomerCard ───────────────────────────────────────────────────────
+interface CardProps {
   customer: Customer
-  index: number
   salesUsers: string[]
   userName: string
   tabType: Props['tabType']
   showOwner?: boolean
   cumulativeBase: number
+  expandedId: string | null
+  onExpand: (id: string | null) => void
   onUpdate: Props['onUpdate']
   onStatusChange: Props['onStatusChange']
   onDelete: Props['onDelete']
   onTransferToOps?: Props['onTransferToOps']
 }
 
-function InCallTableRow({ customer, index, salesUsers, userName, tabType, showOwner, cumulativeBase, onUpdate, onStatusChange, onDelete, onTransferToOps }: RowProps) {
-  const [expanded, setExpanded] = useState(false)
+function CustomerCard({
+  customer,
+  salesUsers,
+  userName,
+  tabType,
+  showOwner,
+  cumulativeBase,
+  expandedId,
+  onExpand,
+  onUpdate,
+  onStatusChange,
+  onDelete,
+  onTransferToOps,
+}: CardProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [contractModalOpen, setContractModalOpen] = useState(false)
   const [tlText, setTlText] = useState('')
@@ -497,13 +526,16 @@ function InCallTableRow({ customer, index, salesUsers, userName, tabType, showOw
   }, [tradeOpen])
 
   const c = customer
-  const rowBg = index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
+  const expanded = expandedId === c.id
+  const leadType = c.details?.lead_type
+  const ownerName = c.sales_user_name || c.details?.sales_user_name || userName
+  const inspectionStatus = c.details?.inspection_status
 
   async function handleContractConfirm(data: Record<string, any>) {
     await onUpdate(c.id, { details: data })
     await onStatusChange(c.id, 'contracted')
     setContractModalOpen(false)
-    setExpanded(false)
+    onExpand(null)
   }
 
   async function handleInspectionRequest() {
@@ -527,9 +559,6 @@ function InCallTableRow({ customer, index, salesUsers, userName, tabType, showOw
     await onUpdate(c.id, { call_timeline: updated })
   }
 
-  const inspectionStatus = c.details?.inspection_status
-  const leadType = c.details?.lead_type
-
   return (
     <>
       {/* 계약완료 모달 */}
@@ -544,473 +573,395 @@ function InCallTableRow({ customer, index, salesUsers, userName, tabType, showOw
         />
       )}
 
-      <tr className={`${rowBg} hover:bg-blue-50/30 transition-colors border-b border-gray-100`}>
-        {/* # */}
-        <td className="px-3 py-2.5 text-gray-300 text-[11px] w-8 font-mono">{index + 1}</td>
-
-        {/* 업체명 — 칸 전체 클릭 */}
-        <td
-          className="px-3 py-2.5 cursor-pointer select-none"
-          onClick={() => setExpanded(v => !v)}
+      {/* 카드 본체 */}
+      <div
+        className={`bg-white border rounded-xl p-3 cursor-pointer hover:shadow-md transition-all relative ${
+          expanded ? 'ring-2 ring-blue-400 border-blue-300' : 'border-gray-200 hover:border-blue-300'
+        }`}
+        onClick={() => onExpand(expanded ? null : c.id)}
+      >
+        {/* 3-dot 메뉴 — 우상단 */}
+        <div
+          className="absolute top-2 right-2"
+          ref={menuRef}
+          onClick={e => e.stopPropagation()}
         >
-          <div className="flex items-center gap-1 min-w-0">
-            <span className="text-gray-400 text-[10px] shrink-0">{expanded ? '▾' : '▸'}</span>
-            <span className="font-semibold text-[#1B2A45] text-xs truncate max-w-[150px]">
-              {c.company || c.name}
-            </span>
-          </div>
-          {c.name && (c.company && c.company !== c.name) && (
-            <p className="text-[10px] text-gray-400 ml-3.5 truncate max-w-[150px]">{c.name}</p>
+          <button
+            type="button"
+            onClick={() => setMenuOpen(v => !v)}
+            className="text-gray-300 hover:text-gray-600 px-1 py-0.5 rounded hover:bg-gray-100 font-bold leading-none text-sm"
+          >
+            ⋮
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 z-50 top-full mt-1 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[140px] py-1">
+              {tabType !== 'contracted' && (
+                <button type="button" onClick={() => { setContractModalOpen(true); setMenuOpen(false) }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-emerald-600 font-medium">
+                  ✅ 계약완료
+                </button>
+              )}
+              {tabType !== 'emotional' && (
+                <button type="button" onClick={() => { onStatusChange(c.id, 'emotional'); setMenuOpen(false) }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-violet-600 font-medium">
+                  💬 감성톡(거절업체)
+                </button>
+              )}
+              {tabType !== 'trash' && (
+                <button type="button" onClick={() => { onStatusChange(c.id, 'trash'); setMenuOpen(false) }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-gray-500 font-medium">
+                  🗑 자체거절
+                </button>
+              )}
+              {tabType !== 'lead' && tabType !== 'db010' && (
+                <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); setMenuOpen(false) }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-blue-500 font-medium">
+                  ↩ 신규복구
+                </button>
+              )}
+              {tabType === 'contracted' && onTransferToOps && (
+                <button type="button" onClick={() => { onTransferToOps(c); setMenuOpen(false) }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-amber-600 font-medium">
+                  📤 자금팀전송
+                </button>
+              )}
+              <div className="border-t border-gray-100 my-0.5" />
+              <button type="button"
+                onClick={() => { if (confirm('삭제하시겠습니까?')) { onDelete(c.id); setMenuOpen(false) } }}
+                className="w-full text-left px-3 py-2 text-xs hover:bg-red-50 text-red-500 font-medium">
+                🗑 삭제
+              </button>
+            </div>
           )}
-          {/* 직가/공가 배지 */}
+        </div>
+
+        {/* 업체명 */}
+        <p className="font-bold text-[#1B2A45] text-xs truncate pr-5">{c.company || c.name}</p>
+        {/* 대표자 */}
+        <p className="text-[10px] text-gray-400 truncate">{c.name}</p>
+
+        {/* 직가/공가 + 담당자 */}
+        <div className="flex gap-1 mt-1 flex-wrap">
           {leadType && (
-            <span className={`ml-3.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-              leadType === '직가' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
-            }`}>{leadType}</span>
+            <span className={`text-[9px] font-bold px-1 rounded ${leadType === '직가' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+              {leadType}
+            </span>
           )}
-        </td>
+          {showOwner && (
+            <span className="text-[9px] bg-gray-100 text-gray-500 px-1 rounded truncate max-w-[60px]">
+              {ownerName}
+            </span>
+          )}
+        </div>
 
-        {/* 담당자 (CEO) */}
-        {showOwner && (
-          <td className="px-3 py-2.5 text-[11px] text-gray-500 whitespace-nowrap">
-            {c.sales_user_name || c.details?.sales_user_name || '—'}
-          </td>
-        )}
-
-        {/* 접수일 */}
-        <td className="px-3 py-2.5 text-gray-500 text-[11px] whitespace-nowrap font-mono">
-          {c.details?.reception_date
-            ? c.details.reception_date.slice(5).replace('-', '/')
-            : <span className="text-gray-300">—</span>}
-        </td>
-
-        {/* 전화번호 */}
-        <td className="px-3 py-2.5 text-gray-600 text-[11px] whitespace-nowrap font-mono">
-          {c.phone || <span className="text-gray-300">—</span>}
-        </td>
-
-        {/* 업종 */}
-        <td className="px-3 py-2.5 text-gray-500 text-[11px] max-w-[100px]">
-          <span className="truncate block">{c.details?.business_type || <span className="text-gray-300">—</span>}</span>
-        </td>
-
-        {/* 결정전결과 */}
-        <td className="px-3 py-2.5">
+        {/* 결정전 결과 배지 */}
+        <div className="mt-1.5" onClick={e => e.stopPropagation()}>
           <BadgeDropdown
             value={c.details?.call_result || ''}
             options={CALL_RESULTS}
             onChange={(val) => onUpdate(c.id, { details: { call_result: val } })}
           />
-        </td>
+        </div>
 
-        {/* 클로징결과 */}
-        <td className="px-3 py-2.5">
-          <BadgeDropdown
-            value={c.details?.closing_result || ''}
-            options={CLOSING_RESULTS}
-            onChange={(val) => onUpdate(c.id, { details: { closing_result: val } })}
-          />
-        </td>
+        {/* 재통화 일정 (있으면) */}
+        {c.details?.follow_up_date && (
+          <p className="text-[9px] text-sky-600 mt-1">📅 {c.details.follow_up_date.slice(5)}</p>
+        )}
+      </div>
 
-        {/* 재통화 */}
-        <td className="px-3 py-2.5">
-          <input
-            type="date"
-            value={c.details?.follow_up_date || ''}
-            onChange={e => onUpdate(c.id, { details: { follow_up_date: e.target.value } })}
-            className="text-[11px] border-0 bg-transparent focus:outline-none w-24 text-gray-500 font-mono"
-          />
-        </td>
-
-        {/* 통화내용 요약 */}
-        <td className="px-3 py-2.5 text-[11px] text-gray-400 max-w-[160px]">
-          <span className="truncate block">
-            {c.memo || c.notes || c.details?.notes || ''}
-          </span>
-        </td>
-
-        {/* 3-dot menu */}
-        <td className="px-3 py-2.5 w-8">
-          <div className="relative" ref={menuRef}>
-            <button
-              type="button"
-              onClick={() => setMenuOpen(v => !v)}
-              className="text-gray-300 hover:text-gray-600 px-1 py-0.5 rounded hover:bg-gray-100 font-bold leading-none"
-            >
-              ⋮
-            </button>
-            {menuOpen && (
-              <div className="absolute right-0 z-50 top-full mt-1 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[140px] py-1">
-                {tabType !== 'contracted' && (
-                  <button type="button" onClick={() => { setContractModalOpen(true); setMenuOpen(false) }}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-emerald-600 font-medium">
-                    ✅ 계약완료
-                  </button>
-                )}
-                {tabType !== 'emotional' && (
-                  <button type="button" onClick={() => { onStatusChange(c.id, 'emotional'); setMenuOpen(false) }}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-violet-600 font-medium">
-                    💬 감성톡(거절업체)
-                  </button>
-                )}
-                {tabType !== 'trash' && (
-                  <button type="button" onClick={() => { onStatusChange(c.id, 'trash'); setMenuOpen(false) }}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-gray-500 font-medium">
-                    🗑 자체거절
-                  </button>
-                )}
-                {tabType !== 'lead' && tabType !== 'db010' && (
-                  <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); setMenuOpen(false) }}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-blue-500 font-medium">
-                    ↩ 신규복구
-                  </button>
-                )}
-                {tabType === 'contracted' && onTransferToOps && (
-                  <button type="button" onClick={() => { onTransferToOps(c); setMenuOpen(false) }}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-amber-600 font-medium">
-                    📤 자금팀전송
-                  </button>
-                )}
-                <div className="border-t border-gray-100 my-0.5" />
-                <button type="button"
-                  onClick={() => { if (confirm('삭제하시겠습니까?')) { onDelete(c.id); setMenuOpen(false) } }}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-red-50 text-red-500 font-medium">
-                  🗑 삭제
-                </button>
-              </div>
-            )}
-          </div>
-        </td>
-      </tr>
-
-      {/* ── 확장 패널 ── */}
+      {/* ── 확장 패널 (col-span-full) ── */}
       {expanded && (
-        <tr>
-          <td colSpan={showOwner ? 11 : 10} className="p-0">
-            <div className="bg-[#FAFAF8] border-t border-b border-blue-100">
+        <div className="col-span-full bg-[#FAFAF8] border border-blue-100 rounded-xl overflow-hidden">
 
-              {/* 상단 액션 바 */}
-              <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b border-gray-100 bg-white">
-                <span className="text-xs font-bold text-[#1B2A45] mr-2">
-                  {c.details?.company || c.company || c.name}
-                </span>
-                {tabType !== 'contracted' && (
-                  <button type="button" onClick={() => setContractModalOpen(true)}
-                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-emerald-500 text-white hover:bg-emerald-600">
-                    ✅ 계약완료
-                  </button>
-                )}
-                {tabType !== 'emotional' && (
-                  <button type="button" onClick={() => { onStatusChange(c.id, 'emotional'); setExpanded(false) }}
-                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-violet-500 text-white">
-                    💬 감성톡(거절업체)
-                  </button>
-                )}
-                {tabType !== 'trash' && (
-                  <button type="button" onClick={() => { onStatusChange(c.id, 'trash'); setExpanded(false) }}
-                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-gray-400 text-white">
-                    🗑 자체거절
-                  </button>
-                )}
-                {tabType !== 'lead' && tabType !== 'db010' && (
-                  <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); setExpanded(false) }}
-                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-blue-500 text-white">
-                    ↩ 신규복구
-                  </button>
-                )}
-                {onTransferToOps && tabType === 'contracted' && (
-                  <button type="button" onClick={() => { onTransferToOps(c); setExpanded(false) }}
-                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-amber-500 text-white">
-                    📤 자금팀 전송
-                  </button>
-                )}
-                {/* DB 트레이드 */}
-                <div className="relative" ref={tradeRef}>
-                  <button type="button" onClick={() => setTradeOpen(v => !v)}
-                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-sky-500 hover:bg-sky-600 text-white">
-                    🔄 DB 트레이드
-                  </button>
-                  {tradeOpen && (
-                    <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 py-1 z-50 min-w-[160px]">
-                      <p className="text-[10px] text-gray-400 px-3 py-1.5 font-semibold border-b border-gray-50">담당자 변경</p>
-                      {salesUsers.filter(u => u !== (c.sales_user_name || c.details?.sales_user_name)).map(u => (
-                        <button key={u} type="button"
-                          onClick={() => {
-                            onUpdate(c.id, { details: {
-                              sales_user_name: u,
-                              trade_from: c.sales_user_name || c.details?.sales_user_name || '',
-                              trade_date: new Date().toISOString().slice(0, 10),
-                            }})
-                            setTradeOpen(false)
-                          }}
-                          className="w-full text-left px-3 py-2.5 text-xs hover:bg-sky-50 text-sky-700 font-semibold flex items-center gap-2">
-                          <span className="text-gray-300 text-[10px]">→</span> {u}
-                        </button>
-                      ))}
-                      {salesUsers.filter(u => u !== (c.sales_user_name || c.details?.sales_user_name)).length === 0 && (
-                        <p className="text-[11px] text-gray-400 px-3 py-2 italic">다른 영업사원 없음</p>
-                      )}
-                    </div>
+          {/* 상단 액션 바 */}
+          <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b border-gray-100 bg-white">
+            <span className="text-xs font-bold text-[#1B2A45] mr-2">
+              {c.details?.company || c.company || c.name}
+            </span>
+            {tabType !== 'contracted' && (
+              <button type="button" onClick={() => setContractModalOpen(true)}
+                className="px-2.5 py-1 rounded text-[11px] font-semibold bg-emerald-500 text-white hover:bg-emerald-600">
+                ✅ 계약완료
+              </button>
+            )}
+            {tabType !== 'emotional' && (
+              <button type="button" onClick={() => { onStatusChange(c.id, 'emotional'); onExpand(null) }}
+                className="px-2.5 py-1 rounded text-[11px] font-semibold bg-violet-500 text-white">
+                💬 감성톡(거절업체)
+              </button>
+            )}
+            {tabType !== 'trash' && (
+              <button type="button" onClick={() => { onStatusChange(c.id, 'trash'); onExpand(null) }}
+                className="px-2.5 py-1 rounded text-[11px] font-semibold bg-gray-400 text-white">
+                🗑 자체거절
+              </button>
+            )}
+            {tabType !== 'lead' && tabType !== 'db010' && (
+              <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); onExpand(null) }}
+                className="px-2.5 py-1 rounded text-[11px] font-semibold bg-blue-500 text-white">
+                ↩ 신규복구
+              </button>
+            )}
+            {onTransferToOps && tabType === 'contracted' && (
+              <button type="button" onClick={() => { onTransferToOps(c); onExpand(null) }}
+                className="px-2.5 py-1 rounded text-[11px] font-semibold bg-amber-500 text-white">
+                📤 자금팀 전송
+              </button>
+            )}
+            {/* DB 트레이드 */}
+            <div className="relative" ref={tradeRef}>
+              <button type="button" onClick={() => setTradeOpen(v => !v)}
+                className="px-2.5 py-1 rounded text-[11px] font-semibold bg-sky-500 hover:bg-sky-600 text-white">
+                🔄 DB 트레이드
+              </button>
+              {tradeOpen && (
+                <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 py-1 z-50 min-w-[160px]">
+                  <p className="text-[10px] text-gray-400 px-3 py-1.5 font-semibold border-b border-gray-50">담당자 변경</p>
+                  {salesUsers.filter(u => u !== (c.sales_user_name || c.details?.sales_user_name)).map(u => (
+                    <button key={u} type="button"
+                      onClick={() => {
+                        onUpdate(c.id, { details: {
+                          sales_user_name: u,
+                          trade_from: c.sales_user_name || c.details?.sales_user_name || '',
+                          trade_date: new Date().toISOString().slice(0, 10),
+                        }})
+                        setTradeOpen(false)
+                      }}
+                      className="w-full text-left px-3 py-2.5 text-xs hover:bg-sky-50 text-sky-700 font-semibold flex items-center gap-2">
+                      <span className="text-gray-300 text-[10px]">→</span> {u}
+                    </button>
+                  ))}
+                  {salesUsers.filter(u => u !== (c.sales_user_name || c.details?.sales_user_name)).length === 0 && (
+                    <p className="text-[11px] text-gray-400 px-3 py-2 italic">다른 영업사원 없음</p>
                   )}
                 </div>
-                <button type="button" onClick={() => { if (confirm('삭제?')) { onDelete(c.id); setExpanded(false) } }}
-                  className="px-2.5 py-1 rounded text-[11px] font-semibold bg-red-50 text-red-500 ml-auto">
-                  🗑 삭제
-                </button>
-                <button type="button" onClick={() => setExpanded(false)}
-                  className="text-gray-400 hover:text-gray-600 text-sm font-bold px-1 ml-1">✕</button>
+              )}
+            </div>
+            <button type="button" onClick={() => { if (confirm('삭제?')) { onDelete(c.id); onExpand(null) } }}
+              className="px-2.5 py-1 rounded text-[11px] font-semibold bg-red-50 text-red-500 ml-auto">
+              🗑 삭제
+            </button>
+            <button type="button" onClick={() => onExpand(null)}
+              className="text-gray-400 hover:text-gray-600 text-sm font-bold px-1 ml-1">✕</button>
+          </div>
+
+          {/* 좌/우 2단 패널 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-0 divide-y md:divide-y-0 md:divide-x divide-gray-200">
+
+            {/* ── 좌측: 인콜일지 ── */}
+            <div className="p-4 overflow-y-auto max-h-[520px]">
+              <p className="text-[10px] font-bold text-[#1B2A45] uppercase tracking-wide mb-2">📋 인콜일지</p>
+
+              {/* ① 직가/공가 — 최상단 */}
+              <div className="flex items-center gap-2 bg-[#1B2A45] border border-[#1B2A45] rounded-lg px-2.5 py-2 mb-2 shadow-sm">
+                <span className="w-20 shrink-0 text-[10px] text-white font-bold">직가/공가</span>
+                <div className="flex gap-1.5">
+                  {['직가', '공가'].map(opt => (
+                    <button key={opt} type="button"
+                      onClick={() => onUpdate(c.id, { details: { lead_type: leadType === opt ? '' : opt } })}
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border transition-colors ${
+                        leadType === opt
+                          ? opt === '직가' ? 'bg-blue-400 text-white border-blue-400' : 'bg-amber-400 text-white border-amber-400'
+                          : 'bg-white/10 text-white/60 border-white/20 hover:bg-white/20'
+                      }`}>{opt}</button>
+                  ))}
+                </div>
               </div>
 
-              {/* 좌/우 2단 패널 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-0 divide-y md:divide-y-0 md:divide-x divide-gray-200">
-
-                {/* ── 좌측: 인콜일지 ── */}
-                <div className="p-4 overflow-y-auto max-h-[520px]">
-                  <p className="text-[10px] font-bold text-[#1B2A45] uppercase tracking-wide mb-2">📋 인콜일지</p>
-
-                  {/* ① 직가/공가 — 최상단 */}
-                  <div className="flex items-center gap-2 bg-[#1B2A45] border border-[#1B2A45] rounded-lg px-2.5 py-2 mb-2 shadow-sm">
-                    <span className="w-20 shrink-0 text-[10px] text-white font-bold">직가/공가</span>
-                    <div className="flex gap-1.5">
-                      {['직가', '공가'].map(opt => (
-                        <button key={opt} type="button"
-                          onClick={() => onUpdate(c.id, { details: { lead_type: leadType === opt ? '' : opt } })}
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border transition-colors ${
-                            leadType === opt
-                              ? opt === '직가' ? 'bg-blue-400 text-white border-blue-400' : 'bg-amber-400 text-white border-amber-400'
-                              : 'bg-white/10 text-white/60 border-white/20 hover:bg-white/20'
-                          }`}>{opt}</button>
-                      ))}
+              {/* ② 필드 목록 (key 필드 강조) */}
+              <div className="grid grid-cols-1 gap-1">
+                {buildLogFields(c).map(({ label, value }) => {
+                  const isEmpty = !value || !String(value).trim()
+                  const isKey = KEY_LABELS.has(label)
+                  return (
+                    <div key={label} className={`flex items-start gap-2 rounded-lg px-2.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${
+                      isKey
+                        ? 'bg-blue-50 border border-blue-200'
+                        : 'bg-white border border-gray-100'
+                    }`}>
+                      <span className={`w-20 shrink-0 text-[10px] font-bold pt-0.5 ${isKey ? 'text-blue-800' : 'text-blue-600'}`}>{label}</span>
+                      <span className={`text-xs flex-1 break-words ${isEmpty ? 'text-gray-300 italic' : isKey ? 'text-gray-900 font-semibold' : 'text-gray-700 font-medium'}`}>
+                        {isEmpty ? '—' : String(value)}
+                      </span>
                     </div>
-                  </div>
+                  )
+                })}
 
-                  {/* ② 필드 목록 (key 필드 강조) */}
-                  <div className="grid grid-cols-1 gap-1">
-                    {buildLogFields(c).map(({ label, value }) => {
-                      const isEmpty = !value || !String(value).trim()
-                      const isKey = KEY_LABELS.has(label)
+                {/* 혁신요건 — 인터랙티브 */}
+                <div className="flex items-start gap-2 bg-violet-50 border border-violet-200 rounded-lg px-2.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                  <span className="w-20 shrink-0 text-[10px] text-violet-800 font-bold pt-1">혁신요건</span>
+                  <div className="flex-1">
+                    <InnovationSelect
+                      value={c.details?.innovation || ''}
+                      onChange={v => onUpdate(c.id, { details: { innovation: v } })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 통화내용 + 메모 미러링 */}
+              <div className="bg-white border border-gray-100 rounded-lg px-2.5 py-2 mt-1 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-[10px] font-bold text-blue-700">통화내용 / 메모</p>
+                  <span className="text-[9px] text-emerald-600">↔ 자금팀 전달메모와 연동</span>
+                </div>
+                <ResultMemoField
+                  value={c.details?.result_memo || c.notes || c.memo || ''}
+                  onChange={(val) => onUpdate(c.id, { details: { result_memo: val } })}
+                />
+              </div>
+            </div>
+
+            {/* ── 우측: 인콜결과 ── */}
+            <div className="p-4 overflow-y-auto max-h-[520px] space-y-4">
+              {/* 담당자 (자동 - 읽기 전용) */}
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">📞 인콜결과</p>
+                <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
+                  담당: {c.sales_user_name || c.details?.sales_user_name || userName}
+                </span>
+              </div>
+
+              {/* 결정전 결과 */}
+              <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">결정전 결과</label>
+                <BadgeDropdown
+                  value={c.details?.call_result || ''}
+                  options={CALL_RESULTS}
+                  onChange={(val) => onUpdate(c.id, { details: { call_result: val } })}
+                />
+              </div>
+
+              {/* 클로징 결과 */}
+              <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">클로징 결과</label>
+                <BadgeDropdown
+                  value={c.details?.closing_result || ''}
+                  options={CLOSING_RESULTS}
+                  onChange={(val) => onUpdate(c.id, { details: { closing_result: val } })}
+                />
+              </div>
+
+              {/* 재통화 일정 */}
+              <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">재통화 일정</label>
+                <input
+                  type="date"
+                  value={c.details?.follow_up_date || ''}
+                  onChange={e => onUpdate(c.id, { details: { follow_up_date: e.target.value } })}
+                  className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50 text-gray-800"
+                />
+              </div>
+
+              {/* A/S 요청 + 심사 요청 */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* A/S 요청 → 대표에게 */}
+                {c.details?.as_requested ? (
+                  <span className="inline-flex items-center gap-1 bg-orange-100 text-orange-700 border border-orange-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
+                    🔧 A/S 요청됨 {c.details.as_request_date ? `(${c.details.as_request_date})` : ''}
+                  </span>
+                ) : (
+                  <button type="button"
+                    onClick={() => onUpdate(c.id, { details: {
+                      as_requested: true,
+                      as_request_date: new Date().toISOString().slice(0, 10),
+                    }})}
+                    className="inline-flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors"
+                  >
+                    🔧 A/S 요청
+                  </button>
+                )}
+
+                {/* 심사 요청 → 대표에게 */}
+                {(tabType === 'lead' || tabType === 'db010') && (
+                  inspectionStatus === 'pending' ? (
+                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
+                      ⏳ 심사요청 중
+                    </span>
+                  ) : inspectionStatus === 'approved' ? (
+                    <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
+                      ✅ 심사 승인
+                    </span>
+                  ) : inspectionStatus === 'rejected' ? (
+                    <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 border border-red-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
+                      ❌ 심사 반려
+                    </span>
+                  ) : (
+                    <button type="button" onClick={handleInspectionRequest}
+                      className="inline-flex items-center gap-1 bg-violet-500 hover:bg-violet-600 text-white px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors"
+                    >
+                      🔍 심사 요청
+                    </button>
+                  )
+                )}
+              </div>
+
+              {/* 메모 */}
+              <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">메모</label>
+                <ResultMemoField
+                  value={c.details?.result_memo || ''}
+                  onChange={(val) => onUpdate(c.id, { details: { result_memo: val } })}
+                />
+              </div>
+
+              {/* 타임라인 */}
+              <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                <p className="text-[10px] font-bold text-blue-700 mb-2">📝 타임라인</p>
+                {/* 추가 입력 */}
+                <div className="flex gap-2 mb-3">
+                  <input
+                    type="text"
+                    value={tlText}
+                    onChange={e => setTlText(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTimelineEntry() } }}
+                    placeholder="기록 입력 후 Enter…"
+                    className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50"
+                  />
+                  <button
+                    type="button"
+                    onClick={addTimelineEntry}
+                    disabled={!tlText.trim()}
+                    className="shrink-0 bg-[#1B2A45] hover:bg-[#243959] disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors"
+                  >
+                    추가
+                  </button>
+                </div>
+                {c.call_timeline && c.call_timeline.length > 0 ? (
+                  <div className="space-y-2">
+                    {(c.call_timeline as any[]).slice().reverse().map((entry: any, i: number) => {
+                      const { date, time } = formatKST(entry.created_at || '')
+                      const initials = entry.user ? entry.user.slice(-2) : '??'
                       return (
-                        <div key={label} className={`flex items-start gap-2 rounded-lg px-2.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${
-                          isKey
-                            ? 'bg-blue-50 border border-blue-200'
-                            : 'bg-white border border-gray-100'
-                        }`}>
-                          <span className={`w-20 shrink-0 text-[10px] font-bold pt-0.5 ${isKey ? 'text-blue-800' : 'text-blue-600'}`}>{label}</span>
-                          <span className={`text-xs flex-1 break-words ${isEmpty ? 'text-gray-300 italic' : isKey ? 'text-gray-900 font-semibold' : 'text-gray-700 font-medium'}`}>
-                            {isEmpty ? '—' : String(value)}
-                          </span>
+                        <div key={i} className="flex gap-2.5">
+                          {/* 아바타 */}
+                          <div className="shrink-0 w-6 h-6 rounded-full bg-[#1B2A45] flex items-center justify-center mt-0.5">
+                            <span className="text-[9px] font-bold text-white">{initials}</span>
+                          </div>
+                          {/* 내용 */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-baseline gap-1.5 flex-wrap">
+                              <span className="text-[10px] font-bold text-[#1B2A45]">{entry.user || '—'}</span>
+                              <span className="text-[9px] text-gray-300">·</span>
+                              <span className="text-[9px] font-mono text-gray-400">{date}</span>
+                              <span className="text-[9px] font-mono text-gray-400">{time}</span>
+                            </div>
+                            <p className="text-[11px] text-gray-600 whitespace-pre-wrap leading-relaxed mt-0.5">{entry.content}</p>
+                          </div>
                         </div>
                       )
                     })}
-
-                    {/* 혁신요건 — 인터랙티브 */}
-                    <div className="flex items-start gap-2 bg-violet-50 border border-violet-200 rounded-lg px-2.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                      <span className="w-20 shrink-0 text-[10px] text-violet-800 font-bold pt-1">혁신요건</span>
-                      <div className="flex-1">
-                        <InnovationSelect
-                          value={c.details?.innovation || ''}
-                          onChange={v => onUpdate(c.id, { details: { innovation: v } })}
-                        />
-                      </div>
-                    </div>
                   </div>
-
-                  {/* 통화내용 + 메모 미러링 */}
-                  <div className="bg-white border border-gray-100 rounded-lg px-2.5 py-2 mt-1 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <p className="text-[10px] font-bold text-blue-700">통화내용 / 메모</p>
-                      <span className="text-[9px] text-emerald-600">↔ 자금팀 전달메모와 연동</span>
-                    </div>
-                    <ResultMemoField
-                      value={c.details?.result_memo || c.notes || c.memo || ''}
-                      onChange={(val) => onUpdate(c.id, { details: { result_memo: val } })}
-                    />
-                  </div>
-                </div>
-
-                {/* ── 우측: 인콜결과 ── */}
-                <div className="p-4 overflow-y-auto max-h-[520px] space-y-4">
-                  {/* 담당자 (자동 - 읽기 전용) */}
-                  <div className="flex items-center justify-between">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">📞 인콜결과</p>
-                    <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
-                      담당: {c.sales_user_name || c.details?.sales_user_name || userName}
-                    </span>
-                  </div>
-
-                  {/* 결정전 결과 */}
-                  <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                    <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">결정전 결과</label>
-                    <BadgeDropdown
-                      value={c.details?.call_result || ''}
-                      options={CALL_RESULTS}
-                      onChange={(val) => onUpdate(c.id, { details: { call_result: val } })}
-                    />
-                  </div>
-
-                  {/* 클로징 결과 */}
-                  <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                    <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">클로징 결과</label>
-                    <BadgeDropdown
-                      value={c.details?.closing_result || ''}
-                      options={CLOSING_RESULTS}
-                      onChange={(val) => onUpdate(c.id, { details: { closing_result: val } })}
-                    />
-                  </div>
-
-                  {/* 재통화 일정 */}
-                  <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                    <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">재통화 일정</label>
-                    <input
-                      type="date"
-                      value={c.details?.follow_up_date || ''}
-                      onChange={e => onUpdate(c.id, { details: { follow_up_date: e.target.value } })}
-                      className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50 text-gray-800"
-                    />
-                  </div>
-
-                  {/* A/S 요청 + 심사 요청 */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    {/* A/S 요청 → 대표에게 */}
-                    {c.details?.as_requested ? (
-                      <span className="inline-flex items-center gap-1 bg-orange-100 text-orange-700 border border-orange-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
-                        🔧 A/S 요청됨 {c.details.as_request_date ? `(${c.details.as_request_date})` : ''}
-                      </span>
-                    ) : (
-                      <button type="button"
-                        onClick={() => onUpdate(c.id, { details: {
-                          as_requested: true,
-                          as_request_date: new Date().toISOString().slice(0, 10),
-                        }})}
-                        className="inline-flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors"
-                      >
-                        🔧 A/S 요청
-                      </button>
-                    )}
-
-                    {/* 심사 요청 → 대표에게 */}
-                    {(tabType === 'lead' || tabType === 'db010') && (
-                      inspectionStatus === 'pending' ? (
-                        <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
-                          ⏳ 심사요청 중
-                        </span>
-                      ) : inspectionStatus === 'approved' ? (
-                        <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
-                          ✅ 심사 승인
-                        </span>
-                      ) : inspectionStatus === 'rejected' ? (
-                        <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 border border-red-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
-                          ❌ 심사 반려
-                        </span>
-                      ) : (
-                        <button type="button" onClick={handleInspectionRequest}
-                          className="inline-flex items-center gap-1 bg-violet-500 hover:bg-violet-600 text-white px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors"
-                        >
-                          🔍 심사 요청
-                        </button>
-                      )
-                    )}
-                  </div>
-
-                  {/* 메모 */}
-                  <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                    <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">메모</label>
-                    <ResultMemoField
-                      value={c.details?.result_memo || ''}
-                      onChange={(val) => onUpdate(c.id, { details: { result_memo: val } })}
-                    />
-                  </div>
-
-                  {/* 타임라인 */}
-                  <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                    <p className="text-[10px] font-bold text-blue-700 mb-2">📝 타임라인</p>
-                    {/* 추가 입력 */}
-                    <div className="flex gap-2 mb-3">
-                      <input
-                        type="text"
-                        value={tlText}
-                        onChange={e => setTlText(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTimelineEntry() } }}
-                        placeholder="기록 입력 후 Enter…"
-                        className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50"
-                      />
-                      <button
-                        type="button"
-                        onClick={addTimelineEntry}
-                        disabled={!tlText.trim()}
-                        className="shrink-0 bg-[#1B2A45] hover:bg-[#243959] disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors"
-                      >
-                        추가
-                      </button>
-                    </div>
-                    {c.call_timeline && c.call_timeline.length > 0 ? (
-                      <div className="space-y-2">
-                        {(c.call_timeline as any[]).slice().reverse().map((entry: any, i: number) => {
-                          const { date, time } = formatKST(entry.created_at || '')
-                          const initials = entry.user ? entry.user.slice(-2) : '??'
-                          return (
-                            <div key={i} className="flex gap-2.5">
-                              {/* 아바타 */}
-                              <div className="shrink-0 w-6 h-6 rounded-full bg-[#1B2A45] flex items-center justify-center mt-0.5">
-                                <span className="text-[9px] font-bold text-white">{initials}</span>
-                              </div>
-                              {/* 내용 */}
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-baseline gap-1.5 flex-wrap">
-                                  <span className="text-[10px] font-bold text-[#1B2A45]">{entry.user || '—'}</span>
-                                  <span className="text-[9px] text-gray-300">·</span>
-                                  <span className="text-[9px] font-mono text-gray-400">{date}</span>
-                                  <span className="text-[9px] font-mono text-gray-400">{time}</span>
-                                </div>
-                                <p className="text-[11px] text-gray-600 whitespace-pre-wrap leading-relaxed mt-0.5">{entry.content}</p>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    ) : (
-                      <p className="text-[11px] text-gray-300 italic text-center py-3">기록 없음</p>
-                    )}
-                  </div>
-                </div>
+                ) : (
+                  <p className="text-[11px] text-gray-300 italic text-center py-3">기록 없음</p>
+                )}
               </div>
             </div>
-          </td>
-        </tr>
+          </div>
+        </div>
       )}
     </>
   )
-}
-
-// ── 날짜 그룹 헤더 ─────────────────────────────────────────────────────
-function DateGroupHeader({ date, count, colSpan }: { date: string; count: number; colSpan: number }) {
-  const display = date === '__none__'
-    ? '📅 날짜 미정'
-    : `📅 ${date.slice(0, 7).replace('-', '년 ')}월  ${date.slice(8, 10)}일`
-  return (
-    <tr className="bg-[#1B2A45]/5">
-      <td colSpan={colSpan} className="px-4 py-1.5">
-        <span className="text-[10px] font-bold text-[#1B2A45]/60 tracking-wide">{display}</span>
-        <span className="ml-2 text-[10px] text-gray-400">{count}건</span>
-      </td>
-    </tr>
-  )
-}
-
-// ── 날짜 기준 그룹핑 ───────────────────────────────────────────────────
-function groupByDate(customers: Customer[]): { date: string; items: Customer[] }[] {
-  const map = new Map<string, Customer[]>()
-  for (const c of customers) {
-    const date = c.details?.reception_date?.slice(0, 10) || '__none__'
-    if (!map.has(date)) map.set(date, [])
-    map.get(date)!.push(c)
-  }
-  const entries = Array.from(map.entries()).sort(([a], [b]) => {
-    if (a === '__none__') return 1
-    if (b === '__none__') return -1
-    return b.localeCompare(a)
-  })
-  return entries.map(([date, items]) => ({ date, items }))
 }
 
 // ── Main InCallTableView ───────────────────────────────────────────────
@@ -1026,67 +977,60 @@ export default function InCallTableView({
   onTransferToOps,
   showOwner = false,
 }: Props) {
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const groups = groupByDate(customers)
-  const colSpan = showOwner ? 11 : 10
-  let globalIndex = 0
+
+  if (customers.length === 0) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 p-16 text-center text-gray-400 text-sm shadow-sm">
+        데이터가 없습니다
+      </div>
+    )
+  }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs min-w-[900px]">
-          <thead>
-            <tr className="bg-[#1B2A45] text-white">
-              <th className="px-3 py-2.5 text-left font-medium text-white/50 w-8">#</th>
-              <th className="px-3 py-2.5 text-left font-semibold">업체명</th>
-              {showOwner && <th className="px-3 py-2.5 text-left font-semibold">담당자</th>}
-              <th className="px-3 py-2.5 text-left font-semibold">접수일</th>
-              <th className="px-3 py-2.5 text-left font-semibold">전화번호</th>
-              <th className="px-3 py-2.5 text-left font-semibold">업종</th>
-              <th className="px-3 py-2.5 text-left font-semibold">결정전결과</th>
-              <th className="px-3 py-2.5 text-left font-semibold">클로징결과</th>
-              <th className="px-3 py-2.5 text-left font-semibold">재통화일정</th>
-              <th className="px-3 py-2.5 text-left font-semibold">통화내용</th>
-              <th className="px-3 py-2.5 w-8"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {groups.length === 0 ? (
-              <tr>
-                <td colSpan={colSpan} className="py-16 text-center text-gray-400 text-sm">
-                  데이터가 없습니다
-                </td>
-              </tr>
-            ) : (
-              groups.map(({ date, items }) => (
-                <>
-                  <DateGroupHeader key={`hdr-${date}`} date={date} count={items.length} colSpan={colSpan} />
-                  {items.map((c) => {
-                    const idx = globalIndex++
-                    const ownerName = c.sales_user_name || c.details?.sales_user_name || userName
-                    const cumBase = calcMonthlyRevenue(allCustomers, ownerName)
-                    return (
-                      <InCallTableRow
-                        key={c.id}
-                        customer={c}
-                        index={idx}
-                        salesUsers={salesUsers}
-                        userName={userName}
-                        tabType={tabType}
-                        showOwner={showOwner}
-                        cumulativeBase={cumBase}
-                        onUpdate={onUpdate}
-                        onStatusChange={onStatusChange}
-                        onDelete={onDelete}
-                        onTransferToOps={onTransferToOps}
-                      />
-                    )
-                  })}
-                </>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+    <div className="space-y-4">
+      {groups.map(({ date, items }) => {
+        const display = date === '__none__'
+          ? '📅 날짜 미정'
+          : `📅 ${date.slice(0, 7).replace('-', '년 ')}월  ${date.slice(8, 10)}일`
+
+        return (
+          <div key={date}>
+            {/* 그룹 헤더 */}
+            <div className="flex items-center gap-2 px-1 mb-2">
+              <span className="text-[10px] font-bold text-[#1B2A45]/60 tracking-wide">{display}</span>
+              <span className="text-[10px] text-gray-400">{items.length}건</span>
+              <div className="flex-1 h-px bg-gray-200" />
+            </div>
+
+            {/* 6열 카드 그리드 */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+              {items.map(c => {
+                const ownerName = c.sales_user_name || c.details?.sales_user_name || userName
+                const cumBase = calcMonthlyRevenue(allCustomers, ownerName)
+                return (
+                  <CustomerCard
+                    key={c.id}
+                    customer={c}
+                    salesUsers={salesUsers}
+                    userName={userName}
+                    tabType={tabType}
+                    showOwner={showOwner}
+                    cumulativeBase={cumBase}
+                    expandedId={expandedId}
+                    onExpand={setExpandedId}
+                    onUpdate={onUpdate}
+                    onStatusChange={onStatusChange}
+                    onDelete={onDelete}
+                    onTransferToOps={onTransferToOps}
+                  />
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

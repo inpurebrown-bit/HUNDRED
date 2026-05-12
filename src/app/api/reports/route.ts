@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { sendPushNotification } from '@/lib/pushNotify'
 
 // GET: 보고 목록 조회
 export async function GET(req: NextRequest) {
@@ -82,5 +83,18 @@ export async function POST(req: NextRequest) {
   }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // 보고 제출 시 대표에게 푸시 알림 (신규 제출만, 수정은 제외)
+  if (!existing?.id) {
+    const reportTypeLabel = report_type === 'morning' ? '오전' : report_type === 'daily' ? '마감' : report_type
+    await sendPushNotification({
+      title: '📋 보고 제출',
+      body: `${user.name || '직원'}님이 ${reportTypeLabel} 보고를 제출했습니다.`,
+      url: '/dashboard',
+      tag: 'report',
+      target: 'ceo',
+    })
+  }
+
   return NextResponse.json({ report: result }, { status: 201 })
 }

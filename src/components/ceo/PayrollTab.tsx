@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 // ─── 타입 정의 ────────────────────────────────────────────
 
@@ -168,6 +168,12 @@ export default function PayrollTab() {
     setLoading(false)
   }
 
+  // yearMonth 변경 시 자동 로드
+  useEffect(() => {
+    handleLoad()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [yearMonth])
+
   async function handleSave() {
     setSaving(true)
     setMsg('')
@@ -195,10 +201,7 @@ export default function PayrollTab() {
       <div className="flex items-center gap-3 flex-wrap">
         <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)}
           className="border border-gray-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
-        <button onClick={handleLoad} disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white px-4 py-1.5 rounded text-sm font-medium">
-          {loading ? '불러오는 중...' : '불러오기'}
-        </button>
+        {loading && <span className="text-xs text-blue-500">불러오는 중...</span>}
         <button onClick={handleSave} disabled={saving}
           className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white px-4 py-1.5 rounded text-sm font-medium">
           {saving ? '저장 중...' : '저장'}

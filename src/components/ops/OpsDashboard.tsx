@@ -916,10 +916,23 @@ export default function OpsDashboard({ userId, userName }: Props) {
 
   const [caseView, setCaseView] = useState<'active' | 'refund' | 'completed'>('active')
 
-  const totalApproval = cases.reduce((sum, c) => {
-    const amt = parseFloat((c.details?.approval_amount || '0').replace(/[^0-9.]/g, ''))
-    return sum + (isNaN(amt) ? 0 : amt)
-  }, 0)
+  const now = new Date()
+  const months = [0, 1, 2].map(offset => {
+    const d = new Date(now.getFullYear(), now.getMonth() - offset, 1)
+    return {
+      label: `${d.getMonth() + 1}월 승인`,
+      month: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+    }
+  })
+  const monthlyApprovals = months.map(m => ({
+    ...m,
+    total: cases
+      .filter(c => (c.details?.contract_date || c.created_at || '').startsWith(m.month))
+      .reduce((sum, c) => {
+        const amt = parseFloat((c.details?.approval_amount || '0').replace(/[^0-9.]/g, ''))
+        return sum + (isNaN(amt) ? 0 : amt)
+      }, 0),
+  }))
   const completedCount = cases.filter(c => COMPLETED_STAGE_KEYS.has(c.progress_stage)).length
   const refundCount = cases.filter(c => REFUND_STAGE_KEYS.has(c.progress_stage) || c.is_refund).length
   const inProgressCount = cases.filter(c => ACTIVE_STAGE_KEYS.has(c.progress_stage)).length
@@ -1046,16 +1059,21 @@ export default function OpsDashboard({ userId, userName }: Props) {
               ))}
             </div>
             {/* Stats bar */}
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
               {[
                 { label: '담당케이스', value: cases.length + '건', color: 'text-[#C5A258]' },
                 { label: '진행중', value: inProgressCount + '건', color: 'text-amber-600' },
                 { label: '완료', value: completedCount + '건', color: 'text-emerald-600' },
-                { label: '승인총액', value: totalApproval > 0 ? (totalApproval / 10000).toFixed(0) + '만원' : '—', color: 'text-violet-600' },
               ].map(s => (
                 <div key={s.label} className="bg-white rounded-xl border border-[#E8E2D4] p-4 text-center">
                   <p className={`text-xl font-black ${s.color}`}>{s.value}</p>
                   <p className="text-xs text-[#1B2A45]/40 mt-0.5">{s.label}</p>
+                </div>
+              ))}
+              {monthlyApprovals.map(m => (
+                <div key={m.month} className="bg-white rounded-xl border border-[#E8E2D4] p-4 text-center">
+                  <p className="text-xl font-black text-violet-600">{m.total > 0 ? (m.total / 10000).toFixed(0) + '만원' : '—'}</p>
+                  <p className="text-xs text-[#1B2A45]/40 mt-0.5">{m.label}</p>
                 </div>
               ))}
             </div>
@@ -1071,10 +1089,6 @@ export default function OpsDashboard({ userId, userName }: Props) {
             ) : (
               <div className="space-y-4">
                 {groupedCases.map(({ stage, items }) => {
-                  const groupApproval = items.reduce((sum, c) => {
-                    const amt = parseFloat((c.details?.approval_amount || '0').replace(/[^0-9.]/g, ''))
-                    return sum + (isNaN(amt) ? 0 : amt)
-                  }, 0)
                   return (
                     <div key={stage.key} className={`rounded-xl border overflow-hidden ${stage.light}`}>
                       {/* Group header */}
@@ -1082,11 +1096,6 @@ export default function OpsDashboard({ userId, userName }: Props) {
                         <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${stage.color}`} />
                         <span className="font-bold text-sm text-gray-700">{stage.label}</span>
                         <span className="text-xs text-gray-400 font-medium">{items.length}건</span>
-                        {groupApproval > 0 && (
-                          <span className="text-xs text-gray-500 ml-auto">
-                            승인총액 {(groupApproval / 10000).toFixed(0)}만원
-                          </span>
-                        )}
                       </div>
                       {/* Table */}
                       <div className="overflow-x-auto bg-white">

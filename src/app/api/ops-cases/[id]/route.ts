@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { sendPushNotification } from '@/lib/pushNotify'
 
 // 프론트 alias → DB 컬럼명 변환
 function toDbPatch(body: Record<string, any>) {
@@ -40,7 +41,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   // 권한 확인
   const { data: existing } = await supabaseAdmin
     .from('ops_cases')
-    .select('owner_id')
+    .select('owner_id, stage, customer_name')
     .eq('id', id)
     .single()
 
@@ -62,5 +63,19 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // 자금 승인 시 대표에게 푸시 알림
+  const newStage = patch.stage
+  if (newStage === '승인' && existing.stage !== '승인') {
+    const caseName = existing.customer_name || '업체'
+    await sendPushNotification({
+      title: '🎉 자금 승인',
+      body: `${caseName} 승인이 완료되었습니다.`,
+      url: '/dashboard',
+      tag: 'approval',
+      target: 'ceo',
+    })
+  }
+
   return NextResponse.json({ case: { ...data, progress_stage: data.stage, progress_memo: data.memo } })
 }

@@ -357,6 +357,15 @@ function PayslipDocument({
         </table>
       )}
 
+      {/* 개인정보 섹션 — 지급 결의서 형태 */}
+      <div className="mt-4 border-t border-gray-300 pt-4 text-xs text-gray-700 space-y-1 print:block">
+        <p className="font-bold text-gray-600 mb-1.5">◆ 수급자 확인</p>
+        <p>성명: <span className="font-semibold">{emp.name || '—'}</span></p>
+        <p>주민번호: <span className="font-mono">{maskedResidentId || '—'}</span></p>
+        <p>주소: {emp.address || '—'}</p>
+        <p>계좌: {emp.bank_name} {emp.bank_account || '—'}</p>
+      </div>
+
       {/* 감사 메시지 */}
       <div className="mt-5 text-center text-sm text-gray-600 py-3 border-t border-gray-200">
         ♥ 귀하의 노고에 진심으로 감사드립니다. -헌드레드 컨설팅
@@ -481,14 +490,23 @@ export default function PayslipTab() {
             top: 0; left: 0;
             width: 100%;
             background: white !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
             padding: 20px !important;
           }
+          /* A4 1명 1페이지 */
+          @page {
+            size: A4 portrait;
+            margin: 15mm;
+          }
+          /* 불필요한 UI 버튼 숨김 */
+          .no-print { display: none !important; }
         }
       `}</style>
 
       <div className="space-y-4 pb-8">
         {/* 상단 컨트롤 바 */}
-        <div className="bg-[#1B2A45] rounded-xl px-5 py-3 flex items-center gap-3 flex-wrap">
+        <div className="no-print bg-[#1B2A45] rounded-xl px-5 py-3 flex items-center gap-3 flex-wrap">
           <input
             type="month"
             value={yearMonth}
@@ -512,7 +530,7 @@ export default function PayslipTab() {
 
         <div className="flex gap-4">
           {/* 왼쪽: 직원 목록 */}
-          <div className="w-56 shrink-0">
+          <div className="no-print w-56 shrink-0">
             <div className="bg-white rounded-xl border border-[#E8E2D4] overflow-hidden">
               <div className="px-4 py-3 border-b border-[#E8E2D4] flex items-center justify-between">
                 <p className="text-xs font-bold text-gray-600">프리랜서 목록</p>
@@ -564,7 +582,7 @@ export default function PayslipTab() {
             ) : (
               <div className="space-y-3">
                 {/* 직원 헤더 + 편집 토글 */}
-                <div className="bg-white rounded-xl border border-[#E8E2D4] px-5 py-3 flex items-center justify-between">
+                <div className="no-print bg-white rounded-xl border border-[#E8E2D4] px-5 py-3 flex items-center justify-between">
                   <div>
                     <h3 className="font-bold text-gray-900">{selectedEmp.name || '(이름 없음)'}</h3>
                     <p className="text-xs text-gray-400 mt-0.5">{selectedEmp.team === 'ops' ? '관리팀' : '영업팀'} · {yearMonth}</p>
@@ -589,7 +607,7 @@ export default function PayslipTab() {
 
                 {editMode ? (
                   /* ── 편집 폼 ── */
-                  <div className="bg-white rounded-xl border border-[#E8E2D4] p-5 space-y-5">
+                  <div className="no-print bg-white rounded-xl border border-[#E8E2D4] p-5 space-y-5">
                     {/* 개인 정보 */}
                     <div>
                       <h4 className="text-sm font-bold text-gray-700 mb-3">👤 개인 정보</h4>
