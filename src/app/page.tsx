@@ -32,6 +32,36 @@ function Reveal({ children, from = 'bottom', delay = 0, className = '' }: {
   )
 }
 
+// ─── 숫자 카운트업 컴포넌트 ─────────────────────────────
+function CountUp({ target, suffix = '' }: { target: number; suffix?: string }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const [count, setCount] = useState(0)
+  const [started, setStarted] = useState(false)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting && !started) setStarted(true) }, { threshold: 0.5 })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [started])
+  useEffect(() => {
+    if (!started) return
+    let frame: number
+    const duration = 1600
+    const start = performance.now()
+    const step = (now: number) => {
+      const p = Math.min((now - start) / duration, 1)
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - p, 3)
+      setCount(Math.round(eased * target))
+      if (p < 1) frame = requestAnimationFrame(step)
+    }
+    frame = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(frame)
+  }, [started, target])
+  return <span ref={ref}>{count}{suffix}</span>
+}
+
 // ─── 데이터 ──────────────────────────────────────────────
 const successCases = [
   {
@@ -523,52 +553,93 @@ export default function HomePage() {
       </div>
 
       {/* ── 3단계 간편 프로세스 ── */}
-      <section className="py-14 px-4 bg-white border-b border-[#E8E2D4]">
+      <section className="py-16 px-4 bg-white border-b border-[#E8E2D4] overflow-hidden">
         <div className="max-w-4xl mx-auto">
           <Reveal>
             <p className="text-center text-xs text-[#C5A258] font-bold tracking-[0.3em] uppercase mb-2">HOW IT WORKS</p>
-            <h2 className="text-center text-xl md:text-2xl font-black text-[#1B2A45] mb-10">상담부터 승인까지, 딱 3단계</h2>
+            <h2 className="text-center text-xl md:text-2xl font-black text-[#1B2A45] mb-12">상담부터 승인까지, 딱 3단계</h2>
           </Reveal>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-0 relative">
-            {/* 연결선 (데스크톱) */}
-            <div className="hidden md:block absolute top-8 left-[16.5%] right-[16.5%] h-0.5 bg-[#E8E2D4] z-0" />
-            {[
-              {
-                step: '01',
-                icon: '📞',
-                title: '무료 상담 신청',
-                desc: '이름과 연락처만 남겨주세요. 담당자가 당일 연락드립니다.',
-                color: 'bg-[#C5A258]',
-              },
-              {
-                step: '02',
-                icon: '🔍',
-                title: '사업체 분석',
-                desc: '업종·매출·신용·대출현황을 종합분석해 최적 정책자금을 찾아드립니다.',
-                color: 'bg-[#1B2A45]',
-              },
-              {
-                step: '03',
-                icon: '🎉',
-                title: '자금 승인',
-                desc: '서류 준비부터 기관 제출까지 전담 처리. 승인 완료까지 함께합니다.',
-                color: 'bg-[#4A9B6F]',
-              },
-            ].map((s, i) => (
-              <Reveal key={s.step} from="bottom" delay={i * 100} className="relative z-10 flex flex-col items-center text-center px-6 pb-6 md:pb-0">
-                <div className={`w-16 h-16 rounded-full ${s.color} flex items-center justify-center shadow-lg mb-4`}>
-                  <span className="text-2xl">{s.icon}</span>
+
+          {/* 데스크톱: 가로 3단 / 모바일: 세로 스텝퍼 */}
+          <div className="hidden md:flex items-start justify-center gap-0 relative">
+            {/* 배경 연결 트랙 */}
+            <div className="absolute top-[38px] left-[22%] right-[22%] h-[3px] bg-gradient-to-r from-[#C5A258] via-[#E8D080] to-[#4A9B6F] rounded-full z-0 opacity-30" />
+
+            {([
+              { step: '01', icon: '📞', title: '무료 상담 신청', desc: '이름과 연락처만 남겨주세요.\n담당자가 당일 연락드립니다.', accent: '#C5A258', bg: 'from-[#FEF9EE] to-[#FDF5E0]', ring: 'ring-[#C5A258]/30' },
+              { step: '02', icon: '🔍', title: '사업체 분석',     desc: '업종·매출·신용·대출현황을\n종합분석해 최적 자금을 찾아드립니다.', accent: '#1B2A45', bg: 'from-[#EEF1F7] to-[#E5EAF4]', ring: 'ring-[#1B2A45]/20' },
+              { step: '03', icon: '🎉', title: '자금 승인',       desc: '서류 준비부터 기관 제출까지\n전담 처리. 승인까지 함께합니다.', accent: '#4A9B6F', bg: 'from-[#EEF7F2] to-[#E5F4EB]', ring: 'ring-[#4A9B6F]/30' },
+            ] as const).map((s, i) => (
+              <Reveal key={s.step} from="bottom" delay={i * 150} className="relative z-10 flex-1 flex flex-col items-center text-center px-5">
+                {/* 아이콘 원 */}
+                <div className="relative mb-5 group cursor-default">
+                  <div
+                    className="w-[76px] h-[76px] rounded-full flex items-center justify-center shadow-xl transition-all duration-300 hover:scale-110 hover:shadow-2xl"
+                    style={{ background: `linear-gradient(135deg, ${s.accent}ee, ${s.accent}99)` }}
+                  >
+                    <span className="text-3xl select-none">{s.icon}</span>
+                  </div>
+                  {/* 맥동 링 */}
+                  <div
+                    className="absolute inset-0 rounded-full animate-ping opacity-20"
+                    style={{ background: s.accent, animationDuration: `${2.2 + i * 0.4}s` }}
+                  />
+                  {/* 스텝 번호 배지 */}
+                  <div
+                    className="absolute -bottom-2 -right-2 w-6 h-6 rounded-full text-white text-[10px] font-black flex items-center justify-center shadow-md border-2 border-white"
+                    style={{ background: s.accent }}
+                  >
+                    {s.step}
+                  </div>
                 </div>
-                <span className={`text-xs font-black tracking-widest ${s.color === 'bg-[#C5A258]' ? 'text-[#C5A258]' : s.color === 'bg-[#1B2A45]' ? 'text-[#1B2A45]' : 'text-[#4A9B6F]'} mb-1`}>STEP {s.step}</span>
-                <h3 className="text-sm font-black text-[#1B2A45] mb-2">{s.title}</h3>
-                <p className="text-xs text-[#1B2A45]/50 leading-relaxed">{s.desc}</p>
+
+                {/* 카드 */}
+                <div className={`w-full bg-gradient-to-b ${s.bg} border border-white/80 rounded-2xl px-5 py-5 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 ring-1 ${s.ring}`}>
+                  <span className="text-[10px] font-black tracking-widest mb-1 block" style={{ color: s.accent }}>STEP {s.step}</span>
+                  <h3 className="text-sm font-black text-[#1B2A45] mb-2">{s.title}</h3>
+                  <p className="text-xs text-[#1B2A45]/50 leading-relaxed whitespace-pre-line">{s.desc}</p>
+                </div>
               </Reveal>
             ))}
           </div>
+
+          {/* 모바일: 세로 스텝퍼 */}
+          <div className="flex md:hidden flex-col gap-0">
+            {([
+              { step: '01', icon: '📞', title: '무료 상담 신청', desc: '이름과 연락처만 남겨주세요. 담당자가 당일 연락드립니다.', accent: '#C5A258' },
+              { step: '02', icon: '🔍', title: '사업체 분석',     desc: '업종·매출·신용·대출현황을 종합분석해 최적 자금을 찾아드립니다.', accent: '#1B2A45' },
+              { step: '03', icon: '🎉', title: '자금 승인',       desc: '서류 준비부터 기관 제출까지 전담 처리. 승인까지 함께합니다.', accent: '#4A9B6F' },
+            ] as const).map((s, i) => (
+              <Reveal key={s.step} from="left" delay={i * 120} className="flex items-start gap-4 pb-8 relative">
+                {/* 수직선 */}
+                {i < 2 && (
+                  <div className="absolute left-[27px] top-[56px] bottom-0 w-0.5 bg-gradient-to-b" style={{ background: `linear-gradient(to bottom, ${s.accent}60, transparent)` }} />
+                )}
+                {/* 아이콘 */}
+                <div className="relative shrink-0">
+                  <div className="w-14 h-14 rounded-full flex items-center justify-center shadow-lg"
+                    style={{ background: `linear-gradient(135deg, ${s.accent}ee, ${s.accent}99)` }}>
+                    <span className="text-2xl">{s.icon}</span>
+                  </div>
+                  <div className="absolute -bottom-1.5 -right-1.5 w-5 h-5 rounded-full text-white text-[9px] font-black flex items-center justify-center shadow border-2 border-white"
+                    style={{ background: s.accent }}>
+                    {s.step}
+                  </div>
+                </div>
+                {/* 텍스트 */}
+                <div className="pt-1 flex-1">
+                  <span className="text-[10px] font-black tracking-widest" style={{ color: s.accent }}>STEP {s.step}</span>
+                  <h3 className="text-sm font-black text-[#1B2A45] mb-1 mt-0.5">{s.title}</h3>
+                  <p className="text-xs text-[#1B2A45]/50 leading-relaxed">{s.desc}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+
           <Reveal>
             <div className="mt-10 text-center">
               <a href="#문의하기"
-                className="inline-flex items-center gap-2 bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-8 py-3.5 rounded-xl text-sm transition-all shadow-lg shadow-[#C5A258]/25 hover:scale-[1.02]">
+                className="inline-flex items-center gap-2 bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-8 py-3.5 rounded-xl text-sm transition-all shadow-lg shadow-[#C5A258]/25 hover:scale-[1.02] active:scale-95">
                 지금 무료 상담 신청하기 →
               </a>
               <p className="text-[11px] text-[#1B2A45]/30 mt-3">신청 후 평균 2시간 내 연락 · 상담비용 0원</p>
@@ -578,38 +649,62 @@ export default function HomePage() {
       </section>
 
       {/* ── 자격 확인 배너 ── */}
-      <section className="py-10 px-4 bg-gradient-to-r from-[#1B2A45] to-[#2A3D5E]">
-        <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center gap-6 md:gap-12">
+      <section className="py-14 px-4 bg-gradient-to-br from-[#1B2A45] via-[#223257] to-[#1B3A2F] relative overflow-hidden">
+        {/* 배경 점 패턴 */}
+        <div className="absolute inset-0 opacity-[0.04]"
+          style={{ backgroundImage: 'radial-gradient(#C5A258 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+        {/* 우상단 글로우 */}
+        <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-[#C5A258]/10 blur-3xl pointer-events-none" />
+
+        <div className="relative max-w-4xl mx-auto flex flex-col md:flex-row items-center gap-8 md:gap-14">
+          {/* 왼쪽: 체크리스트 */}
           <Reveal from="left" className="flex-1 text-white">
-            <p className="text-xs text-[#C5A258] font-bold tracking-widest uppercase mb-2">내 사업, 정책자금 받을 수 있을까?</p>
-            <h3 className="text-xl md:text-2xl font-black leading-snug mb-3">
+            <p className="text-xs text-[#C5A258] font-bold tracking-[0.25em] uppercase mb-3">내 사업, 정책자금 받을 수 있을까?</p>
+            <h3 className="text-2xl md:text-3xl font-black leading-tight mb-5">
               아래 하나라도 해당되면<br />
               <span className="text-[#C5A258]">받을 수 있습니다</span>
             </h3>
-            <ul className="space-y-1.5">
+            <ul className="space-y-3">
               {[
-                '사업자 등록 후 1년 이상',
-                '직원 있거나 4대보험 가입 중',
-                '기존 대출 있어도 상관없음',
-                '세금 납부 중이거나 납부 예정',
-                '매출 연 1억 이상 (업종 무관)',
-              ].map(item => (
-                <li key={item} className="flex items-center gap-2 text-sm text-white/80">
-                  <span className="text-[#C5A258] font-bold shrink-0">✓</span>
-                  {item}
-                </li>
+                { icon: '👤', text: '직원이 없어도' },
+                { icon: '📉', text: '매출이 적어도' },
+                { icon: '💳', text: '기존 대출이 많아도' },
+                { icon: '🔧', text: '기술이 없어도' },
+                { icon: '📋', text: '사업자등록을 방금 했어도' },
+              ].map((item, i) => (
+                <Reveal key={item.text} from="left" delay={i * 80}>
+                  <li className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-full bg-[#C5A258]/20 border border-[#C5A258]/40 flex items-center justify-center shrink-0 text-sm">
+                      {item.icon}
+                    </div>
+                    <span className="text-sm md:text-base text-white/85 font-medium">{item.text}</span>
+                    <span className="ml-auto text-[#C5A258] font-black text-base shrink-0">✓</span>
+                  </li>
+                </Reveal>
               ))}
             </ul>
           </Reveal>
-          <Reveal from="right" className="shrink-0 flex flex-col items-center gap-4">
-            <div className="bg-white/10 border border-white/20 rounded-2xl px-8 py-6 text-center">
-              <p className="text-4xl font-black text-[#C5A258] mb-1">94<span className="text-2xl">%</span></p>
-              <p className="text-xs text-white/60">헌드레드 고객 승인율</p>
+
+          {/* 오른쪽: 승인율 + CTA */}
+          <Reveal from="right" className="shrink-0 flex flex-col items-center gap-5 w-full md:w-auto">
+            {/* 승인율 카드 */}
+            <div className="relative bg-white/10 backdrop-blur-sm border border-white/20 rounded-3xl px-10 py-8 text-center shadow-2xl overflow-hidden">
+              {/* 안쪽 글로우 */}
+              <div className="absolute inset-0 bg-gradient-to-br from-[#C5A258]/10 to-transparent pointer-events-none rounded-3xl" />
+              <p className="text-[10px] text-white/40 tracking-widest uppercase mb-2">헌드레드 고객</p>
+              <p className="text-6xl font-black text-[#C5A258] leading-none mb-1">
+                <CountUp target={94} />
+                <span className="text-3xl">%</span>
+              </p>
+              <div className="w-12 h-0.5 bg-[#C5A258]/40 mx-auto my-2 rounded-full" />
+              <p className="text-xs text-white/60 font-medium">정책자금 승인율</p>
             </div>
+
             <a href="#문의하기"
-              className="inline-flex items-center gap-2 bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-7 py-3.5 rounded-xl text-sm transition-all hover:scale-[1.02] shadow-lg shadow-[#C5A258]/30">
+              className="inline-flex items-center gap-2 bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-8 py-4 rounded-2xl text-sm transition-all hover:scale-[1.03] active:scale-95 shadow-xl shadow-[#C5A258]/30 w-full justify-center">
               3분 자격 확인하기 →
             </a>
+            <p className="text-[10px] text-white/30 text-center">무료 · 비밀보장 · 부담 없음</p>
           </Reveal>
         </div>
       </section>
@@ -940,52 +1035,32 @@ export default function HomePage() {
           </Reveal>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
             {[
-              {
-                // 건설현장 — 실제 공사 현장 작업자들
-                photo: 'https://images.unsplash.com/photo-1590674899484-d5640e854abe?w=800&q=80',
-                caption: '건설업 대표님과 현장 미팅', badge: '정책자금 3억 승인',
-              },
-              {
-                // 한식당 주방 — 실제 주방 조리 장면
-                photo: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&q=80',
-                caption: '요식업 대표님 매장 방문 상담', badge: '소진공 1억 승인',
-              },
-              {
-                // 소규모 사무실 미팅
-                photo: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=800&q=80',
-                caption: '인테리어 업체 사무실 방문', badge: '기보 2억 승인',
-              },
-              {
-                // 공장 생산 라인 실제 현장
-                photo: 'https://images.unsplash.com/photo-1518314916381-77a37c2a49ae?w=800&q=80',
-                caption: '제조업 공장 현장 방문 상담', badge: '신보 5억 승인',
-              },
-              {
-                // 소매점 / 매장 내부
-                photo: 'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=800&q=80',
-                caption: '소매업 대표님 직접 방문', badge: '무상지원금 5천만원',
-              },
-              {
-                // 스타트업 팀 실무 미팅
-                photo: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&q=80',
-                caption: '스타트업 대표님 사무실 미팅', badge: '벤처인증 + 정책자금',
-              },
+              { photo: '/images/consulting/construction.png', caption: '건설업 대표님과 현장 미팅',    badge: '정책자금 3억 승인',    pos: 'center' },
+              { photo: '/images/consulting/restaurant.jpg',   caption: '요식업 대표님 매장 방문 상담', badge: '소진공 1억 승인',    pos: 'center' },
+              { photo: '/images/consulting/interior.jpg',     caption: '인테리어 업체 사무실 방문',    badge: '기보 2억 승인',    pos: 'center top' },
+              { photo: '/images/consulting/factory.jpg',      caption: '제조업 공장 현장 방문 상담',   badge: '신보 5억 승인',    pos: 'center' },
+              { photo: '/images/consulting/retail.jpg',       caption: '소매업 대표님 직접 방문',      badge: '무상지원금 5천만원', pos: 'center' },
+              { photo: '/images/consulting/startup.jpg',      caption: '스타트업 대표님 사무실 미팅',  badge: '벤처인증 + 정책자금', pos: 'center' },
             ].map((s, i) => (
-              <Reveal key={i} from="bottom" delay={i * 60}>
-                <div className="relative rounded-2xl overflow-hidden aspect-[4/3] shadow-lg hover:scale-[1.02] transition-transform cursor-default group">
-                  {/* 실제 사진 */}
-                  <div className="absolute inset-0" style={{
-                    backgroundImage: `url(${s.photo})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    transition: 'transform 0.4s ease',
-                  }} />
-                  {/* 어두운 그라데이션 오버레이 */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+              <Reveal key={i} from="bottom" delay={i * 70}>
+                <div className="relative rounded-2xl overflow-hidden aspect-[4/3] shadow-lg cursor-default group">
+                  {/* 실제 사진 — 호버 시 살짝 확대 */}
+                  <div
+                    className="absolute inset-0 transition-transform duration-500 ease-out group-hover:scale-105"
+                    style={{
+                      backgroundImage: `url(${s.photo})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: s.pos,
+                    }}
+                  />
+                  {/* 그라데이션 오버레이 — 평상시 진하게, 호버 시 살짝 밝아짐 */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/5 transition-opacity duration-300 group-hover:opacity-80" />
+                  {/* 호버 시 골드 테두리 효과 */}
+                  <div className="absolute inset-0 rounded-2xl ring-2 ring-[#C5A258]/0 group-hover:ring-[#C5A258]/60 transition-all duration-300" />
                   {/* 텍스트 */}
-                  <div className="absolute bottom-0 left-0 right-0 p-3">
-                    <p className="text-white text-xs font-semibold leading-snug mb-1.5 drop-shadow">{s.caption}</p>
-                    <span className="text-[10px] bg-[#C5A258] text-white font-bold px-2 py-0.5 rounded-full">{s.badge}</span>
+                  <div className="absolute bottom-0 left-0 right-0 p-3 md:p-4 translate-y-0.5 group-hover:translate-y-0 transition-transform duration-300">
+                    <p className="text-white text-[11px] md:text-xs font-semibold leading-snug mb-2 drop-shadow-sm">{s.caption}</p>
+                    <span className="text-[9px] md:text-[10px] bg-[#C5A258] text-white font-bold px-2.5 py-1 rounded-full shadow-md">{s.badge}</span>
                   </div>
                 </div>
               </Reveal>
