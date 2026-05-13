@@ -33,13 +33,14 @@ export function isActiveRow(
 }
 
 /**
- * 계약금액 → 계약 가중치
- * 30만원 이하(25만원, 30만원 등 소액 계약) = 0.5개
+ * 입금액 → 계약 가중치
+ * 입금액 33만원 이하(부가세 포함 기준) = 0.5개
  * 그 외 = 1개
+ * ※ 계약금(contract_fee)이 아닌 실입금액(payment_amount) 기준
  */
-export function contractWeight(feeStr: string | number | undefined): number {
-  if (!feeStr) return 0
-  const n = parseInt(String(feeStr).replace(/[^0-9]/g, ''), 10) || 0
+export function contractWeight(paymentAmountStr: string | number | undefined): number {
+  if (!paymentAmountStr) return 0
+  const n = parseInt(String(paymentAmountStr).replace(/[^0-9]/g, ''), 10) || 0
   if (n <= 0) return 0
-  return n <= 300000 ? 0.5 : 1
+  return n <= 330000 ? 0.5 : 1
 }

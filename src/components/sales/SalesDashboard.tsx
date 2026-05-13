@@ -303,7 +303,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
           (c.sales_user_name === userName || (c as any).details?.sales_user_name === userName) &&
           ((c as any).details?.contract_date || (c as any).created_at || '').slice(0, 7) === thisMonth
         )
-        .reduce((sum, c) => sum + contractWeight((c as any).details?.contract_fee), 0)
+        .reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount), 0)
     : 0
   const myTotalContracted = mySupplyCfg ? mySupplyCfg.base + myDbContracted : myDbContracted
   const contractRate = mySupplyCfg && mySupplyCfg.supplied > 0

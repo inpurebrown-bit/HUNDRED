@@ -549,7 +549,7 @@ export default function SalesCeoTab() {
           (c.sales_user_name === name || (c as any).details?.sales_user_name === name) &&
           ((c as any).details?.contract_date || c.created_at || '').slice(0, 7) === thisMonthStr
         )
-        .reduce((sum, c) => sum + contractWeight((c as any).details?.contract_fee), 0)
+        .reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount), 0)
       const totalContracted = cfg.base + dbContracted
       const rate = cfg.supplied > 0 ? Math.round(totalContracted / cfg.supplied * 100) : 0
       const recommended = calcRecommendedSupply(rate, bizElapsed)
@@ -1078,7 +1078,7 @@ export default function SalesCeoTab() {
               </tbody>
             </table>
             <div className="px-5 py-3 bg-amber-50 border-t border-amber-100">
-              <p className="text-[11px] text-amber-700 font-semibold">💡 계약 가중치: 계약금 30만원 이하 = 0.5개, 그 외 = 1개</p>
+              <p className="text-[11px] text-amber-700 font-semibold">💡 계약 가중치: 입금액 33만원 이하(부가세 포함 기준) = 0.5개, 그 외 = 1개</p>
             </div>
           </div>
         </div>
