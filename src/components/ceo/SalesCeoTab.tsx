@@ -4,6 +4,337 @@ import React, { useState, useEffect, useMemo } from 'react'
 import InCallTableView from '@/components/sales/InCallTableView'
 import type { Customer } from '@/components/sales/InCallTableView'
 
+// ── DB 이동 모드 컴포넌트 ─────────────────────────────────
+function TransferModeView({
+  customers,
+  salesPeople,
+  onClose,
+  onTransferDone,
+}: {
+  customers: Customer[]
+  salesPeople: string[]
+  onClose: () => void
+  onTransferDone: (updated: Customer[]) => void
+}) {
+  const [filterPerson, setFilterPerson] = useState<string>('all')
+  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [targetUser, setTargetUser] = useState<string>('')
+  const [customUser, setCustomUser] = useState<string>('')
+  const [transferToOps, setTransferToOps] = useState(false)
+  const [opsUsers, setOpsUsers] = useState<string[]>([])
+  const [selectedOpsUser, setSelectedOpsUser] = useState<string>('')
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<{ ok: number; fail: number } | null>(null)
+
+  // ops 유저 목록 로드
+  useEffect(() => {
+    fetch('/api/ops-cases').then(r => r.json()).then(d => {
+      const names = Array.from(new Set(
+        (d.cases || []).map((c: any) => c.ops_user_name).filter(Boolean)
+      )) as string[]
+      setOpsUsers(names)
+    }).catch(() => {})
+  }, [])
+
+  const statusGroups = [
+    { key: 'all',        label: '전체' },
+    { key: 'lead',       label: '고객DB' },
+    { key: 'db010',      label: '010 DB' },
+    { key: 'contracted', label: '계약' },
+    { key: 'emotional',  label: '감성톡' },
+    { key: 'trash',      label: '자체거절' },
+  ]
+
+  const filtered = useMemo(() => {
+    return customers.filter(c => {
+      const owner = (c as any).details?.sales_user_name || (c as any).sales_user_name || ''
+      const matchPerson = filterPerson === 'all' || owner === filterPerson
+      const matchStatus = filterStatus === 'all' || c.status === filterStatus ||
+        (filterStatus === 'lead' && ['lead', 'consulting'].includes(c.status))
+      return matchPerson && matchStatus
+    })
+  }, [customers, filterPerson, filterStatus])
+
+  function toggleOne(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+  function selectAll() {
+    setSelectedIds(new Set(filtered.map(c => c.id)))
+  }
+  function clearAll() {
+    setSelectedIds(new Set())
+  }
+
+  async function handleTransfer() {
+    if (selectedIds.size === 0) return
+    const dest = customUser.trim() || targetUser
+    if (!dest && !transferToOps) return
+    if (transferToOps && !selectedOpsUser) return
+
+    setLoading(true)
+    setResult(null)
+    let ok = 0, fail = 0
+
+    for (const id of Array.from(selectedIds)) {
+      try {
+        const c = customers.find(x => x.id === id)!
+        if (transferToOps) {
+          // 관리팀으로 강제 전송 (ops_case 생성)
+          const r = await fetch('/api/ops-cases', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              customer_id: id,
+              ops_user_name: selectedOpsUser,
+              progress_stage: 'assigned',
+              details: { forced_assign: true, forced_by: 'CEO', forced_at: new Date().toISOString() },
+              timeline: [{
+                user: 'CEO',
+                content: `대표 강제 배정 → ${selectedOpsUser}`,
+                created_at: new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(' ', 'T') + '+09:00',
+              }],
+            }),
+          })
+          r.ok ? ok++ : fail++
+        } else {
+          // 영업팀 내 이동
+          const r = await fetch(`/api/customers/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              details: {
+                ...(c as any).details,
+                sales_user_name: dest,
+                transfer_history: [
+                  ...((c as any).details?.transfer_history || []),
+                  {
+                    from: (c as any).details?.sales_user_name || '—',
+                    to: dest,
+                    at: new Date().toISOString().slice(0, 10),
+                    by: 'CEO',
+                  },
+                ],
+              },
+            }),
+          })
+          r.ok ? ok++ : fail++
+        }
+      } catch { fail++ }
+    }
+
+    setResult({ ok, fail })
+    setLoading(false)
+    setSelectedIds(new Set())
+
+    // 데이터 갱신
+    const res = await fetch('/api/customers')
+    const data = await res.json()
+    onTransferDone(data.customers || [])
+  }
+
+  const finalDestLabel = transferToOps
+    ? (selectedOpsUser ? `관리팀 · ${selectedOpsUser}` : '관리팀 (담당자 미선택)')
+    : (customUser.trim() || targetUser || '—')
+
+  return (
+    <div className="space-y-4">
+      {/* 헤더 */}
+      <div className="bg-gradient-to-r from-[#1B2A45] to-blue-700 rounded-xl px-5 py-4 text-white">
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <h3 className="font-bold text-base">🔀 DB 이동 모드</h3>
+            <p className="text-white/60 text-xs mt-0.5">카드를 선택하고 이동 대상을 지정하세요 (대표 전용)</p>
+          </div>
+          <button onClick={onClose} className="text-white/60 hover:text-white text-sm px-3 py-1.5 border border-white/20 rounded-lg">✕ 닫기</button>
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="bg-white/10 rounded-lg px-3 py-2">
+            <p className="text-white/50 text-[10px]">표시 건수</p>
+            <p className="text-white font-black text-lg">{filtered.length}</p>
+          </div>
+          <div className="bg-white/10 rounded-lg px-3 py-2">
+            <p className="text-white/50 text-[10px]">선택됨</p>
+            <p className="text-[#C5A258] font-black text-lg">{selectedIds.size}</p>
+          </div>
+          <div className="bg-white/10 rounded-lg px-3 py-2">
+            <p className="text-white/50 text-[10px]">이동 대상</p>
+            <p className="text-white font-bold text-xs mt-0.5 truncate">{finalDestLabel}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* 필터 */}
+      <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
+        {/* 직원 필터 */}
+        <div>
+          <p className="text-[10px] font-bold text-gray-400 mb-1.5">👤 직원 필터 (퇴사자 포함 모든 직원 표시)</p>
+          <div className="flex flex-wrap gap-1.5">
+            <button onClick={() => { setFilterPerson('all'); clearAll() }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${filterPerson === 'all' ? 'bg-[#1B2A45] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+              전체 ({customers.length})
+            </button>
+            {salesPeople.map(name => {
+              const cnt = customers.filter((c: any) => (c.details?.sales_user_name || c.sales_user_name || '') === name).length
+              return (
+                <button key={name} onClick={() => { setFilterPerson(name); clearAll() }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${filterPerson === name ? 'bg-[#1B2A45] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                  {name} ({cnt})
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* 상태 필터 */}
+        <div>
+          <p className="text-[10px] font-bold text-gray-400 mb-1.5">📊 상태 필터</p>
+          <div className="flex flex-wrap gap-1.5">
+            {statusGroups.map(s => (
+              <button key={s.key} onClick={() => { setFilterStatus(s.key); clearAll() }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${filterStatus === s.key ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 일괄 선택 */}
+        <div className="flex gap-2">
+          <button onClick={selectAll}
+            className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold py-2 rounded-lg border border-blue-200 transition-colors">
+            ☑️ 필터된 {filtered.length}건 전체 선택
+          </button>
+          <button onClick={clearAll}
+            className="px-4 bg-gray-50 hover:bg-gray-100 text-gray-500 text-xs font-semibold py-2 rounded-lg border border-gray-200 transition-colors">
+            선택 해제
+          </button>
+        </div>
+      </div>
+
+      {/* 이동 대상 설정 */}
+      <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
+        <p className="text-sm font-bold text-gray-700">🎯 이동 대상 설정</p>
+
+        {/* 관리팀 전송 토글 */}
+        <label className="flex items-center gap-3 cursor-pointer bg-violet-50 rounded-lg px-4 py-3 border border-violet-200">
+          <input type="checkbox" checked={transferToOps} onChange={e => { setTransferToOps(e.target.checked); setTargetUser(''); setCustomUser('') }}
+            className="w-4 h-4 accent-violet-500" />
+          <div>
+            <p className="text-sm font-semibold text-violet-800">🔀 관리팀으로 강제 전송</p>
+            <p className="text-[10px] text-violet-500">선택한 DB를 관리팀에 ops_case로 등록</p>
+          </div>
+        </label>
+
+        {transferToOps ? (
+          <div>
+            <p className="text-xs text-gray-500 mb-1.5 font-medium">관리팀 담당자 선택</p>
+            <div className="flex flex-wrap gap-1.5">
+              {opsUsers.map(u => (
+                <button key={u} onClick={() => setSelectedOpsUser(u)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${selectedOpsUser === u ? 'bg-violet-500 text-white border-violet-500' : 'bg-white text-gray-600 border-gray-200 hover:border-violet-300'}`}>
+                  {u}
+                </button>
+              ))}
+              {opsUsers.length === 0 && <p className="text-xs text-gray-400">관리팀 멤버를 찾을 수 없습니다 (직접 입력)</p>}
+              <input
+                placeholder="직접 입력"
+                value={selectedOpsUser}
+                onChange={e => setSelectedOpsUser(e.target.value)}
+                className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs w-28 focus:outline-none focus:ring-1 focus:ring-violet-400" />
+            </div>
+          </div>
+        ) : (
+          <div>
+            <p className="text-xs text-gray-500 mb-1.5 font-medium">영업팀 담당자 선택 (기존 직원 or 신규 입력)</p>
+            <div className="flex flex-wrap gap-1.5">
+              {salesPeople.map(u => (
+                <button key={u} onClick={() => { setTargetUser(u); setCustomUser('') }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${targetUser === u && !customUser ? 'bg-[#1B2A45] text-white border-[#1B2A45]' : 'bg-white text-gray-600 border-gray-200 hover:border-[#1B2A45]/30'}`}>
+                  {u}
+                </button>
+              ))}
+              <input
+                placeholder="신규 직원명 입력"
+                value={customUser}
+                onChange={e => { setCustomUser(e.target.value); setTargetUser('') }}
+                className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs w-36 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 결과 */}
+      {result && (
+        <div className={`rounded-xl px-4 py-3 text-sm font-semibold ${result.fail === 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+          ✅ 이동 완료: {result.ok}건 성공{result.fail > 0 ? `, ${result.fail}건 실패` : ''}
+        </div>
+      )}
+
+      {/* 이동 실행 버튼 (fixed bottom) */}
+      <div className="sticky bottom-4 z-20">
+        <button
+          onClick={handleTransfer}
+          disabled={loading || selectedIds.size === 0 || (!transferToOps && !targetUser && !customUser.trim()) || (transferToOps && !selectedOpsUser)}
+          className="w-full bg-[#C5A258] hover:bg-[#C5A258]/90 disabled:opacity-40 text-white py-3.5 rounded-xl text-sm font-bold shadow-lg transition-colors"
+        >
+          {loading ? '이동 중...' : `🔀 선택된 ${selectedIds.size}건 → ${finalDestLabel} 으로 이동`}
+        </button>
+      </div>
+
+      {/* 카드 목록 */}
+      <div className="space-y-2 pb-16">
+        {filtered.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">해당하는 데이터가 없습니다</div>
+        ) : (
+          filtered.map(c => {
+            const sel = selectedIds.has(c.id)
+            const owner = (c as any).details?.sales_user_name || (c as any).sales_user_name || '—'
+            const statusColor: Record<string, string> = {
+              lead: 'bg-sky-100 text-sky-700', db010: 'bg-violet-100 text-violet-700',
+              contracted: 'bg-emerald-100 text-emerald-700', emotional: 'bg-pink-100 text-pink-700',
+              trash: 'bg-gray-100 text-gray-500', consulting: 'bg-sky-100 text-sky-700',
+            }
+            return (
+              <div key={c.id} onClick={() => toggleOne(c.id)}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all ${sel ? 'bg-blue-50 border-blue-400 shadow-sm' : 'bg-white border-gray-200 hover:border-blue-200'}`}>
+                {/* 체크박스 */}
+                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${sel ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}`}>
+                  {sel && <span className="text-white text-[10px] font-bold">✓</span>}
+                </div>
+                {/* 정보 */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-[#1B2A45] text-sm" style={{ wordBreak: 'break-all' }}>
+                      {(c as any).details?.company || c.company || c.name}
+                    </span>
+                    <span className="text-xs text-gray-400">{c.name}</span>
+                    <span className="text-[10px] text-gray-400 font-mono">{c.phone}</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[10px] text-violet-500 font-medium">{owner}</span>
+                    {(c as any).details?.transfer_history?.length > 0 && (
+                      <span className="text-[10px] text-amber-500">이동이력 {(c as any).details.transfer_history.length}회</span>
+                    )}
+                  </div>
+                </div>
+                {/* 상태 */}
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold shrink-0 ${statusColor[c.status] || 'bg-gray-100 text-gray-500'}`}>
+                  {c.status === 'lead' || c.status === 'consulting' ? '고객DB' : c.status === 'db010' ? '010DB' : c.status === 'contracted' ? '계약' : c.status === 'emotional' ? '감성톡' : c.status === 'trash' ? '거절' : c.status}
+                </span>
+              </div>
+            )
+          })
+        )}
+      </div>
+    </div>
+  )
+}
+
 type StatusKey = 'lead' | 'db010' | 'contracted' | 'emotional' | 'trash'
 
 const STATUS_TABS = [
@@ -14,7 +345,7 @@ const STATUS_TABS = [
   { key: 'trash' as StatusKey,      label: '자체거절',  color: 'text-gray-500',    bg: 'bg-gray-400' },
 ]
 
-type CeoView = 'customers' | 'inspection' | 'as'
+type CeoView = 'customers' | 'inspection' | 'as' | 'transfer'
 
 export default function SalesCeoTab() {
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -170,6 +501,12 @@ export default function SalesCeoTab() {
             </span>
           )}
         </button>
+        <button type="button" onClick={() => setCeoView('transfer')}
+          className={"flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border transition-colors " + (
+            ceoView === 'transfer' ? 'bg-[#C5A258] text-white border-[#C5A258]' : 'bg-white text-[#C5A258] border-[#C5A258]/40 hover:border-[#C5A258]'
+          )}>
+          🔀 DB 이동
+        </button>
       </div>
 
       {/* ── 심사요청 전용 뷰 ── */}
@@ -259,6 +596,16 @@ export default function SalesCeoTab() {
             </div>
           )}
         </div>
+      )}
+
+      {/* ── DB 이동 뷰 ── */}
+      {ceoView === 'transfer' && (
+        <TransferModeView
+          customers={customers}
+          salesPeople={salesPeople}
+          onClose={() => setCeoView('customers')}
+          onTransferDone={(updated) => setCustomers(updated)}
+        />
       )}
 
       {/* ── 고객관리 뷰 ── */}
