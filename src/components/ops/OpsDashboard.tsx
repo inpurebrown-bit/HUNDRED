@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, FormEvent, ReactNode } from 'react'
-import { signOut } from 'next-auth/react'
+import { signOut, useSession } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
 import MyProfileTab from '@/components/MyProfileTab'
@@ -73,6 +73,8 @@ const PIPELINE_STAGES = [
   { key: '검토중',     label: '검토중',     color: 'bg-gray-400',    light: 'bg-gray-50 border-gray-200' },
   { key: '접수',       label: '접수',       color: 'bg-sky-400',     light: 'bg-sky-50 border-sky-200' },
   { key: '진행중',     label: '진행중',     color: 'bg-blue-400',    light: 'bg-blue-50 border-blue-200' },
+  { key: '환불예정',   label: '환불예정',   color: 'bg-rose-400',    light: 'bg-rose-50 border-rose-200' },
+  { key: '종료예정',   label: '종료예정',   color: 'bg-orange-400',  light: 'bg-orange-50 border-orange-200' },
 ]
 
 const STAGE_COLOR: Record<string, string> = Object.fromEntries(
@@ -82,11 +84,14 @@ const STAGE_COLOR: Record<string, string> = Object.fromEntries(
 const ACTIVE_STAGE_KEYS = new Set([
   '서류받는중','접수전','신청완료','반려보정','실사대기','실사완료',
   '승인대기','승인','부결','입금전','홀딩','검토중','접수','진행중',
+  '환불예정','종료예정',
   'assigned','absorbed','doc_collect','reviewing','approved','executing','rejected',
 ])
-const REFUND_STAGE_KEYS  = new Set(['환불','refunded'])
+const REFUND_STAGE_KEYS    = new Set(['환불','refunded'])
 const COMPLETED_STAGE_KEYS = new Set(['종료','완료','completed'])
-const NEWDB_STAGE_KEYS   = new Set(['new_db'])
+const PENDING_REFUND_KEYS  = new Set(['환불예정'])
+const PENDING_DONE_KEYS    = new Set(['종료예정'])
+const NEWDB_STAGE_KEYS     = new Set(['new_db'])
 
 // ── 기관 목록 ──────────────────────────────────────────────────────────
 const INST_DIRECT   = ['중진공','소진공(혁신)','소진공(신취)','소진공(재도전)','서민금융(미소)']
@@ -198,7 +203,7 @@ function TimelineSection({ initialTimeline, onSchedule }: {
 // ──────────────────────────────────────────────────────────────────────
 // OpsDetailPanel (타임라인 기본, 고객정보 탭 제거)
 // ──────────────────────────────────────────────────────────────────────
-function OpsDetailPanel({ c, onSave }: { c: OpsCase; onSave: (id: string, patch: Record<string, any>) => void }) {
+function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (id: string, patch: Record<string, any>) => void; userRole?: string }) {
   const [local, setLocal] = useState<OpsCase>({ ...c })
   const [activeDetailTab, setActiveDetailTab] = useState<DetailTab>('진행현황')
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -245,11 +250,23 @@ function OpsDetailPanel({ c, onSave }: { c: OpsCase; onSave: (id: string, patch:
     } catch {}
   }
   function handleStageChange(nextStage: string) {
+    // 관리팀 직원은 환불/종료를 직접 선택 불가 → 예정 단계로 자동 전환
+    if (userRole !== 'ceo') {
+      if (nextStage === '환불') nextStage = '환불예정'
+      if (nextStage === '종료') nextStage = '종료예정'
+    }
     const prevStage = local.progress_stage
     const autoEntry = { user: '자동기록', content: `단계 변경: ${prevStage} → ${nextStage}`, created_at: nowKST() }
     const updatedTimeline = [...(local.timeline || []), autoEntry]
     setLocal(prev => ({ ...prev, progress_stage: nextStage, timeline: updatedTimeline }))
     schedule({ progress_stage: nextStage, timeline: updatedTimeline })
+  }
+  function handleCeoApprove() {
+    const targetStage = local.progress_stage === '환불예정' ? '환불' : '종료'
+    handleStageChange(targetStage)
+  }
+  function handleCeoReject() {
+    handleStageChange('서류받는중')
   }
   function schedule(patch: Record<string, any>) {
     if (timerRef.current) clearTimeout(timerRef.current)
@@ -261,8 +278,47 @@ function OpsDetailPanel({ c, onSave }: { c: OpsCase; onSave: (id: string, patch:
   const hasIndirect = selectedInstitutions.some((i: string) => INDIRECT_SET.has(i))
   const indirectList = selectedInstitutions.filter((i: string) => INDIRECT_SET.has(i))
 
+  const isPendingApproval = local.progress_stage === '환불예정' || local.progress_stage === '종료예정'
+  const isCeo = userRole === 'ceo'
+
   return (
     <div className="space-y-3">
+      {/* ── CEO 승인 대기 배너 ── */}
+      {isPendingApproval && isCeo && (
+        <div className={`rounded-xl p-3.5 border ${local.progress_stage === '환불예정' ? 'bg-rose-50 border-rose-200' : 'bg-orange-50 border-orange-200'}`}>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className={`text-sm font-bold ${local.progress_stage === '환불예정' ? 'text-rose-800' : 'text-orange-800'}`}>
+                ⏳ {local.progress_stage === '환불예정' ? '환불' : '종료'} 처리 승인 요청
+              </p>
+              <p className={`text-xs mt-0.5 ${local.progress_stage === '환불예정' ? 'text-rose-600' : 'text-orange-600'}`}>
+                담당 직원이 {local.progress_stage === '환불예정' ? '환불' : '종료'} 처리를 요청했습니다. 승인하시겠습니까?
+              </p>
+            </div>
+            <div className="flex gap-1.5 shrink-0">
+              <button onClick={handleCeoApprove}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-colors ${local.progress_stage === '환불예정' ? 'bg-rose-500 hover:bg-rose-600' : 'bg-orange-500 hover:bg-orange-600'}`}>
+                ✅ 승인
+              </button>
+              <button onClick={handleCeoReject}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors">
+                ❌ 반려
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 일반 직원 — 승인 대기 안내 ── */}
+      {isPendingApproval && !isCeo && (
+        <div className={`rounded-xl p-3 border ${local.progress_stage === '환불예정' ? 'bg-rose-50 border-rose-200' : 'bg-orange-50 border-orange-200'}`}>
+          <p className={`text-xs font-semibold ${local.progress_stage === '환불예정' ? 'text-rose-700' : 'text-orange-700'}`}>
+            ⏳ {local.progress_stage === '환불예정' ? '환불' : '종료'} 처리 대표 승인 대기중
+          </p>
+          <p className="text-[10px] text-gray-500 mt-0.5">대표 컨펌 후 최종 {local.progress_stage === '환불예정' ? '환불' : '종료'} 처리됩니다</p>
+        </div>
+      )}
+
       {/* 탭 네비게이션 */}
       <div className="flex border-b border-gray-100 overflow-x-auto">
         {DETAIL_TABS.map(tab => (
@@ -301,7 +357,13 @@ function OpsDetailPanel({ c, onSave }: { c: OpsCase; onSave: (id: string, patch:
               <div>
                 <label className={lbl}>진행 단계</label>
                 <select value={local.progress_stage} onChange={e => handleStageChange(e.target.value)} className={inp}>
-                  {[...PIPELINE_STAGES, { key: '환불', label: '환불' }, { key: '종료', label: '종료' }].map(s => (
+                  {[
+                    ...PIPELINE_STAGES,
+                    ...(isCeo
+                      ? [{ key: '환불', label: '환불' }, { key: '종료', label: '종료' }]
+                      : [{ key: '환불예정', label: '환불예정 (승인요청)' }, { key: '종료예정', label: '종료예정 (승인요청)' }]
+                    ),
+                  ].map(s => (
                     <option key={s.key} value={s.key}>{s.label}</option>
                   ))}
                 </select>
@@ -649,6 +711,15 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
         </div>
       )}
 
+      {/* 승인대기 뱃지 */}
+      {(c.progress_stage === '환불예정' || c.progress_stage === '종료예정') && (
+        <div className={`mt-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[8px] font-bold ${
+          c.progress_stage === '환불예정' ? 'bg-rose-100 text-rose-700' : 'bg-orange-100 text-orange-700'
+        }`}>
+          ⏳ 대표 승인 대기
+        </div>
+      )}
+
       {/* 스크립트 발송 체크 */}
       <div className="mt-1.5 flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
         <input type="checkbox" id={`script-${c.id}`} checked={scriptSent}
@@ -905,17 +976,27 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
+  // 승인 대기 케이스 분리 (환불예정/종료예정) — 기관 그룹에서 제외
+  const pendingCases = cases.filter(c =>
+    PENDING_REFUND_KEYS.has(c.progress_stage) || PENDING_DONE_KEYS.has(c.progress_stage)
+  )
+  const regularCases = cases.filter(c =>
+    !PENDING_REFUND_KEYS.has(c.progress_stage) && !PENDING_DONE_KEYS.has(c.progress_stage)
+  )
+
   // 기관별 그룹: 한 케이스가 여러 기관에 걸쳐 있으면 모두 등장
   const instGroups = ALL_INST_ORDER.map(inst => ({
     inst,
-    items: cases.filter(c =>
+    items: regularCases.filter(c =>
       (c.institution || '').split(',').map((s: string) => s.trim()).includes(inst)
     ),
   })).filter(g => g.items.length > 0)
 
   // 신규 유입 (institution이 비어있는 케이스) — 제일 상단에 배치
-  const unassigned = cases.filter(c => !c.institution || c.institution.trim() === '')
+  const unassigned = regularCases.filter(c => !c.institution || c.institution.trim() === '')
   if (unassigned.length > 0) instGroups.unshift({ inst: '신규 유입', items: unassigned })
+  // 승인 대기 — 최상단에 배치
+  if (pendingCases.length > 0) instGroups.unshift({ inst: '⏳ 대표 승인 대기', items: pendingCases })
 
   if (instGroups.length === 0) {
     return (
@@ -940,7 +1021,9 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
                   ? 'bg-violet-600 hover:bg-violet-700'
                   : inst === '신규 유입'
                     ? 'bg-sky-500 hover:bg-sky-600'
-                    : 'bg-[#1B2A45] hover:bg-[#1B2A45]/90'
+                    : inst === '⏳ 대표 승인 대기'
+                      ? 'bg-rose-500 hover:bg-rose-600'
+                      : 'bg-[#1B2A45] hover:bg-[#1B2A45]/90'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -1198,7 +1281,7 @@ function OpsNewDbTab({ cases, userName, onSave }: {
                 <button onClick={() => setOpenId(null)} className="text-gray-400 hover:text-gray-600 text-sm">✕</button>
               </div>
             </div>
-            <OpsDetailPanel c={c} onSave={onSave} />
+            <OpsDetailPanel c={c} onSave={onSave} userRole="ops" />
           </div>
         )
       })()}
@@ -1788,6 +1871,8 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
 // Main OpsDashboard
 // ──────────────────────────────────────────────────────────────────────
 export default function OpsDashboard({ userId, userName }: Props) {
+  const { data: session } = useSession()
+  const userRole = (session?.user as any)?.role || 'ops'
   const [activeTab, setActiveTab] = useState<OpsTab>('dashboard')
   const [menuOpen, setMenuOpen] = useState(false)
   const [cases, setCases] = useState<OpsCase[]>([])
@@ -2158,7 +2243,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
               <button onClick={() => togglePanel(id)} className="text-gray-400 hover:text-gray-600 text-xl leading-none px-1">✕</button>
             </div>
             <div className="p-4">
-              <OpsDetailPanel c={c} onSave={handleSave} />
+              <OpsDetailPanel c={c} onSave={handleSave} userRole={userRole} />
             </div>
           </div>
         )

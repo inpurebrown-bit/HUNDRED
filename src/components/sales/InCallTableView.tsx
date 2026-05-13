@@ -1294,40 +1294,29 @@ function CustomerCard({
                 </div>
               )}
             </div>
-            <button type="button" onClick={() => { if (confirm('삭제?')) { onDelete(c.id); onExpand(null) } }}
-              className="px-2.5 py-1 rounded text-[11px] font-semibold bg-red-50 text-red-500 ml-auto">
-              🗑 삭제
-            </button>
             <button type="button" onClick={() => onExpand(null)}
-              className="text-gray-400 hover:text-gray-600 text-sm font-bold px-1 ml-1">✕</button>
+              className="text-gray-400 hover:text-gray-600 text-sm font-bold px-1 ml-auto">✕</button>
           </div>
 
           {/* 좌/우 2단 패널 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-0 divide-y md:divide-y-0 md:divide-x divide-gray-200">
 
             {/* ── 좌측: 인콜일지 ── */}
-            <div className="p-4 overflow-y-auto max-h-[520px]">
-              {/* 헤더 + 수정 버튼 */}
-              <div className="flex items-center justify-between mb-2">
+            <div className="p-4 flex flex-col" style={{ maxHeight: 520 }}>
+              {/* 헤더 + 수정 버튼 (우측 위) */}
+              <div className="flex items-center justify-between mb-2 shrink-0">
                 <p className="text-[10px] font-bold text-[#1B2A45] uppercase tracking-wide">📋 인콜일지</p>
-                {!logEditMode ? (
-                  <button type="button" onClick={openLogEdit}
-                    className="flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-50 text-blue-600 border border-blue-200 text-[10px] font-semibold hover:bg-blue-100 transition-colors">
-                    ✏️ 수정
-                  </button>
-                ) : (
-                  <div className="flex gap-1">
-                    <button type="button" onClick={() => setLogEditMode(false)}
-                      className="px-2 py-1 rounded-lg bg-gray-100 text-gray-500 text-[10px] font-semibold hover:bg-gray-200 transition-colors">
-                      취소
-                    </button>
-                    <button type="button" onClick={saveLogEdit} disabled={logSaving}
-                      className="px-2.5 py-1 rounded-lg bg-blue-600 text-white text-[10px] font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60">
-                      {logSaving ? '저장중…' : '💾 저장'}
-                    </button>
-                  </div>
-                )}
+                <button type="button" onClick={logEditMode ? () => setLogEditMode(false) : openLogEdit}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-semibold transition-colors ${
+                    logEditMode
+                      ? 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+                      : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                  }`}>
+                  {logEditMode ? '✕ 취소' : '✏️ 수정'}
+                </button>
               </div>
+              {/* 스크롤 영역 */}
+              <div className="flex-1 overflow-y-auto min-h-0">
 
               {/* ① 직가/공가 — 최상단 (항상 표시) */}
               <div className="flex items-center gap-2 bg-[#1B2A45] border border-[#1B2A45] rounded-lg px-2.5 py-2 mb-2 shadow-sm">
@@ -1443,6 +1432,23 @@ function CustomerCard({
                   value={c.details?.result_memo || c.notes || c.memo || ''}
                   onChange={(val) => onUpdate(c.id, { details: { result_memo: val } })}
                 />
+              </div>
+              </div>{/* end scroll area */}
+              {/* ── 하단 버튼 바: 저장(항상) + 삭제(우측 하단) ── */}
+              <div className="flex items-center justify-between pt-2 mt-1 border-t border-gray-100 shrink-0">
+                <button type="button" onClick={saveLogEdit} disabled={logSaving || !logEditMode}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
+                    logEditMode
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                      : 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                  }`}>
+                  {logSaving ? '저장중…' : '💾 저장'}
+                </button>
+                <button type="button"
+                  onClick={() => { if (confirm('이 고객을 삭제하시겠습니까?')) { onDelete(c.id); onExpand(null) } }}
+                  className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-red-50 text-red-400 hover:bg-red-100 border border-red-100 transition-colors">
+                  🗑 삭제
+                </button>
               </div>
             </div>
 
