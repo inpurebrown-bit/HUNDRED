@@ -987,6 +987,28 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             <h2 className="text-sm font-bold text-gray-700">
               💬 감성톡 관리 업체 <span className="text-gray-400 font-normal">({emotionalCustomers.length}건)</span>
             </h2>
+
+            {/* 오늘 재통화 업체 미니맵 */}
+            {(() => {
+              const today = new Date().toISOString().slice(0, 10)
+              const todayCallbacks = emotionalCustomers.filter(c => (c as any).details?.follow_up_date === today)
+              if (todayCallbacks.length === 0) return null
+              return (
+                <div className="bg-sky-50 border border-sky-200 rounded-xl px-4 py-3">
+                  <p className="text-[11px] font-bold text-sky-700 mb-2">📞 오늘 재통화 업체 ({todayCallbacks.length}건)</p>
+                  <div className="flex flex-wrap gap-2">
+                    {todayCallbacks.map(c => (
+                      <div key={c.id} className="bg-white border border-sky-200 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
+                        <span className="text-[10px] font-semibold text-sky-600 bg-sky-100 px-1.5 py-0.5 rounded">재통화</span>
+                        <span className="text-xs font-medium text-gray-800">{(c as any).details?.company || c.company || c.name}</span>
+                        <span className="text-[10px] text-gray-400">{c.phone}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+
             <p className="text-xs text-gray-400 bg-violet-50 border border-violet-100 rounded-lg px-4 py-2">
               일단 거절했지만 감성적 접근이 가능한 업체 관리 · 장기 육성 대상
             </p>

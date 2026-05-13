@@ -796,6 +796,16 @@ function DashboardOverview({ cases }: { cases: OpsCase[] }) {
   activeCases.forEach(c => { stageMap[c.progress_stage] = (stageMap[c.progress_stage] || 0) + 1 })
   const stageEntries = Object.entries(stageMap).sort((a, b) => b[1] - a[1]).slice(0, 6)
 
+  // 본인 매출 계산
+  const allMonthRevenue = monthCases.reduce((s, c) => {
+    const v = parseFloat((c.details?.deposit_amount || c.details?.contract_amount || '0').replace(/[^0-9.]/g, ''))
+    return s + (isNaN(v) ? 0 : v)
+  }, 0)
+  const totalAllRevenue = completedCases.reduce((s, c) => {
+    const v = parseFloat((c.details?.deposit_amount || c.details?.contract_amount || '0').replace(/[^0-9.]/g, ''))
+    return s + (isNaN(v) ? 0 : v)
+  }, 0)
+
   return (
     <div className="space-y-4">
       {/* 통계 카드 */}
@@ -812,6 +822,25 @@ function DashboardOverview({ cases }: { cases: OpsCase[] }) {
           </div>
         ))}
       </div>
+
+      {/* 본인 매출 현황 */}
+      {(allMonthRevenue > 0 || totalAllRevenue > 0) && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+          <p className="text-[11px] font-bold text-emerald-700 mb-3">💰 나의 매출 현황</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white rounded-lg p-3 text-center border border-emerald-100">
+              <p className="text-[10px] text-gray-400 mb-1">이번달 입금</p>
+              <p className="text-lg font-black text-emerald-700">{fmt(allMonthRevenue)}원</p>
+              <p className="text-[9px] text-gray-400">{monthCases.length}건</p>
+            </div>
+            <div className="bg-white rounded-lg p-3 text-center border border-emerald-100">
+              <p className="text-[10px] text-gray-400 mb-1">과거 총 입금</p>
+              <p className="text-lg font-black text-[#1B2A45]">{fmt(totalAllRevenue)}원</p>
+              <p className="text-[9px] text-gray-400">{completedCases.length}건</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 이번달 매출 */}
       {monthRevenue > 0 && (

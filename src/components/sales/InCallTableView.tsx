@@ -426,6 +426,8 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
   const [vatIncluded, setVatIncluded] = useState(false)
   const [myRevenue,   setMyRevenue]   = useState('')
   const [contractDate, setContractDate] = useState(new Date().toISOString().slice(0, 10))
+  const [paymentMethod, setPaymentMethod] = useState<'카드' | '현금' | '계좌이체' | ''>('')
+  const [commissionRate, setCommissionRate] = useState('')
   // 메모 미러링: 통화내용/메모와 동일 필드 (initialMemo로 pre-fill)
   const [opsMemo,     setOpsMemo]     = useState(initialMemo)
   const [noRefund,    setNoRefund]    = useState(initialNoRefund)
@@ -448,6 +450,8 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
 
   async function handleConfirm() {
     setSaving(true)
+    const commRateNum = parseFloat(commissionRate) || 0
+    const commAmount  = paidNum > 0 && commRateNum > 0 ? Math.round(paidNum * commRateNum / 100) : 0
     await onConfirm({
       contract_fee:        formatNumber(feeNum),
       payment_amount:      formatNumber(paidNum),
@@ -457,7 +461,10 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
       unpaid_amount:       unpaid > 0 ? formatNumber(unpaid) : '0',
       my_revenue:          formatNumber(myRevNum),
       cumulative_revenue:  formatNumber(cumulative),
-      result_memo:         opsMemo,   // 미러링: 메모와 같은 필드
+      payment_method:      paymentMethod,
+      commission_rate:     commissionRate,
+      commission_amount:   commAmount > 0 ? formatNumber(commAmount) : '',
+      result_memo:         opsMemo,
       no_refund:           noRefund,
       group_chat_invited:  groupChatInvited,
       coop_request_sent:   coopRequestSent,
@@ -503,6 +510,48 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
               className="w-4 h-4 rounded accent-blue-500" />
             <span className="text-xs text-blue-800 font-medium">입금액에 부가세 포함 (÷11 자동계산)</span>
           </label>
+
+          {/* 결제방식 */}
+          <div>
+            <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">결제방식</label>
+            <div className="flex gap-2">
+              {(['카드', '현금', '계좌이체'] as const).map(m => (
+                <button key={m} type="button"
+                  onClick={() => setPaymentMethod(p => p === m ? '' : m)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                    paymentMethod === m
+                      ? m === '카드' ? 'bg-blue-500 text-white border-blue-500'
+                        : m === '현금' ? 'bg-emerald-500 text-white border-emerald-500'
+                        : 'bg-amber-500 text-white border-amber-500'
+                      : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
+                  }`}>{m}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* 수수료율 */}
+          <div>
+            <label className="text-[10px] text-blue-700 mb-1 block font-bold">
+              수수료율 <span className="text-gray-400 font-normal">(% 입력 → 금액 자동계산)</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="number"
+                  value={commissionRate}
+                  onChange={e => setCommissionRate(e.target.value)}
+                  placeholder="예: 5"
+                  className={INP + ' pr-6'}
+                />
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+              </div>
+              {commissionRate && parseNumber(paidAmount) > 0 && (
+                <span className="text-xs font-bold text-violet-600 whitespace-nowrap">
+                  = {Math.round(parseNumber(paidAmount) * parseFloat(commissionRate || '0') / 100).toLocaleString()}원
+                </span>
+              )}
+            </div>
+          </div>
 
           {/* ③ 자동계산 박스 */}
           <div className="bg-gray-50 rounded-xl px-4 py-3 space-y-2">
@@ -1134,9 +1183,15 @@ function CustomerCard({
           </div>
         </div>
 
-        {/* 재통화 일정 */}
+        {/* 재통화 일정 마크 */}
         {c.details?.follow_up_date && (
-          <p className="text-[9px] text-sky-500 mt-1.5 font-medium">📅 {c.details.follow_up_date.slice(5)}</p>
+          <div className={`mt-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${
+            c.details.follow_up_date === new Date().toISOString().slice(0, 10)
+              ? 'bg-sky-500 text-white animate-pulse'
+              : 'bg-sky-100 text-sky-700'
+          }`}>
+            📞 재통화일정 {c.details.follow_up_date.slice(5)}
+          </div>
         )}
 
         {/* 계약일자 표시 (contracted 탭) */}
@@ -1190,6 +1245,12 @@ function CustomerCard({
               <button type="button" onClick={() => { setTrashReason(''); setTrashOpen(true) }}
                 className="px-2.5 py-1 rounded text-[11px] font-semibold bg-gray-400 text-white">
                 🗑 자체거절
+              </button>
+            )}
+            {tabType === 'db010' && (
+              <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); onExpand(null) }}
+                className="px-2.5 py-1 rounded text-[11px] font-semibold bg-blue-600 text-white hover:bg-blue-700">
+                👤 신규고객으로 이동
               </button>
             )}
             {tabType !== 'lead' && tabType !== 'db010' && (
