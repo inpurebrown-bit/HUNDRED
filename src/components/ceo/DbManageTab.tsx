@@ -70,6 +70,11 @@ export default function DbManageTab() {
   // ── 직원 관리 ──────────────────────────────────────────────────────────────
   const [employees, setEmployees] = useState<Employee[]>([])
   const [empLoading, setEmpLoading] = useState(false)
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [createForm, setCreateForm] = useState({ name: '', username: '', password: '', role: 'sales' as 'sales' | 'ops' })
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState('')
+  const [newlyCreatedId, setNewlyCreatedId] = useState<string | null>(null)
 
   const loadEmployees = useCallback(async () => {
     setEmpLoading(true)
@@ -109,6 +114,31 @@ export default function DbManageTab() {
         return next
       })
     }
+  }
+
+  // ── 직원 생성 ──────────────────────────────────────────────────────────────
+  async function createEmployee() {
+    setCreateError('')
+    if (!createForm.name.trim() || !createForm.username.trim() || !createForm.password.trim()) {
+      setCreateError('이름, 아이디, 비밀번호를 모두 입력해주세요')
+      return
+    }
+    setCreating(true)
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(createForm),
+      })
+      const data = await res.json()
+      if (!res.ok) { setCreateError(data.error || '생성 실패'); setCreating(false); return }
+      setEmployees(p => [...p, data.user])
+      setNewlyCreatedId(data.user.id)
+      setCreateForm({ name: '', username: '', password: '', role: 'sales' })
+      setShowCreateForm(false)
+      setTimeout(() => setNewlyCreatedId(null), 5000)
+    } catch { setCreateError('네트워크 오류') }
+    setCreating(false)
   }
 
   // ── 직원 삭제 ──────────────────────────────────────────────────────────────
@@ -299,13 +329,114 @@ export default function DbManageTab() {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-sm font-bold text-gray-800">👤 직원 관리</h3>
-              <p className="text-xs text-gray-400 mt-0.5">직원 계정 조회 및 삭제 (대표 계정 제외)</p>
+              <p className="text-xs text-gray-400 mt-0.5">직원 계정 조회·생성·삭제 (대표 계정 제외)</p>
             </div>
-            <button onClick={loadEmployees}
-              className="px-3 py-1.5 text-xs bg-white border border-gray-200 text-gray-600 rounded-xl hover:border-gray-400 transition-colors">
-              🔄 새로고침
-            </button>
+            <div className="flex gap-2">
+              <button onClick={loadEmployees}
+                className="px-3 py-1.5 text-xs bg-white border border-gray-200 text-gray-600 rounded-xl hover:border-gray-400 transition-colors">
+                🔄 새로고침
+              </button>
+              <button onClick={() => { setShowCreateForm(v => !v); setCreateError('') }}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition-colors ${
+                  showCreateForm
+                    ? 'bg-gray-100 text-gray-600 border-gray-200'
+                    : 'bg-[#1B2A45] text-white border-[#1B2A45] hover:bg-[#1B2A45]/90'
+                }`}>
+                {showCreateForm ? '✕ 취소' : '➕ 직원 추가'}
+              </button>
+            </div>
           </div>
+
+          {/* 직원 생성 폼 */}
+          {showCreateForm && (
+            <div className="bg-white border border-[#1B2A45]/20 rounded-xl p-5 space-y-4">
+              <p className="text-sm font-bold text-[#1B2A45]">새 직원 계정 만들기</p>
+
+              {/* 역할 선택 */}
+              <div className="flex gap-2">
+                {(['sales', 'ops'] as const).map(r => (
+                  <button key={r} onClick={() => setCreateForm(f => ({ ...f, role: r }))}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
+                      createForm.role === r
+                        ? r === 'sales'
+                          ? 'bg-sky-500 text-white border-sky-500'
+                          : 'bg-violet-500 text-white border-violet-500'
+                        : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
+                    }`}>
+                    {r === 'sales' ? '📞 영업팀' : '🗂 관리팀'}
+                  </button>
+                ))}
+              </div>
+
+              {/* 입력 필드 */}
+              <div className="grid grid-cols-1 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 font-medium mb-1 block">이름 (실명)</label>
+                  <input
+                    type="text"
+                    placeholder="예) 홍길동"
+                    value={createForm.name}
+                    onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#1B2A45]/50 focus:ring-1 focus:ring-[#1B2A45]/20"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 font-medium mb-1 block">아이디 (로그인 ID)</label>
+                  <input
+                    type="text"
+                    placeholder="예) hong2024"
+                    value={createForm.username}
+                    onChange={e => setCreateForm(f => ({ ...f, username: e.target.value.trim() }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#1B2A45]/50 focus:ring-1 focus:ring-[#1B2A45]/20 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 font-medium mb-1 block">초기 비밀번호</label>
+                  <input
+                    type="text"
+                    placeholder="4자 이상"
+                    value={createForm.password}
+                    onChange={e => setCreateForm(f => ({ ...f, password: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#1B2A45]/50 focus:ring-1 focus:ring-[#1B2A45]/20 font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* 역할별 안내 */}
+              <div className={`rounded-xl p-3 text-xs leading-relaxed ${
+                createForm.role === 'sales' ? 'bg-sky-50 text-sky-700' : 'bg-violet-50 text-violet-700'
+              }`}>
+                {createForm.role === 'sales' ? (
+                  <>
+                    <p className="font-semibold mb-1">📞 영업팀 권한</p>
+                    <p>• 고객 DB 등록·조회·수정 (본인 담당 고객)</p>
+                    <p>• 인콜일지 작성, 콜 타임라인 기록</p>
+                    <p>• 오전/마감 보고서 제출</p>
+                    <p>• 매출 입력, 재통화 관리</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-semibold mb-1">🗂 관리팀 권한</p>
+                    <p>• 흡수 업체 배정·진행현황 관리</p>
+                    <p>• 정책자금 기관·솔루션 배정</p>
+                    <p>• 환불·종료 처리 (대표 승인 후 확정)</p>
+                    <p>• 오전/마감 보고서 제출</p>
+                  </>
+                )}
+              </div>
+
+              {createError && (
+                <p className="text-xs text-red-500 font-medium">⚠️ {createError}</p>
+              )}
+
+              <button
+                onClick={createEmployee}
+                disabled={creating}
+                className="w-full py-2.5 bg-[#1B2A45] hover:bg-[#1B2A45]/90 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50">
+                {creating ? '생성 중...' : `✅ ${createForm.role === 'sales' ? '영업팀' : '관리팀'} 직원 계정 생성`}
+              </button>
+            </div>
+          )}
 
           {empLoading ? (
             <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
@@ -317,7 +448,7 @@ export default function DbManageTab() {
             <div className="bg-white border border-[#E8E2D4] rounded-xl overflow-hidden">
               <div className="divide-y divide-gray-50">
                 {employees.map(emp => (
-                  <div key={emp.id} className="flex items-center gap-4 px-5 py-4">
+                  <div key={emp.id} className={`flex items-center gap-4 px-5 py-4 transition-colors ${emp.id === newlyCreatedId ? 'bg-green-50' : ''}`}>
                     <div className="w-10 h-10 rounded-xl bg-[#1B2A45]/10 flex items-center justify-center text-sm font-bold text-[#1B2A45] shrink-0">
                       {emp.name?.slice(-2) || '??'}
                     </div>
@@ -328,6 +459,9 @@ export default function DbManageTab() {
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${roleBg[emp.role] || 'bg-gray-100 text-gray-600'}`}>
                           {roleLabel[emp.role] || emp.role}
                         </span>
+                        {emp.id === newlyCreatedId && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-green-100 text-green-700">✨ 방금 생성</span>
+                        )}
                       </div>
                     </div>
                     <button onClick={() => deleteEmployee(emp)}
