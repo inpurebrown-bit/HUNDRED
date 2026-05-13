@@ -332,7 +332,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
       const json = await res.json()
       if (res.ok) {
         setShow010Form(false)
-        showToast(`✅ "${data.company || data.name}" 010DB 등록 완료!`)
+        showToast(`✅ "${data.company || data.name}" 직가DB 등록 완료!`)
         loadAll()
       } else {
         showToast(`❌ 등록 실패: ${json.error || '알 수 없는 오류'}`, 'error')
@@ -435,7 +435,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
     contracted: 'contracted', emotional: 'emotional', trash: 'trash',
   }
   const STATUS_LABEL: Record<string, string> = {
-    db010: '010DB', lead: '신규고객', consulting: '신규고객',
+    db010: '직가DB', lead: '공가DB', consulting: '공가DB',
     contracted: '계약업체', emotional: '감성톡', trash: '자체거절',
   }
   const q = searchQuery.trim().toLowerCase()
@@ -494,8 +494,8 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   // ── Tabs ──────────────────────────────────────────────────────────
   const tabs: { key: SalesTab; label: string; count?: number }[] = [
     { key: 'board',      label: '🏠 메인보드' },
-    { key: 'db010',      label: '📞 010DB',      count: db010List.length },
-    { key: 'customers',  label: '👤 신규 고객',   count: activeCustomers.length },
+    { key: 'db010',      label: '🏷️ 직가DB',      count: db010List.length },
+    { key: 'customers',  label: '📋 공가DB',       count: activeCustomers.length },
     { key: 'contracted', label: '✅ 계약 업체',   count: contractedCustomers.length },
     { key: 'emotional',  label: '💬 감성톡(거절업체)',      count: emotionalCustomers.length },
     { key: 'trash',      label: '🗑 자체거절',    count: trashCustomers.length },
@@ -880,32 +880,22 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
           </div>
         )}
 
-        {/* ══════════ 010 DB ══════════ */}
+        {/* ══════════ 직가 DB ══════════ */}
         {activeTab === 'db010' && (
           <div className="space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-sm font-bold text-gray-700 mr-auto">
-                010 DB <span className="text-gray-400 font-normal">({db010List.length}건)</span>
+                직가 DB <span className="text-gray-400 font-normal">({db010List.length}건)</span>
               </h2>
-              {db010List.length > 0 && (
-                <button
-                  onClick={async () => {
-                    if (!confirm(`010DB ${db010List.length}건을 전부 신규고객으로 이동할까요?`)) return
-                    for (const c of db010List) await moveCustomer(c.id, 'lead')
-                  }}
-                  className="bg-sky-500 hover:bg-sky-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
-                  👤 전체 신규고객으로 이동
-                </button>
-              )}
               <button onClick={() => setShow010Form(v => !v)}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                {show010Form ? '✕ 취소' : '+ 010DB 등록'}
+                {show010Form ? '✕ 취소' : '+ 직가DB 등록'}
               </button>
             </div>
 
             {show010Form && (
               <InCallForm
-                title="010DB 인콜일지 등록"
+                title="직가DB 인콜일지 등록"
                 salesUsers={salesUserNames}
                 submitting={submitting}
                 onSubmit={submit010}
@@ -917,7 +907,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
             ) : db010List.length === 0 ? (
               <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
-                010 DB가 없습니다.
+                직가 DB가 없습니다.
               </div>
             ) : (
               <InCallTableView
@@ -934,22 +924,22 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
           </div>
         )}
 
-        {/* ══════════ 신규 고객 ══════════ */}
+        {/* ══════════ 공가 DB ══════════ */}
         {activeTab === 'customers' && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-gray-700">
-                고객 DB <span className="text-gray-400 font-normal">({activeCustomers.length}건)</span>
+                공가 DB <span className="text-gray-400 font-normal">({activeCustomers.length}건)</span>
               </h2>
               <button onClick={() => setShowNewForm(v => !v)}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                {showNewForm ? '✕ 취소' : '+ 고객 등록'}
+                {showNewForm ? '✕ 취소' : '+ 공가DB 등록'}
               </button>
             </div>
 
             {showNewForm && (
               <InCallForm
-                title="고객 DB 인콜일지 등록"
+                title="공가DB 인콜일지 등록"
                 salesUsers={salesUserNames}
                 submitting={submitting}
                 onSubmit={submitNew}
@@ -961,7 +951,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
             ) : activeCustomers.length === 0 ? (
               <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
-                고객 DB가 없습니다.
+                공가 DB가 없습니다.
               </div>
             ) : (
               <InCallTableView
