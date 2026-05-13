@@ -208,6 +208,7 @@ function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (id: stri
   const [activeDetailTab, setActiveDetailTab] = useState<DetailTab>('진행현황')
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [pwVisible, setPwVisible] = useState<Record<string, boolean>>({})
+  const [salesLogOpen, setSalesLogOpen] = useState(false)
 
   useEffect(() => { setLocal({ ...c }) }, [c.id])
 
@@ -258,8 +259,25 @@ function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (id: stri
     const prevStage = local.progress_stage
     const autoEntry = { user: '자동기록', content: `단계 변경: ${prevStage} → ${nextStage}`, created_at: nowKST() }
     const updatedTimeline = [...(local.timeline || []), autoEntry]
-    setLocal(prev => ({ ...prev, progress_stage: nextStage, timeline: updatedTimeline }))
-    schedule({ progress_stage: nextStage, timeline: updatedTimeline })
+
+    // 재원날짜 자동입력: '승인' 단계 진입 시 오늘 날짜 자동 세팅 (미입력 시에만)
+    const todayKST = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' })
+    const autoFundingDate = nextStage === '승인' && !local.details?.funding_date ? todayKST : undefined
+    const updatedDetails = autoFundingDate
+      ? { ...(local.details || {}), funding_date: autoFundingDate }
+      : local.details || {}
+
+    setLocal(prev => ({
+      ...prev,
+      progress_stage: nextStage,
+      timeline: updatedTimeline,
+      details: updatedDetails,
+    }))
+    schedule({
+      progress_stage: nextStage,
+      timeline: updatedTimeline,
+      ...(autoFundingDate ? { details: updatedDetails } : {}),
+    })
   }
   function handleCeoApprove() {
     const targetStage = local.progress_stage === '환불예정' ? '환불' : '종료'
@@ -281,8 +299,54 @@ function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (id: stri
   const isPendingApproval = local.progress_stage === '환불예정' || local.progress_stage === '종료예정'
   const isCeo = userRole === 'ceo'
 
+  // 전달화면 모달용 영업팀 기록 추출
+  const salesLogs = (local.timeline || []).filter((e: any) => e.source === 'sales')
+
   return (
     <div className="space-y-3">
+
+      {/* ── 전달화면 모달 ── */}
+      {salesLogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setSalesLogOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-violet-600 px-4 py-3 flex items-center justify-between">
+              <div>
+                <p className="font-bold text-white text-sm">📋 영업팀 전달 기록</p>
+                <p className="text-white/70 text-xs mt-0.5">{c.customers?.name} · {c.customers?.company || c.customers?.phone}</p>
+              </div>
+              <button onClick={() => setSalesLogOpen(false)} className="text-white/70 hover:text-white text-lg leading-none">✕</button>
+            </div>
+            <div className="p-4 max-h-[60vh] overflow-y-auto">
+              {salesLogs.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-6">전달 기록이 없습니다</p>
+              ) : (
+                <div className="relative pl-4 border-l-2 border-violet-200 space-y-2">
+                  {[...salesLogs].reverse().map((log: any, i: number) => {
+                    const kst = formatKST(log.created_at || log.date || '')
+                    const author = log.user || log.author || log.user_name || '영업팀'
+                    return (
+                      <div key={i} className="relative">
+                        <div className="absolute -left-[21px] top-1.5 w-3 h-3 rounded-full bg-violet-400 border-2 border-white" />
+                        <div className="bg-violet-50 rounded-lg px-3 py-2">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-[10px] font-bold text-violet-700">{author}</span>
+                            <span className="text-[10px] text-gray-400">{kst.date} {kst.time}</span>
+                            {log.call_result && (
+                              <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-medium">{log.call_result}</span>
+                            )}
+                          </div>
+                          {log.content && <p className="text-xs text-gray-700 whitespace-pre-wrap">{log.content}</p>}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── CEO 승인 대기 배너 ── */}
       {isPendingApproval && isCeo && (
         <div className={`rounded-xl p-3.5 border ${local.progress_stage === '환불예정' ? 'bg-rose-50 border-rose-200' : 'bg-orange-50 border-orange-200'}`}>
@@ -352,6 +416,16 @@ function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (id: stri
             <div className="flex items-center gap-1.5 mb-2">
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">진행 현황</span>
               <div className="flex-1 h-px bg-gray-100" />
+              {/* 전달화면 버튼 — 영업팀 인콜 기록 있을 때만 표시 */}
+              {(local.timeline || []).some((e: any) => e.source === 'sales') && (
+                <button
+                  type="button"
+                  onClick={() => setSalesLogOpen(true)}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-600 text-[10px] font-bold border border-violet-200 transition-colors whitespace-nowrap"
+                >
+                  📋 전달화면
+                </button>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-x-2 gap-y-2">
               <div>
@@ -371,6 +445,20 @@ function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (id: stri
               <div>
                 <label className={lbl}>계약 날짜</label>
                 <input type="date" value={d.contract_date || ''} onChange={e => detailField('contract_date', e.target.value)} className={inp} />
+              </div>
+              {/* 재원날짜: 승인 단계 진입 시 자동입력, 수동 수정도 가능 */}
+              <div>
+                <label className={lbl}>
+                  재원날짜
+                  {local.progress_stage === '승인' && d.funding_date && (
+                    <span className="ml-1 text-[9px] text-emerald-600 font-medium">✅ 자동입력</span>
+                  )}
+                </label>
+                <input type="date" value={d.funding_date || ''} onChange={e => detailField('funding_date', e.target.value)} className={inp} />
+              </div>
+              <div>
+                <label className={lbl}>입금 날짜</label>
+                <input type="date" value={d.deposit_date || ''} onChange={e => detailField('deposit_date', e.target.value)} className={inp} />
               </div>
               <div className="col-span-2">
                 <label className={lbl}>담당 기관 (복수 선택)</label>
