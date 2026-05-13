@@ -37,6 +37,7 @@ interface RevenueData {
 
 interface Contract {
   id: string
+  customer_id?: string
   created_at: string
   sales_user_id: string
   sales_user_name: string
@@ -290,6 +291,7 @@ export default function OverviewTabNew() {
   const [reports, setReports] = useState<Report[]>([])
   const [events, setEvents] = useState<CalEvent[]>([])
   const [allContracts, setAllContracts] = useState<Contract[]>([])
+  const [allCustomers, setAllCustomers] = useState<any[]>([])  // customers 테이블에서 직접
   const [opsCases, setOpsCases] = useState<OpsCase[]>([])
   const [salesGoals, setSalesGoals] = useState<SalesGoal[]>([])
   const [lastMonthGoals, setLastMonthGoals] = useState<SalesGoal[]>([])
@@ -324,6 +326,7 @@ export default function OverviewTabNew() {
           reportsRes,
           eventsRes,
           contractsRes,
+          customersRes,
           opsRes,
           goalsRes,
           lastGoalsRes,
@@ -334,6 +337,7 @@ export default function OverviewTabNew() {
           fetch('/api/reports').catch(() => null),
           fetch('/api/events').catch(() => null),
           fetch('/api/contracts').catch(() => null),
+          fetch('/api/customers').catch(() => null),
           fetch('/api/ops-cases').catch(() => null),
           fetch(`/api/sales-goals?year_month=${thisMonthStr}`).catch(() => null),
           fetch(`/api/sales-goals?year_month=${lastMonthStr}`).catch(() => null),
@@ -346,6 +350,7 @@ export default function OverviewTabNew() {
           reportsData,
           eventsData,
           contractsData,
+          customersData,
           opsData,
           goalsData,
           lastGoalsData,
@@ -356,6 +361,7 @@ export default function OverviewTabNew() {
           reportsRes?.json().catch(() => ({})) ?? {},
           eventsRes?.json().catch(() => ({})) ?? {},
           contractsRes?.json().catch(() => ({})) ?? {},
+          customersRes?.json().catch(() => ({})) ?? {},
           opsRes?.json().catch(() => ({})) ?? {},
           goalsRes?.json().catch(() => ({})) ?? {},
           lastGoalsRes?.json().catch(() => ({})) ?? {},
@@ -369,6 +375,7 @@ export default function OverviewTabNew() {
         setReports(a(reportsData).reports ?? [])
         setEvents(a(eventsData).events ?? [])
         setAllContracts(a(contractsData).contracts ?? [])
+        setAllCustomers(a(customersData).customers ?? [])
         setOpsCases(a(opsData).cases ?? [])
         setSalesGoals(a(goalsData).sales_goals ?? a(goalsData).goals ?? [])
         setLastMonthGoals(a(lastGoalsData).sales_goals ?? a(lastGoalsData).goals ?? [])
@@ -413,11 +420,29 @@ export default function OverviewTabNew() {
       ? thisMonthRevRaw.toLocaleString() + '원'
       : '-'
 
-  // Contracts
-  const thisMonthContracts = allContracts.filter(
+  // Contracts: contracts 테이블 + customers 테이블에서 contracted 상태 업체 모두 포함
+  // customers 테이블 기반 계약 목록 (contract_date 기준)
+  const contractedCustomers = allCustomers.filter((c: any) => c.status === 'contracted')
+  // customers → Contract 형태로 변환 (buildRows 함수와 호환)
+  const customersAsContracts: Contract[] = contractedCustomers.map((c: any) => ({
+    id: c.id,
+    created_at: c.details?.contract_date || c.created_at || '',
+    sales_user_id: c.owner_id || c.details?.sales_user_id || '',
+    sales_user_name: c.details?.sales_user_name || c.sales_user_name || '',
+    contract_amount: parseInt(String(c.details?.payment_amount || '0').replace(/[^0-9]/g, ''), 10) || 0,
+    status: 'contracted',
+  }))
+  // 두 소스 합치기 (중복 방지: customer_id 기준)
+  const contractIdSet = new Set(allContracts.map((c: Contract) => c.customer_id))
+  const mergedContracts = [
+    ...allContracts,
+    ...customersAsContracts.filter(c => !contractIdSet.has(c.id)),
+  ]
+
+  const thisMonthContracts = mergedContracts.filter(
     c => (c.created_at ?? '').slice(0, 7) === thisMonthStr
   )
-  const lastMonthContracts = allContracts.filter(
+  const lastMonthContracts = mergedContracts.filter(
     c => (c.created_at ?? '').slice(0, 7) === lastMonthStr
   )
 
@@ -689,6 +714,9 @@ export default function OverviewTabNew() {
       {/* ═══ 6. 공지사항 ════════════════════════════════════ */}
       <NoticeSection />
 
+      {/* ═══ 6.5. DB 중복 쓰레기통 ═════════════════════════ */}
+      <DuplicateTrashSection />
+
       {/* ═══ 7. 공급기준표 ══════════════════════════════════ */}
       <div className="bg-white rounded-xl border border-[#E8E2D4] overflow-hidden">
         <div className="px-5 py-3 border-b border-[#E8E2D4] flex items-center justify-between">
@@ -746,7 +774,7 @@ function NoticeSection() {
     try {
       const r = await fetch('/api/notices')
       const d = await r.json()
-      setNotices((d.notices || []).filter((n: any) => n.notice_type !== 'supply_count').slice(0, 10))
+      setNotices((d.notices || []).slice(0, 30))
     } catch {}
   }
 
@@ -770,13 +798,15 @@ function NoticeSection() {
   }
 
   async function del(id: string) {
-    if (!confirm('삭제할까요?')) return
-    await fetch(`/api/notices?id=${id}`, { method: 'DELETE' })
-    load()
+    if (!confirm('이 공지를 삭제할까요?')) return
+    const r = await fetch(`/api/notices?id=${id}`, { method: 'DELETE' })
+    if (r.ok) await load()
+    else toast_('❌ 삭제 실패')
   }
 
   const teamLabel = (t: string) => t === 'sales' ? '영업팀' : t === 'ops' ? '관리팀' : '전체'
   const teamColor = (t: string) => t === 'sales' ? 'bg-blue-100 text-blue-700' : t === 'ops' ? 'bg-violet-100 text-violet-700' : 'bg-amber-100 text-amber-700'
+  const typeLabel = (n: any) => n.notice_type === 'supply_count' ? '[공급기준]' : ''
 
   return (
     <div className="bg-white rounded-xl border border-[#E8E2D4] overflow-hidden">
@@ -823,12 +853,143 @@ function NoticeSection() {
                   {teamLabel(n.target_team)}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[#1B2A45] truncate">{n.title}</p>
+                  <p className="text-sm font-semibold text-[#1B2A45] truncate">
+                    {typeLabel(n) && <span className="text-[10px] text-gray-400 font-normal mr-1">{typeLabel(n)}</span>}
+                    {n.title}
+                  </p>
                   {n.content && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.content}</p>}
                   <p className="text-[10px] text-gray-300 mt-1">{new Date(n.created_at).toLocaleString('ko-KR', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</p>
                 </div>
               </div>
               <button onClick={() => del(n.id)} className="text-gray-300 hover:text-red-400 transition-colors shrink-0 text-xs mt-0.5">✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── DB 중복 쓰레기통 ─────────────────────────────────────────
+function DuplicateTrashSection() {
+  const [duplicates, setDuplicates] = useState<any[][]>([])
+  const [loading, setLoading] = useState(false)
+  const [scanned, setScanned] = useState(false)
+  const [trashing, setTrashing] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
+
+  function toast_(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000) }
+
+  async function scan() {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/customers')
+      const data = await res.json()
+      const all: any[] = (data.customers || []).filter((c: any) =>
+        // 활발히 진행 중인 건 제외: contracted, emotional은 제외
+        !['contracted', 'trash'].includes(c.status)
+      )
+
+      // 전화번호 기준으로 그룹화 (정규화: 숫자만)
+      const byPhone: Record<string, any[]> = {}
+      for (const c of all) {
+        const phone = (c.phone || '').replace(/\D/g, '')
+        if (!phone) continue
+        if (!byPhone[phone]) byPhone[phone] = []
+        byPhone[phone].push(c)
+      }
+
+      // 2건 이상인 그룹만 추출
+      const groups = Object.values(byPhone).filter(g => g.length >= 2)
+      setDuplicates(groups)
+      setScanned(true)
+    } catch {}
+    setLoading(false)
+  }
+
+  async function moveToTrash(id: string) {
+    setTrashing(id)
+    try {
+      const res = await fetch(`/api/customers/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'trash' }),
+      })
+      if (res.ok) {
+        setDuplicates(prev => prev
+          .map(group => group.filter(c => c.id !== id))
+          .filter(group => group.length >= 2)
+        )
+        toast_('🗑 쓰레기통으로 이동')
+      }
+    } catch {}
+    setTrashing(null)
+  }
+
+  const totalDups = duplicates.reduce((s, g) => s + g.length - 1, 0)
+
+  return (
+    <div className="bg-white rounded-xl border border-[#E8E2D4] overflow-hidden">
+      {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] px-5 py-3 rounded-xl shadow-2xl text-sm font-semibold text-white bg-red-500">{toast}</div>}
+      <div className="px-5 py-3 border-b border-[#E8E2D4] flex items-center justify-between">
+        <div>
+          <h2 className="font-semibold text-[#1B2A45] text-base">🗑 DB 중복 쓰레기통</h2>
+          <p className="text-[11px] text-[#1B2A45]/40 mt-0.5">같은 전화번호의 중복 고객카드 감지</p>
+        </div>
+        <button
+          onClick={scan}
+          disabled={loading}
+          className="text-xs bg-[#1B2A45] hover:bg-[#1B2A45]/80 text-white px-4 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-40"
+        >
+          {loading ? '스캔 중...' : '중복 스캔'}
+        </button>
+      </div>
+
+      {!scanned ? (
+        <div className="px-5 py-8 text-center text-sm text-gray-400">
+          "중복 스캔" 버튼을 눌러 중복 업체를 찾아보세요
+        </div>
+      ) : duplicates.length === 0 ? (
+        <div className="px-5 py-8 text-center text-sm text-emerald-600 font-medium">
+          ✅ 중복 업체 없음 (계약/거절 제외)
+        </div>
+      ) : (
+        <div className="divide-y divide-[#E8E2D4]/50">
+          <div className="px-5 py-2 bg-red-50">
+            <p className="text-xs text-red-600 font-semibold">⚠️ {duplicates.length}개 그룹 / {totalDups}건 중복 감지 (계약·거절·쓰레기통 제외)</p>
+          </div>
+          {duplicates.map((group, gi) => (
+            <div key={gi} className="px-5 py-3 space-y-2">
+              <p className="text-[10px] font-bold text-gray-400">📞 {(group[0].phone || '').replace(/\D/g, '').replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3')}</p>
+              <div className="space-y-1.5">
+                {group.map((c: any, ci: number) => {
+                  const company = c.details?.company || c.company || c.name || '—'
+                  const owner = c.details?.sales_user_name || c.sales_user_name || '미배정'
+                  const status = c.status || '—'
+                  const isFirst = ci === 0
+                  return (
+                    <div key={c.id} className={`flex items-center justify-between gap-3 px-3 py-2 rounded-lg ${isFirst ? 'bg-blue-50 border border-blue-100' : 'bg-red-50 border border-red-100'}`}>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {isFirst && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-200 text-blue-700 font-bold">원본</span>}
+                          <span className="text-xs font-semibold text-[#1B2A45] truncate">{company}</span>
+                          <span className="text-[10px] text-gray-500">{owner}</span>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${status === 'db010' ? 'bg-violet-100 text-violet-700' : status === 'lead' ? 'bg-sky-100 text-sky-700' : 'bg-gray-100 text-gray-500'}`}>{status === 'db010' ? '010DB' : status === 'lead' ? '신규고객' : status}</span>
+                        </div>
+                      </div>
+                      {!isFirst && (
+                        <button
+                          onClick={() => moveToTrash(c.id)}
+                          disabled={trashing === c.id}
+                          className="shrink-0 text-[10px] px-2.5 py-1 rounded-lg bg-red-500 hover:bg-red-600 text-white font-semibold disabled:opacity-40 transition-colors"
+                        >
+                          {trashing === c.id ? '...' : '🗑 이동'}
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           ))}
         </div>

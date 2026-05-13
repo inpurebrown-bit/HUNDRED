@@ -14,7 +14,7 @@ import FreelancerTab from './FreelancerTab'
 import AssignBoard from './AssignBoard'
 import OverviewTabNew from './OverviewTabNew'
 import SalesCeoTab from './SalesCeoTab'
-import OpsCeoTab from './OpsCeoTab'
+import OpsDashboard from '@/components/ops/OpsDashboard'
 import PinManageTab from './PinManageTab'
 import MyProfileTab from '@/components/MyProfileTab'
 
@@ -67,10 +67,12 @@ interface OpsUser {
 export default function CeoDashboard() {
   const { data: session } = useSession()
   const ceoName = session?.user?.name ?? '대표'
+  const ceoId = (session?.user as any)?.id ?? ''
   const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'payslip' | 'freelancer' | 'reports' | 'minutes' | 'calendar' | 'ailogs' | 'profile'>('overview')
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
+  const [allCustomersCache, setAllCustomersCache] = useState<any[]>([])
   const [installPrompt, setInstallPrompt] = useState<any>(null)
   const [installable, setInstallable] = useState(false)
 
@@ -87,20 +89,26 @@ export default function CeoDashboard() {
     if (outcome === 'accepted') { setInstallable(false); setInstallPrompt(null) }
   }
 
-  async function handleSearch(q: string) {
+  // 검색용 고객 캐시 초기 로드
+  useEffect(() => {
+    fetch('/api/customers').then(r => r.json()).then(d => {
+      setAllCustomersCache(d.customers || [])
+    }).catch(() => {})
+  }, [])
+
+  function handleSearch(q: string) {
     setSearchQuery(q)
     if (q.trim().length < 1) { setSearchResults([]); return }
-    try {
-      const res = await fetch('/api/customers')
-      const data = await res.json()
-      const all: any[] = data.customers || []
-      const lower = q.trim().toLowerCase()
-      setSearchResults(all.filter((c: any) =>
-        c.company?.toLowerCase().includes(lower) ||
+    const lower = q.trim().toLowerCase()
+    const clean = lower.replace(/-/g, '')
+    setSearchResults(
+      allCustomersCache.filter((c: any) =>
+        // 업체명, 대표자명, 연락처만 검색
+        (c.details?.company || c.company || '').toLowerCase().includes(lower) ||
         c.name?.toLowerCase().includes(lower) ||
-        c.phone?.replace(/-/g, '').includes(lower.replace(/-/g, ''))
-      ).slice(0, 15))
-    } catch { setSearchResults([]) }
+        (c.phone || '').replace(/-/g, '').includes(clean)
+      ).slice(0, 15)
+    )
   }
 
   const tabs = [
@@ -231,7 +239,7 @@ export default function CeoDashboard() {
         {activeTab === 'overview'  && <OverviewTabNew />}
         {activeTab === 'assign'    && <AssignBoard />}
         {activeTab === 'sales'     && <SalesCeoTab />}
-        {activeTab === 'ops'       && <OpsCeoTab />}
+        {activeTab === 'ops'       && <OpsDashboard userId={ceoId} userName={ceoName} />}
         {activeTab === 'analytics' && <AnalyticsTab />}
         {activeTab === 'payslip'    && <PayslipTab />}
         {activeTab === 'freelancer' && <FreelancerTab />}

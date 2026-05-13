@@ -612,8 +612,10 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
         style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
         {companyName}
       </p>
-      {/* 대표자 */}
-      <p className="text-[10px] text-gray-400 mt-0.5">{c.customers?.name}</p>
+      {/* 대표자 — 업체명과 다를 때만 표시 */}
+      {c.customers?.name && c.customers.name !== companyName && (
+        <p className="text-[10px] text-gray-400 mt-0.5">{c.customers?.name}</p>
+      )}
       {/* 전화번호 */}
       <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{c.customers?.phone}</p>
 

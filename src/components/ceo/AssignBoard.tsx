@@ -871,6 +871,10 @@ function LeadDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [assignSelect, setAssignSelect] = useState<Record<string, string>>({})
   const [patching, setPatching] = useState<string | null>(null)
+  const [migrating, setMigrating] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
+
+  function toast_(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000) }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -880,13 +884,63 @@ function LeadDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '불러오기 실패')
       const all: LeadCustomer[] = data.customers || []
-      setLeads(all.filter(c => c.status === 'lead'))
+      // 홈페이지 문의 유입만 표시 (source='lead_form' 또는 details.db_source='홈페이지문의')
+      setLeads(all.filter(c =>
+        c.status === 'lead' && (
+          (c as any).source === 'lead_form' ||
+          (c as any).details?.db_source === '홈페이지문의' ||
+          // 기존 데이터 호환: db_source가 없는 lead는 일단 포함
+          !(c as any).details?.db_source
+        )
+      ))
     } catch (e: any) {
       setError(e.message)
     } finally {
       setLoading(false)
     }
   }, [])
+
+  // 단건 한경연DB로 이동
+  async function moveToHankyung(id: string) {
+    setPatching(id)
+    try {
+      const res = await fetch(`/api/customers/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'db010',
+          details: { db_source: '한경연', sub_status: 'db010' },
+        }),
+      })
+      if (!res.ok) throw new Error('이동 실패')
+      toast_('✅ 한경연DB로 이동 완료')
+      load()
+    } catch (e: any) { alert(e.message) } finally { setPatching(null) }
+  }
+
+  // 전체 이동
+  async function migrateAllToHankyung() {
+    if (!leads.length) return
+    if (!confirm(`리드폼 ${leads.length}건을 모두 한경연DB로 이동하시겠습니까?`)) return
+    setMigrating(true)
+    let ok = 0
+    for (const lead of leads) {
+      try {
+        await fetch(`/api/customers/${lead.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            status: 'db010',
+            details: { db_source: '한경연', sub_status: 'db010' },
+          }),
+        })
+        ok++
+      } catch {}
+    }
+    setMigrating(false)
+    toast_(`✅ ${ok}건 한경연DB로 이동 완료`)
+    load()
+  }
 
   useEffect(() => { load() }, [load])
 
@@ -924,10 +978,24 @@ function LeadDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
 
   return (
     <div>
+      {toast && (
+        <div className="mb-3 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-700">
+          {toast}
+        </div>
+      )}
       <SectionHeader
         title="리드폼 DB"
         subtitle="홈페이지 상담신청 유입 DB"
         count={leads.length}
+        action={leads.length > 0 ? (
+          <button
+            onClick={migrateAllToHankyung}
+            disabled={migrating}
+            className="px-3 py-1.5 text-[11px] font-semibold rounded-lg bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-40 transition-colors"
+          >
+            {migrating ? '이동 중...' : `전체 한경연DB로 이동 (${leads.length}건)`}
+          </button>
+        ) : undefined}
       />
 
       {loading ? (
@@ -1005,6 +1073,13 @@ function LeadDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
                         className="px-4 py-2 rounded-lg bg-[#1B2A45] text-white text-xs font-medium hover:bg-[#1B2A45]/90 disabled:opacity-40 transition-colors"
                       >
                         {patching === lead.id ? '저장 중...' : '배정'}
+                      </button>
+                      <button
+                        onClick={() => moveToHankyung(lead.id)}
+                        disabled={patching === lead.id}
+                        className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium disabled:opacity-40 transition-colors"
+                      >
+                        한경연DB로 이동
                       </button>
                     </div>
                   </div>

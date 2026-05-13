@@ -201,6 +201,8 @@ export default function ReportTab({ userId, userName }: Props) {
       return sum + (isNaN(r) ? 0 : r)
     }, 0)
 
+  const [showYesterdayPreview, setShowYesterdayPreview] = useState(false)
+
   // ── 과거 보고 수정하기 ────────────────────────────────
   function loadForEdit(r: any) {
     if (r.report_type === 'morning') {
@@ -276,6 +278,15 @@ export default function ReportTab({ userId, userName }: Props) {
 
   const morningReports = pastReports.filter(r => r.report_type === 'morning')
   const dailyReports = pastReports.filter(r => r.report_type === 'daily')
+
+  // ── 어제 보고 미리보기 ────────────────────────────────
+  const yesterdayStr = (() => {
+    const d = new Date()
+    d.setDate(d.getDate() - 1)
+    return d.toISOString().slice(0, 10)
+  })()
+  const yesterdayMorning = morningReports.find(r => r.report_date === yesterdayStr)
+  const yesterdayDaily   = dailyReports.find(r => r.report_date === yesterdayStr)
 
   // 과거 보고에 등장한 업체명 목록 (자동완성용)
   const allCompanies: string[] = Array.from(new Set(
@@ -392,6 +403,33 @@ export default function ReportTab({ userId, userName }: Props) {
               확인
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ── 어제 보고 미리보기 ── */}
+      {(yesterdayMorning || yesterdayDaily) && (
+        <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
+          <button type="button" onClick={() => setShowYesterdayPreview(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
+            <span>📅 어제({yesterdayStr}) 보고 미리보기</span>
+            <span className="text-gray-400 text-xs">{showYesterdayPreview ? '▲ 접기' : '▼ 펼치기'}</span>
+          </button>
+          {showYesterdayPreview && (
+            <div className="px-4 pb-4 space-y-3 text-xs text-gray-600">
+              {yesterdayMorning && (
+                <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
+                  <p className="text-[11px] font-bold text-amber-700 mb-2">☀️ 어제 오전보고</p>
+                  <MorningDetailView data={yesterdayMorning.data} />
+                </div>
+              )}
+              {yesterdayDaily && (
+                <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+                  <p className="text-[11px] font-bold text-blue-700 mb-2">📋 어제 마감보고</p>
+                  <DailyDetailView data={yesterdayDaily.data} />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

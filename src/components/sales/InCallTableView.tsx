@@ -1049,7 +1049,7 @@ function CustomerCard({
 
       {/* ── 확장 패널 (col-span-full) ── */}
       {expanded && (
-        <div className="col-span-full bg-[#FAFAF8] border border-blue-100 rounded-xl overflow-hidden">
+        <div className="col-span-full bg-[#FAFAF8] border border-blue-100 rounded-xl">
 
           {/* 상단 액션 바 */}
           <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b border-gray-100 bg-white">

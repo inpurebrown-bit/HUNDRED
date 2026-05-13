@@ -26,11 +26,11 @@ function PinInput({
     <div>
       <label className="block text-xs font-semibold text-[#1B2A45]/60 mb-1.5">{label}</label>
       <div
-        className="relative flex items-center gap-1.5 cursor-text"
+        className="relative cursor-text"
         onClick={() => inputRef.current?.focus()}
       >
-        {/* dot indicators */}
-        <div className="flex gap-2 p-3 bg-[#F5F3EE] rounded-xl border border-[#E8E2D4] w-full justify-center">
+        {/* dot indicators (visual) */}
+        <div className="flex gap-2 p-3 bg-[#F5F3EE] rounded-xl border border-[#E8E2D4] w-full justify-center pointer-events-none">
           {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
@@ -41,16 +41,18 @@ function PinInput({
             />
           ))}
         </div>
+        {/* actual input — full coverage, fully transparent but still interactive */}
         <input
           ref={inputRef}
           type="tel"
           inputMode="numeric"
           pattern="[0-9]*"
-          autoComplete="off"
+          autoComplete="one-time-code"
           value={value}
           onChange={handleChange}
           disabled={disabled}
-          className="absolute inset-0 opacity-0 w-full h-full cursor-text"
+          style={{ caretColor: 'transparent' }}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-text z-10 bg-transparent border-0 outline-none"
         />
       </div>
     </div>

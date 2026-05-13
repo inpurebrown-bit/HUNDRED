@@ -47,8 +47,8 @@ const MONTHLY_GOALS: Record<string, number> = {
   'hd-sales2': 20,
 }
 
-// All sales users for assignee dropdown
-const SALES_USERS = ['hd-sales1', 'hd-sales2', 'hd-sales3']
+// All sales users for assignee dropdown (legacy — replaced by dynamic salesUserNames)
+const SALES_USERS: string[] = []
 
 type SalesTab = 'board' | 'db010' | 'customers' | 'contracted' | 'emotional' | 'trash' | 'revenue' | 'report' | 'profile'
 
@@ -62,6 +62,8 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [supplyConfig, setSupplyConfig] = useState<Record<string, { supplied: number; goal: number; base: number }> | null>(null)
+  // 영업팀 실제 이름 목록 (DB 트레이드용)
+  const [salesUserNames, setSalesUserNames] = useState<string[]>([])
   const [installPrompt, setInstallPrompt] = useState<any>(null)
   const [installable, setInstallable] = useState(false)
 
@@ -316,6 +318,15 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const dailyPaceNeeded = bizRemaining > 0 ? (remaining / bizRemaining).toFixed(1) : '0'
   const onPaceCount = bizTotal > 0 ? Math.round((monthlyGoal / bizTotal) * bizElapsed) : 0
   const isAhead = monthContractCount >= onPaceCount
+
+  // ── 영업팀 실제 이름 동적 추출 (DB 트레이드용) ───────────────────
+  useEffect(() => {
+    const names = Array.from(new Set(
+      customers.map(c => (c as any).details?.sales_user_name || c.sales_user_name).filter(Boolean)
+    )) as string[]
+    if (!names.includes(userName)) names.push(userName)
+    setSalesUserNames(names)
+  }, [customers, userName])
 
   // ── Filtered lists ────────────────────────────────────────────────
   const db010List = customers.filter(c => c.status === 'db010')
@@ -699,7 +710,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             {show010Form && (
               <InCallForm
                 title="010DB 인콜일지 등록"
-                salesUsers={SALES_USERS}
+                salesUsers={salesUserNames}
                 submitting={submitting}
                 onSubmit={submit010}
                 onCancel={() => setShow010Form(false)}
@@ -717,7 +728,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 customers={db010List}
                 allCustomers={customers}
                 tabType="db010"
-                salesUsers={SALES_USERS}
+                salesUsers={salesUserNames}
                 userName={userName}
                 onUpdate={updateCustomer}
                 onStatusChange={async (id, status) => moveCustomer(id, status as any)}
@@ -743,7 +754,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             {showNewForm && (
               <InCallForm
                 title="고객 DB 인콜일지 등록"
-                salesUsers={SALES_USERS}
+                salesUsers={salesUserNames}
                 submitting={submitting}
                 onSubmit={submitNew}
                 onCancel={() => setShowNewForm(false)}
@@ -762,7 +773,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 allCustomers={customers}
                 opsContracts={contracts}
                 tabType="lead"
-                salesUsers={SALES_USERS}
+                salesUsers={salesUserNames}
                 userName={userName}
                 onUpdate={updateCustomer}
                 onStatusChange={async (id, status) => moveCustomer(id, status as any)}
@@ -801,7 +812,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   customers={contractedCustomers}
                   allCustomers={customers}
                   tabType="contracted"
-                  salesUsers={SALES_USERS}
+                  salesUsers={salesUserNames}
                   userName={userName}
                   onUpdate={updateCustomer}
                   onStatusChange={async (id, status) => moveCustomer(id, status as any)}
@@ -834,7 +845,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 customers={emotionalCustomers}
                 allCustomers={customers}
                 tabType="emotional"
-                salesUsers={SALES_USERS}
+                salesUsers={salesUserNames}
                 userName={userName}
                 onUpdate={updateCustomer}
                 onStatusChange={async (id, status) => moveCustomer(id, status as any)}
@@ -865,7 +876,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 customers={trashCustomers}
                 allCustomers={customers}
                 tabType="trash"
-                salesUsers={SALES_USERS}
+                salesUsers={salesUserNames}
                 userName={userName}
                 onUpdate={updateCustomer}
                 onStatusChange={async (id, status) => moveCustomer(id, status as any)}
