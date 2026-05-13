@@ -14,21 +14,22 @@ import FreelancerTab from './FreelancerTab'
 import AssignBoard from './AssignBoard'
 import OverviewTabNew from './OverviewTabNew'
 import SalesCeoTab from './SalesCeoTab'
-import OpsDashboard from '@/components/ops/OpsDashboard'
+import OpsCeoTab from './OpsCeoTab'
 import PinManageTab from './PinManageTab'
 import MyProfileTab from '@/components/MyProfileTab'
 import DbManageTab from './DbManageTab'
 
-// 매출·손익·결제율 통합 탭
+// 매출·손익·결제율·급여명세서 통합 탭
 function AnalyticsTab() {
-  const [sub, setSub] = useState<'revenue' | 'payroll' | 'payrate'>('revenue')
+  const [sub, setSub] = useState<'revenue' | 'payroll' | 'payrate' | 'payslip'>('revenue')
   return (
     <div>
-      <div className="flex gap-2 mb-5">
+      <div className="flex gap-2 mb-5 flex-wrap">
         {([
           { key: 'revenue', label: '💰 매출 관리' },
           { key: 'payroll', label: '💼 급여·손익' },
           { key: 'payrate', label: '📈 결제율' },
+          { key: 'payslip', label: '📋 급여명세서' },
         ] as const).map(t => (
           <button key={t.key} onClick={() => setSub(t.key)}
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors border ${
@@ -41,6 +42,57 @@ function AnalyticsTab() {
       {sub === 'revenue' && <RevenueTab />}
       {sub === 'payroll' && <PayrollTab />}
       {sub === 'payrate' && <PayRateTab />}
+      {sub === 'payslip' && <PayslipTab />}
+    </div>
+  )
+}
+
+// 회의록·보고함 통합 탭
+function MinutesReportsTab() {
+  const [sub, setSub] = useState<'minutes' | 'reports'>('reports')
+  return (
+    <div>
+      <div className="flex gap-2 mb-5">
+        {([
+          { key: 'reports', label: '📝 보고함' },
+          { key: 'minutes', label: '📒 회의록' },
+        ] as const).map(t => (
+          <button key={t.key} onClick={() => setSub(t.key)}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors border ${
+              sub === t.key ? 'bg-[#1B2A45] text-white border-[#1B2A45]' : 'bg-white text-[#1B2A45]/60 border-[#E8E2D4] hover:border-[#1B2A45]/30'
+            }`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {sub === 'reports' && <ReportsTab isCeo={true} />}
+      {sub === 'minutes' && <MinutesTab />}
+    </div>
+  )
+}
+
+// 직원관리 통합 탭 (프리랜서 + 직원관리 + 사원정보)
+function StaffManageTab() {
+  const [sub, setSub] = useState<'employees' | 'freelancer' | 'profile'>('employees')
+  return (
+    <div>
+      <div className="flex gap-2 mb-5 flex-wrap">
+        {([
+          { key: 'employees', label: '👤 직원 관리' },
+          { key: 'freelancer', label: '📋 프리랜서 관리대장' },
+          { key: 'profile', label: '🪪 사원정보' },
+        ] as const).map(t => (
+          <button key={t.key} onClick={() => setSub(t.key)}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors border ${
+              sub === t.key ? 'bg-[#1B2A45] text-white border-[#1B2A45]' : 'bg-white text-[#1B2A45]/60 border-[#E8E2D4] hover:border-[#1B2A45]/30'
+            }`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {sub === 'employees' && <EmployeeManageSection />}
+      {sub === 'freelancer' && <FreelancerTab />}
+      {sub === 'profile' && <div className="space-y-8"><MyProfileTab /><PinManageTab /></div>}
     </div>
   )
 }
@@ -69,7 +121,7 @@ export default function CeoDashboard() {
   const { data: session } = useSession()
   const ceoName = session?.user?.name ?? '대표'
   const ceoId = (session?.user as any)?.id ?? ''
-  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'payslip' | 'freelancer' | 'reports' | 'minutes' | 'calendar' | 'ailogs' | 'dbmanage' | 'profile'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'staffmanage' | 'minutesreports' | 'calendar' | 'ailogs' | 'trash' | 'dbmanage' | 'profile'>('overview')
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
@@ -115,19 +167,17 @@ export default function CeoDashboard() {
   }
 
   const tabs = [
-    { key: 'overview',  label: '📊 전체 현황' },
-    { key: 'assign',    label: '🔀 계약 배정' },
-    { key: 'sales',     label: '👥 영업팀' },
-    { key: 'ops',       label: '⚙️ 관리팀' },
-    { key: 'analytics', label: '💰 매출·손익·결제율' },
-    { key: 'payslip',    label: '📋 급여명세서' },
-    { key: 'freelancer', label: '👤 프리랜서 관리대장' },
-    { key: 'reports',    label: '📝 보고함' },
-    { key: 'minutes',   label: '📒 회의록' },
-    { key: 'calendar',  label: '📅 일정관리' },
-    { key: 'ailogs',    label: '🔍 AI 질문 로그' },
-    { key: 'dbmanage',  label: '🗑 DB·직원 관리' },
-    { key: 'profile',   label: '👤 사원정보' },
+    { key: 'overview',      label: '📊 전체 현황' },
+    { key: 'assign',        label: '🔀 계약 배정' },
+    { key: 'sales',         label: '👥 영업팀' },
+    { key: 'ops',           label: '⚙️ 관리팀' },
+    { key: 'analytics',     label: '💰 매출·손익·결제율·급여' },
+    { key: 'staffmanage',   label: '🧑‍💼 직원관리' },
+    { key: 'minutesreports',label: '📒 회의록·보고함' },
+    { key: 'calendar',      label: '📅 일정관리' },
+    { key: 'ailogs',        label: '🔍 AI 질문 로그' },
+    { key: 'trash',         label: '🗑 거절 DB' },
+    { key: 'dbmanage',      label: '♻️ 중복 DB' },
   ]
 
   return (
@@ -244,24 +294,17 @@ export default function CeoDashboard() {
 
       <div className="px-4 md:px-6 pt-6">
 
-        {activeTab === 'overview'  && <OverviewTabNew />}
-        {activeTab === 'assign'    && <AssignBoard />}
-        {activeTab === 'sales'     && <SalesCeoTab />}
-        {activeTab === 'ops'       && <OpsDashboard userId={ceoId} userName={ceoName} />}
-        {activeTab === 'analytics' && <AnalyticsTab />}
-        {activeTab === 'payslip'    && <PayslipTab />}
-        {activeTab === 'freelancer' && <FreelancerTab />}
-        {activeTab === 'reports'   && <ReportsTab isCeo={true} />}
-        {activeTab === 'minutes'   && <MinutesTab />}
-        {activeTab === 'calendar'  && <CalendarTab />}
-        {activeTab === 'ailogs'    && <AiLogsTab />}
-        {activeTab === 'dbmanage'  && <DbManageTab />}
-        {activeTab === 'profile'   && (
-          <div className="space-y-8">
-            <MyProfileTab />
-            <PinManageTab />
-          </div>
-        )}
+        {activeTab === 'overview'       && <OverviewTabNew />}
+        {activeTab === 'assign'         && <AssignBoard />}
+        {activeTab === 'sales'          && <SalesCeoTab />}
+        {activeTab === 'ops'            && <OpsCeoTab />}
+        {activeTab === 'analytics'      && <AnalyticsTab />}
+        {activeTab === 'staffmanage'    && <StaffManageTab />}
+        {activeTab === 'minutesreports' && <MinutesReportsTab />}
+        {activeTab === 'calendar'       && <CalendarTab />}
+        {activeTab === 'ailogs'         && <AiLogsTab />}
+        {activeTab === 'trash'          && <TrashOnlyTab />}
+        {activeTab === 'dbmanage'       && <DuplicateOnlyTab />}
       </div>
 
       {/* 검색 빠른 조회 드로어 */}
@@ -1006,6 +1049,233 @@ function RevenueTab() {
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ─── 거절 DB 쓰레기통 전용 탭 ────────────────────────────────
+function TrashOnlyTab() {
+  return <DbManageTab initialView="trash" />
+}
+
+// ─── 중복 DB 전용 탭 ──────────────────────────────────────
+function DuplicateOnlyTab() {
+  return <DbManageTab initialView="duplicate" />
+}
+
+// ─── 직원 관리 섹션 (생성·수정·팀이관) ──────────────────────
+interface EmpRow { id: string; name: string; username: string; role: string }
+function EmployeeManageSection() {
+  const [employees, setEmployees] = useState<EmpRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [newlyCreatedId, setNewlyCreatedId] = useState<string | null>(null)
+  const [editId, setEditId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState<{ name: string; username: string; password: string; role: string }>({ name: '', username: '', password: '', role: '' })
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState('')
+  const [showCreate, setShowCreate] = useState(false)
+  const [createForm, setCreateForm] = useState({ name: '', username: '', password: '', role: 'sales' as 'sales' | 'ops' })
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState('')
+
+  const roleLabel: Record<string, string> = { sales: '영업팀', ops: '관리팀', ceo: '대표' }
+  const roleBg: Record<string, string> = { sales: 'bg-sky-100 text-sky-700', ops: 'bg-violet-100 text-violet-700', ceo: 'bg-amber-100 text-amber-700' }
+
+  const load = async () => {
+    setLoading(true)
+    const res = await fetch('/api/users')
+    const data = await res.json()
+    setEmployees((data.users || []).filter((u: EmpRow) => u.role !== 'ceo'))
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
+
+  function openEdit(emp: EmpRow) {
+    setEditId(emp.id)
+    setEditForm({ name: emp.name, username: emp.username, password: '', role: emp.role })
+    setEditError('')
+  }
+
+  async function saveEdit() {
+    if (!editId) return
+    setEditSaving(true)
+    setEditError('')
+    const patch: Record<string, any> = {}
+    if (editForm.name) patch.name = editForm.name
+    if (editForm.username) patch.username = editForm.username
+    if (editForm.password) patch.password = editForm.password
+    if (editForm.role) patch.role = editForm.role
+
+    const res = await fetch(`/api/users/${editId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    const data = await res.json()
+    if (!res.ok) { setEditError(data.error || '저장 실패'); setEditSaving(false); return }
+
+    if (data.customersUnassigned) {
+      alert(`⚠️ 팀이관 완료: ${editForm.name}의 담당 고객 DB가 전부 미배정으로 변경됐습니다.\n다른 영업사원에게 재배정해주세요.`)
+    }
+    setEmployees(p => p.map(e => e.id === editId ? { ...e, ...data.user } : e))
+    setEditId(null)
+    setEditSaving(false)
+  }
+
+  async function deleteEmployee(emp: EmpRow) {
+    if (!confirm(`${emp.name} (${emp.username}) 직원을 삭제하시겠습니까?`)) return
+    const res = await fetch(`/api/users/${emp.id}`, { method: 'DELETE' })
+    if (res.ok) setEmployees(p => p.filter(e => e.id !== emp.id))
+    else { const d = await res.json(); alert(`삭제 실패: ${d.error}`) }
+  }
+
+  async function createEmployee() {
+    setCreateError('')
+    if (!createForm.name.trim() || !createForm.username.trim() || !createForm.password.trim()) {
+      setCreateError('이름, 아이디, 비밀번호를 모두 입력해주세요'); return
+    }
+    setCreating(true)
+    const res = await fetch('/api/users', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(createForm),
+    })
+    const data = await res.json()
+    if (!res.ok) { setCreateError(data.error || '생성 실패'); setCreating(false); return }
+    setEmployees(p => [...p, data.user])
+    setNewlyCreatedId(data.user.id)
+    setCreateForm({ name: '', username: '', password: '', role: 'sales' })
+    setShowCreate(false)
+    setCreating(false)
+    setTimeout(() => setNewlyCreatedId(null), 5000)
+  }
+
+  return (
+    <div className="space-y-4 max-w-3xl">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-bold text-gray-800">👤 직원 관리</h3>
+          <p className="text-xs text-gray-400 mt-0.5">이름·아이디·비밀번호 수정, 팀이관, 계정 삭제</p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={load} className="px-3 py-1.5 text-xs bg-white border border-gray-200 text-gray-600 rounded-xl hover:border-gray-400 transition-colors">🔄 새로고침</button>
+          <button onClick={() => { setShowCreate(v => !v); setCreateError('') }}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition-colors ${showCreate ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-[#1B2A45] text-white border-[#1B2A45]'}`}>
+            {showCreate ? '✕ 취소' : '➕ 직원 추가'}
+          </button>
+        </div>
+      </div>
+
+      {/* 직원 생성 폼 */}
+      {showCreate && (
+        <div className="bg-white border border-[#1B2A45]/20 rounded-xl p-5 space-y-4">
+          <p className="text-sm font-bold text-[#1B2A45]">새 직원 계정 만들기</p>
+          <div className="flex gap-2">
+            {(['sales', 'ops'] as const).map(r => (
+              <button key={r} onClick={() => setCreateForm(f => ({ ...f, role: r }))}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${createForm.role === r ? (r === 'sales' ? 'bg-sky-500 text-white border-sky-500' : 'bg-violet-500 text-white border-violet-500') : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'}`}>
+                {r === 'sales' ? '📞 영업팀' : '🗂 관리팀'}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 gap-3">
+            {[['이름 (실명)', 'name', 'text', '예) 홍길동'], ['아이디 (로그인 ID)', 'username', 'text', '예) hong2024'], ['초기 비밀번호', 'password', 'text', '4자 이상']].map(([label, key, type, ph]) => (
+              <div key={key}>
+                <label className="text-xs text-gray-500 font-medium mb-1 block">{label}</label>
+                <input type={type} placeholder={ph}
+                  value={(createForm as any)[key]}
+                  onChange={e => setCreateForm(f => ({ ...f, [key]: key === 'username' ? e.target.value.trim() : e.target.value }))}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#1B2A45]/50 focus:ring-1 focus:ring-[#1B2A45]/20" />
+              </div>
+            ))}
+          </div>
+          {createError && <p className="text-xs text-red-500 font-medium">⚠️ {createError}</p>}
+          <button onClick={createEmployee} disabled={creating}
+            className="w-full py-2.5 bg-[#1B2A45] hover:bg-[#1B2A45]/90 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50">
+            {creating ? '생성 중...' : `✅ ${createForm.role === 'sales' ? '영업팀' : '관리팀'} 직원 계정 생성`}
+          </button>
+        </div>
+      )}
+
+      {/* 직원 목록 */}
+      {loading ? (
+        <div className="text-center py-8 text-gray-400 text-sm">불러오는 중...</div>
+      ) : employees.length === 0 ? (
+        <div className="bg-white border border-[#E8E2D4] rounded-xl p-12 text-center text-sm text-gray-400">직원이 없습니다</div>
+      ) : (
+        <div className="bg-white border border-[#E8E2D4] rounded-xl overflow-hidden">
+          {employees.map(emp => (
+            <div key={emp.id} className={`border-b border-gray-50 last:border-b-0 ${emp.id === newlyCreatedId ? 'bg-green-50' : ''}`}>
+              {editId === emp.id ? (
+                /* 수정 폼 */
+                <div className="px-5 py-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    {[['이름', 'name', 'text'], ['아이디', 'username', 'text'], ['새 비밀번호', 'password', 'text']].map(([label, key, type]) => (
+                      <div key={key}>
+                        <label className="text-[10px] text-gray-400 font-medium block mb-1">{label}</label>
+                        <input type={type}
+                          placeholder={key === 'password' ? '변경 안 하면 비워두세요' : ''}
+                          value={(editForm as any)[key]}
+                          onChange={e => setEditForm(f => ({ ...f, [key]: e.target.value }))}
+                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-[#1B2A45]/50" />
+                      </div>
+                    ))}
+                    <div>
+                      <label className="text-[10px] text-gray-400 font-medium block mb-1">팀 (이관 시 DB 미배정 처리)</label>
+                      <select value={editForm.role} onChange={e => setEditForm(f => ({ ...f, role: e.target.value }))}
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-[#1B2A45]/50">
+                        <option value="sales">영업팀</option>
+                        <option value="ops">관리팀</option>
+                      </select>
+                    </div>
+                  </div>
+                  {editForm.role !== emp.role && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      <p className="text-xs text-amber-700 font-semibold">⚠️ 팀이관 시 {emp.name}의 담당 고객 DB가 모두 미배정으로 변경됩니다</p>
+                    </div>
+                  )}
+                  {editError && <p className="text-xs text-red-500">⚠️ {editError}</p>}
+                  <div className="flex gap-2">
+                    <button onClick={saveEdit} disabled={editSaving}
+                      className="flex-1 py-2 bg-[#1B2A45] text-white text-sm font-semibold rounded-xl disabled:opacity-50">
+                      {editSaving ? '저장 중...' : '💾 저장'}
+                    </button>
+                    <button onClick={() => setEditId(null)}
+                      className="px-4 py-2 bg-gray-100 text-gray-600 text-sm rounded-xl hover:bg-gray-200">
+                      취소
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* 기본 행 */
+                <div className="flex items-center gap-4 px-5 py-4">
+                  <div className="w-10 h-10 rounded-xl bg-[#1B2A45]/10 flex items-center justify-center text-sm font-bold text-[#1B2A45] shrink-0">
+                    {emp.name?.slice(-2) || '??'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-[#1B2A45] text-sm">{emp.name}</span>
+                      <span className="text-xs text-gray-400 font-mono">{emp.username}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${roleBg[emp.role] || 'bg-gray-100 text-gray-600'}`}>
+                        {roleLabel[emp.role] || emp.role}
+                      </span>
+                      {emp.id === newlyCreatedId && <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-green-100 text-green-700">✨ 방금 생성</span>}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button onClick={() => openEdit(emp)}
+                      className="text-xs text-[#1B2A45] hover:text-[#1B2A45]/80 px-3 py-1.5 rounded-xl hover:bg-[#1B2A45]/10 border border-transparent hover:border-[#1B2A45]/20 transition-colors font-medium">
+                      ✏️ 수정
+                    </button>
+                    <button onClick={() => deleteEmployee(emp)}
+                      className="text-xs text-red-400 hover:text-red-600 px-3 py-1.5 rounded-xl hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors font-medium">
+                      🗑 삭제
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

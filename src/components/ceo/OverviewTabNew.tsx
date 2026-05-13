@@ -15,7 +15,7 @@ import {
   getElapsedBusinessDays as _bizElapsed,
   getRemainingBusinessDays as _bizRemaining,
 } from '@/lib/businessDays'
-import { SUPPLY_RATE_TABLE, isActiveRow, contractWeight } from '@/lib/supplyRules'
+import { SUPPLY_RATE_TABLE, isActiveRow, contractWeight, calcRecommendedSupply } from '@/lib/supplyRules'
 
 // ─── Interfaces ───────────────────────────────────────────
 
@@ -528,6 +528,23 @@ export default function OverviewTabNew() {
   const thisMonthRows = buildRows(thisMonthContracts, salesGoals, thisElapsed, thisRemaining, true)
   const lastMonthRows = buildRows(lastMonthContracts, lastMonthGoals, lastElapsed, lastRemaining, false)
 
+  // ── 오늘 인별 공급 배정 ──────────────────────────────────
+  const bizElapsed = _bizElapsed(thisYear, thisMonth - 1, now.getDate())
+  const supplyStats = Object.entries(supplyConfigMap).map(([name, cfg]: [string, any]) => {
+    const supplied = cfg.supplied || 0
+    const base = cfg.base || 0
+    const dbContracted = mergedContracts
+      .filter((c: any) =>
+        (c.sales_user_name === name) &&
+        (c.created_at ?? '').slice(0, 7) === thisMonthStr
+      )
+      .reduce((s: number, c: any) => s + contractWeight(c.contract_amount), 0)
+    const totalContracted = base + dbContracted
+    const rate = supplied > 0 ? Math.round(totalContracted / supplied * 100) : 0
+    const recommended = calcRecommendedSupply(rate, bizElapsed)
+    return { name, rate, totalContracted, recommended }
+  })
+
   // ── A/S confirm ─────────────────────────────────────────
 
   async function handleConfirm(id: string) {
@@ -596,31 +613,39 @@ export default function OverviewTabNew() {
         />
       </div>
 
-      {/* ═══ 2. 3-MONTH SALES CHART ═════════════════════════ */}
-      <div ref={chartRef} className="bg-white rounded-xl border border-[#E8E2D4] p-5">
-        <h2 className="font-semibold text-[#1B2A45] text-base mb-4">최근 3개월 매출 추이</h2>
+      {/* ═══ 2. 오늘 인별 공급 배정 ═════════════════════════ */}
+      <div ref={chartRef} className="bg-white rounded-xl border border-[#E8E2D4] overflow-hidden">
+        <div className="px-5 py-3 border-b border-[#E8E2D4] flex items-center justify-between">
+          <h2 className="font-semibold text-[#1B2A45] text-base">📦 오늘 공급 배정</h2>
+          <span className="text-[10px] text-[#1B2A45]/40">결제율 기준 · 인별 오늘 공급 권장 수</span>
+        </div>
         {loading ? (
-          <Skeleton className="h-52 w-full" />
-        ) : chartData.length === 0 || chartData.every(m => m.합계 === 0) ? (
-          <div className="h-52 flex items-center justify-center text-sm text-[#1B2A45]/40">
-            매출 데이터 없음
-          </div>
+          <div className="p-5"><Skeleton className="h-20 w-full" /></div>
+        ) : supplyStats.length === 0 ? (
+          <div className="p-8 text-center text-sm text-[#1B2A45]/40">영업사원 데이터 없음</div>
         ) : (
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#1B2A45' }} />
-              <YAxis tickFormatter={fmtY} tick={{ fontSize: 11, fill: '#1B2A45' }} width={56} />
-              <Tooltip content={<ChartTooltip />} />
-              <Legend
-                wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
-                formatter={(value) => <span style={{ color: '#1B2A45' }}>{value}</span>}
-              />
-              <Bar dataKey="영업팀" fill="#1B2A45" radius={[4, 4, 0, 0]} maxBarSize={48} />
-              <Bar dataKey="관리팀" fill="#C5A258" radius={[4, 4, 0, 0]} maxBarSize={48} />
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="divide-y divide-[#E8E2D4]/60">
+            {supplyStats.map(s => (
+              <div key={s.name} className="px-5 py-3.5 flex items-center gap-4">
+                <div className="w-8 h-8 rounded-full bg-[#1B2A45]/10 flex items-center justify-center text-xs font-bold text-[#1B2A45] shrink-0">
+                  {s.name.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-[#1B2A45]">{s.name.replace(' 수석팀장', '')}</p>
+                  <p className="text-[10px] text-[#1B2A45]/50">
+                    결제율 {s.rate}% · 이달 계약 {s.totalContracted % 1 === 0 ? s.totalContracted : s.totalContracted.toFixed(1)}건
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className={`text-2xl font-black ${s.recommended === 0 ? 'text-red-500' : s.recommended >= 5 ? 'text-[#C5A258]' : 'text-[#1B2A45]'}`}>
+                    {s.recommended}개
+                  </p>
+                  <p className="text-[10px] text-[#1B2A45]/40">오늘 권장</p>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
-        <p className="text-xs text-[#1B2A45]/40 mt-2 text-right">단위: 만원</p>
       </div>
 
       {/* ═══ 3. THIS MONTH SECTION ══════════════════════════ */}

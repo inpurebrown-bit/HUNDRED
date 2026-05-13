@@ -25,8 +25,8 @@ interface Employee {
 // ──────────────────────────────────────────────────────────────────────────────
 // DbManageTab — CEO 전용 DB 관리 탭
 // ──────────────────────────────────────────────────────────────────────────────
-export default function DbManageTab() {
-  const [view, setView] = useState<'trash' | 'duplicate' | 'employees'>('trash')
+export default function DbManageTab({ initialView = 'trash' }: { initialView?: 'trash' | 'duplicate' | 'employees' }) {
+  const [view, setView] = useState<'trash' | 'duplicate' | 'employees'>(initialView)
 
   // ── 쓰레기통 ──────────────────────────────────────────────────────────────
   const [trashList, setTrashList] = useState<Customer[]>([])

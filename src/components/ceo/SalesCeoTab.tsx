@@ -661,6 +661,46 @@ export default function SalesCeoTab() {
   // ── 공급 현황 계산 ──────────────────────────────────────
   const now = new Date()
   const thisMonthStr = now.toISOString().slice(0, 7)
+  const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const lastMonthStr = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`
+
+  // ── 이번달 / 저번달 매출 · 계약 수 ──────────────────────
+  const thisMonthContracted = useMemo(() =>
+    customers.filter(c => c.status === 'contracted' &&
+      ((c as any).details?.contract_date || c.created_at || '').slice(0, 7) === thisMonthStr),
+  [customers, thisMonthStr])
+
+  const lastMonthContracted = useMemo(() =>
+    customers.filter(c => c.status === 'contracted' &&
+      ((c as any).details?.contract_date || c.created_at || '').slice(0, 7) === lastMonthStr),
+  [customers, lastMonthStr])
+
+  const thisMonthRevenue = useMemo(() =>
+    thisMonthContracted.reduce((s, c) => s + parseNum((c as any).details?.my_revenue), 0),
+  [thisMonthContracted])
+
+  const lastMonthRevenue = useMemo(() =>
+    lastMonthContracted.reduce((s, c) => s + parseNum((c as any).details?.my_revenue), 0),
+  [lastMonthContracted])
+
+  const thisMonthContractCount = useMemo(() =>
+    thisMonthContracted.reduce((s, c) => s + contractWeight((c as any).details?.payment_amount), 0),
+  [thisMonthContracted])
+
+  const lastMonthContractCount = useMemo(() =>
+    lastMonthContracted.reduce((s, c) => s + contractWeight((c as any).details?.payment_amount), 0),
+  [lastMonthContracted])
+
+  // 인별 이번달 매출
+  const personThisMonth = useMemo(() => salesPeople.map(name => ({
+    name,
+    revenue: thisMonthContracted
+      .filter(c => (c as any).details?.sales_user_name === name || c.sales_user_name === name)
+      .reduce((s, c) => s + parseNum((c as any).details?.my_revenue), 0),
+    count: thisMonthContracted
+      .filter(c => (c as any).details?.sales_user_name === name || c.sales_user_name === name)
+      .reduce((s, c) => s + contractWeight((c as any).details?.payment_amount), 0),
+  })), [salesPeople, thisMonthContracted])
   const bizElapsed = getElapsedBusinessDays(now.getFullYear(), now.getMonth(), now.getDate())
 
   const supplyStats = useMemo(() => {
@@ -1223,38 +1263,51 @@ export default function SalesCeoTab() {
 
       {/* ── 매출 통계 패널 ── */}
       <div className="bg-gradient-to-r from-[#1B2A45] to-blue-800 rounded-2xl px-5 py-4 text-white">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-xs font-bold text-white/60 uppercase tracking-wide">💰 영업팀 매출 현황</p>
-          <p className="text-[10px] text-white/40">계약업체 본인매출 합산</p>
+        <p className="text-xs font-bold text-white/60 uppercase tracking-wide mb-3">💰 영업팀 매출 현황</p>
+
+        {/* 이번달 / 저번달 나란히 */}
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="bg-white/10 rounded-xl px-4 py-3">
+            <p className="text-[10px] text-white/50 mb-1">이번달 ({now.getMonth() + 1}월)</p>
+            <p className="text-2xl font-black text-[#C5A258]">{fmtWon(thisMonthRevenue)}</p>
+            <p className="text-xs text-white/50 mt-0.5">
+              계약 {thisMonthContractCount % 1 === 0 ? thisMonthContractCount : thisMonthContractCount.toFixed(1)}건
+            </p>
+          </div>
+          <div className="bg-white/10 rounded-xl px-4 py-3">
+            <p className="text-[10px] text-white/50 mb-1">저번달 ({lastMonthDate.getMonth() + 1}월)</p>
+            <p className="text-2xl font-black text-white/70">{fmtWon(lastMonthRevenue)}</p>
+            <p className="text-xs text-white/50 mt-0.5">
+              계약 {lastMonthContractCount % 1 === 0 ? lastMonthContractCount : lastMonthContractCount.toFixed(1)}건
+            </p>
+          </div>
         </div>
-        <div className="flex items-end gap-3 mb-4">
-          <p className="text-3xl font-black text-[#C5A258]">{fmtWon(totalRevenue)}</p>
-          <p className="text-sm text-white/50 mb-1">원 · 전체합계</p>
-        </div>
-        {personStats.length === 0 ? (
+
+        {/* 인별 이번달 매출 */}
+        {personThisMonth.length === 0 ? (
           <p className="text-white/40 text-xs">등록된 영업사원 없음</p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-            {personStats.map(p => {
-              const pct = totalRevenue > 0 ? Math.round((p.revenue / totalRevenue) * 100) : 0
-              return (
-                <div key={p.name} className="bg-white/10 rounded-xl px-3 py-2.5">
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-bold">{p.name.charAt(0)}</div>
-                    <span className="text-xs font-semibold text-white/90 truncate">{p.name.replace(' 수석팀장', '')}</span>
-                    <span className="ml-auto text-[10px] text-white/40">{pct}%</span>
-                  </div>
-                  <p className="text-base font-black text-[#C5A258]">{fmtWon(p.revenue)}</p>
-                  <p className="text-[10px] text-white/40 mt-0.5">계약 {p.contracted % 1 === 0 ? p.contracted : p.contracted.toFixed(1)}건 · DB {p.lead}</p>
-                  {/* 점유율 바 */}
-                  <div className="mt-1.5 h-1 bg-white/10 rounded-full overflow-hidden">
-                    <div className="h-full bg-[#C5A258] rounded-full transition-all" style={{ width: `${pct}%` }} />
-                  </div>
+            {personThisMonth.map(p => (
+              <div key={p.name} className="bg-white/10 rounded-xl px-3 py-2.5">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-bold">{p.name.charAt(0)}</div>
+                  <span className="text-xs font-semibold text-white/90 truncate">{p.name.replace(' 수석팀장', '')}</span>
                 </div>
-              )
-            })}
+                <p className="text-base font-black text-[#C5A258]">{fmtWon(p.revenue)}</p>
+                <p className="text-[10px] text-white/40 mt-0.5">계약 {p.count % 1 === 0 ? p.count : p.count.toFixed(1)}건</p>
+              </div>
+            ))}
           </div>
         )}
+
+        {/* 전체 합계 (부가 표시) */}
+        <div className="mt-3 pt-3 border-t border-white/10 flex items-center gap-2">
+          <span className="text-[10px] text-white/30">전체 누적</span>
+          <span className="text-xs text-white/40 font-medium">{fmtWon(totalRevenue)}</span>
+          <span className="text-[10px] text-white/20 ml-1">·</span>
+          <span className="text-[10px] text-white/30">계약 {customers.filter(c => c.status === 'contracted').length}개</span>
+        </div>
       </div>
 
       {/* ── A/S 승인 → 공급 DB 보충 알림 배너 ── */}

@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
 
   const user = session.user as any
 
-  // 영업팀 매출 (contracts.contract_amount)
+  // 영업팀 매출 — contracts 테이블 + customers.details.my_revenue 병합
   const contractsQuery = supabaseAdmin
     .from('contracts')
     .select('contract_amount, created_at, sales_user_id, sales_user_name, customers(name, company)')
@@ -19,10 +19,18 @@ export async function GET(req: NextRequest) {
     ? contractsQuery.eq('sales_user_id', user.id)
     : contractsQuery
 
+  // customers 테이블에서 contracted 상태 & my_revenue 있는 행
+  let custQuery = supabaseAdmin
+    .from('customers')
+    .select('id, owner_id, details, created_at')
+    .eq('status', 'contracted')
+
+  if (user.role === 'sales') custQuery = custQuery.eq('owner_id', user.id)
+
   // 관리팀 매출 (ops_cases.revenue)
   const opsQuery = supabaseAdmin
     .from('ops_cases')
-    .select('revenue, created_at, ops_user_id, ops_user_name, customers(name, company)')
+    .select('revenue, created_at, updated_at, ops_user_id, ops_user_name, customers(name, company)')
     .gt('revenue', 0)
     .order('created_at', { ascending: false })
 
@@ -30,10 +38,27 @@ export async function GET(req: NextRequest) {
     ? opsQuery.eq('ops_user_id', user.id)
     : opsQuery
 
-  const [{ data: contracts }, { data: opsCases }] = await Promise.all([
+  const [{ data: contracts }, { data: custContracted }, { data: opsCases }] = await Promise.all([
     finalContractsQuery,
+    custQuery,
     finalOpsQuery,
   ])
+
+  // customers.details.my_revenue 를 contract 형태로 변환 (contracts 테이블에 없는 것만)
+  const contractCustomerIds = new Set((contracts || []).map((c: any) => c.customer_id || c.id).filter(Boolean))
+  const custContracts = (custContracted || [])
+    .filter((c: any) => {
+      const rev = parseInt(String(c.details?.my_revenue || '0').replace(/[^0-9]/g, ''), 10)
+      return rev > 0 && !contractCustomerIds.has(c.id)
+    })
+    .map((c: any) => ({
+      contract_amount: parseInt(String(c.details?.my_revenue || '0').replace(/[^0-9]/g, ''), 10) || 0,
+      created_at: c.details?.contract_date || c.created_at || '',
+      sales_user_id: c.owner_id || c.details?.sales_user_id || '',
+      sales_user_name: c.details?.sales_user_name || '',
+    }))
+
+  const allContracts = [...(contracts || []), ...custContracts]
 
   // 월별 집계 (최근 6개월)
   const monthlyMap: Record<string, { sales: number; ops: number }> = {}
@@ -45,7 +70,7 @@ export async function GET(req: NextRequest) {
     monthlyMap[key] = { sales: 0, ops: 0 }
   }
 
-  ;(contracts || []).forEach((c: any) => {
+  allContracts.forEach((c: any) => {
     const key = c.created_at?.slice(0, 7)
     if (key && monthlyMap[key]) monthlyMap[key].sales += c.contract_amount || 0
   })
@@ -64,7 +89,7 @@ export async function GET(req: NextRequest) {
 
   // 직원별 집계
   const salesByUser: Record<string, { name: string; amount: number; count: number }> = {}
-  ;(contracts || []).forEach((c: any) => {
+  allContracts.forEach((c: any) => {
     const id = c.sales_user_id
     if (!id) return
     if (!salesByUser[id]) salesByUser[id] = { name: c.sales_user_name, amount: 0, count: 0 }
@@ -82,7 +107,7 @@ export async function GET(req: NextRequest) {
   })
 
   // 총계
-  const totalSales = (contracts || []).reduce((s: number, c: any) => s + (c.contract_amount || 0), 0)
+  const totalSales = allContracts.reduce((s: number, c: any) => s + (c.contract_amount || 0), 0)
   const totalOps = (opsCases || []).reduce((s: number, c: any) => s + (c.revenue || 0), 0)
 
   return NextResponse.json({
