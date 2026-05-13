@@ -678,19 +678,17 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                     <p className="text-2xl font-black text-gray-700">{contractedCustomers.length}건</p>
                   </div>
                 </div>
-                {contractedCustomers.map(c => (
-                  <CustomerCard
-                    key={c.id}
-                    customer={c}
-                    tabType="contracted"
-                    userName={userName}
-                    salesUsers={SALES_USERS}
-                    onStatusChange={async (newStatus) => moveCustomer(c.id, newStatus)}
-                    onUpdate={async (patch) => patchCustomer(c.id, patch)}
-                    onDelete={async () => deleteCustomer(c.id)}
-                    onTransferToOps={async () => transferToOps(c)}
-                  />
-                ))}
+                <InCallTableView
+                  customers={contractedCustomers}
+                  allCustomers={customers}
+                  tabType="contracted"
+                  salesUsers={SALES_USERS}
+                  userName={userName}
+                  onUpdate={updateCustomer}
+                  onStatusChange={async (id, status) => moveCustomer(id, status as any)}
+                  onDelete={async (id) => deleteCustomer(id)}
+                  onTransferToOps={transferToOps as any}
+                />
               </>
             )}
           </div>
@@ -712,18 +710,18 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
                 감성톡 관리 업체가 없습니다.
               </div>
-            ) : emotionalCustomers.map(c => (
-              <CustomerCard
-                key={c.id}
-                customer={c}
+            ) : (
+              <InCallTableView
+                customers={emotionalCustomers}
+                allCustomers={customers}
                 tabType="emotional"
-                userName={userName}
                 salesUsers={SALES_USERS}
-                onStatusChange={async (newStatus) => moveCustomer(c.id, newStatus)}
-                onUpdate={async (patch) => patchCustomer(c.id, patch)}
-                onDelete={async () => deleteCustomer(c.id)}
+                userName={userName}
+                onUpdate={updateCustomer}
+                onStatusChange={async (id, status) => moveCustomer(id, status as any)}
+                onDelete={async (id) => deleteCustomer(id)}
               />
-            ))}
+            )}
           </div>
         )}
 
@@ -743,18 +741,18 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
                 자체거절 업체가 없습니다.
               </div>
-            ) : trashCustomers.map(c => (
-              <CustomerCard
-                key={c.id}
-                customer={c}
+            ) : (
+              <InCallTableView
+                customers={trashCustomers}
+                allCustomers={customers}
                 tabType="trash"
-                userName={userName}
                 salesUsers={SALES_USERS}
-                onStatusChange={async (newStatus) => moveCustomer(c.id, newStatus)}
-                onUpdate={async (patch) => patchCustomer(c.id, patch)}
-                onDelete={async () => deleteCustomer(c.id)}
+                userName={userName}
+                onUpdate={updateCustomer}
+                onStatusChange={async (id, status) => moveCustomer(id, status as any)}
+                onDelete={async (id) => deleteCustomer(id)}
               />
-            ))}
+            )}
           </div>
         )}
 

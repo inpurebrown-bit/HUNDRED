@@ -91,6 +91,7 @@ export interface Customer {
   details?: Record<string, any>
   call_timeline?: any[]
   created_at?: string
+  updated_at?: string
   sales_user_name?: string
 }
 
@@ -506,6 +507,10 @@ function CustomerCard({
 }: CardProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [contractModalOpen, setContractModalOpen] = useState(false)
+  const [quickTransferOpen, setQuickTransferOpen] = useState(false)
+  const [qtCheckedGroup, setQtCheckedGroup] = useState(false)
+  const [qtCheckedCoop,  setQtCheckedCoop]  = useState(false)
+  const [qtLoading, setQtLoading] = useState(false)
   const [tlText, setTlText] = useState('')
   const [tradeOpen, setTradeOpen] = useState(false)
   const menuRef  = useRef<HTMLDivElement>(null)
@@ -563,8 +568,63 @@ function CustomerCard({
     await onUpdate(c.id, { call_timeline: updated })
   }
 
+  async function deleteTimelineEntry(reversedIdx: number) {
+    const orig = (c.call_timeline || []).length - 1 - reversedIdx
+    const updated = (c.call_timeline || []).filter((_, i) => i !== orig)
+    await onUpdate(c.id, { call_timeline: updated })
+  }
+
+  async function handleQuickTransfer() {
+    if (!onTransferToOps) return
+    setQtLoading(true)
+    await onTransferToOps(c)
+    setQtLoading(false)
+    setQuickTransferOpen(false)
+    setQtCheckedGroup(false)
+    setQtCheckedCoop(false)
+  }
+
   return (
     <>
+      {/* 관리팀 빠른 전송 모달 */}
+      {quickTransferOpen && (
+        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4"
+          onClick={e => { if (e.target === e.currentTarget) setQuickTransferOpen(false) }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h2 className="font-bold text-[#1B2A45] text-sm">📤 관리팀 전송</h2>
+                <p className="text-[11px] text-gray-400 mt-0.5">{c.company || c.name}</p>
+              </div>
+              <button onClick={() => setQuickTransferOpen(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-[10px] text-gray-400 font-semibold">📋 전송 전 체크리스트</p>
+              <label className="flex items-center gap-3 cursor-pointer bg-emerald-50 rounded-lg px-3 py-2.5 border border-emerald-100">
+                <input type="checkbox" checked={qtCheckedGroup} onChange={e => setQtCheckedGroup(e.target.checked)} className="w-4 h-4 accent-emerald-500" />
+                <span className={`text-xs font-medium ${qtCheckedGroup ? 'text-emerald-700 line-through' : 'text-gray-700'}`}>단톡방 초대 완료</span>
+                {qtCheckedGroup && <span className="text-[10px] bg-emerald-500 text-white px-1.5 py-0.5 rounded-full ml-auto font-bold">✓</span>}
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer bg-emerald-50 rounded-lg px-3 py-2.5 border border-emerald-100">
+                <input type="checkbox" checked={qtCheckedCoop} onChange={e => setQtCheckedCoop(e.target.checked)} className="w-4 h-4 accent-emerald-500" />
+                <span className={`text-xs font-medium ${qtCheckedCoop ? 'text-emerald-700 line-through' : 'text-gray-700'}`}>업무협조 요청서 발송 완료</span>
+                {qtCheckedCoop && <span className="text-[10px] bg-emerald-500 text-white px-1.5 py-0.5 rounded-full ml-auto font-bold">✓</span>}
+              </label>
+            </div>
+            <div className="px-5 pb-5 flex gap-2">
+              <button onClick={() => setQuickTransferOpen(false)}
+                className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50">
+                취소
+              </button>
+              <button onClick={handleQuickTransfer} disabled={qtLoading}
+                className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
+                {qtLoading ? '전송중...' : '📤 관리팀 전송'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 계약완료 모달 */}
       {contractModalOpen && (
         <ContractModal
@@ -687,6 +747,20 @@ function CustomerCard({
         {/* 재통화 일정 */}
         {c.details?.follow_up_date && (
           <p className="text-[9px] text-sky-500 mt-1.5 font-medium">📅 {c.details.follow_up_date.slice(5)}</p>
+        )}
+
+        {/* 계약업체 전송 빠른버튼 */}
+        {tabType === 'contracted' && onTransferToOps && !c.details?.ops_transferred && (
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); setQuickTransferOpen(true) }}
+            className="mt-1.5 w-full text-[9px] bg-amber-500 hover:bg-amber-600 text-white rounded py-1 font-semibold transition-colors"
+          >
+            📤 관리팀 전송
+          </button>
+        )}
+        {tabType === 'contracted' && c.details?.ops_transferred && (
+          <p className="mt-1.5 text-[9px] text-emerald-600 font-semibold">✅ 전송완료</p>
         )}
       </div>
 
@@ -917,15 +991,6 @@ function CustomerCard({
                 )}
               </div>
 
-              {/* 메모 */}
-              <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">메모</label>
-                <ResultMemoField
-                  value={c.details?.result_memo || ''}
-                  onChange={(val) => onUpdate(c.id, { details: { result_memo: val } })}
-                />
-              </div>
-
               {/* 타임라인 */}
               <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                 <p className="text-[10px] font-bold text-blue-700 mb-2">📝 타임라인</p>
@@ -954,7 +1019,7 @@ function CustomerCard({
                       const { date, time } = formatKST(entry.created_at || '')
                       const initials = entry.user ? entry.user.slice(-2) : '??'
                       return (
-                        <div key={i} className="flex gap-2.5">
+                        <div key={i} className="flex gap-2.5 group">
                           {/* 아바타 */}
                           <div className="shrink-0 w-6 h-6 rounded-full bg-[#1B2A45] flex items-center justify-center mt-0.5">
                             <span className="text-[9px] font-bold text-white">{initials}</span>
@@ -969,6 +1034,13 @@ function CustomerCard({
                             </div>
                             <p className="text-[11px] text-gray-600 whitespace-pre-wrap leading-relaxed mt-0.5">{entry.content}</p>
                           </div>
+                          {/* 삭제 버튼 */}
+                          <button
+                            type="button"
+                            onClick={() => { if (confirm('이 기록을 삭제하시겠습니까?')) deleteTimelineEntry(i) }}
+                            className="shrink-0 opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-xs px-1 py-0.5 rounded self-start mt-0.5"
+                            title="삭제"
+                          >✕</button>
                         </div>
                       )
                     })}

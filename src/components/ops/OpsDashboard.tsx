@@ -407,6 +407,39 @@ function OpsDetailPanel({ c, onSave }: { c: OpsCase; onSave: (id: string, patch:
               </div>
             )}
           </div>
+          {/* ── 소진공 확인서 ── */}
+          {selectedInstitutions.some(i => i.startsWith('소진공')) && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">소진공 확인서</span>
+                <div className="flex-1 h-px bg-gray-100" />
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 space-y-2">
+                <p className="text-[10px] font-semibold text-amber-700 mb-2">📋 확인서 종류 선택</p>
+                {[
+                  { key: 'cert_general', label: '일반경영애로 확인서' },
+                  { key: 'cert_youth',   label: '청년 확인서' },
+                  { key: 'cert_disabled', label: '장애인 확인서' },
+                ].map(({ key, label }) => (
+                  <label key={key} className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!(d as any)[key]}
+                      onChange={() => toggleDetail(key)}
+                      className="w-4 h-4 accent-amber-500"
+                    />
+                    <span className={`text-xs font-medium ${(d as any)[key] ? 'text-amber-800 font-semibold' : 'text-gray-600'}`}>
+                      {label}
+                    </span>
+                    {(d as any)[key] && (
+                      <span className="text-[10px] bg-amber-500 text-white px-1.5 py-0.5 rounded-full font-bold ml-auto">✓ 선택됨</span>
+                    )}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
             <div className="flex items-center gap-1.5 mb-2">
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">재무</span>
@@ -633,7 +666,7 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// CaseListRow (환불/종료용 리스트 행)
+// CaseListRow (환불/종료용 리스트 행) — 레거시, CaseCard로 교체됨
 // ──────────────────────────────────────────────────────────────────────
 function CaseListRow({ c, onToggle, isOpen }: { c: OpsCase; onToggle: (id: string) => void; isOpen: boolean }) {
   const companyName = c.customers?.details?.company || c.customers?.name || '—'
@@ -674,6 +707,64 @@ function CaseListRow({ c, onToggle, isOpen }: { c: OpsCase; onToggle: (id: strin
         )}
         <span className="text-gray-300 text-xs">›</span>
       </div>
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// CaseCard (환불/종료용 카드형)
+// ──────────────────────────────────────────────────────────────────────
+function CaseCard({ c, onToggle, isOpen, cardType }: {
+  c: OpsCase
+  onToggle: (id: string) => void
+  isOpen: boolean
+  cardType: 'refund' | 'completed'
+}) {
+  const companyName = c.customers?.details?.company || c.customers?.name || '—'
+  // 이동 날짜: timeline에서 환불/종료 변경 기록 찾기, 없으면 updated_at
+  const movedTimeline = (c.timeline || []).slice().reverse().find((e: any) => {
+    const txt = (e.content || e.text || '').toLowerCase()
+    return cardType === 'refund' ? txt.includes('환불') : (txt.includes('종료') || txt.includes('완료'))
+  })
+  const movedDate = movedTimeline
+    ? formatKST(movedTimeline.created_at || movedTimeline.date || '').date
+    : formatKST(c.updated_at || '').date
+
+  const stageBg  = cardType === 'refund' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
+  const borderOn = cardType === 'refund' ? 'ring-2 ring-rose-400 border-rose-300' : 'ring-2 ring-emerald-400 border-emerald-300'
+  const borderOff = cardType === 'refund' ? 'border-gray-200 hover:border-rose-300' : 'border-gray-200 hover:border-emerald-300'
+
+  return (
+    <div
+      className={`bg-white border rounded-xl p-2.5 cursor-pointer hover:shadow-md transition-all text-center relative ${isOpen ? borderOn : borderOff}`}
+      onClick={() => onToggle(c.id)}
+    >
+      {/* 스테이지 뱃지 */}
+      <div className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold mb-1 ${stageBg}`}>
+        {cardType === 'refund' ? '💸 환불' : '✅ 종료'}
+      </div>
+      {/* 업체명 */}
+      <p className="font-bold text-[#1B2A45] text-[11px] leading-snug break-all" style={{ wordBreak: 'break-all' }}>
+        {companyName}
+      </p>
+      {/* 대표자 */}
+      <p className="text-[10px] text-gray-400 mt-0.5">{c.customers?.name}</p>
+      {/* 기관 */}
+      {c.institution && (
+        <p className="text-[9px] text-violet-500 mt-0.5 font-medium">🏦 {c.institution.split(',')[0].trim()}</p>
+      )}
+      {/* 이동 날짜 */}
+      <div className={`mt-1.5 inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded ${cardType === 'refund' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
+        📅 {movedDate || '—'}
+      </div>
+      {/* 담당자 */}
+      {c.ops_user_name && (
+        <p className="text-[9px] text-gray-400 mt-0.5">{c.ops_user_name}</p>
+      )}
+      {/* 승인금액 */}
+      {c.details?.approval_amount && (
+        <p className="text-[9px] text-emerald-600 font-semibold mt-0.5">{c.details.approval_amount}</p>
+      )}
     </div>
   )
 }
@@ -1673,7 +1764,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
 
         {/* ── 환불업체 ── */}
         {activeTab === 'refund' && (
-          <div className="max-w-5xl space-y-4">
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="font-bold text-[#1B2A45] text-base">💸 환불업체</h2>
               <span className="text-xs text-gray-400">{refundCases.length}건</span>
@@ -1683,18 +1774,32 @@ export default function OpsDashboard({ userId, userName }: Props) {
             ) : refundCases.length === 0 ? (
               <div className="bg-white rounded-xl border border-[#E8E2D4] p-14 text-center text-[#1B2A45]/40 text-sm">환불 업체가 없습니다</div>
             ) : (
-              <div className="space-y-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
                 {refundCases.map(c => (
-                  <CaseListRow key={c.id} c={c} onToggle={togglePanel} isOpen={openPanelIds.includes(c.id)} />
+                  <CaseCard key={c.id} c={c} onToggle={togglePanel} isOpen={openPanelIds.includes(c.id)} cardType="refund" />
                 ))}
               </div>
             )}
+            {/* 상세 드로어 */}
+            {openPanelIds.map(id => {
+              const c = refundCases.find(x => x.id === id)
+              if (!c) return null
+              return (
+                <div key={id} className="bg-white border border-rose-200 rounded-2xl p-4 shadow-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-bold text-[#1B2A45] text-sm">{c.customers?.details?.company || c.customers?.name}</span>
+                    <button onClick={() => togglePanel(id)} className="text-gray-400 hover:text-gray-600 text-sm">✕</button>
+                  </div>
+                  <OpsDetailPanel c={c} onSave={handleSave} />
+                </div>
+              )
+            })}
           </div>
         )}
 
         {/* ── 종료업체 ── */}
         {activeTab === 'completed' && (
-          <div className="max-w-5xl space-y-4">
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="font-bold text-[#1B2A45] text-base">✅ 종료업체</h2>
               <span className="text-xs text-gray-400">{completedCases.length}건</span>
@@ -1704,12 +1809,26 @@ export default function OpsDashboard({ userId, userName }: Props) {
             ) : completedCases.length === 0 ? (
               <div className="bg-white rounded-xl border border-[#E8E2D4] p-14 text-center text-[#1B2A45]/40 text-sm">종료 업체가 없습니다</div>
             ) : (
-              <div className="space-y-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
                 {completedCases.map(c => (
-                  <CaseListRow key={c.id} c={c} onToggle={togglePanel} isOpen={openPanelIds.includes(c.id)} />
+                  <CaseCard key={c.id} c={c} onToggle={togglePanel} isOpen={openPanelIds.includes(c.id)} cardType="completed" />
                 ))}
               </div>
             )}
+            {/* 상세 드로어 */}
+            {openPanelIds.map(id => {
+              const c = completedCases.find(x => x.id === id)
+              if (!c) return null
+              return (
+                <div key={id} className="bg-white border border-emerald-200 rounded-2xl p-4 shadow-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-bold text-[#1B2A45] text-sm">{c.customers?.details?.company || c.customers?.name}</span>
+                    <button onClick={() => togglePanel(id)} className="text-gray-400 hover:text-gray-600 text-sm">✕</button>
+                  </div>
+                  <OpsDetailPanel c={c} onSave={handleSave} />
+                </div>
+              )
+            })}
           </div>
         )}
 
