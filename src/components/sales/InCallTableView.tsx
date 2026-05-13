@@ -380,24 +380,24 @@ function BadgeDropdown({ value, options, onChange, placeholder }: BadgeDropdownP
   }, [open])
 
   return (
-    <div className="relative inline-block" ref={ref}>
+    <div className="relative w-full" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
-        className={`px-2 py-0.5 rounded text-[11px] font-semibold cursor-pointer select-none whitespace-nowrap ${current.color}`}
+        className={`w-full block text-center px-1 py-0.5 rounded text-[9px] font-bold cursor-pointer select-none leading-tight break-keep ${current.color}`}
       >
         {current.key || placeholder || '—'}
       </button>
       {open && (
-        <div className="absolute z-50 top-full left-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[110px] py-1">
+        <div className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[100px] py-1">
           {options.map(opt => (
             <button
               key={opt.key || '__empty__'}
               type="button"
               onClick={() => { onChange(opt.key); setOpen(false) }}
-              className="w-full text-left px-3 py-1.5 text-[11px] font-semibold hover:bg-gray-50 flex items-center gap-2"
+              className="w-full text-left px-2.5 py-1.5 text-[10px] font-semibold hover:bg-gray-50 flex items-center gap-1.5"
             >
-              <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] ${opt.color}`}>
+              <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] whitespace-nowrap ${opt.color}`}>
                 {opt.key || '—'}
               </span>
             </button>
@@ -1117,7 +1117,7 @@ function CustomerCard({
 
         {/* 직가/공가 뱃지 */}
         {leadType && (
-          <div className="mb-1">
+          <div className="mb-1 flex justify-center">
             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${leadType === '직가' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
               {leadType}
             </span>
@@ -1125,18 +1125,18 @@ function CustomerCard({
         )}
 
         {/* 업체명 — 긴 이름 줄바꿈 */}
-        <p className="font-bold text-[#1B2A45] text-[11px] leading-snug pr-4 break-all word-break-all"
+        <p className="font-bold text-[#1B2A45] text-[11px] leading-snug px-1 break-all"
           style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
           {c.company || c.name}
         </p>
         {/* 대표자 */}
-        <p className="text-[10px] text-gray-400 mt-0.5">{c.name}</p>
+        <p className="text-[10px] text-gray-400 mt-0.5 truncate px-1">{c.name}</p>
         {/* 전화번호 */}
-        <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{c.phone}</p>
+        <p className="text-[9px] text-gray-400 mt-0.5 font-mono truncate px-1">{c.phone}</p>
 
         {/* 감도 */}
         {c.details?.sensitivity && (
-          <div className="mt-1.5 flex justify-center">
+          <div className="mt-1.5 flex justify-center w-full">
             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
               c.details.sensitivity === '상' ? 'bg-red-100 text-red-600' :
               c.details.sensitivity === '중' ? 'bg-orange-100 text-orange-600' :
@@ -1147,7 +1147,7 @@ function CustomerCard({
 
         {/* 거절업체 감도 */}
         {c.details?.rejection_mood && (
-          <div className="mt-1 flex justify-center">
+          <div className="mt-1 flex justify-center w-full">
             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
               c.details.rejection_mood === '상' ? 'bg-red-100 text-red-600' :
               c.details.rejection_mood === '중' ? 'bg-orange-100 text-orange-600' :
@@ -1158,14 +1158,14 @@ function CustomerCard({
 
         {/* 자체거절 사유 */}
         {c.details?.self_rejection_reason && (
-          <p className="mt-1 text-[9px] text-gray-400 leading-tight text-center break-all" style={{ wordBreak: 'break-all' }}>
+          <p className="mt-1 text-[9px] text-gray-400 leading-tight text-center px-1 line-clamp-2" style={{ wordBreak: 'break-all' }}>
             {c.details.self_rejection_reason}
           </p>
         )}
 
         {/* 결정전 결과 + 클로징 결과 — 레이블 포함 2열 */}
-        <div className="mt-1.5 grid grid-cols-2 gap-1" onClick={e => e.stopPropagation()}>
-          <div className="flex flex-col items-center gap-0.5">
+        <div className="mt-1.5 grid grid-cols-2 gap-1 w-full" onClick={e => e.stopPropagation()}>
+          <div className="flex flex-col items-center gap-0.5 min-w-0">
             <span className="text-[9px] text-gray-400 font-medium leading-none">결정전</span>
             <BadgeDropdown
               value={c.details?.call_result || ''}
@@ -1173,7 +1173,7 @@ function CustomerCard({
               onChange={(val) => onUpdate(c.id, { details: { call_result: val } })}
             />
           </div>
-          <div className="flex flex-col items-center gap-0.5">
+          <div className="flex flex-col items-center gap-0.5 min-w-0">
             <span className="text-[9px] text-gray-400 font-medium leading-none">클로징</span>
             <BadgeDropdown
               value={c.details?.closing_result || ''}
@@ -1185,12 +1185,14 @@ function CustomerCard({
 
         {/* 재통화 일정 마크 */}
         {c.details?.follow_up_date && (
-          <div className={`mt-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${
-            c.details.follow_up_date === new Date().toISOString().slice(0, 10)
-              ? 'bg-sky-500 text-white animate-pulse'
-              : 'bg-sky-100 text-sky-700'
-          }`}>
-            📞 재통화일정 {c.details.follow_up_date.slice(5)}
+          <div className="mt-1.5 flex justify-center w-full">
+            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold max-w-full text-center leading-tight ${
+              c.details.follow_up_date === new Date().toISOString().slice(0, 10)
+                ? 'bg-sky-500 text-white animate-pulse'
+                : 'bg-sky-100 text-sky-700'
+            }`}>
+              📞 {c.details.follow_up_date.slice(5)}
+            </span>
           </div>
         )}
 
