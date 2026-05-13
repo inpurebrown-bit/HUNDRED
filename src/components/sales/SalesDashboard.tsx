@@ -130,7 +130,17 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   }, [])
 
   const moveCustomer = useCallback(async (id: string, newStatus: Customer['status']) => {
-    setCustomers(prev => prev.map(c => c.id === id ? { ...c, status: newStatus } : c))
+    // 계약업체로 이동 시 로컬 state에서도 sub_status 제거 (미제거 시 stale sub_status 재기입 버그)
+    setCustomers(prev => prev.map(c => {
+      if (c.id !== id) return c
+      const updatedDetails: any = { ...(c.details || {}) }
+      if (newStatus === 'contracted') {
+        delete updatedDetails.sub_status
+      } else {
+        updatedDetails.sub_status = newStatus
+      }
+      return { ...c, status: newStatus, details: updatedDetails }
+    }))
     await fetch(`/api/customers/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -149,9 +159,9 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   }, [patchCustomer])
 
   const transferToOps = useCallback(async (customer: Customer) => {
-    const details = customer.details || {}
-    const progressMemo = [
-      customer.company && `업체: ${customer.company}`,
+    const details: any = customer.details || {}
+    const memo = [
+      details.company && `업체: ${details.company}`,
       details.contract_fee && `계약금: ${details.contract_fee}`,
       details.payment_amount && `입금액: ${details.payment_amount}`,
       details.unpaid_amount && `미입금: ${details.unpaid_amount}`,
@@ -159,17 +169,23 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
       details.tax_invoice && `세금계산서: ${details.tax_invoice}`,
     ].filter(Boolean).join(' / ')
 
-    await patchCustomer(customer.id, {
-      details: { ...details, ops_transferred: true },
-    })
+    // ⚡ 핵심 수정: full details 스프레드 금지 → ops_transferred 플래그만 전송
+    // (details 스프레드 시 stale sub_status가 DB에 재기입되어 계약업체가 고객DB로 역행하는 버그 발생)
+    await patchCustomer(customer.id, { details: { ops_transferred: true } })
+
+    const anyDetails = details as any
+    const revenue = parseInt(String(anyDetails.my_revenue || '0').replace(/[^0-9]/g, ''), 10) || 0
+
     await fetch('/api/ops-cases', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        customer_id: customer.id,
-        progress_stage: 'assigned',
-        progress_memo: progressMemo,
-        revenue: 0,
+        // API가 기대하는 필드명으로 전송 (progress_stage → stage, progress_memo → memo)
+        customer_name: (anyDetails.company as string) || customer.company || customer.name || '',
+        phone: customer.phone || '',
+        stage: '서류받는중',
+        memo,
+        revenue,
       }),
     })
     await loadAll()

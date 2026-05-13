@@ -50,6 +50,13 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     updateBody.details = { ...(existing.details || {}), ...incomingDetails }
   }
 
+  // ⚡ 안전장치: 계약 상태인 고객에 sub_status가 끼어들지 않도록 강제 제거
+  // (프론트 state에 stale sub_status가 남아있을 때 재기입 방지)
+  const finalStatus = updateBody.status ?? existing.status
+  if (finalStatus === 'contracted' && updateBody.details) {
+    delete updateBody.details.sub_status
+  }
+
   const { data, error } = await supabaseAdmin
     .from('customers')
     .update(updateBody)
