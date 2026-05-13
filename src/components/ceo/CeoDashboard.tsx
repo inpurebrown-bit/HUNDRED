@@ -75,6 +75,8 @@ export default function CeoDashboard() {
   const [allCustomersCache, setAllCustomersCache] = useState<any[]>([])
   const [installPrompt, setInstallPrompt] = useState<any>(null)
   const [installable, setInstallable] = useState(false)
+  // 검색 결과 클릭 시 빠른 조회 드로어
+  const [quickViewCustomer, setQuickViewCustomer] = useState<any | null>(null)
 
   useEffect(() => {
     const handler = (e: any) => { e.preventDefault(); setInstallPrompt(e); setInstallable(true) }
@@ -153,19 +155,23 @@ export default function CeoDashboard() {
             {searchResults.length > 0 && (
               <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 w-80 max-h-80 overflow-y-auto">
                 <p className="text-[10px] text-gray-400 px-3 pt-2.5 pb-1 font-semibold">{searchResults.length}건 검색됨</p>
-                {searchResults.map((c: any) => (
-                  <button key={c.id}
-                    onClick={() => { setActiveTab('sales'); setSearchQuery(''); setSearchResults([]) }}
-                    className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors flex items-center justify-between gap-2 border-t border-gray-50">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 truncate">{c.company || '(업체명 없음)'}</p>
-                      <p className="text-[11px] text-gray-400 truncate">{c.name} · {c.phone} · {c.sales_user_name}</p>
-                    </div>
-                    <span className="shrink-0 text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">
-                      {c.status === 'lead' ? '신규' : c.status === 'consulting' ? '상담중' : c.status === 'contracted' ? '계약' : c.status}
-                    </span>
-                  </button>
-                ))}
+                {searchResults.map((c: any) => {
+                  const company = c.details?.company || c.company || '(업체명 없음)'
+                  const statusLabel: Record<string, string> = { lead: '신규', consulting: '상담중', contracted: '계약', db010: '010DB', emotional: '감성톡', trash: '거절' }
+                  return (
+                    <button key={c.id}
+                      onClick={() => { setQuickViewCustomer(c); setSearchQuery(''); setSearchResults([]) }}
+                      className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors flex items-center justify-between gap-2 border-t border-gray-50">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{company}</p>
+                        <p className="text-[11px] text-gray-400 truncate">{c.name} · {c.phone} · {c.details?.sales_user_name || c.sales_user_name || '-'}</p>
+                      </div>
+                      <span className="shrink-0 text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">
+                        {statusLabel[c.status] || c.status}
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
             )}
             {searchQuery.length >= 1 && searchResults.length === 0 && (
@@ -253,6 +259,251 @@ export default function CeoDashboard() {
             <PinManageTab />
           </div>
         )}
+      </div>
+
+      {/* 검색 빠른 조회 드로어 */}
+      {quickViewCustomer && (
+        <CustomerQuickDrawer
+          customer={quickViewCustomer}
+          onClose={() => setQuickViewCustomer(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── 검색 빠른 조회 드로어 ────────────────────────────────
+function CustomerQuickDrawer({ customer, onClose }: { customer: any; onClose: () => void }) {
+  const [opsCase, setOpsCase]       = useState<any | null>(null)
+  const [loading, setLoading]       = useState(true)
+  const [tlText, setTlText]         = useState('')
+  const [tlSaving, setTlSaving]     = useState(false)
+  const [activeTab, setActiveTab]   = useState<'incall' | 'ops'>('incall')
+
+  const company  = customer.details?.company || customer.company || customer.name || '—'
+  const ownerName = customer.details?.sales_user_name || customer.sales_user_name || '-'
+  const d = customer.details || {}
+
+  useEffect(() => {
+    // ops_case 조회 (customer_id로)
+    setLoading(true)
+    fetch('/api/ops-cases')
+      .then(r => r.json())
+      .then(data => {
+        const found = (data.cases || []).find((c: any) => c.customer_id === customer.id)
+        setOpsCase(found || null)
+        // ops_case 있으면 관리팀 탭 먼저 보여주기
+        if (found) setActiveTab('ops')
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [customer.id])
+
+  async function addTimeline() {
+    if (!tlText.trim() || !opsCase) return
+    setTlSaving(true)
+    const entry = { user: 'CEO', content: tlText.trim(), created_at: new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(' ', 'T') + '+09:00' }
+    const updated = [...(opsCase.timeline || []), entry]
+    await fetch(`/api/ops-cases/${opsCase.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ timeline: updated }),
+    })
+    setOpsCase((prev: any) => ({ ...prev, timeline: updated }))
+    setTlText('')
+    setTlSaving(false)
+  }
+
+  const INCALL_FIELDS = [
+    ['업체명', d.company],
+    ['지역', d.region],
+    ['접수일', d.reception_date],
+    ['업종', d.business_type],
+    ['실제업무', d.real_work],
+    ['업력', d.years_in_business],
+    ['매출(25)', d.revenue_2025],
+    ['매출(24)', d.revenue_2024],
+    ['기보대출', d.loan_kibo],
+    ['신보대출', d.loan_shinbo],
+    ['재단대출', d.loan_jaedan],
+    ['기타대출', d.loan_other],
+    ['KCB점수', d.credit_kcb],
+    ['NICE점수', d.credit_nice],
+    ['세금체납', d.tax_status],
+    ['필요자금', d.required_funds],
+    ['솔루션', d.solution],
+  ].filter(([, v]) => v)
+
+  const statusLabel: Record<string, string> = { lead: '신규', db010: '010DB', contracted: '계약', emotional: '감성톡', trash: '거절' }
+  const statusColor: Record<string, string> = { lead: 'bg-sky-100 text-sky-700', db010: 'bg-violet-100 text-violet-700', contracted: 'bg-emerald-100 text-emerald-700', emotional: 'bg-pink-100 text-pink-700', trash: 'bg-gray-100 text-gray-500' }
+
+  return (
+    <div className="fixed inset-0 z-[200]">
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="absolute top-0 bottom-0 right-0 w-full md:w-[480px] bg-white shadow-2xl flex flex-col overflow-hidden">
+
+        {/* 헤더 */}
+        <div className="flex items-start justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+          <div>
+            <p className="font-bold text-[#1B2A45] text-base leading-tight">{company}</p>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <span className="text-xs text-gray-400">{customer.name} · {customer.phone}</span>
+              <span className="text-xs text-gray-400">담당: {ownerName}</span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${statusColor[customer.status] || 'bg-gray-100 text-gray-500'}`}>
+                {statusLabel[customer.status] || customer.status}
+              </span>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none px-1 mt-0.5">✕</button>
+        </div>
+
+        {/* 탭 */}
+        <div className="flex border-b border-gray-100 shrink-0">
+          <button onClick={() => setActiveTab('incall')}
+            className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors ${activeTab === 'incall' ? 'border-[#1B2A45] text-[#1B2A45]' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+            📋 인콜일지
+          </button>
+          <button onClick={() => setActiveTab('ops')}
+            className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors ${activeTab === 'ops' ? 'border-violet-500 text-violet-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+            ⚙️ 관리팀 타임라인 {opsCase ? '' : loading ? '…' : '(없음)'}
+          </button>
+        </div>
+
+        {/* 내용 */}
+        <div className="flex-1 overflow-y-auto p-5">
+
+          {/* ── 인콜일지 ── */}
+          {activeTab === 'incall' && (
+            <div className="space-y-3">
+              {/* 기본 연락처 */}
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  ['대표명', customer.name],
+                  ['연락처', customer.phone],
+                  ...INCALL_FIELDS,
+                ].filter(([, v]) => v).map(([label, val]) => (
+                  <div key={label as string} className="bg-[#F8F6F1] rounded-lg px-3 py-2">
+                    <p className="text-[10px] text-[#1B2A45]/40 mb-0.5">{label}</p>
+                    <p className="text-xs font-semibold text-[#1B2A45] break-words">{String(val)}</p>
+                  </div>
+                ))}
+              </div>
+              {INCALL_FIELDS.length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-8">인콜일지 데이터가 없습니다</p>
+              )}
+              {customer.memo && (
+                <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                  <p className="text-[10px] text-amber-600 font-semibold mb-1">메모</p>
+                  <p className="text-xs text-gray-700 whitespace-pre-wrap">{customer.memo || customer.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── 관리팀 타임라인 ── */}
+          {activeTab === 'ops' && (
+            <div className="space-y-3">
+              {loading ? (
+                <p className="text-sm text-gray-400 text-center py-8">불러오는 중...</p>
+              ) : !opsCase ? (
+                <div className="text-center py-10">
+                  <p className="text-sm text-gray-400">관리팀 진행 내역이 없습니다</p>
+                  <p className="text-xs text-gray-300 mt-1">계약 후 관리팀 배정 시 표시됩니다</p>
+                </div>
+              ) : (
+                <>
+                  {/* 기관·단계 요약 */}
+                  <div className="bg-violet-50 rounded-lg px-4 py-3 flex items-center justify-between gap-2 flex-wrap">
+                    <div>
+                      <p className="text-[10px] text-violet-500 font-semibold mb-0.5">담당 기관</p>
+                      <p className="text-sm font-bold text-[#1B2A45]">{opsCase.institution || '미배정'}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] text-violet-500 font-semibold mb-0.5">단계</p>
+                      <span className="text-xs px-2.5 py-1 rounded-full font-bold text-white bg-violet-500">
+                        {opsCase.progress_stage || opsCase.stage || '—'}
+                      </span>
+                    </div>
+                    {opsCase.ops_user_name && (
+                      <div className="text-right">
+                        <p className="text-[10px] text-violet-500 font-semibold mb-0.5">담당자</p>
+                        <p className="text-xs font-semibold text-[#1B2A45]">{opsCase.ops_user_name}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 재무 정보 */}
+                  {[
+                    ['승인금액', opsCase.details?.approval_amount],
+                    ['계약금', opsCase.details?.contract_amount],
+                    ['입금액', opsCase.details?.deposit_amount],
+                    ['방문일정', opsCase.details?.visit_date],
+                    ['계약일', opsCase.details?.contract_date],
+                  ].filter(([, v]) => v).length > 0 && (
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        ['승인금액', opsCase.details?.approval_amount],
+                        ['계약금', opsCase.details?.contract_amount],
+                        ['입금액', opsCase.details?.deposit_amount],
+                        ['방문일정', opsCase.details?.visit_date],
+                        ['계약일', opsCase.details?.contract_date],
+                      ].filter(([, v]) => v).map(([label, val]) => (
+                        <div key={label as string} className="bg-gray-50 rounded-lg px-3 py-2">
+                          <p className="text-[10px] text-gray-400 mb-0.5">{label}</p>
+                          <p className="text-xs font-semibold text-gray-800">{String(val)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 타임라인 입력 */}
+                  <div className="flex gap-2">
+                    <input value={tlText} onChange={e => setTlText(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && addTimeline()}
+                      placeholder="타임라인 메모 추가..."
+                      className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400" />
+                    <button onClick={addTimeline} disabled={tlSaving || !tlText.trim()}
+                      className="bg-violet-500 hover:bg-violet-600 disabled:opacity-40 text-white px-3 py-2 rounded-lg text-xs font-semibold transition-colors">
+                      {tlSaving ? '…' : '추가'}
+                    </button>
+                  </div>
+
+                  {/* 타임라인 목록 */}
+                  {(!opsCase.timeline || opsCase.timeline.length === 0) ? (
+                    <p className="text-xs text-gray-400 text-center py-4">타임라인이 없습니다</p>
+                  ) : (
+                    <div className="relative pl-4 border-l-2 border-violet-200 space-y-2">
+                      {[...(opsCase.timeline || [])].reverse().map((entry: any, i: number) => {
+                        const isAuto = entry.user === '자동기록'
+                        const d2 = new Date(entry.created_at || entry.date || '')
+                        const dateStr = isNaN(d2.getTime()) ? '' : d2.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit', timeZone: 'Asia/Seoul' }) + ' ' + d2.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Seoul' })
+                        return (
+                          <div key={i} className="relative">
+                            <div className={`absolute -left-[21px] top-1.5 w-3 h-3 rounded-full border-2 border-white ${isAuto ? 'bg-violet-300' : 'bg-[#1B2A45]'}`} />
+                            <div className={`rounded-lg px-3 py-2 ${isAuto ? 'bg-violet-50' : 'bg-gray-50'}`}>
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <span className={`text-[10px] font-semibold ${isAuto ? 'text-violet-600' : 'text-[#1B2A45]'}`}>{entry.user || '—'}</span>
+                                <span className="text-[10px] text-gray-400">{dateStr}</span>
+                              </div>
+                              <p className="text-xs text-gray-700">{entry.content || entry.text}</p>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {opsCase.progress_memo && (
+                    <div className="bg-gray-50 rounded-lg px-3 py-2">
+                      <p className="text-[10px] text-gray-400 font-semibold mb-1">진행 메모</p>
+                      <p className="text-xs text-gray-700">{opsCase.progress_memo}</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
