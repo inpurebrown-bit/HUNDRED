@@ -755,12 +755,17 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   <span className="text-[10px] text-gray-400">{thisMonth}</span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {/* 금일/이달 공급 — 합칩 */}
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                    <p className="text-[10px] text-gray-400 mb-1">공급 현황</p>
+                    <p className="text-xl font-black text-blue-700">{mySupplyCfg.supplied}개 <span className="text-[11px] font-normal text-gray-400">이달</span></p>
+                    {todaySupply > 0 && <p className="text-[10px] text-blue-500 font-semibold mt-0.5">금일 {todaySupply}개 배정</p>}
+                  </div>
                   {[
-                    { label: '이번달 공급', value: `${mySupplyCfg.supplied}개`, color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-100' },
                     { label: '결제수', value: `${myTotalContracted.toFixed(1)}개`, color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-100',
                       sub: mySupplyCfg.base > 0 ? `기존 ${mySupplyCfg.base} + DB ${myDbContracted.toFixed(1)}` : undefined },
                     { label: '계약율', value: `${contractRate}%`, color: contractRate >= 17 ? 'text-emerald-700' : contractRate >= 13 ? 'text-amber-700' : 'text-red-600', bg: contractRate >= 17 ? 'bg-emerald-50' : contractRate >= 13 ? 'bg-amber-50' : 'bg-red-50', border: contractRate >= 17 ? 'border-emerald-100' : contractRate >= 13 ? 'border-amber-100' : 'border-red-100' },
-                    { label: '권장 내일 공급', value: tomorrowSupplyNeeded > 0 ? `${tomorrowSupplyNeeded}개` : '공급 중단', color: 'text-violet-700', bg: 'bg-violet-50', border: 'border-violet-100' },
+                    { label: '결제율 대비 공급예정', value: tomorrowSupplyNeeded > 0 ? `${tomorrowSupplyNeeded}개` : '공급 중단', color: 'text-violet-700', bg: 'bg-violet-50', border: 'border-violet-100' },
                   ].map(s => (
                     <div key={s.label} className={`${s.bg} border ${(s as any).border} rounded-xl p-3`}>
                       <p className="text-[10px] text-gray-400 mb-1">{s.label}</p>
@@ -786,11 +791,16 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             ) : (
               /* 기본 공급 통계 (공급 설정 미등록 시) */
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {/* 금일/이달 공급 — 합쳐서 하나의 카드에 */}
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3.5">
+                  <p className="text-[10px] text-gray-400 mb-1">공급 현황</p>
+                  <p className="text-2xl font-black text-blue-700">{todaySupply > 0 ? `${todaySupply}개` : '미배정'}</p>
+                  <p className="text-[10px] text-blue-400 mt-0.5">금일 · 이달 계약 {monthContractCount}건</p>
+                </div>
                 {[
-                  { label: '금일 공급 (대표 배정)', value: todaySupply > 0 ? `${todaySupply}개` : '미배정', color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-100' },
                   { label: '이번달 계약', value: `${monthContractCount}건`, color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-100' },
                   { label: '공급 대비 계약율', value: todaySupply > 0 ? `${contractRate}%` : '—', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-100' },
-                  { label: '권장 내일 공급', value: tomorrowSupplyNeeded > 0 ? `${tomorrowSupplyNeeded}개` : '—', color: 'text-violet-700', bg: 'bg-violet-50', border: 'border-violet-100' },
+                  { label: '결제율 대비 공급예정', value: tomorrowSupplyNeeded > 0 ? `${tomorrowSupplyNeeded}개` : '—', color: 'text-violet-700', bg: 'bg-violet-50', border: 'border-violet-100' },
                 ].map(s => (
                   <div key={s.label} className={`${s.bg} border ${s.border} rounded-xl p-3.5`}>
                     <p className="text-[10px] text-gray-400 mb-1">{s.label}</p>

@@ -41,6 +41,8 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   if (body.owner_id !== undefined) updateBody.owner_id = body.owner_id
   if (body.sales_user_id !== undefined) updateBody.owner_id = body.sales_user_id
   if (body.source !== undefined) updateBody.source = body.source
+  // call_timeline: 인콜 타임라인 (직접 컬럼으로 저장)
+  if (body.call_timeline !== undefined) updateBody.call_timeline = body.call_timeline
 
   // details JSONB 머지 (company/sales_user_name 포함)
   // ⚡ 수정: updateBody.details(status 처리 결과)를 베이스로 사용해야 sub_status가 유실되지 않음

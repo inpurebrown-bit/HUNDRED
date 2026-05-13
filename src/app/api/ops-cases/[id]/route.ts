@@ -46,7 +46,8 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     .single()
 
   if (!existing) return NextResponse.json({ error: '케이스 없음' }, { status: 404 })
-  if (user.role === 'ops' && existing.owner_id !== user.id) {
+  // ops 직원은 본인 케이스 또는 미배정(owner_id null) 케이스만 수정 가능
+  if (user.role === 'ops' && existing.owner_id !== null && existing.owner_id !== user.id) {
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
 
