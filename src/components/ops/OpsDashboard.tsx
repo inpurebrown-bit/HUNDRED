@@ -1882,6 +1882,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
   const [openPanelIds, setOpenPanelIds] = useState<string[]>([])
   const [installPrompt, setInstallPrompt] = useState<any>(null)
   const [installable, setInstallable] = useState(false)
+  const [notices, setNotices] = useState<any[]>([])
   // ── 메모장 ──────────────────────────────────────────────
   const [notepadOpen, setNotepadOpen] = useState(false)
   const [notepadText, setNotepadText] = useState(() => {
@@ -1916,6 +1917,16 @@ export default function OpsDashboard({ userId, userName }: Props) {
   }
 
   useEffect(() => { loadCases() }, [])
+
+  useEffect(() => {
+    fetch('/api/notices?team=ops&_t=' + Date.now())
+      .then(r => r.json())
+      .then(d => {
+        const all = (d.notices || [])
+        setNotices(all.filter((n: any) => n.notice_type !== 'supply_config' && n.notice_type !== 'supply_count'))
+      })
+      .catch(() => {})
+  }, [])
 
   function togglePanel(id: string) {
     setOpenPanelIds(prev => {
@@ -2078,6 +2089,21 @@ export default function OpsDashboard({ userId, userName }: Props) {
                 </button>
               </div>
               <DashboardOverview cases={cases} />
+
+              {/* 공지사항 */}
+              {notices.length > 0 && (
+                <div className="space-y-2 mt-4">
+                  <h3 className="text-sm font-bold text-gray-700">📢 공지사항</h3>
+                  {notices.map(n => (
+                    <div key={n.id} className="bg-white border border-[#E8E2D4] rounded-xl px-5 py-4">
+                      <p className="font-semibold text-[#1B2A45] text-sm">{n.title}</p>
+                      {n.content && <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{n.content}</p>}
+                      <p className="text-xs text-gray-300 mt-2">{new Date(n.created_at).toLocaleDateString('ko-KR')}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* 빠른 메뉴 */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4">
                 {[
