@@ -672,8 +672,66 @@ function CustomerCard({
   const [qtLoading, setQtLoading] = useState(false)
   const [tlText, setTlText] = useState('')
   const [tradeOpen, setTradeOpen] = useState(false)
+  const [logEditMode, setLogEditMode] = useState(false)
+  const [logDraft, setLogDraft] = useState<Record<string, string>>({})
+  const [logSaving, setLogSaving] = useState(false)
   const menuRef  = useRef<HTMLDivElement>(null)
   const tradeRef = useRef<HTMLDivElement>(null)
+
+  function openLogEdit() {
+    const d = c.details || {} as any
+    setLogDraft({
+      name:               c.name || '',
+      phone:              c.phone || '',
+      company:            d.company || (c as any).company || '',
+      region:             d.region || '',
+      reception_date:     d.reception_date || '',
+      business_type:      d.business_type || '',
+      real_work:          d.real_work || '',
+      years_in_business:  d.years_in_business || d.biz_size || '',
+      employee_count:     d.employee_count || '',
+      patent:             d.patent || '',
+      revenue_2026:       d.revenue_2026 || '',
+      revenue_2025:       d.revenue_2025 || '',
+      revenue_2024:       d.revenue_2024 || '',
+      revenue_2023:       d.revenue_2023 || '',
+      loan_kibo:          d.loan_kibo || d.loan_policy || '',
+      loan_shinbo:        d.loan_shinbo || '',
+      loan_jaedan:        d.loan_jaedan || '',
+      loan_jinjong:       d.loan_jinjong || '',
+      loan_sojin:         d.loan_sojin || '',
+      loan_other:         d.loan_other || d.loan_credit || '',
+      loan_total:         d.loan_total || '',
+      credit_kcb:         d.credit_kcb || d.credit_score || '',
+      credit_nice:        d.credit_nice || '',
+      tax_status:         d.tax_status || d.tax_delinquency || '',
+      assets:             d.assets || '',
+      required_funds:     d.required_funds || '',
+      solution:           d.solution || '',
+    })
+    setLogEditMode(true)
+  }
+
+  async function saveLogEdit() {
+    setLogSaving(true)
+    const { name, phone, company, region, reception_date, business_type, real_work,
+      years_in_business, employee_count, patent, revenue_2026, revenue_2025, revenue_2024, revenue_2023,
+      loan_kibo, loan_shinbo, loan_jaedan, loan_jinjong, loan_sojin, loan_other, loan_total,
+      credit_kcb, credit_nice, tax_status, assets, required_funds, solution } = logDraft
+    await onUpdate(c.id, {
+      name,
+      phone,
+      details: {
+        company, region, reception_date, business_type, real_work,
+        years_in_business, employee_count, patent,
+        revenue_2026, revenue_2025, revenue_2024, revenue_2023,
+        loan_kibo, loan_shinbo, loan_jaedan, loan_jinjong, loan_sojin, loan_other, loan_total,
+        credit_kcb, credit_nice, tax_status, assets, required_funds, solution,
+      },
+    })
+    setLogSaving(false)
+    setLogEditMode(false)
+  }
 
   useEffect(() => {
     if (!menuOpen) return
@@ -1027,9 +1085,29 @@ function CustomerCard({
 
             {/* ── 좌측: 인콜일지 ── */}
             <div className="p-4 overflow-y-auto max-h-[520px]">
-              <p className="text-[10px] font-bold text-[#1B2A45] uppercase tracking-wide mb-2">📋 인콜일지</p>
+              {/* 헤더 + 수정 버튼 */}
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] font-bold text-[#1B2A45] uppercase tracking-wide">📋 인콜일지</p>
+                {!logEditMode ? (
+                  <button type="button" onClick={openLogEdit}
+                    className="flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-50 text-blue-600 border border-blue-200 text-[10px] font-semibold hover:bg-blue-100 transition-colors">
+                    ✏️ 수정
+                  </button>
+                ) : (
+                  <div className="flex gap-1">
+                    <button type="button" onClick={() => setLogEditMode(false)}
+                      className="px-2 py-1 rounded-lg bg-gray-100 text-gray-500 text-[10px] font-semibold hover:bg-gray-200 transition-colors">
+                      취소
+                    </button>
+                    <button type="button" onClick={saveLogEdit} disabled={logSaving}
+                      className="px-2.5 py-1 rounded-lg bg-blue-600 text-white text-[10px] font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60">
+                      {logSaving ? '저장중…' : '💾 저장'}
+                    </button>
+                  </div>
+                )}
+              </div>
 
-              {/* ① 직가/공가 — 최상단 */}
+              {/* ① 직가/공가 — 최상단 (항상 표시) */}
               <div className="flex items-center gap-2 bg-[#1B2A45] border border-[#1B2A45] rounded-lg px-2.5 py-2 mb-2 shadow-sm">
                 <span className="w-20 shrink-0 text-[10px] text-white font-bold">직가/공가</span>
                 <div className="flex gap-1.5">
@@ -1045,36 +1123,93 @@ function CustomerCard({
                 </div>
               </div>
 
-              {/* ② 필드 목록 (key 필드 강조) */}
-              <div className="grid grid-cols-1 gap-1">
-                {buildLogFields(c).map(({ label, value }) => {
-                  const isEmpty = !value || !String(value).trim()
-                  const isKey = KEY_LABELS.has(label)
-                  return (
-                    <div key={label} className={`flex items-start gap-2 rounded-lg px-2.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${
-                      isKey
-                        ? 'bg-blue-50 border border-blue-200'
-                        : 'bg-white border border-gray-100'
+              {logEditMode ? (
+                /* ── 편집 모드: 인풋 폼 ── */
+                <div className="grid grid-cols-1 gap-1">
+                  {([
+                    { label: '업체명',    key: 'company',          isKey: true },
+                    { label: '대표자',    key: 'name',             isKey: true },
+                    { label: '연락처',    key: 'phone',            isKey: true },
+                    { label: '지역',      key: 'region' },
+                    { label: '접수일',    key: 'reception_date' },
+                    { label: '업종',      key: 'business_type',    isKey: true },
+                    { label: '실제업무',  key: 'real_work',        isKey: true },
+                    { label: '업력',      key: 'years_in_business' },
+                    { label: '직원수',    key: 'employee_count' },
+                    { label: '특허',      key: 'patent' },
+                    { label: '26년매출',  key: 'revenue_2026' },
+                    { label: '25년매출',  key: 'revenue_2025',     isKey: true },
+                    { label: '24년매출',  key: 'revenue_2024' },
+                    { label: '23년매출',  key: 'revenue_2023' },
+                    { label: '기보대출',  key: 'loan_kibo' },
+                    { label: '신보대출',  key: 'loan_shinbo' },
+                    { label: '재단대출',  key: 'loan_jaedan' },
+                    { label: '중진공',    key: 'loan_jinjong' },
+                    { label: '소진공',    key: 'loan_sojin' },
+                    { label: '신용/담보', key: 'loan_other' },
+                    { label: '기대출합계',key: 'loan_total' },
+                    { label: 'KCB점수',   key: 'credit_kcb' },
+                    { label: 'NICE점수',  key: 'credit_nice',      isKey: true },
+                    { label: '세금체납',  key: 'tax_status' },
+                    { label: '자산',      key: 'assets' },
+                    { label: '필요자금',  key: 'required_funds',   isKey: true },
+                    { label: '솔루션',    key: 'solution' },
+                  ] as { label: string; key: string; isKey?: boolean }[]).map(({ label, key, isKey }) => (
+                    <div key={key} className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 ${
+                      isKey ? 'bg-blue-50 border border-blue-200' : 'bg-white border border-gray-100'
                     }`}>
-                      <span className={`w-20 shrink-0 text-[10px] font-bold pt-0.5 ${isKey ? 'text-blue-800' : 'text-blue-600'}`}>{label}</span>
-                      <span className={`text-xs flex-1 break-words ${isEmpty ? 'text-gray-300 italic' : isKey ? 'text-gray-900 font-semibold' : 'text-gray-700 font-medium'}`}>
-                        {isEmpty ? '—' : String(value)}
-                      </span>
+                      <span className={`w-20 shrink-0 text-[10px] font-bold ${isKey ? 'text-blue-800' : 'text-blue-600'}`}>{label}</span>
+                      <input
+                        type="text"
+                        value={logDraft[key] || ''}
+                        onChange={e => setLogDraft(prev => ({ ...prev, [key]: e.target.value }))}
+                        className="flex-1 text-xs bg-transparent border-0 border-b border-gray-300 focus:border-blue-400 focus:outline-none py-0.5 text-gray-800 placeholder:text-gray-300"
+                        placeholder="—"
+                      />
                     </div>
-                  )
-                })}
+                  ))}
 
-                {/* 혁신요건 — 인터랙티브 */}
-                <div className="flex items-start gap-2 bg-violet-50 border border-violet-200 rounded-lg px-2.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                  <span className="w-20 shrink-0 text-[10px] text-violet-800 font-bold pt-1">혁신요건</span>
-                  <div className="flex-1">
-                    <InnovationSelect
-                      value={c.details?.innovation || ''}
-                      onChange={v => onUpdate(c.id, { details: { innovation: v } })}
-                    />
+                  {/* 혁신요건 — 항상 인터랙티브 */}
+                  <div className="flex items-start gap-2 bg-violet-50 border border-violet-200 rounded-lg px-2.5 py-2">
+                    <span className="w-20 shrink-0 text-[10px] text-violet-800 font-bold pt-1">혁신요건</span>
+                    <div className="flex-1">
+                      <InnovationSelect
+                        value={c.details?.innovation || ''}
+                        onChange={v => onUpdate(c.id, { details: { innovation: v } })}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                /* ── 읽기 모드 ── */
+                <div className="grid grid-cols-1 gap-1">
+                  {buildLogFields(c).map(({ label, value }) => {
+                    const isEmpty = !value || !String(value).trim()
+                    const isKey = KEY_LABELS.has(label)
+                    return (
+                      <div key={label} className={`flex items-start gap-2 rounded-lg px-2.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${
+                        isKey ? 'bg-blue-50 border border-blue-200' : 'bg-white border border-gray-100'
+                      }`}>
+                        <span className={`w-20 shrink-0 text-[10px] font-bold pt-0.5 ${isKey ? 'text-blue-800' : 'text-blue-600'}`}>{label}</span>
+                        <span className={`text-xs flex-1 break-words ${isEmpty ? 'text-gray-300 italic' : isKey ? 'text-gray-900 font-semibold' : 'text-gray-700 font-medium'}`}>
+                          {isEmpty ? '—' : String(value)}
+                        </span>
+                      </div>
+                    )
+                  })}
+
+                  {/* 혁신요건 — 인터랙티브 */}
+                  <div className="flex items-start gap-2 bg-violet-50 border border-violet-200 rounded-lg px-2.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                    <span className="w-20 shrink-0 text-[10px] text-violet-800 font-bold pt-1">혁신요건</span>
+                    <div className="flex-1">
+                      <InnovationSelect
+                        value={c.details?.innovation || ''}
+                        onChange={v => onUpdate(c.id, { details: { innovation: v } })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* 통화내용 + 메모 미러링 */}
               <div className="bg-white border border-gray-100 rounded-lg px-2.5 py-2 mt-1 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
