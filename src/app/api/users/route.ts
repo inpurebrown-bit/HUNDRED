@@ -9,10 +9,24 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
   const user = session.user as any
-  if (user.role !== 'ceo') return NextResponse.json({ error: '권한 없음' }, { status: 403 })
-
   const { searchParams } = new URL(req.url)
   const role = searchParams.get('role')
+
+  // 영업팀은 영업팀 이름 목록만 조회 가능 (DB 트레이드용)
+  // CEO는 전체 조회 가능
+  if (user.role !== 'ceo') {
+    if (user.role === 'sales' && role === 'sales') {
+      // 이름만 반환 (민감 정보 제외)
+      const { data, error } = await supabaseAdmin
+        .from('users')
+        .select('name')
+        .eq('role', 'sales')
+        .order('name')
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ users: data })
+    }
+    return NextResponse.json({ error: '권한 없음' }, { status: 403 })
+  }
 
   const query = supabaseAdmin
     .from('users')

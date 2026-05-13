@@ -60,18 +60,19 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { customer_name, phone, stage, memo, revenue, owner_id } = body
+  const { customer_name, phone, stage, memo, revenue, owner_id, timeline } = body
 
   const { data, error } = await supabaseAdmin
     .from('ops_cases')
     .insert({
-      customer_name: customer_name ?? '',
-      phone:         phone         ?? '',
-      owner_id:      owner_id      ?? null,
-      stage:         stage         ?? '서류받는중',
-      memo:          memo          ?? '',
-      revenue:       revenue       ?? 0,
+      customer_name:    customer_name ?? '',
+      phone:            phone         ?? '',
+      owner_id:         owner_id      ?? null,
+      stage:            stage         ?? '서류받는중',
+      memo:             memo          ?? '',
+      revenue:          revenue       ?? 0,
       institution_type: 'new',
+      ...(timeline ? { timeline } : {}),
     })
     .select()
     .single()

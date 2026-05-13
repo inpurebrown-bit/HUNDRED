@@ -217,6 +217,12 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
     const anyDetails = details as any
     const revenue = parseInt(String(anyDetails.my_revenue || '0').replace(/[^0-9]/g, ''), 10) || 0
 
+    // 영업팀 call_timeline → ops_case 초기 timeline에 임베딩 (source: 'sales' 마킹)
+    const salesTimeline = ((customer as any).call_timeline || []).map((e: any) => ({
+      ...e,
+      source: 'sales',
+    }))
+
     await fetch('/api/ops-cases', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -227,6 +233,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         stage: '서류받는중',
         memo,
         revenue,
+        timeline: salesTimeline.length > 0 ? salesTimeline : undefined,
       }),
     })
     await loadAll()
@@ -352,14 +359,25 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const onPaceCount = bizTotal > 0 ? Math.round((monthlyGoal / bizTotal) * bizElapsed) : 0
   const isAhead = monthContractCount >= onPaceCount
 
-  // ── 영업팀 실제 이름 동적 추출 (DB 트레이드용) ───────────────────
+  // ── 영업팀 이름 목록: DB users 테이블 role=sales 기준 (3명 고정) ────
   useEffect(() => {
-    const names = Array.from(new Set(
-      customers.map(c => (c as any).details?.sales_user_name || c.sales_user_name).filter(Boolean)
-    )) as string[]
-    if (!names.includes(userName)) names.push(userName)
-    setSalesUserNames(names)
-  }, [customers, userName])
+    fetch('/api/users?role=sales')
+      .then(r => r.json())
+      .then(d => {
+        const names: string[] = (d.users || []).map((u: any) => u.name).filter(Boolean)
+        // 현재 로그인 유저가 없으면 추가 (fallback)
+        if (!names.includes(userName)) names.push(userName)
+        setSalesUserNames(names)
+      })
+      .catch(() => {
+        // fallback: customers 데이터에서 추출
+        const names = Array.from(new Set(
+          customers.map((c: any) => c.details?.sales_user_name || c.sales_user_name).filter(Boolean)
+        )) as string[]
+        if (!names.includes(userName)) names.push(userName)
+        setSalesUserNames(names)
+      })
+  }, [userName])
 
   // ── Filtered lists ────────────────────────────────────────────────
   const db010List = customers.filter(c => c.status === 'db010')
