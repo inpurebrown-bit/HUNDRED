@@ -551,8 +551,8 @@ function SupplyDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
         company: data.company || '',
         loan_history: data.loan_credit || '',
         notes: data.notes || '',
-        status: 'db010',
-        details: data,
+        status: 'lead',  // #8: 대표 공급 DB는 신규업체(lead) 탭으로
+        details: { ...data, db_source: 'ceo_supply' },
       }
       // CEO가 특정 영업사원에게 배정
       if (assignTo && selectedUser) {
