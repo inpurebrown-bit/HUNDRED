@@ -28,6 +28,26 @@ function nowKST2() {
   return new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(' ', 'T') + '+09:00'
 }
 
+function parseNum(s: string | number | undefined): number {
+  if (!s) return 0
+  return parseInt(String(s).replace(/[^0-9]/g, ''), 10) || 0
+}
+
+function fmtWon(n: number): string {
+  if (n === 0) return '0'
+  if (n >= 100000000) return (n / 100000000).toFixed(1).replace(/\.0$/, '') + '억'
+  if (n >= 10000) return (n / 10000).toFixed(0) + '만'
+  return n.toLocaleString()
+}
+
+function toTabType(status: string): 'lead' | 'db010' | 'contracted' | 'emotional' | 'trash' {
+  if (status === 'db010') return 'db010'
+  if (status === 'contracted') return 'contracted'
+  if (status === 'emotional') return 'emotional'
+  if (status === 'trash') return 'trash'
+  return 'lead'
+}
+
 function TransferModeView({
   customers,
   salesPeople,
@@ -410,6 +430,7 @@ export default function SalesCeoTab() {
   const [ceoView, setCeoView] = useState<CeoView>('customers')
   const [personTab, setPersonTab] = useState<string>('all')
   const [statusTab, setStatusTab] = useState<StatusKey>('lead')
+  const [inspDetail, setInspDetail] = useState<Customer | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -452,23 +473,37 @@ export default function SalesCeoTab() {
 
   // A/S 요청 대기 중인 업체
   const pendingAsRequests = useMemo(() =>
-    customers.filter(c => c.details?.as_requested === true && !c.details?.as_resolved),
+    customers.filter(c => (c as any).details?.as_requested === true && !(c as any).details?.as_resolved),
   [customers])
 
-  async function resolveAsRequest(id: string) {
-    await updateCustomer(id, { details: { as_resolved: true, as_resolve_date: new Date().toISOString().slice(0, 10) } })
+  const asApprovedList = useMemo(() =>
+    customers.filter(c => (c as any).details?.as_approved === true),
+  [customers])
+
+  async function approveAs(id: string) {
+    await updateCustomer(id, { details: { as_approved: true, as_resolved: true, as_approve_date: new Date().toISOString().slice(0, 10) } })
+  }
+  async function rejectAs(id: string) {
+    await updateCustomer(id, { details: { as_rejected: true, as_resolved: true, as_reject_date: new Date().toISOString().slice(0, 10) } })
   }
 
   const personStats = useMemo(() => salesPeople.map(name => {
     const mine = customers.filter((c: any) => (c.details?.sales_user_name || c.sales_user_name || '').trim() === name)
+    const contracted = mine.filter((c: any) => c.status === 'contracted')
     return {
       name,
       total: mine.length,
       lead: mine.filter((c: any) => ['lead', 'consulting'].includes(c.status)).length,
       db010: mine.filter((c: any) => c.status === 'db010').length,
-      contracted: mine.filter((c: any) => c.status === 'contracted').length,
+      contracted: contracted.length,
+      revenue: contracted.reduce((sum, c) => sum + parseNum((c as any).details?.my_revenue), 0),
     }
   }), [customers, salesPeople])
+
+  const totalRevenue = useMemo(() =>
+    customers.filter(c => c.status === 'contracted')
+      .reduce((sum, c) => sum + parseNum((c as any).details?.my_revenue), 0),
+  [customers])
 
   const counts = useMemo(() => ({
     lead:       personCustomers.filter(c => ['lead', 'consulting'].includes(c.status)).length,
@@ -568,90 +603,172 @@ export default function SalesCeoTab() {
 
       {/* ── 심사요청 전용 뷰 ── */}
       {ceoView === 'inspection' && (
-        <div className="bg-white border border-amber-200 rounded-2xl overflow-hidden">
-          <div className="px-5 py-3 bg-amber-50 border-b border-amber-200 flex items-center justify-between">
-            <span className="text-sm font-bold text-amber-800">🔍 심사 요청 대기</span>
-            <span className="text-[10px] text-amber-600">{pendingInspections.length}건 · 영업팀에서 심사를 요청했습니다</span>
-          </div>
-          {pendingInspections.length === 0 ? (
-            <div className="p-12 text-center text-sm text-gray-400">심사 요청 없음</div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {pendingInspections.map(c => {
-                const owner = (c as any).details?.sales_user_name || (c as any).sales_user_name || '—'
-                return (
-                  <div key={c.id} className="px-5 py-4 flex items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <p className="font-bold text-gray-900 text-sm">{c.company || c.name}</p>
-                        <span className="text-[10px] text-gray-400">{c.name}</span>
-                        <span className="text-[10px] text-gray-400 font-mono">{c.phone}</span>
-                        <span className="text-[10px] bg-amber-50 border border-amber-200 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">{owner}</span>
+        <div className="space-y-3">
+          <div className="bg-white border border-amber-200 rounded-2xl overflow-hidden">
+            <div className="px-5 py-3 bg-amber-50 border-b border-amber-200 flex items-center justify-between">
+              <span className="text-sm font-bold text-amber-800">🔍 심사 요청 대기</span>
+              <span className="text-[10px] text-amber-600">{pendingInspections.length}건 · 업체 클릭 → 인콜일지 확인 후 승인/반려</span>
+            </div>
+            {pendingInspections.length === 0 ? (
+              <div className="p-12 text-center text-sm text-gray-400">심사 요청 없음</div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {pendingInspections.map(c => {
+                  const owner = (c as any).details?.sales_user_name || (c as any).sales_user_name || '—'
+                  const isOpen = inspDetail?.id === c.id
+                  return (
+                    <div key={c.id}>
+                      {/* 요약 행 — 클릭 시 인콜일지 펼침 */}
+                      <div
+                        onClick={() => setInspDetail(isOpen ? null : c)}
+                        className={`px-5 py-4 flex items-start justify-between gap-4 cursor-pointer transition-colors ${isOpen ? 'bg-amber-50' : 'hover:bg-gray-50'}`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <p className="font-bold text-gray-900 text-sm">{(c as any).details?.company || c.company || c.name}</p>
+                            <span className="text-[10px] text-gray-400">{c.name}</span>
+                            <span className="text-[10px] text-gray-400 font-mono">{c.phone}</span>
+                            <span className="text-[10px] bg-amber-50 border border-amber-200 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">{owner}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-3 text-[10px] text-gray-500">
+                            <span>요청일: <b>{(c as any).details?.inspection_date || '—'}</b></span>
+                            {(c as any).details?.business_type && <span>업종: {(c as any).details.business_type}</span>}
+                            {(c as any).details?.required_funds && <span>필요자금: {(c as any).details.required_funds}</span>}
+                            {(c as any).details?.credit_nice && <span>NICE: {(c as any).details.credit_nice}</span>}
+                          </div>
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded-lg border font-medium shrink-0 transition-colors ${isOpen ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
+                          {isOpen ? '▲ 닫기' : '📋 인콜일지 보기'}
+                        </span>
                       </div>
-                      <div className="flex flex-wrap gap-3 text-[10px] text-gray-500 mb-1">
-                        <span>요청일: <b>{c.details?.inspection_date || '—'}</b></span>
-                        {c.details?.business_type && <span>업종: {c.details.business_type}</span>}
-                        {c.details?.required_funds && <span>필요자금: {c.details.required_funds}</span>}
-                        {c.details?.credit_nice && <span>NICE: {c.details.credit_nice}</span>}
-                      </div>
-                      {c.details?.result_memo && (
-                        <p className="text-[11px] text-gray-600 bg-gray-50 rounded px-2 py-1 mt-1">{c.details.result_memo}</p>
+
+                      {/* 인콜일지 + 승인/반려 버튼 */}
+                      {isOpen && (
+                        <div className="border-t border-amber-100 bg-amber-50/30">
+                          {/* 승인/반려 버튼 바 */}
+                          <div className="flex items-center gap-3 px-5 py-3 bg-white border-b border-amber-100">
+                            <p className="text-xs text-gray-500 flex-1">타임라인에 메모 작성 후 승인 또는 반려하세요. 승인 시 담당자에게 DB가 반환됩니다.</p>
+                            <button type="button" onClick={async () => { await handleInspection(c.id, 'approved'); setInspDetail(null) }}
+                              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg transition-colors">
+                              ✅ 승인
+                            </button>
+                            <button type="button" onClick={async () => { await handleInspection(c.id, 'rejected'); setInspDetail(null) }}
+                              className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-lg border border-red-200 transition-colors">
+                              ❌ 반려
+                            </button>
+                          </div>
+                          {/* 인콜일지 전체 렌더 */}
+                          <div className="p-3">
+                            <InCallTableView
+                              customers={[customers.find(x => x.id === c.id) || c]}
+                              allCustomers={customers}
+                              tabType={toTabType(c.status)}
+                              salesUsers={salesPeople}
+                              userName="ceo"
+                              showOwner={true}
+                              onUpdate={async (id, patch) => {
+                                await updateCustomer(id, patch)
+                                // inspDetail 동기화
+                                setInspDetail(prev => prev?.id === id ? { ...prev, ...(patch.details ? { details: { ...(prev.details || {}), ...patch.details } } : patch) } : prev)
+                              }}
+                              onStatusChange={changeStatus}
+                              onDelete={deleteCustomer}
+                            />
+                          </div>
+                        </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 shrink-0 pt-1">
-                      <button type="button" onClick={() => handleInspection(c.id, 'approved')}
-                        className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-lg transition-colors">
-                        ✅ 승인
-                      </button>
-                      <button type="button" onClick={() => handleInspection(c.id, 'rejected')}
-                        className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold rounded-lg border border-red-200 transition-colors">
-                        ❌ 반려
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
       {/* ── A/S 요청 전용 뷰 ── */}
       {ceoView === 'as' && (
-        <div className="bg-white border border-orange-200 rounded-2xl overflow-hidden">
-          <div className="px-5 py-3 bg-orange-50 border-b border-orange-200 flex items-center justify-between">
-            <span className="text-sm font-bold text-orange-800">🔧 A/S 요청 대기</span>
-            <span className="text-[10px] text-orange-600">{pendingAsRequests.length}건 · 영업팀에서 A/S를 요청했습니다</span>
-          </div>
-          {pendingAsRequests.length === 0 ? (
-            <div className="p-12 text-center text-sm text-gray-400">A/S 요청 없음</div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {pendingAsRequests.map(c => {
-                const owner = (c as any).details?.sales_user_name || (c as any).sales_user_name || '—'
-                return (
-                  <div key={c.id} className="px-5 py-4 flex items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <p className="font-bold text-gray-900 text-sm">{c.company || c.name}</p>
-                        <span className="text-[10px] text-gray-400">{c.name}</span>
-                        <span className="text-[10px] text-gray-400 font-mono">{c.phone}</span>
-                        <span className="text-[10px] bg-orange-50 border border-orange-200 text-orange-700 px-1.5 py-0.5 rounded-full font-medium">{owner}</span>
-                      </div>
-                      <p className="text-[10px] text-gray-500 mb-1">요청일: <b>{c.details?.as_request_date || '—'}</b></p>
-                      {c.details?.result_memo && (
-                        <p className="text-[11px] text-gray-600 bg-gray-50 rounded px-2 py-1">{c.details.result_memo}</p>
-                      )}
-                    </div>
-                    <button type="button" onClick={() => resolveAsRequest(c.id)}
-                      className="shrink-0 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-lg transition-colors mt-1">
-                      ✅ 처리완료
-                    </button>
-                  </div>
-                )
-              })}
+        <div className="space-y-4">
+          {/* 대기 중인 A/S 요청 */}
+          <div className="bg-white border border-orange-200 rounded-2xl overflow-hidden">
+            <div className="px-5 py-3 bg-orange-50 border-b border-orange-200 flex items-center justify-between">
+              <span className="text-sm font-bold text-orange-800">🔧 A/S 요청 대기</span>
+              <span className="text-[10px] text-orange-600">{pendingAsRequests.length}건 · A/S 승인 또는 불가 처리</span>
             </div>
-          )}
+            {pendingAsRequests.length === 0 ? (
+              <div className="p-10 text-center text-sm text-gray-400">A/S 요청 없음</div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {pendingAsRequests.map(c => {
+                  const owner = (c as any).details?.sales_user_name || (c as any).sales_user_name || '—'
+                  return (
+                    <div key={c.id} className="px-5 py-4 flex items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <p className="font-bold text-gray-900 text-sm">{(c as any).details?.company || c.company || c.name}</p>
+                          <span className="text-[10px] text-gray-400">{c.name}</span>
+                          <span className="text-[10px] text-gray-400 font-mono">{c.phone}</span>
+                          <span className="text-[10px] bg-orange-50 border border-orange-200 text-orange-700 px-1.5 py-0.5 rounded-full font-medium">{owner}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-500 mb-1">
+                          요청일: <b>{(c as any).details?.as_request_date || '—'}</b>
+                        </p>
+                        {(c as any).details?.as_memo && (
+                          <p className="text-[11px] text-gray-600 bg-gray-50 rounded px-2 py-1">{(c as any).details.as_memo}</p>
+                        )}
+                        {(c as any).details?.result_memo && (
+                          <p className="text-[11px] text-gray-600 bg-gray-50 rounded px-2 py-1 mt-1">{(c as any).details.result_memo}</p>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-2 shrink-0 pt-1">
+                        <button type="button" onClick={() => approveAs(c.id)}
+                          className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg transition-colors whitespace-nowrap">
+                          ✅ A/S 승인
+                        </button>
+                        <button type="button" onClick={() => rejectAs(c.id)}
+                          className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-lg border border-red-200 transition-colors whitespace-nowrap">
+                          🚫 A/S 불가
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* A/S 승인된 업체 목록 */}
+          <div className="bg-white border border-emerald-200 rounded-2xl overflow-hidden">
+            <div className="px-5 py-3 bg-emerald-50 border-b border-emerald-200 flex items-center justify-between">
+              <span className="text-sm font-bold text-emerald-800">✅ A/S 승인 업체</span>
+              <span className="text-[10px] text-emerald-600">{asApprovedList.length}건 · 나중에 재활용 가능한 DB</span>
+            </div>
+            {asApprovedList.length === 0 ? (
+              <div className="p-8 text-center text-sm text-gray-400">승인된 A/S 없음</div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {asApprovedList.map(c => {
+                  const owner = (c as any).details?.sales_user_name || (c as any).sales_user_name || '—'
+                  return (
+                    <div key={c.id} className="px-5 py-3 flex items-center gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold text-gray-800 text-sm">{(c as any).details?.company || c.company || c.name}</p>
+                          <span className="text-[10px] text-gray-400">{c.name}</span>
+                          <span className="text-[10px] text-gray-400 font-mono">{c.phone}</span>
+                          <span className="text-[10px] bg-emerald-50 border border-emerald-200 text-emerald-700 px-1.5 py-0.5 rounded-full font-medium">{owner}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-0.5">
+                          요청일: {(c as any).details?.as_request_date || '—'} · 승인일: {(c as any).details?.as_approve_date || '—'}
+                        </p>
+                      </div>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold shrink-0">A/S 완료</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -667,6 +784,42 @@ export default function SalesCeoTab() {
 
       {/* ── 고객관리 뷰 ── */}
       {ceoView === 'customers' && (<>
+
+      {/* ── 매출 통계 패널 ── */}
+      <div className="bg-gradient-to-r from-[#1B2A45] to-blue-800 rounded-2xl px-5 py-4 text-white">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-bold text-white/60 uppercase tracking-wide">💰 영업팀 매출 현황</p>
+          <p className="text-[10px] text-white/40">계약업체 본인매출 합산</p>
+        </div>
+        <div className="flex items-end gap-3 mb-4">
+          <p className="text-3xl font-black text-[#C5A258]">{fmtWon(totalRevenue)}</p>
+          <p className="text-sm text-white/50 mb-1">원 · 전체합계</p>
+        </div>
+        {personStats.length === 0 ? (
+          <p className="text-white/40 text-xs">등록된 영업사원 없음</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+            {personStats.map(p => {
+              const pct = totalRevenue > 0 ? Math.round((p.revenue / totalRevenue) * 100) : 0
+              return (
+                <div key={p.name} className="bg-white/10 rounded-xl px-3 py-2.5">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-bold">{p.name.charAt(0)}</div>
+                    <span className="text-xs font-semibold text-white/90 truncate">{p.name.replace(' 수석팀장', '')}</span>
+                    <span className="ml-auto text-[10px] text-white/40">{pct}%</span>
+                  </div>
+                  <p className="text-base font-black text-[#C5A258]">{fmtWon(p.revenue)}</p>
+                  <p className="text-[10px] text-white/40 mt-0.5">계약 {p.contracted}건 · DB {p.lead}</p>
+                  {/* 점유율 바 */}
+                  <div className="mt-1.5 h-1 bg-white/10 rounded-full overflow-hidden">
+                    <div className="h-full bg-[#C5A258] rounded-full transition-all" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
 
       {/* ── 영업사원 탭 ── */}
       <div>
@@ -710,9 +863,9 @@ export default function SalesCeoTab() {
                 )}>{p.total}</span>
               </div>
               <div className={"flex gap-2 mt-1.5 text-[10px] " + (personTab === p.name ? 'text-white/70' : 'text-gray-400')}>
-                <span>DB {p.lead}</span><span>·</span>
-                <span>계약 {p.contracted}</span><span>·</span>
-                <span>010 {p.db010}</span>
+                <span>매출 <b className={personTab === p.name ? 'text-[#C5A258]' : 'text-emerald-600'}>{fmtWon(p.revenue)}</b></span>
+                <span>·</span>
+                <span>계약 {p.contracted}</span>
               </div>
             </button>
           ))}
