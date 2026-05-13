@@ -25,7 +25,7 @@ function fmt(n: number) {
 }
 
 // ── Types ──────────────────────────────────────────────────────────────
-interface OpsCase {
+export interface OpsCase {
   id: string
   customer_id: string
   ops_user_id: string
@@ -203,7 +203,7 @@ function TimelineSection({ initialTimeline, onSchedule }: {
 // ──────────────────────────────────────────────────────────────────────
 // OpsDetailPanel (타임라인 기본, 고객정보 탭 제거)
 // ──────────────────────────────────────────────────────────────────────
-function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (id: string, patch: Record<string, any>) => void; userRole?: string }) {
+export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (id: string, patch: Record<string, any>) => void; userRole?: string }) {
   const [local, setLocal] = useState<OpsCase>({ ...c })
   const [activeDetailTab, setActiveDetailTab] = useState<DetailTab>('진행현황')
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)

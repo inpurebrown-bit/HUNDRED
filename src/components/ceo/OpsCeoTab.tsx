@@ -1,28 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-
-// ─── Types ────────────────────────────────────────────────
-interface OpsCase {
-  id: string
-  customer_id?: string
-  ops_user_name?: string
-  institution: string
-  progress_stage: string
-  progress_memo?: string
-  revenue?: number
-  is_refund?: boolean
-  is_completed?: boolean
-  timeline?: any[]
-  details?: Record<string, any>
-  updated_at?: string
-  customers?: { name: string; phone: string; details?: any }
-  // legacy fields
-  customer_name?: string
-  phone?: string
-  stage?: string
-  institution_type?: string
-}
+import { OpsDetailPanel, OpsCase } from '@/components/ops/OpsDashboard'
 
 // ─── Constants ─────────────────────────────────────────────
 const PIPELINE_STAGES = [
@@ -43,8 +22,6 @@ const PIPELINE_STAGES = [
   { key: '환불',       label: '환불',       color: 'bg-rose-500'    },
   { key: '종료',       label: '종료',       color: 'bg-neutral-400' },
 ]
-const STAGE_COLOR: Record<string, string> = Object.fromEntries(PIPELINE_STAGES.map(s => [s.key, s.color]))
-
 const INST_DIRECT   = ['중진공','소진공(혁신)','소진공(신취)','소진공(재도전)','서민금융(미소)']
 const INST_INDIRECT = ['기보','신보','재단']
 const INDIRECT_SET  = new Set(INST_INDIRECT)
@@ -54,12 +31,6 @@ const ACTIVE_STAGE_KEYS    = new Set(['서류받는중','접수전','신청완�
 const REFUND_STAGE_KEYS    = new Set(['환불','refunded'])
 const COMPLETED_STAGE_KEYS = new Set(['종료','완료','completed'])
 
-function fmt(n: number) {
-  if (!n) return '-'
-  if (n >= 100_000_000) return (n / 100_000_000).toFixed(1) + '억'
-  if (n >= 10_000) return Math.round(n / 10_000) + '만'
-  return n.toLocaleString()
-}
 function formatKST(isoStr: string) {
   if (!isoStr) return { date: '', time: '' }
   const d = new Date(isoStr)
@@ -68,156 +39,10 @@ function formatKST(isoStr: string) {
   return { date, time }
 }
 
-// ─── Timeline Drawer ──────────────────────────────────────
-function TimelineDrawer({ c, onClose, onSave }: {
-  c: OpsCase
-  onClose: () => void
-  onSave: (id: string, patch: Record<string, any>) => void
-}) {
-  const [tl, setTl] = useState<any[]>(c.timeline || [])
-  const [text, setText] = useState('')
-  const [view, setView] = useState<'timeline' | 'info'>('timeline')
-  const companyName = c.customers?.details?.company || c.customers?.name || c.customer_name || '—'
-  const stage = c.progress_stage || c.stage || '—'
-
-  function add() {
-    if (!text.trim()) return
-    const entry = { user: 'CEO', content: text.trim(), created_at: new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(' ', 'T') + '+09:00' }
-    const updated = [...tl, entry]
-    setTl(updated)
-    onSave(c.id, { timeline: updated })
-    setText('')
-  }
-
-  return (
-    <div className="fixed inset-0 z-[100]">
-      <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="absolute top-0 bottom-0 right-0 w-full md:w-[500px] bg-white shadow-2xl overflow-y-auto">
-        {/* 헤더 */}
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-3 flex items-center justify-between z-10">
-          <div>
-            <p className="font-bold text-[#1B2A45] text-sm">{companyName}</p>
-            <div className="flex items-center gap-2 mt-0.5">
-              <p className="text-[10px] text-gray-400">{c.customers?.name} · {c.customers?.phone}</p>
-              {c.ops_user_name && <span className="text-[10px] text-violet-500 font-medium">{c.ops_user_name}</span>}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold text-white ${STAGE_COLOR[stage] || 'bg-gray-400'}`}>{stage}</span>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none px-1">✕</button>
-          </div>
-        </div>
-
-        {/* 서브탭 */}
-        <div className="flex border-b border-gray-100 px-5">
-          {[{ key: 'timeline', label: '📋 타임라인' }, { key: 'info', label: 'ℹ️ 진행정보' }].map(t => (
-            <button key={t.key} onClick={() => setView(t.key as any)}
-              className={`px-3 py-2.5 text-xs font-medium border-b-2 transition-colors ${
-                view === t.key ? 'border-violet-500 text-violet-600' : 'border-transparent text-gray-400 hover:text-gray-600'
-              }`}>{t.label}</button>
-          ))}
-        </div>
-
-        <div className="p-5">
-          {view === 'timeline' && (
-            <div className="space-y-3">
-              {/* 타임라인 입력 */}
-              <div className="flex gap-2">
-                <input value={text} onChange={e => setText(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && add()}
-                  placeholder="타임라인 메모 추가..."
-                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-violet-400" />
-                <button onClick={add} className="bg-violet-500 hover:bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-medium">추가</button>
-              </div>
-
-              {tl.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-8">타임라인이 없습니다</p>
-              ) : (
-                <div className="relative pl-4 border-l-2 border-violet-200 space-y-3">
-                  {[...tl].reverse().map((entry: any, i: number) => {
-                    const isAuto = entry.user === '자동기록'
-                    const kst = formatKST(entry.created_at || entry.date || '')
-                    const user = entry.user || entry.author || ''
-                    const content = entry.content || entry.text || ''
-                    return (
-                      <div key={i} className="relative">
-                        <div className={`absolute -left-[21px] top-1.5 w-3 h-3 rounded-full border-2 border-white ${isAuto ? 'bg-violet-400' : 'bg-[#1B2A45]'}`} />
-                        <div className={`rounded-lg px-3 py-2 ${isAuto ? 'bg-violet-50' : 'bg-gray-50'}`}>
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <span className={`text-[10px] font-semibold ${isAuto ? 'text-violet-600' : 'text-[#1B2A45]'}`}>{user || '—'}</span>
-                            <span className="text-[10px] text-gray-400">{kst.date} {kst.time}</span>
-                          </div>
-                          <p className="text-sm text-gray-700">{content}</p>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {view === 'info' && (
-            <div className="space-y-4">
-              {/* 기관 정보 */}
-              <div>
-                <p className="text-xs font-bold text-gray-500 mb-2">🏦 담당 기관</p>
-                {c.institution ? (
-                  <div className="flex flex-wrap gap-1">
-                    {c.institution.split(',').map((inst: string) => {
-                      const s = inst.trim()
-                      return (
-                        <span key={s} className={`text-xs px-3 py-1 rounded-full font-medium ${
-                          INDIRECT_SET.has(s) ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'
-                        }`}>{s}</span>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-400">기관 미배정</p>
-                )}
-              </div>
-
-              {/* 메모 */}
-              {c.progress_memo && (
-                <div>
-                  <p className="text-xs font-bold text-gray-500 mb-1">📝 진행 메모</p>
-                  <p className="text-sm text-gray-700 bg-gray-50 rounded-xl p-3">{c.progress_memo}</p>
-                </div>
-              )}
-
-              {/* 재무 */}
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: '승인금액', value: c.details?.approval_amount },
-                  { label: '수수료', value: c.details?.fee_amount },
-                  { label: '계약금(VAT제외)', value: c.details?.contract_amount },
-                  { label: '입금액', value: c.details?.deposit_amount },
-                  { label: '방문 일정', value: c.details?.visit_date },
-                  { label: '계약일', value: c.details?.contract_date },
-                ].filter(item => item.value).map(item => (
-                  <div key={item.label} className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-[10px] text-gray-400 mb-0.5">{item.label}</p>
-                    <p className="text-sm font-semibold text-gray-800">{item.value}</p>
-                  </div>
-                ))}
-              </div>
-
-              {c.updated_at && (
-                <p className="text-[10px] text-gray-300 text-right">마지막 수정: {new Date(c.updated_at).toLocaleString('ko-KR')}</p>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ─── Case Card (8-col grid) ───────────────────────────────
 function CeoCaseCard({ c, isOpen, onToggle }: { c: OpsCase; isOpen: boolean; onToggle: (id: string) => void }) {
-  const companyName = c.customers?.details?.company || c.customers?.name || c.customer_name || '—'
-  const stage = c.progress_stage || c.stage || ''
+  const companyName = c.customers?.details?.company || c.customers?.name || '—'
+  const stage = c.progress_stage || ''
   const stageInfo = PIPELINE_STAGES.find(s => s.key === stage)
   const allInstitutions = (c.institution || '').split(',').map((s: string) => s.trim()).filter(Boolean)
   const hasMultiple = allInstitutions.length > 1
@@ -235,8 +60,11 @@ function CeoCaseCard({ c, isOpen, onToggle }: { c: OpsCase; isOpen: boolean; onT
         style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
         {companyName}
       </p>
-      <p className="text-[10px] text-gray-400 mt-0.5">{c.customers?.name || c.customer_name}</p>
-      <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{c.customers?.phone || c.phone}</p>
+      {/* 대표자 — 업체명과 다를 때만 표시 */}
+      {c.customers?.name && c.customers.name !== companyName && (
+        <p className="text-[10px] text-gray-400 mt-0.5">{c.customers.name}</p>
+      )}
+      <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{c.customers?.phone}</p>
       {c.ops_user_name && <p className="text-[9px] text-violet-500 mt-0.5">{c.ops_user_name}</p>}
 
       <div className="mt-1.5">
@@ -269,8 +97,8 @@ function CeoCaseCard({ c, isOpen, onToggle }: { c: OpsCase; isOpen: boolean; onT
 
 // ─── CaseListRow (환불/종료 리스트) ───────────────────────
 function CeoCaseListRow({ c, isOpen, onToggle }: { c: OpsCase; isOpen: boolean; onToggle: (id: string) => void }) {
-  const companyName = c.customers?.details?.company || c.customers?.name || c.customer_name || '—'
-  const stage = c.progress_stage || c.stage || '—'
+  const companyName = c.customers?.details?.company || c.customers?.name || '—'
+  const stage = c.progress_stage || '—'
   const stageInfo = PIPELINE_STAGES.find(s => s.key === stage)
   const latestTl = c.timeline && c.timeline.length > 0 ? c.timeline[c.timeline.length - 1] : null
 
@@ -282,7 +110,9 @@ function CeoCaseListRow({ c, isOpen, onToggle }: { c: OpsCase; isOpen: boolean; 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-semibold text-[#1B2A45] text-sm" style={{ wordBreak: 'break-all' }}>{companyName}</span>
-          <span className="text-xs text-gray-400">{c.customers?.name || c.customer_name}</span>
+          {c.customers?.name && c.customers.name !== companyName && (
+            <span className="text-xs text-gray-400">{c.customers.name}</span>
+          )}
           {c.ops_user_name && <span className="text-[10px] text-violet-500">{c.ops_user_name}</span>}
         </div>
         {(c.institution || latestTl) && (
@@ -309,9 +139,9 @@ function CeoCaseListRow({ c, isOpen, onToggle }: { c: OpsCase; isOpen: boolean; 
 }
 
 // ─── Institution Grouped View (진행중) ────────────────────
-function InstitutionGroupedView({ cases, openId, onToggle }: {
+function InstitutionGroupedView({ cases, openPanelIds, onToggle }: {
   cases: OpsCase[]
-  openId: string | null
+  openPanelIds: string[]
   onToggle: (id: string) => void
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
@@ -353,7 +183,7 @@ function InstitutionGroupedView({ cases, openId, onToggle }: {
             {isOpen && (
               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
                 {items.map(c => (
-                  <CeoCaseCard key={`${inst}-${c.id}`} c={c} isOpen={openId === c.id} onToggle={onToggle} />
+                  <CeoCaseCard key={`${inst}-${c.id}`} c={c} isOpen={openPanelIds.includes(c.id)} onToggle={onToggle} />
                 ))}
               </div>
             )}
@@ -370,7 +200,7 @@ export default function OpsCeoTab() {
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<'active' | 'refund' | 'completed'>('active')
   const [search, setSearch] = useState('')
-  const [openId, setOpenId] = useState<string | null>(null)
+  const [openPanelIds, setOpenPanelIds] = useState<string[]>([])
   const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
   async function load() {
@@ -379,13 +209,10 @@ export default function OpsCeoTab() {
     const data = await res.json()
     setCases((data.cases || []).map((c: any) => ({
       ...c,
-      stage: c.stage || c.progress_stage || '',
       progress_stage: c.progress_stage || c.stage || '',
       timeline: Array.isArray(c.timeline) ? c.timeline : [],
       institution: c.institution || '',
-      customer_name: c.customers?.name || c.customer_name || '',
-      phone: c.customers?.phone || c.phone || '',
-    })))
+    })) as OpsCase[])
     setLoading(false)
   }
 
@@ -407,24 +234,28 @@ export default function OpsCeoTab() {
     }, 1500)
   }, [])
 
-  function toggleOpen(id: string) {
-    setOpenId(prev => prev === id ? null : id)
+  function togglePanel(id: string) {
+    setOpenPanelIds(prev => {
+      if (prev.includes(id)) return prev.filter(x => x !== id)
+      const next = [...prev, id]
+      return next.length > 2 ? next.slice(1) : next
+    })
   }
 
   // 필터
   const q = search.trim().toLowerCase()
   const filtered = q
     ? cases.filter(c =>
-        (c.customers?.details?.company || c.customers?.name || c.customer_name || '').toLowerCase().includes(q) ||
-        (c.customers?.phone || c.phone || '').replace(/-/g, '').includes(q.replace(/-/g, '')) ||
+        (c.customers?.details?.company || c.customers?.name || '').toLowerCase().includes(q) ||
+        (c.customers?.phone || '').replace(/-/g, '').includes(q.replace(/-/g, '')) ||
         (c.institution || '').toLowerCase().includes(q) ||
         (c.ops_user_name || '').toLowerCase().includes(q)
       )
     : cases
 
-  const activeCases    = filtered.filter(c => ACTIVE_STAGE_KEYS.has(c.progress_stage || c.stage || '') || (!REFUND_STAGE_KEYS.has(c.progress_stage || '') && !COMPLETED_STAGE_KEYS.has(c.progress_stage || '') && !c.is_refund && !c.is_completed))
-  const refundCases    = filtered.filter(c => REFUND_STAGE_KEYS.has(c.progress_stage || c.stage || '') || c.is_refund)
-  const completedCases = filtered.filter(c => COMPLETED_STAGE_KEYS.has(c.progress_stage || c.stage || '') || c.is_completed)
+  const activeCases    = filtered.filter(c => ACTIVE_STAGE_KEYS.has(c.progress_stage) || (!REFUND_STAGE_KEYS.has(c.progress_stage) && !COMPLETED_STAGE_KEYS.has(c.progress_stage) && !c.is_refund && !c.is_completed))
+  const refundCases    = filtered.filter(c => REFUND_STAGE_KEYS.has(c.progress_stage) || c.is_refund)
+  const completedCases = filtered.filter(c => COMPLETED_STAGE_KEYS.has(c.progress_stage) || c.is_completed)
 
   const viewCases = view === 'refund' ? refundCases : view === 'completed' ? completedCases : activeCases
 
@@ -488,7 +319,7 @@ export default function OpsCeoTab() {
       {loading ? (
         <div className="text-center py-12 text-gray-400">불러오는 중...</div>
       ) : view === 'active' ? (
-        <InstitutionGroupedView cases={activeCases} openId={openId} onToggle={toggleOpen} />
+        <InstitutionGroupedView cases={activeCases} openPanelIds={openPanelIds} onToggle={togglePanel} />
       ) : (
         <div className="space-y-2">
           {viewCases.length === 0 ? (
@@ -497,18 +328,34 @@ export default function OpsCeoTab() {
             </div>
           ) : (
             viewCases.map(c => (
-              <CeoCaseListRow key={c.id} c={c} isOpen={openId === c.id} onToggle={toggleOpen} />
+              <CeoCaseListRow key={c.id} c={c} isOpen={openPanelIds.includes(c.id)} onToggle={togglePanel} />
             ))
           )}
         </div>
       )}
 
-      {/* 드로어 */}
-      {openId && (() => {
-        const c = cases.find(x => x.id === openId)
+      {/* ── 우측 슬라이딩 패널 (관리팀과 동일한 OpsDetailPanel) ── */}
+      {openPanelIds.map((id, panelIndex) => {
+        const c = cases.find(x => x.id === id)
         if (!c) return null
-        return <TimelineDrawer c={c} onClose={() => setOpenId(null)} onSave={handleSave} />
-      })()}
+        const rightOffset = panelIndex === 0 ? 'right-0' : 'right-0 md:right-[530px]'
+        return (
+          <div key={id}
+            className={`fixed top-0 bottom-0 ${rightOffset} w-full md:w-[520px] bg-white shadow-2xl overflow-y-auto z-[100]`}
+          >
+            <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-3 flex items-center justify-between z-10">
+              <div>
+                <p className="font-bold text-[#1B2A45] text-sm">{c.customers?.details?.company || c.customers?.name}</p>
+                <p className="text-[10px] text-gray-400">{c.customers?.name} · {c.customers?.phone}</p>
+              </div>
+              <button onClick={() => togglePanel(id)} className="text-gray-400 hover:text-gray-600 text-xl leading-none px-1">✕</button>
+            </div>
+            <div className="p-4">
+              <OpsDetailPanel c={c} onSave={handleSave} userRole="ceo" />
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
