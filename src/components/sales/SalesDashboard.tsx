@@ -377,9 +377,11 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const supplyNotice = notices.find(n => n.notice_type === 'supply_count')
   const todaySupply = supplyNotice ? parseInt(supplyNotice.content) || 0 : 0
 
-  const contractRate = mySupplyCfg && mySupplyCfg.supplied > 0
-    ? Math.round(myTotalContracted / mySupplyCfg.supplied * 100)
-    : todaySupply > 0 ? Math.round(myDbContracted / todaySupply * 100) : 0
+  // displayCfg: 공급설정 없으면 기본값 — 두 유저 동일 뷰 보장
+  const displayCfg = mySupplyCfg ?? { supplied: todaySupply, goal: monthlyGoal, base: 0 }
+  const contractRate = displayCfg.supplied > 0
+    ? parseFloat((myTotalContracted / displayCfg.supplied * 100).toFixed(2))
+    : 0
   const tomorrowSupplyNeeded = calcRecommendedSupply(contractRate, bizElapsed)
 
   const achievementRate = Math.min(100, Math.round(monthContractCount / monthlyGoal * 100))
@@ -423,7 +425,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   // 매출: 계약 상태인 모든 고객 (ops 전송 여부 무관)
   const revenueCustomers = customers.filter(c => c.status === 'contracted')
 
-  const generalNotices = notices.filter(n => n.notice_type !== 'supply_count')
+  const generalNotices = notices.filter(n => n.notice_type !== 'supply_count' && n.notice_type !== 'supply_config')
 
   // 오늘 재통화 예정 고객 (전체 탭 통합)
   const todayStr2 = new Date().toISOString().slice(0, 10)
@@ -765,69 +767,49 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               </p>
             </div>
 
-            {/* 공급 현황 + 계약율 */}
-            {mySupplyCfg ? (
-              /* 인당 공급 설정이 있는 경우: 상세 통계 */
-              <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-bold text-gray-700">📊 내 이번달 공급 현황</p>
-                  <span className="text-[10px] text-gray-400">{thisMonth}</span>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {/* 금일/이달 공급 — 합칩 */}
-                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
-                    <p className="text-[10px] text-gray-400 mb-1">공급 현황</p>
-                    <p className="text-xl font-black text-blue-700">{mySupplyCfg.supplied}개 <span className="text-[11px] font-normal text-gray-400">이달</span></p>
-                    {todaySupply > 0 && <p className="text-[10px] text-blue-500 font-semibold mt-0.5">금일 {todaySupply}개 배정</p>}
-                  </div>
-                  {[
-                    { label: '결제수', value: `${myTotalContracted.toFixed(1)}개`, color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-100',
-                      sub: mySupplyCfg.base > 0 ? `기존 ${mySupplyCfg.base} + DB ${myDbContracted.toFixed(1)}` : undefined },
-                    { label: '계약율', value: `${contractRate}%`, color: contractRate >= 17 ? 'text-emerald-700' : contractRate >= 13 ? 'text-amber-700' : 'text-red-600', bg: contractRate >= 17 ? 'bg-emerald-50' : contractRate >= 13 ? 'bg-amber-50' : 'bg-red-50', border: contractRate >= 17 ? 'border-emerald-100' : contractRate >= 13 ? 'border-amber-100' : 'border-red-100' },
-                    { label: '결제율 대비 공급예정', value: tomorrowSupplyNeeded > 0 ? `${tomorrowSupplyNeeded}개` : '공급 중단', color: 'text-violet-700', bg: 'bg-violet-50', border: 'border-violet-100' },
-                  ].map(s => (
-                    <div key={s.label} className={`${s.bg} border ${(s as any).border} rounded-xl p-3`}>
-                      <p className="text-[10px] text-gray-400 mb-1">{s.label}</p>
-                      <p className={`text-xl font-black ${s.color}`}>{s.value}</p>
-                      {(s as any).sub && <p className="text-[9px] text-gray-400 mt-0.5">{(s as any).sub}</p>}
-                    </div>
-                  ))}
-                </div>
-                {/* 목표 달성 바 */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] text-gray-500">목표 달성 ({myTotalContracted.toFixed(1)} / {mySupplyCfg.goal}개)</span>
-                    <span className="text-[10px] font-bold text-gray-700">
-                      {mySupplyCfg.goal > 0 ? Math.round(myTotalContracted / mySupplyCfg.goal * 100) : 0}%
-                    </span>
-                  </div>
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-500 rounded-full transition-all"
-                      style={{ width: `${mySupplyCfg.goal > 0 ? Math.min(100, Math.round(myTotalContracted / mySupplyCfg.goal * 100)) : 0}%` }} />
-                  </div>
-                </div>
+            {/* 공급 현황 + 계약율 — 항상 상세뷰 (설정 없으면 displayCfg 기본값 사용) */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold text-gray-700">📊 내 이번달 공급 현황</p>
+                <span className="text-[10px] text-gray-400">{thisMonth}</span>
               </div>
-            ) : (
-              /* 기본 공급 통계 (공급 설정 미등록 시) */
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {/* 금일/이달 공급 — 합쳐서 하나의 카드에 */}
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3.5">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {/* 공급 현황 카드 */}
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
                   <p className="text-[10px] text-gray-400 mb-1">공급 현황</p>
-                  <p className="text-2xl font-black text-blue-700">{todaySupply > 0 ? `${todaySupply}개` : '미배정'}</p>
-                  <p className="text-[10px] text-blue-400 mt-0.5">금일 · 이달 계약 {monthContractCount}건</p>
+                  <p className="text-xl font-black text-blue-700">
+                    {displayCfg.supplied > 0 ? `${displayCfg.supplied}개` : '미배정'}
+                    {displayCfg.supplied > 0 && <span className="text-[11px] font-normal text-gray-400"> 이달</span>}
+                  </p>
+                  {todaySupply > 0 && <p className="text-[10px] text-blue-500 font-semibold mt-0.5">금일 {todaySupply}개 배정</p>}
                 </div>
                 {[
-                  { label: '이번달 계약', value: `${monthContractCount}건`, color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-100' },
-                  { label: '공급 대비 계약율', value: todaySupply > 0 ? `${contractRate}%` : '—', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-100' },
-                  { label: '결제율 대비 공급예정', value: tomorrowSupplyNeeded > 0 ? `${tomorrowSupplyNeeded}개` : '—', color: 'text-violet-700', bg: 'bg-violet-50', border: 'border-violet-100' },
+                  { label: '결제수', value: `${myTotalContracted.toFixed(1)}개`, color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-100',
+                    sub: displayCfg.base > 0 ? `기존 ${displayCfg.base} + DB ${myDbContracted.toFixed(1)}` : undefined },
+                  { label: '공급 대비 계약율', value: `${contractRate.toFixed(2)}%`, color: contractRate >= 17 ? 'text-emerald-700' : contractRate >= 13 ? 'text-amber-700' : 'text-red-600', bg: contractRate >= 17 ? 'bg-emerald-50' : contractRate >= 13 ? 'bg-amber-50' : 'bg-red-50', border: contractRate >= 17 ? 'border-emerald-100' : contractRate >= 13 ? 'border-amber-100' : 'border-red-100' },
+                  { label: '결제율 대비 공급예정', value: tomorrowSupplyNeeded > 0 ? `${tomorrowSupplyNeeded}개` : '공급 중단', color: 'text-violet-700', bg: 'bg-violet-50', border: 'border-violet-100' },
                 ].map(s => (
-                  <div key={s.label} className={`${s.bg} border ${s.border} rounded-xl p-3.5`}>
+                  <div key={s.label} className={`${s.bg} border ${(s as any).border} rounded-xl p-3`}>
                     <p className="text-[10px] text-gray-400 mb-1">{s.label}</p>
-                    <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
+                    <p className={`text-xl font-black ${s.color}`}>{s.value}</p>
+                    {(s as any).sub && <p className="text-[9px] text-gray-400 mt-0.5">{(s as any).sub}</p>}
                   </div>
                 ))}
               </div>
-            )}
+              {/* 목표 달성 바 */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] text-gray-500">목표 달성 ({myTotalContracted.toFixed(1)} / {displayCfg.goal}개)</span>
+                  <span className="text-[10px] font-bold text-gray-700">
+                    {displayCfg.goal > 0 ? Math.round(myTotalContracted / displayCfg.goal * 100) : 0}%
+                  </span>
+                </div>
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500 rounded-full transition-all"
+                    style={{ width: `${displayCfg.goal > 0 ? Math.min(100, Math.round(myTotalContracted / displayCfg.goal * 100)) : 0}%` }} />
+                </div>
+              </div>
+            </div>
 
             {/* 공급기준표 */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
