@@ -425,6 +425,7 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
   const [paidAmount,  setPaidAmount]  = useState('')
   const [vatIncluded, setVatIncluded] = useState(false)
   const [myRevenue,   setMyRevenue]   = useState('')
+  const [contractDate, setContractDate] = useState(new Date().toISOString().slice(0, 10))
   // 메모 미러링: 통화내용/메모와 동일 필드 (initialMemo로 pre-fill)
   const [opsMemo,     setOpsMemo]     = useState(initialMemo)
   const [noRefund,    setNoRefund]    = useState(initialNoRefund)
@@ -460,7 +461,7 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
       no_refund:           noRefund,
       group_chat_invited:  groupChatInvited,
       coop_request_sent:   coopRequestSent,
-      contract_date:       new Date().toISOString().slice(0, 10),
+      contract_date:       contractDate,
     })
     setSaving(false)
   }
@@ -532,6 +533,19 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
                 {feeNum.toLocaleString()}원 (합의) − {netPaid.toLocaleString()}원 (순입금) = <span className={unpaid > 0 ? 'text-red-500 font-semibold' : 'text-emerald-600 font-semibold'}>{unpaid > 0 ? unpaid.toLocaleString() + '원 잔금' : '완납'}</span>
               </p>
             )}
+          </div>
+
+          {/* ★ 계약 일자 (매출 월 반영 기준) */}
+          <div>
+            <label className="text-[10px] text-red-600 mb-1 block font-bold">
+              📅 계약 일자 <span className="text-gray-400 font-normal">(매출 월 분류 기준 — 정확히 입력)</span>
+            </label>
+            <input
+              type="date"
+              value={contractDate}
+              onChange={e => setContractDate(e.target.value)}
+              className={INP + ' text-gray-800'}
+            />
           </div>
 
           {/* 본인 매출 */}
@@ -670,6 +684,7 @@ function CustomerCard({
   const [qtCheckedGroup, setQtCheckedGroup] = useState(false)
   const [qtCheckedCoop,  setQtCheckedCoop]  = useState(false)
   const [qtLoading, setQtLoading] = useState(false)
+  const [qtContractDate, setQtContractDate] = useState('')
   const [tlText, setTlText] = useState('')
   const [tradeOpen, setTradeOpen] = useState(false)
   const [logEditMode, setLogEditMode] = useState(false)
@@ -794,6 +809,11 @@ function CustomerCard({
   async function handleQuickTransfer() {
     if (!onTransferToOps) return
     setQtLoading(true)
+    // 계약일자가 바뀐 경우 먼저 업데이트
+    const existingDate = (c as any).details?.contract_date || ''
+    if (qtContractDate && qtContractDate !== existingDate) {
+      await onUpdate(c.id, { details: { contract_date: qtContractDate } })
+    }
     await onTransferToOps(c)
     setQtLoading(false)
     setQuickTransferOpen(false)
@@ -829,6 +849,18 @@ function CustomerCard({
               <button onClick={() => setQuickTransferOpen(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
             </div>
             <div className="px-5 py-4 space-y-3">
+              {/* ★ 계약일자 확인/수정 */}
+              <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
+                <label className="text-[10px] text-red-700 font-bold block mb-1.5">
+                  📅 계약 일자 확인 <span className="font-normal text-red-500">(매출 월 반영 기준 — 꼭 확인)</span>
+                </label>
+                <input
+                  type="date"
+                  value={qtContractDate}
+                  onChange={e => setQtContractDate(e.target.value)}
+                  className="w-full border border-red-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300/50 text-gray-800 bg-white"
+                />
+              </div>
               <p className="text-[10px] text-gray-400 font-semibold">📋 전송 전 체크리스트</p>
               <label className="flex items-center gap-3 cursor-pointer bg-emerald-50 rounded-lg px-3 py-2.5 border border-emerald-100">
                 <input type="checkbox" checked={qtCheckedGroup} onChange={e => setQtCheckedGroup(e.target.checked)} className="w-4 h-4 accent-emerald-500" />
@@ -989,11 +1021,22 @@ function CustomerCard({
           <p className="text-[9px] text-sky-500 mt-1.5 font-medium">📅 {c.details.follow_up_date.slice(5)}</p>
         )}
 
+        {/* 계약일자 표시 (contracted 탭) */}
+        {tabType === 'contracted' && (
+          <p className="text-[9px] text-emerald-600 font-semibold mt-1">
+            📅 {(c as any).details?.contract_date ? (c as any).details.contract_date.slice(0, 10) : '계약일 미입력'}
+          </p>
+        )}
+
         {/* 계약업체 전송 빠른버튼 */}
         {tabType === 'contracted' && onTransferToOps && !c.details?.ops_transferred && (
           <button
             type="button"
-            onClick={e => { e.stopPropagation(); setQuickTransferOpen(true) }}
+            onClick={e => {
+              e.stopPropagation()
+              setQtContractDate((c as any).details?.contract_date || new Date().toISOString().slice(0, 10))
+              setQuickTransferOpen(true)
+            }}
             className="mt-1.5 w-full text-[9px] bg-amber-500 hover:bg-amber-600 text-white rounded py-1 font-semibold transition-colors"
           >
             📤 관리팀 전송
@@ -1253,6 +1296,24 @@ function CustomerCard({
                   onChange={(val) => onUpdate(c.id, { details: { closing_result: val } })}
                 />
               </div>
+
+              {/* ★ 계약 일자 (contracted 탭 - 항상 편집 가능) */}
+              {tabType === 'contracted' && (
+                <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                  <label className="text-[10px] text-red-700 mb-1.5 block font-bold">
+                    📅 계약 일자 <span className="text-red-400 font-normal">(매출 월 기준 — 수정 가능)</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={(c as any).details?.contract_date || ''}
+                    onChange={e => onUpdate(c.id, { details: { contract_date: e.target.value } })}
+                    className="w-full border border-red-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-red-400/50 text-gray-800 bg-white"
+                  />
+                  {!(c as any).details?.contract_date && (
+                    <p className="text-[9px] text-red-500 mt-1 font-medium">⚠️ 계약일 미입력 — 반드시 입력해야 해당 월 매출에 반영됩니다</p>
+                  )}
+                </div>
+              )}
 
               {/* 재통화 일정 */}
               <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">

@@ -467,6 +467,19 @@ export default function SalesCeoTab() {
         const thisMonth = new Date().toISOString().slice(0, 7)
         if (scData.config?.month === thisMonth) {
           setSupplyConfig(scData.config.people || {})
+        } else {
+          // 이번달 설정 없음 → 기본값으로 초기화 (손제후 27/40, 김윤지 12/20)
+          const defaultPeople: SupplyConfig = {
+            '손제후': { supplied: 27, goal: 40, base: 3.5 },
+            '김윤지': { supplied: 12, goal: 20, base: 0.5 },
+          }
+          // 자동 저장
+          fetch('/api/supply-config', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ month: thisMonth, people: defaultPeople }),
+          })
+          setSupplyConfig(defaultPeople)
         }
       } catch {}
       setLoading(false)
