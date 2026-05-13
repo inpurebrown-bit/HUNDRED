@@ -442,7 +442,7 @@ export default function SalesCeoTab() {
         setCustomers(cData.customers || [])
         // ops_user_name이 없는 경우 owner_id(이름 저장)로 fallback
         const names = Array.from(new Set(
-          (oData.cases || []).map((c: any) => c.ops_user_name || c.owner_id).filter((v: any) => v && typeof v === 'string' && v.length < 50)
+          (oData.cases || []).map((c: any) => c.ops_user_name || c.owner_id).filter((v: any) => v && typeof v === 'string' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v))
         )) as string[]
         setOpsUsers(names)
       } catch {}
@@ -867,6 +867,24 @@ export default function SalesCeoTab() {
           </div>
         )}
       </div>
+
+      {/* ── A/S 승인 → 공급 DB 보충 알림 배너 ── */}
+      {asApprovedList.length > 0 && (
+        <div className="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 flex items-center gap-3">
+          <span className="text-xl">⚠️</span>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-amber-800">공급 DB 보충 필요</p>
+            <p className="text-xs text-amber-600">A/S 승인 {asApprovedList.length}건 확인됨 · 소진된 DB {asApprovedList.length}개를 보충해주세요</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setCeoView('as')}
+            className="text-xs bg-amber-500 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-amber-600 transition-colors"
+          >
+            A/S 확인
+          </button>
+        </div>
+      )}
 
       {/* ── 영업사원 탭 ── */}
       <div>

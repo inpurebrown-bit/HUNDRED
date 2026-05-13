@@ -162,25 +162,32 @@ function CeoMoveModal({
   onClose: () => void
   onConfirm: (destPerson: string, destBucket: string, destRole: 'sales' | 'ops') => Promise<void>
 }) {
+  // 단계별 선택: 팀 → 담당자 → 메뉴
+  const [selTeam, setSelTeam] = useState<'sales' | 'ops' | null>(null)
   const [selPerson, setSelPerson] = useState<string>('')
-  const [selRole, setSelRole] = useState<'sales' | 'ops' | null>(null)
   const [selBucket, setSelBucket] = useState<string>('')
-  const [customPerson, setCustomPerson] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const buckets = selRole === 'ops' ? OPS_BUCKETS : SALES_BUCKETS
-  const finalPerson = customPerson.trim() || selPerson
-  const canMove = finalPerson && selBucket
+  const buckets = selTeam === 'ops' ? OPS_BUCKETS : SALES_BUCKETS
+  const people = selTeam === 'ops' ? opsUsers : salesUsers
+  const canMove = selPerson && selBucket
+
+  function pickTeam(team: 'sales' | 'ops') {
+    setSelTeam(team)
+    setSelPerson('')
+    setSelBucket('')
+  }
 
   async function handleMove() {
-    if (!canMove || !selRole) return
+    if (!canMove || !selTeam) return
     setLoading(true)
-    await onConfirm(finalPerson, selBucket, selRole)
+    await onConfirm(selPerson, selBucket, selTeam)
     setLoading(false)
     onClose()
   }
 
   const company = (customer as any).details?.company || customer.company || customer.name
+  const bucketLabel = buckets.find(b => b.value === selBucket)?.label
 
   return (
     <div className="fixed inset-0 bg-black/60 z-[300] flex items-center justify-center p-4"
@@ -196,67 +203,55 @@ function CeoMoveModal({
         </div>
 
         <div className="p-4 space-y-4">
-          {/* STEP 1: 이동 대상 선택 */}
+
+          {/* STEP 1: 팀 선택 */}
           <div>
-            <p className="text-[10px] font-bold text-gray-400 mb-2">STEP 1 · 이동 대상 선택</p>
-
-            {salesUsers.length > 0 && (
-              <div className="mb-2">
-                <p className="text-[9px] font-bold text-blue-500 mb-1.5">📂 영업팀</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {salesUsers.map(u => (
-                    <button key={u} onClick={() => { setSelPerson(u); setSelRole('sales'); setSelBucket(''); setCustomPerson('') }}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${selPerson === u && selRole === 'sales' ? 'bg-[#1B2A45] text-white border-[#1B2A45]' : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-blue-300'}`}>
-                      {u}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {opsUsers.length > 0 && (
-              <div className="mb-2">
-                <p className="text-[9px] font-bold text-violet-500 mb-1.5">📂 관리팀</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {opsUsers.map(u => (
-                    <button key={u} onClick={() => { setSelPerson(u); setSelRole('ops'); setSelBucket(''); setCustomPerson('') }}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${selPerson === u && selRole === 'ops' ? 'bg-violet-600 text-white border-violet-600' : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-violet-300'}`}>
-                      {u}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 관리팀 직접입력 */}
-            <div className="flex gap-2 items-center mt-1">
-              <div className="flex gap-1">
-                <button onClick={() => { setSelRole('sales'); setSelPerson(''); setSelBucket('') }}
-                  className={`text-[9px] px-2 py-1 rounded border font-semibold ${selRole === 'sales' && !selPerson ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>영업팀</button>
-                <button onClick={() => { setSelRole('ops'); setSelPerson(''); setSelBucket('') }}
-                  className={`text-[9px] px-2 py-1 rounded border font-semibold ${selRole === 'ops' && !selPerson ? 'bg-violet-500 text-white border-violet-500' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>관리팀</button>
-              </div>
-              <input
-                placeholder="직접 입력 (팀 선택 후)"
-                value={customPerson}
-                onChange={e => { setCustomPerson(e.target.value); setSelPerson('') }}
-                className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
-              />
+            <p className="text-[10px] font-bold text-gray-400 mb-2">어느 팀으로 이동할까요?</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => pickTeam('sales')}
+                className={`py-3 rounded-xl text-sm font-bold border-2 transition-all ${selTeam === 'sales' ? 'bg-[#1B2A45] text-white border-[#1B2A45]' : 'bg-white text-[#1B2A45] border-[#1B2A45]/30 hover:border-[#1B2A45]'}`}>
+                📂 영업팀
+              </button>
+              <button onClick={() => pickTeam('ops')}
+                className={`py-3 rounded-xl text-sm font-bold border-2 transition-all ${selTeam === 'ops' ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-violet-600 border-violet-200 hover:border-violet-400'}`}>
+                📂 관리팀
+              </button>
             </div>
           </div>
 
-          {/* STEP 2: 메뉴(버킷) 선택 */}
-          {selRole && (
+          {/* STEP 2: 담당자 선택 */}
+          {selTeam && (
             <div>
               <p className="text-[10px] font-bold text-gray-400 mb-2">
-                STEP 2 · <span className={selRole === 'ops' ? 'text-violet-600' : 'text-blue-600'}>
-                  {finalPerson || (selRole === 'ops' ? '관리팀' : '영업팀')}
-                </span> 메뉴 선택
+                {selTeam === 'sales' ? '영업팀' : '관리팀'} 담당자를 선택하세요
+              </p>
+              {people.length === 0 ? (
+                <p className="text-xs text-gray-400 italic">등록된 담당자 없음</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {people.map(u => (
+                    <button key={u} onClick={() => { setSelPerson(u); setSelBucket('') }}
+                      className={`px-3 py-2 rounded-xl text-xs font-semibold border-2 transition-all ${selPerson === u
+                        ? selTeam === 'ops' ? 'bg-violet-600 text-white border-violet-600' : 'bg-[#1B2A45] text-white border-[#1B2A45]'
+                        : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-400'}`}>
+                      {u}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* STEP 3: 메뉴 선택 */}
+          {selPerson && (
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 mb-2">
+                <span className="font-bold text-gray-700">{selPerson}</span>의 어느 메뉴로?
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {buckets.map(b => (
                   <button key={b.value} onClick={() => setSelBucket(b.value)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${selBucket === b.value ? b.color + ' border-transparent' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}>
+                    className={`px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all ${selBucket === b.value ? b.color + ' border-transparent' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}>
                     {b.label}
                   </button>
                 ))}
@@ -265,11 +260,14 @@ function CeoMoveModal({
           )}
 
           {/* 이동 경로 요약 */}
-          {canMove && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700 font-medium">
-              📍 이동 경로: <span className="font-bold">{company}</span> →{' '}
-              <span className="font-bold">{finalPerson}</span>의{' '}
-              <span className="font-bold">{buckets.find(b => b.value === selBucket)?.label}</span>
+          {canMove && bucketLabel && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800">
+              <p className="font-bold text-sm mb-0.5">📍 이동 경로 확인</p>
+              <p className="text-amber-600">
+                <span className="font-bold text-amber-900">{company}</span>{' '}
+                →{' '}<span className="font-bold text-amber-900">{selPerson}</span>의{' '}
+                <span className={`font-bold px-1.5 py-0.5 rounded ${buckets.find(b => b.value === selBucket)?.color}`}>{bucketLabel}</span>
+              </p>
             </div>
           )}
         </div>
