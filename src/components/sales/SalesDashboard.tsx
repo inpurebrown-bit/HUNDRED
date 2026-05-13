@@ -14,7 +14,7 @@ import {
   getElapsedBusinessDays,
   getRemainingBusinessDays,
 } from '@/lib/businessDays'
-import { SUPPLY_RATE_TABLE, calcRecommendedSupply, isActiveRow } from '@/lib/supplyRules'
+import { SUPPLY_RATE_TABLE, calcRecommendedSupply, isActiveRow, contractWeight } from '@/lib/supplyRules'
 
 // ── Types ──────────────────────────────────────────────────────────────
 interface Contract {
@@ -61,6 +61,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [supplyConfig, setSupplyConfig] = useState<Record<string, { supplied: number; goal: number; base: number }> | null>(null)
   const [installPrompt, setInstallPrompt] = useState<any>(null)
   const [installable, setInstallable] = useState(false)
 
@@ -99,15 +100,20 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   // ── Data loading ──────────────────────────────────────────────────
   async function loadAll() {
     setLoading(true)
-    const [cRes, conRes, nRes] = await Promise.all([
+    const [cRes, conRes, nRes, scRes] = await Promise.all([
       fetch('/api/customers'),
       fetch('/api/contracts'),
       fetch('/api/notices?team=sales'),
+      fetch('/api/supply-config'),
     ])
-    const [cData, conData, nData] = await Promise.all([cRes.json(), conRes.json(), nRes.json()])
+    const [cData, conData, nData, scData] = await Promise.all([cRes.json(), conRes.json(), nRes.json(), scRes.json()])
     setCustomers(cData.customers || [])
     setContracts(conData.contracts || [])
     setNotices(nData.notices || [])
+    const thisMonth = new Date().toISOString().slice(0, 7)
+    if (scData.config?.month === thisMonth) {
+      setSupplyConfig(scData.config.people || {})
+    }
     setLoading(false)
   }
 
@@ -287,7 +293,22 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
 
   const supplyNotice = notices.find(n => n.notice_type === 'supply_count')
   const todaySupply = supplyNotice ? parseInt(supplyNotice.content) || 0 : 0
-  const contractRate = todaySupply > 0 ? Math.round(monthContractCount / todaySupply * 100) : 0
+
+  // ── 인당 공급 통계 (supply_config 기반) ──────────────────
+  const mySupplyCfg = supplyConfig?.[userName] ?? null
+  const myDbContracted = mySupplyCfg !== null
+    ? customers
+        .filter(c =>
+          c.status === 'contracted' &&
+          (c.sales_user_name === userName || (c as any).details?.sales_user_name === userName) &&
+          ((c as any).details?.contract_date || (c as any).created_at || '').slice(0, 7) === thisMonth
+        )
+        .reduce((sum, c) => sum + contractWeight((c as any).details?.contract_fee), 0)
+    : 0
+  const myTotalContracted = mySupplyCfg ? mySupplyCfg.base + myDbContracted : myDbContracted
+  const contractRate = mySupplyCfg && mySupplyCfg.supplied > 0
+    ? Math.round(myTotalContracted / mySupplyCfg.supplied * 100)
+    : todaySupply > 0 ? Math.round(monthContractCount / todaySupply * 100) : 0
   const tomorrowSupplyNeeded = calcRecommendedSupply(contractRate, bizElapsed)
 
   // ── Filtered lists ────────────────────────────────────────────────
@@ -296,7 +317,8 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const contractedCustomers = customers.filter(c => c.status === 'contracted')
   const emotionalCustomers = customers.filter(c => c.status === 'emotional')
   const trashCustomers = customers.filter(c => c.status === 'trash')
-  const revenueCustomers = customers.filter(c => c.status === 'contracted' && c.details?.ops_transferred === true)
+  // 매출: 계약 상태인 모든 고객 (ops 전송 여부 무관)
+  const revenueCustomers = customers.filter(c => c.status === 'contracted')
 
   const generalNotices = notices.filter(n => n.notice_type !== 'supply_count')
 
@@ -321,9 +343,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
     : []
 
   // Revenue tab totals
+  // 총 매출: my_revenue 합산 (본인 수익 기준)
   const totalRevenue = revenueCustomers
     .filter(c => !c.details?.is_cancelled)
-    .reduce((sum, c) => sum + parseFloat(c.details?.contract_fee?.replace(/[^0-9.]/g, '') || '0'), 0)
+    .reduce((sum, c) => {
+      const n = parseInt(String((c as any).details?.my_revenue || '0').replace(/[^0-9]/g, ''), 10) || 0
+      return sum + n
+    }, 0)
   const cancelledCount = revenueCustomers.filter(c => c.details?.is_cancelled).length
 
   // ── Tabs ──────────────────────────────────────────────────────────
@@ -515,19 +541,58 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             </div>
 
             {/* 공급 현황 + 계약율 */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {[
-                { label: '금일 공급 (대표 배정)', value: todaySupply > 0 ? `${todaySupply}개` : '미배정', color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-100' },
-                { label: '이번달 계약', value: `${monthContractCount}건`, color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-100' },
-                { label: '공급 대비 계약율', value: todaySupply > 0 ? `${contractRate}%` : '—', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-100' },
-                { label: '내일 필요 공급(3계약 기준)', value: tomorrowSupplyNeeded > 0 ? `${tomorrowSupplyNeeded}개` : '—', color: 'text-violet-700', bg: 'bg-violet-50', border: 'border-violet-100' },
-              ].map(s => (
-                <div key={s.label} className={`${s.bg} border ${s.border} rounded-xl p-3.5`}>
-                  <p className="text-[10px] text-gray-400 mb-1">{s.label}</p>
-                  <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
+            {mySupplyCfg ? (
+              /* 인당 공급 설정이 있는 경우: 상세 통계 */
+              <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-gray-700">📊 내 이번달 공급 현황</p>
+                  <span className="text-[10px] text-gray-400">{thisMonth}</span>
                 </div>
-              ))}
-            </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { label: '이번달 공급', value: `${mySupplyCfg.supplied}개`, color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-100' },
+                    { label: '결제수', value: `${myTotalContracted.toFixed(1)}개`, color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-100',
+                      sub: mySupplyCfg.base > 0 ? `기존 ${mySupplyCfg.base} + DB ${myDbContracted.toFixed(1)}` : undefined },
+                    { label: '계약율', value: `${contractRate}%`, color: contractRate >= 17 ? 'text-emerald-700' : contractRate >= 13 ? 'text-amber-700' : 'text-red-600', bg: contractRate >= 17 ? 'bg-emerald-50' : contractRate >= 13 ? 'bg-amber-50' : 'bg-red-50', border: contractRate >= 17 ? 'border-emerald-100' : contractRate >= 13 ? 'border-amber-100' : 'border-red-100' },
+                    { label: '권장 내일 공급', value: tomorrowSupplyNeeded > 0 ? `${tomorrowSupplyNeeded}개` : '공급 중단', color: 'text-violet-700', bg: 'bg-violet-50', border: 'border-violet-100' },
+                  ].map(s => (
+                    <div key={s.label} className={`${s.bg} border ${(s as any).border} rounded-xl p-3`}>
+                      <p className="text-[10px] text-gray-400 mb-1">{s.label}</p>
+                      <p className={`text-xl font-black ${s.color}`}>{s.value}</p>
+                      {(s as any).sub && <p className="text-[9px] text-gray-400 mt-0.5">{(s as any).sub}</p>}
+                    </div>
+                  ))}
+                </div>
+                {/* 목표 달성 바 */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] text-gray-500">목표 달성 ({myTotalContracted.toFixed(1)} / {mySupplyCfg.goal}개)</span>
+                    <span className="text-[10px] font-bold text-gray-700">
+                      {mySupplyCfg.goal > 0 ? Math.round(myTotalContracted / mySupplyCfg.goal * 100) : 0}%
+                    </span>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500 rounded-full transition-all"
+                      style={{ width: `${mySupplyCfg.goal > 0 ? Math.min(100, Math.round(myTotalContracted / mySupplyCfg.goal * 100)) : 0}%` }} />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* 기본 공급 통계 (공급 설정 미등록 시) */
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { label: '금일 공급 (대표 배정)', value: todaySupply > 0 ? `${todaySupply}개` : '미배정', color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-100' },
+                  { label: '이번달 계약', value: `${monthContractCount}건`, color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+                  { label: '공급 대비 계약율', value: todaySupply > 0 ? `${contractRate}%` : '—', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-100' },
+                  { label: '권장 내일 공급', value: tomorrowSupplyNeeded > 0 ? `${tomorrowSupplyNeeded}개` : '—', color: 'text-violet-700', bg: 'bg-violet-50', border: 'border-violet-100' },
+                ].map(s => (
+                  <div key={s.label} className={`${s.bg} border ${s.border} rounded-xl p-3.5`}>
+                    <p className="text-[10px] text-gray-400 mb-1">{s.label}</p>
+                    <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* 공급기준표 */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

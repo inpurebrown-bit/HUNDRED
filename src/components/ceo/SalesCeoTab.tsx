@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import InCallTableView from '@/components/sales/InCallTableView'
 import type { Customer } from '@/components/sales/InCallTableView'
+import { SUPPLY_RATE_TABLE, calcRecommendedSupply, isActiveRow, contractWeight } from '@/lib/supplyRules'
+import { getElapsedBusinessDays } from '@/lib/businessDays'
 
 // ── DB 이동 모드 컴포넌트 ─────────────────────────────────
 type TransferDir = 'sales_to_sales' | 'sales_to_ops' | 'ops_to_sales' | 'ops_to_ops'
@@ -422,7 +424,15 @@ const STATUS_TABS = [
   { key: 'trash' as StatusKey,      label: '자체거절',  color: 'text-gray-500',    bg: 'bg-gray-400' },
 ]
 
-type CeoView = 'customers' | 'inspection' | 'as' | 'transfer'
+type CeoView = 'customers' | 'inspection' | 'as' | 'transfer' | 'supply'
+
+// ── 공급 설정 타입 ──────────────────────────────────────
+interface PersonSupply {
+  supplied: number   // 이번달 총 공급수 (대표 입력)
+  goal:     number   // 이번달 목표 결제수 (대표 입력)
+  base:     number   // 기존 결제 오프셋 (시스템 전 계약수 수동 입력)
+}
+type SupplyConfig = Record<string, PersonSupply>
 
 export default function SalesCeoTab() {
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -432,19 +442,32 @@ export default function SalesCeoTab() {
   const [statusTab, setStatusTab] = useState<StatusKey>('lead')
   const [inspDetail, setInspDetail] = useState<Customer | null>(null)
   const [opsUsers, setOpsUsers] = useState<string[]>([])
+  const [supplyConfig, setSupplyConfig] = useState<SupplyConfig>({})
+  const [supplyEditMode, setSupplyEditMode] = useState(false)
+  const [supplyDraft, setSupplyDraft] = useState<Record<string, { supplied: string; goal: string; base: string }>>({})
+  const [supplySaving, setSupplySaving] = useState(false)
 
   useEffect(() => {
     async function load() {
       setLoading(true)
       try {
-        const [cRes, oRes] = await Promise.all([fetch('/api/customers'), fetch('/api/ops-cases')])
-        const [cData, oData] = await Promise.all([cRes.json(), oRes.json()])
+        const [cRes, oRes, scRes] = await Promise.all([
+          fetch('/api/customers'),
+          fetch('/api/ops-cases'),
+          fetch('/api/supply-config'),
+        ])
+        const [cData, oData, scData] = await Promise.all([cRes.json(), oRes.json(), scRes.json()])
         setCustomers(cData.customers || [])
         // ops_user_name이 없는 경우 owner_id(이름 저장)로 fallback
         const names = Array.from(new Set(
           (oData.cases || []).map((c: any) => c.ops_user_name || c.owner_id).filter((v: any) => v && typeof v === 'string' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v))
         )) as string[]
         setOpsUsers(names)
+        // 공급 설정 로드 (이번달 것만 사용)
+        const thisMonth = new Date().toISOString().slice(0, 7)
+        if (scData.config?.month === thisMonth) {
+          setSupplyConfig(scData.config.people || {})
+        }
       } catch {}
       setLoading(false)
     }
@@ -511,6 +534,30 @@ export default function SalesCeoTab() {
       .reduce((sum, c) => sum + parseNum((c as any).details?.my_revenue), 0),
   [customers])
 
+  // ── 공급 현황 계산 ──────────────────────────────────────
+  const now = new Date()
+  const thisMonthStr = now.toISOString().slice(0, 7)
+  const bizElapsed = getElapsedBusinessDays(now.getFullYear(), now.getMonth(), now.getDate())
+
+  const supplyStats = useMemo(() => {
+    return salesPeople.map(name => {
+      const cfg = supplyConfig[name] || { supplied: 0, goal: 30, base: 0 }
+      // 이번달 계약된 고객 중 해당 영업사원의 계약 가중치 합산
+      const dbContracted = customers
+        .filter(c =>
+          c.status === 'contracted' &&
+          (c.sales_user_name === name || (c as any).details?.sales_user_name === name) &&
+          ((c as any).details?.contract_date || c.created_at || '').slice(0, 7) === thisMonthStr
+        )
+        .reduce((sum, c) => sum + contractWeight((c as any).details?.contract_fee), 0)
+      const totalContracted = cfg.base + dbContracted
+      const rate = cfg.supplied > 0 ? Math.round(totalContracted / cfg.supplied * 100) : 0
+      const recommended = calcRecommendedSupply(rate, bizElapsed)
+      const achievePct = cfg.goal > 0 ? Math.round(totalContracted / cfg.goal * 100) : 0
+      return { name, cfg, dbContracted, totalContracted, rate, recommended, achievePct }
+    })
+  }, [salesPeople, supplyConfig, customers, thisMonthStr, bizElapsed])
+
   const counts = useMemo(() => ({
     lead:       personCustomers.filter(c => ['lead', 'consulting'].includes(c.status)).length,
     db010:      personCustomers.filter(c => c.status === 'db010').length,
@@ -532,6 +579,42 @@ export default function SalesCeoTab() {
       if (patch.details) return { ...c, details: { ...(c.details || {}), ...patch.details } }
       return { ...c, ...patch }
     }))
+  }
+
+  // ── 공급 설정 저장 ──────────────────────────────────────
+  async function saveSupplyConfig() {
+    setSupplySaving(true)
+    const thisMonth = new Date().toISOString().slice(0, 7)
+    const people: SupplyConfig = {}
+    for (const name of Object.keys(supplyDraft)) {
+      people[name] = {
+        supplied: parseFloat(supplyDraft[name].supplied) || 0,
+        goal:     parseFloat(supplyDraft[name].goal) || 0,
+        base:     parseFloat(supplyDraft[name].base) || 0,
+      }
+    }
+    await fetch('/api/supply-config', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ month: thisMonth, people }),
+    })
+    setSupplyConfig(people)
+    setSupplyEditMode(false)
+    setSupplySaving(false)
+  }
+
+  function openSupplyEdit() {
+    const draft: Record<string, { supplied: string; goal: string; base: string }> = {}
+    for (const name of salesPeople) {
+      const cfg = supplyConfig[name] || { supplied: 0, goal: 30, base: 0 }
+      draft[name] = {
+        supplied: String(cfg.supplied),
+        goal:     String(cfg.goal),
+        base:     String(cfg.base),
+      }
+    }
+    setSupplyDraft(draft)
+    setSupplyEditMode(true)
   }
 
   async function changeStatus(id: string, status: string) {
@@ -645,6 +728,12 @@ export default function SalesCeoTab() {
             ceoView === 'transfer' ? 'bg-[#C5A258] text-white border-[#C5A258]' : 'bg-white text-[#C5A258] border-[#C5A258]/40 hover:border-[#C5A258]'
           )}>
           🔀 DB 이동
+        </button>
+        <button type="button" onClick={() => setCeoView('supply')}
+          className={"flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border transition-colors " + (
+            ceoView === 'supply' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-700 border-emerald-200 hover:border-emerald-400'
+          )}>
+          📊 공급현황
         </button>
       </div>
 
@@ -815,6 +904,182 @@ export default function SalesCeoTab() {
                 })}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── 공급 현황 뷰 ── */}
+      {ceoView === 'supply' && (
+        <div className="space-y-5">
+          {/* 헤더 */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-gray-800">📊 이번달 공급 현황</h2>
+              <p className="text-[11px] text-gray-400 mt-0.5">{thisMonthStr} · 공급 대비 결제율 기반 내일 공급 권장량 산출</p>
+            </div>
+            {!supplyEditMode ? (
+              <button type="button" onClick={openSupplyEdit}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 transition-colors">
+                ✏️ 공급수/목표 수정
+              </button>
+            ) : (
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setSupplyEditMode(false)}
+                  className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-500 text-xs font-semibold hover:bg-gray-200 transition-colors">취소</button>
+                <button type="button" onClick={saveSupplyConfig} disabled={supplySaving}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-60">
+                  {supplySaving ? '저장중…' : '💾 저장'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* 인당 공급 카드 */}
+          {salesPeople.length === 0 ? (
+            <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center text-gray-400 text-sm">
+              등록된 영업사원이 없습니다
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {supplyStats.map(s => (
+                <div key={s.name} className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
+                  {/* 이름 + 달성률 */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-[#1B2A45] text-white flex items-center justify-center text-sm font-bold">
+                        {s.name.charAt(0)}
+                      </div>
+                      <span className="font-bold text-gray-800 text-sm">{s.name}</span>
+                    </div>
+                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+                      s.achievePct >= 100 ? 'bg-emerald-100 text-emerald-700' :
+                      s.achievePct >= 70  ? 'bg-blue-100 text-blue-700' :
+                      s.achievePct >= 40  ? 'bg-amber-100 text-amber-700' :
+                      'bg-red-50 text-red-600'
+                    }`}>달성 {s.achievePct}%</span>
+                  </div>
+
+                  {/* 수치 그리드 */}
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="bg-sky-50 rounded-xl py-2.5">
+                      <p className="text-[10px] text-gray-400 mb-0.5">이번달 공급</p>
+                      {supplyEditMode ? (
+                        <input type="number" min="0"
+                          value={supplyDraft[s.name]?.supplied ?? s.cfg.supplied}
+                          onChange={e => setSupplyDraft(prev => ({
+                            ...prev, [s.name]: { ...(prev[s.name] || { supplied: '0', goal: '0', base: '0' }), supplied: e.target.value }
+                          }))}
+                          className="w-full text-center text-base font-black text-sky-700 bg-transparent border-b-2 border-sky-400 focus:outline-none"
+                        />
+                      ) : (
+                        <p className="text-base font-black text-sky-700">{s.cfg.supplied}개</p>
+                      )}
+                    </div>
+                    <div className="bg-emerald-50 rounded-xl py-2.5">
+                      <p className="text-[10px] text-gray-400 mb-0.5">결제수</p>
+                      <p className="text-base font-black text-emerald-700">{s.totalContracted}개</p>
+                      {s.cfg.base > 0 && (
+                        <p className="text-[9px] text-gray-400">기존 {s.cfg.base} + DB {s.dbContracted.toFixed(1)}</p>
+                      )}
+                    </div>
+                    <div className={`rounded-xl py-2.5 ${
+                      s.rate >= 17 ? 'bg-emerald-50' : s.rate >= 13 ? 'bg-amber-50' : 'bg-red-50'
+                    }`}>
+                      <p className="text-[10px] text-gray-400 mb-0.5">계약율</p>
+                      <p className={`text-base font-black ${
+                        s.rate >= 17 ? 'text-emerald-700' : s.rate >= 13 ? 'text-amber-700' : 'text-red-600'
+                      }`}>{s.rate}%</p>
+                    </div>
+                  </div>
+
+                  {/* 목표 + 달성 바 */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] text-gray-500 font-semibold">목표 달성</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-gray-400">{s.totalContracted.toFixed(1)} /</span>
+                        {supplyEditMode ? (
+                          <input type="number" min="0"
+                            value={supplyDraft[s.name]?.goal ?? s.cfg.goal}
+                            onChange={e => setSupplyDraft(prev => ({
+                              ...prev, [s.name]: { ...(prev[s.name] || { supplied: '0', goal: '0', base: '0' }), goal: e.target.value }
+                            }))}
+                            className="w-12 text-center text-[10px] font-bold text-gray-800 bg-transparent border-b border-gray-400 focus:outline-none"
+                          />
+                        ) : (
+                          <span className="text-[10px] font-bold text-gray-800">{s.cfg.goal}개</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all bg-emerald-500"
+                        style={{ width: `${Math.min(100, s.achievePct)}%` }} />
+                    </div>
+                  </div>
+
+                  {/* 기존 결제 오프셋 (수정모드에서 보임) */}
+                  {supplyEditMode && (
+                    <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                      <span className="text-[10px] text-gray-500 flex-1">시스템 전 기존 결제수 (오프셋)</span>
+                      <input type="number" min="0" step="0.5"
+                        value={supplyDraft[s.name]?.base ?? s.cfg.base}
+                        onChange={e => setSupplyDraft(prev => ({
+                          ...prev, [s.name]: { ...(prev[s.name] || { supplied: '0', goal: '0', base: '0' }), base: e.target.value }
+                        }))}
+                        className="w-16 text-center text-xs font-bold text-gray-800 bg-white border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                      />
+                    </div>
+                  )}
+
+                  {/* 권장 내일 공급 */}
+                  <div className={`rounded-xl px-4 py-3 flex items-center justify-between ${
+                    s.recommended >= 5 ? 'bg-emerald-50 border border-emerald-200' :
+                    s.recommended >= 3 ? 'bg-blue-50 border border-blue-200' :
+                    s.recommended >= 1 ? 'bg-amber-50 border border-amber-200' :
+                    'bg-red-50 border border-red-200'
+                  }`}>
+                    <div>
+                      <p className="text-[10px] text-gray-500 font-semibold">권장 내일 공급</p>
+                      <p className="text-[10px] text-gray-400">계약율 {s.rate}% 기준</p>
+                    </div>
+                    <p className={`text-2xl font-black ${
+                      s.recommended >= 5 ? 'text-emerald-700' :
+                      s.recommended >= 3 ? 'text-blue-700' :
+                      s.recommended >= 1 ? 'text-amber-700' : 'text-red-600'
+                    }`}>{s.recommended}개</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 기준표 */}
+          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+            <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-gray-700">📋 공급기준표</h3>
+              <span className="text-[10px] text-gray-400">계약율 기준 권장 공급 (일일)</span>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">기준</th>
+                  <th className="px-4 py-2.5 text-xs font-semibold text-[#C5A258] text-center">권장 공급</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {SUPPLY_RATE_TABLE.map(row => (
+                  <tr key={row.condition}>
+                    <td className="px-4 py-2.5 text-xs text-gray-600">{row.condition}</td>
+                    <td className={`px-4 py-2.5 text-center font-bold text-sm ${row.supply === 0 ? 'text-red-500' : 'text-gray-700'}`}>
+                      {row.supply}개
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="px-5 py-3 bg-amber-50 border-t border-amber-100">
+              <p className="text-[11px] text-amber-700 font-semibold">💡 계약 가중치: 계약금 30만원 이하 = 0.5개, 그 외 = 1개</p>
+            </div>
           </div>
         </div>
       )}

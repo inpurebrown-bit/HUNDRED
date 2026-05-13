@@ -31,3 +31,15 @@ export function isActiveRow(
   if (row.minRate === null) return rate < row.maxRate
   return rate >= row.minRate && rate <= row.maxRate
 }
+
+/**
+ * 계약금액 → 계약 가중치
+ * 30만원 이하(25만원, 30만원 등 소액 계약) = 0.5개
+ * 그 외 = 1개
+ */
+export function contractWeight(feeStr: string | number | undefined): number {
+  if (!feeStr) return 0
+  const n = parseInt(String(feeStr).replace(/[^0-9]/g, ''), 10) || 0
+  if (n <= 0) return 0
+  return n <= 300000 ? 0.5 : 1
+}
