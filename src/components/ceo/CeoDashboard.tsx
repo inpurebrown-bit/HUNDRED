@@ -17,6 +17,7 @@ import SalesCeoTab from './SalesCeoTab'
 import OpsDashboard from '@/components/ops/OpsDashboard'
 import PinManageTab from './PinManageTab'
 import MyProfileTab from '@/components/MyProfileTab'
+import DbManageTab from './DbManageTab'
 
 // 매출·손익·결제율 통합 탭
 function AnalyticsTab() {
@@ -68,7 +69,7 @@ export default function CeoDashboard() {
   const { data: session } = useSession()
   const ceoName = session?.user?.name ?? '대표'
   const ceoId = (session?.user as any)?.id ?? ''
-  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'payslip' | 'freelancer' | 'reports' | 'minutes' | 'calendar' | 'ailogs' | 'profile'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'payslip' | 'freelancer' | 'reports' | 'minutes' | 'calendar' | 'ailogs' | 'dbmanage' | 'profile'>('overview')
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
@@ -125,6 +126,7 @@ export default function CeoDashboard() {
     { key: 'minutes',   label: '📒 회의록' },
     { key: 'calendar',  label: '📅 일정관리' },
     { key: 'ailogs',    label: '🔍 AI 질문 로그' },
+    { key: 'dbmanage',  label: '🗑 DB·직원 관리' },
     { key: 'profile',   label: '👤 사원정보' },
   ]
 
@@ -253,6 +255,7 @@ export default function CeoDashboard() {
         {activeTab === 'minutes'   && <MinutesTab />}
         {activeTab === 'calendar'  && <CalendarTab />}
         {activeTab === 'ailogs'    && <AiLogsTab />}
+        {activeTab === 'dbmanage'  && <DbManageTab />}
         {activeTab === 'profile'   && (
           <div className="space-y-8">
             <MyProfileTab />
