@@ -43,11 +43,12 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   if (body.source !== undefined) updateBody.source = body.source
 
   // details JSONB 머지 (company/sales_user_name 포함)
+  // ⚡ 수정: updateBody.details(status 처리 결과)를 베이스로 사용해야 sub_status가 유실되지 않음
   if (body.details || body.company || body.sales_user_name) {
     const incomingDetails: Record<string, any> = { ...(body.details || {}) }
     if (body.company !== undefined) incomingDetails.company = body.company
     if (body.sales_user_name !== undefined) incomingDetails.sales_user_name = body.sales_user_name
-    updateBody.details = { ...(existing.details || {}), ...incomingDetails }
+    updateBody.details = { ...(updateBody.details || existing.details || {}), ...incomingDetails }
   }
 
   // ⚡ 안전장치: 계약 상태인 고객에 sub_status가 끼어들지 않도록 강제 제거

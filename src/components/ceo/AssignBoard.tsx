@@ -184,6 +184,8 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
   const [patching, setPatching] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  // 재배정 모드 — 이미 배정된 항목도 담당자 변경 가능
+  const [reassignMode, setReassignMode] = useState<Record<string, boolean>>({})
 
   function set(k: string, v: string) { setForm(p => ({ ...p, [k]: v })) }
 
@@ -233,30 +235,45 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-      if (!res.ok) throw new Error('등록 실패')
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || '등록 실패')
       setForm({ ...EMPTY_HK })
       setShowForm(false)
-      setToast('등록 완료!')
-      setTimeout(() => setToast(null), 2500)
+      const assignedTo = selectedUser ? ` → ${selectedUser.name} 배정` : ' (미배정)'
+      setToast(`등록 완료${assignedTo}`)
+      setTimeout(() => setToast(null), 3000)
       load()
     } catch (e: any) { alert(e.message) } finally { setSubmitting(false) }
   }
 
-  async function handleAssign(id: string) {
+  // 배정 / 재배정 공통 함수
+  async function handleAssign(id: string, currentName?: string | null) {
+    const userId = assignSelect[id] ?? ''
+    if (!userId) { alert('담당자를 선택하세요'); return }
+    const selectedUser = salesUsers.find(u => u.id === userId)
+    if (!selectedUser) { alert('선택한 담당자를 찾을 수 없습니다'); return }
+
+    const confirmMsg = currentName
+      ? `"${currentName}" → "${selectedUser.name}" 으로 변경하시겠습니까?\n(담당자 변경 시 팀장의 010DB 탭에 즉시 반영됩니다)`
+      : `"${selectedUser.name}" 에게 배정하시겠습니까?`
+    if (!confirm(confirmMsg)) return
+
     setPatching(id)
     try {
-      const userId = assignSelect[id] ?? ''
-      const selectedUser = salesUsers.find(u => u.id === userId)
       const res = await fetch(`/api/customers/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sales_user_id: userId || null,
-          sales_user_name: selectedUser?.name || null,
+          sales_user_id: selectedUser.id,
+          sales_user_name: selectedUser.name,
           status: 'db010',
         }),
       })
-      if (!res.ok) throw new Error('배정 실패')
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || '배정 실패')
+      setReassignMode(p => ({ ...p, [id]: false }))
+      setToast(`✅ ${selectedUser.name} 배정 완료`)
+      setTimeout(() => setToast(null), 3000)
       load()
     } catch (e: any) { alert(e.message) } finally { setPatching(null) }
   }
@@ -331,9 +348,9 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
           {/* 담당자 배정 */}
           <div className="flex items-end gap-3 pt-2 border-t border-[#F0EDE6]">
             <div className="flex-1">
-              <label className={lbl}>담당자 배정 (선택)</label>
+              <label className={lbl}>담당자 배정 <span className="text-red-400 font-normal">(미배정 시 팀장 010DB에 안 들어감)</span></label>
               <select className={inp} value={form.assign_id} onChange={e => set('assign_id', e.target.value)}>
-                <option value="">-- 미배정 --</option>
+                <option value="">-- 담당자 선택 (필수 권장) --</option>
                 {salesUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             </div>
@@ -362,48 +379,70 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
             <div className="col-span-3">담당자 배정</div>
           </div>
           <div className="divide-y divide-[#F0EDE6]">
-            {entries.map(e => (
+            {entries.map(e => {
+              const isReassign = reassignMode[e.id] ?? false
+              return (
               <div key={e.id}>
                 <div
                   className="grid grid-cols-12 gap-2 px-4 py-3 items-center hover:bg-[#FAF8F3] cursor-pointer"
                   onClick={() => setExpandedId(expandedId === e.id ? null : e.id)}
                 >
                   <div className="col-span-3 min-w-0">
-                    <p className="text-sm font-semibold text-[#1B2A45] truncate">{e.company}</p>
+                    <p className="text-sm font-semibold text-[#1B2A45] truncate">{(e as any).details?.company || e.company || e.name}</p>
                     <p className="text-[11px] text-[#1B2A45]/50">{e.name}</p>
                   </div>
                   <div className="col-span-2 text-xs text-gray-600">{e.phone}</div>
                   <div className="col-span-2 min-w-0">
-                    <p className="text-xs text-gray-600 truncate">{e.details?.business_type || '-'}</p>
-                    <p className="text-[11px] text-gray-400">{e.details?.region || '-'}</p>
+                    <p className="text-xs text-gray-600 truncate">{(e as any).details?.business_type || '-'}</p>
+                    <p className="text-[11px] text-gray-400">{(e as any).details?.region || '-'}</p>
                   </div>
                   <div className="col-span-2 min-w-0">
-                    <p className="text-xs text-gray-600">{e.details?.revenue_2025 || '-'}</p>
-                    <p className="text-[11px] text-gray-400">{e.details?.credit_nice || '-'}</p>
+                    <p className="text-xs text-gray-600">{(e as any).details?.revenue_2025 || '-'}</p>
+                    <p className="text-[11px] text-gray-400">{(e as any).details?.credit_nice || '-'}</p>
                   </div>
+                  {/* 담당자 배정 컬럼 */}
                   <div className="col-span-3 flex items-center gap-1.5" onClick={ev => ev.stopPropagation()}>
-                    {e.sales_user_name ? (
-                      <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold">
-                        {e.sales_user_name}
-                      </span>
+                    {e.sales_user_name && !isReassign ? (
+                      // 이미 배정됨 — 이름 + 변경 버튼
+                      <div className="flex items-center gap-1.5 w-full">
+                        <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold flex-1 text-center">
+                          ✓ {e.sales_user_name}
+                        </span>
+                        <button
+                          onClick={() => {
+                            setReassignMode(p => ({ ...p, [e.id]: true }))
+                            setAssignSelect(p => ({ ...p, [e.id]: '' }))
+                          }}
+                          className="px-2 py-1 text-[10px] bg-orange-50 text-orange-600 border border-orange-200 rounded-lg hover:bg-orange-100 font-semibold"
+                        >
+                          변경
+                        </button>
+                      </div>
                     ) : (
-                      <>
+                      // 미배정 또는 재배정 모드
+                      <div className="flex items-center gap-1.5 w-full">
+                        {isReassign && (
+                          <button
+                            onClick={() => setReassignMode(p => ({ ...p, [e.id]: false }))}
+                            className="text-[10px] text-gray-400 hover:text-gray-600 px-1"
+                          >✕</button>
+                        )}
                         <select
-                          className="flex-1 border border-[#E8E2D4] rounded-lg px-2 py-1.5 text-xs focus:outline-none"
+                          className="flex-1 border border-[#E8E2D4] rounded-lg px-2 py-1.5 text-xs focus:outline-none min-w-0"
                           value={assignSelect[e.id] ?? ''}
                           onChange={ev => setAssignSelect(p => ({ ...p, [e.id]: ev.target.value }))}
                         >
-                          <option value="">담당자 선택</option>
+                          <option value="">{isReassign ? '변경할 담당자' : '담당자 선택'}</option>
                           {salesUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                         </select>
                         <button
-                          onClick={() => handleAssign(e.id)}
+                          onClick={() => handleAssign(e.id, isReassign ? e.sales_user_name : null)}
                           disabled={!assignSelect[e.id] || patching === e.id}
-                          className="px-3 py-1.5 bg-[#1B2A45] text-white text-xs font-semibold rounded-lg hover:bg-[#2D4070] disabled:opacity-40"
+                          className={"px-3 py-1.5 text-white text-xs font-semibold rounded-lg disabled:opacity-40 " + (isReassign ? 'bg-orange-500 hover:bg-orange-600' : 'bg-[#1B2A45] hover:bg-[#2D4070]')}
                         >
-                          {patching === e.id ? '...' : '배정'}
+                          {patching === e.id ? '...' : isReassign ? '변경' : '배정'}
                         </button>
-                      </>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -411,12 +450,12 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
                 {expandedId === e.id && (
                   <div className="px-4 pb-3 grid grid-cols-4 gap-2 bg-[#FAF8F3] text-[11px]">
                     {[
-                      ['사업자번호', e.details?.business_reg_no],
-                      ['업종', e.details?.business_type],
-                      ['지역', e.details?.region],
-                      ['접수일', e.details?.reception_date],
-                      ['작년매출', e.details?.revenue_2025],
-                      ['NICE점수', e.details?.credit_nice],
+                      ['사업자번호', (e as any).details?.business_reg_no],
+                      ['업종', (e as any).details?.business_type],
+                      ['지역', (e as any).details?.region],
+                      ['접수일', (e as any).details?.reception_date],
+                      ['작년매출', (e as any).details?.revenue_2025],
+                      ['NICE점수', (e as any).details?.credit_nice],
                     ].map(([label, val]) => (
                       <div key={label as string} className="bg-white rounded-lg px-3 py-2 border border-[#E8E2D4]">
                         <p className="text-[10px] text-[#1B2A45]/40 mb-0.5">{label}</p>
@@ -426,7 +465,8 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
                   </div>
                 )}
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
