@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   let quote: string
   try {
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
     const result = await model.generateContent(
       '세계적으로 유명한 위인이 남긴 명언 1개를 알려줘. 영업, 성공, 인생 발전에 도움이 되는 내용으로. 형식: \'명언 내용\' - 인물이름 (한국어로). 명언과 출처만 출력해줘.'
     )
