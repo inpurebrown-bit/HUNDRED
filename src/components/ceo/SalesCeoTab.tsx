@@ -22,6 +22,7 @@ function TransferModeView({
   const [targetUser, setTargetUser] = useState<string>('')
   const [customUser, setCustomUser] = useState<string>('')
   const [transferToOps, setTransferToOps] = useState(false)
+  const [isPuto, setIsPuto] = useState(false)
   const [opsUsers, setOpsUsers] = useState<string[]>([])
   const [selectedOpsUser, setSelectedOpsUser] = useState<string>('')
   const [loading, setLoading] = useState(false)
@@ -84,18 +85,27 @@ function TransferModeView({
       try {
         const c = customers.find(x => x.id === id)!
         if (transferToOps) {
-          // 관리팀으로 강제 전송 (ops_case 생성)
+          // 관리팀으로 강제 전송 (ops_case 생성) — 뿌토 or 일반 배정
+          const stage = isPuto ? 'new_db' : 'assigned'
+          const timelineMsg = isPuto
+            ? `대표 뿌토DB 배정 → ${selectedOpsUser}`
+            : `대표 강제 배정 → ${selectedOpsUser}`
           const r = await fetch('/api/ops-cases', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               customer_id: id,
               ops_user_name: selectedOpsUser,
-              progress_stage: 'assigned',
-              details: { forced_assign: true, forced_by: 'CEO', forced_at: new Date().toISOString() },
+              progress_stage: stage,
+              details: {
+                forced_assign: !isPuto,
+                is_puto: isPuto,
+                forced_by: 'CEO',
+                forced_at: new Date().toISOString(),
+              },
               timeline: [{
                 user: 'CEO',
-                content: `대표 강제 배정 → ${selectedOpsUser}`,
+                content: timelineMsg,
                 created_at: new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(' ', 'T') + '+09:00',
               }],
             }),
@@ -138,7 +148,9 @@ function TransferModeView({
   }
 
   const finalDestLabel = transferToOps
-    ? (selectedOpsUser ? `관리팀 · ${selectedOpsUser}` : '관리팀 (담당자 미선택)')
+    ? (selectedOpsUser
+        ? `${isPuto ? '🆕 뿌토DB' : '관리팀'} · ${selectedOpsUser}`
+        : `${isPuto ? '🆕 뿌토DB' : '관리팀'} (담당자 미선택)`)
     : (customUser.trim() || targetUser || '—')
 
   return (
@@ -222,13 +234,26 @@ function TransferModeView({
 
         {/* 관리팀 전송 토글 */}
         <label className="flex items-center gap-3 cursor-pointer bg-violet-50 rounded-lg px-4 py-3 border border-violet-200">
-          <input type="checkbox" checked={transferToOps} onChange={e => { setTransferToOps(e.target.checked); setTargetUser(''); setCustomUser('') }}
+          <input type="checkbox" checked={transferToOps} onChange={e => { setTransferToOps(e.target.checked); setTargetUser(''); setCustomUser(''); setIsPuto(false) }}
             className="w-4 h-4 accent-violet-500" />
           <div>
             <p className="text-sm font-semibold text-violet-800">🔀 관리팀으로 강제 전송</p>
             <p className="text-[10px] text-violet-500">선택한 DB를 관리팀에 ops_case로 등록</p>
           </div>
         </label>
+
+        {/* 뿌토 DB 옵션 */}
+        {transferToOps && (
+          <label className="flex items-center gap-3 cursor-pointer bg-sky-50 rounded-lg px-4 py-3 border border-sky-200 ml-4">
+            <input type="checkbox" checked={isPuto} onChange={e => setIsPuto(e.target.checked)}
+              className="w-4 h-4 accent-sky-500" />
+            <div>
+              <p className="text-sm font-semibold text-sky-800">🆕 뿌토 DB로 전송</p>
+              <p className="text-[10px] text-sky-500">관리팀 신규DB탭에 배정 (계약 후 진행중으로 이동)</p>
+            </div>
+            {isPuto && <span className="ml-auto text-[10px] bg-sky-500 text-white px-2 py-0.5 rounded-full font-bold">뿌토</span>}
+          </label>
+        )}
 
         {transferToOps ? (
           <div>

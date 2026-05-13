@@ -86,6 +86,7 @@ const ACTIVE_STAGE_KEYS = new Set([
 ])
 const REFUND_STAGE_KEYS  = new Set(['환불','refunded'])
 const COMPLETED_STAGE_KEYS = new Set(['종료','완료','completed'])
+const NEWDB_STAGE_KEYS   = new Set(['new_db'])
 
 // ── 기관 목록 ──────────────────────────────────────────────────────────
 const INST_DIRECT   = ['중진공','소진공(혁신)','소진공(신취)','소진공(재도전)','서민금융(미소)']
@@ -119,13 +120,14 @@ const inp = 'w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outli
 const lbl = 'text-[10px] text-gray-400 mb-0.5 block font-medium'
 
 // ── Tab types ──────────────────────────────────────────────────────────
-type OpsTab = 'dashboard' | 'active' | 'refund' | 'completed' | 'ops_contract' | 'report' | 'profile'
+type OpsTab = 'dashboard' | 'active' | 'refund' | 'completed' | 'newdb' | 'ops_contract' | 'report' | 'profile'
 
 const opsTabs: { key: OpsTab; label: string }[] = [
   { key: 'dashboard',    label: '📊 대시보드' },
   { key: 'active',       label: '🔄 진행중업체' },
   { key: 'refund',       label: '💸 환불업체' },
   { key: 'completed',    label: '✅ 종료업체' },
+  { key: 'newdb',        label: '🆕 신규DB' },
   { key: 'ops_contract', label: '📝 관리팀계약' },
   { key: 'report',       label: '📋 관리팀보고' },
   { key: 'profile',      label: '👤 사원정보' },
@@ -944,6 +946,242 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
 }
 
 // ──────────────────────────────────────────────────────────────────────
+// OpsNewDbTab (신규DB - 대표에게 배정받은 뿌토 DB)
+// ──────────────────────────────────────────────────────────────────────
+function OpsNewDbTab({ cases, userName, onSave }: {
+  cases: OpsCase[]
+  userName: string
+  onSave: (id: string, patch: Record<string, any>) => void
+}) {
+  const [contractingCase, setContractingCase] = useState<OpsCase | null>(null)
+  const [form, setForm] = useState({ institution: '', contract_amount: '', stage: '서류받는중', memo: '' })
+  const [saving, setSaving] = useState(false)
+  const [openId, setOpenId] = useState<string | null>(null)
+
+  function openContractModal(c: OpsCase) {
+    setContractingCase(c)
+    setForm({ institution: c.institution || '', contract_amount: '', stage: '서류받는중', memo: '' })
+  }
+
+  function handleContract() {
+    if (!contractingCase) return
+    setSaving(true)
+    const patch: Record<string, any> = {
+      progress_stage: form.stage,
+      institution: form.institution || contractingCase.institution,
+      details: {
+        ...(contractingCase.details || {}),
+        puto_contract_amount: form.contract_amount,
+        puto_contract_date: new Date().toISOString().slice(0, 10),
+        puto_contract_memo: form.memo,
+      },
+      timeline: [
+        ...(contractingCase.timeline || []),
+        {
+          user: userName,
+          content: `🆕 뿌토DB 계약 시작 → ${form.institution || '기관미정'}${form.contract_amount ? ' / ' + Number(form.contract_amount.replace(/[^0-9]/g,'')).toLocaleString() + '원' : ''}`,
+          created_at: nowKST(),
+        },
+      ],
+    }
+    onSave(contractingCase.id, patch)
+    setSaving(false)
+    setContractingCase(null)
+  }
+
+  return (
+    <div className="space-y-4">
+
+      {/* 계약 모달 */}
+      {contractingCase && (
+        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4"
+          onClick={e => { if (e.target === e.currentTarget) setContractingCase(null) }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="bg-gradient-to-r from-[#1B2A45] to-sky-700 px-5 py-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-white text-sm">🆕 뿌토DB 계약 처리</h3>
+                  <p className="text-white/60 text-xs mt-0.5">
+                    {contractingCase.customers?.details?.company || contractingCase.customers?.name}
+                  </p>
+                </div>
+                <button onClick={() => setContractingCase(null)} className="text-white/60 hover:text-white text-lg">✕</button>
+              </div>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              {/* 담당 기관 */}
+              <div>
+                <p className="text-[10px] font-bold text-gray-400 mb-1.5">🏦 담당 기관 (복수 선택)</p>
+                <div className="space-y-1">
+                  <div className="flex flex-wrap gap-1">
+                    <span className="text-[10px] text-blue-500 font-medium w-12 flex items-center">직접</span>
+                    {INST_DIRECT.map(inst => {
+                      const sel = form.institution.split(',').map(s => s.trim()).includes(inst)
+                      return (
+                        <button key={inst} type="button"
+                          onClick={() => {
+                            const cur = form.institution.split(',').map(s => s.trim()).filter(Boolean)
+                            const next = sel ? cur.filter(s => s !== inst) : [...cur, inst]
+                            setForm(p => ({ ...p, institution: next.join(', ') }))
+                          }}
+                          className={`px-2 py-0.5 rounded text-xs font-medium border transition-colors ${sel ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}>
+                          {inst}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    <span className="text-[10px] text-violet-500 font-medium w-12 flex items-center">간접</span>
+                    {INST_INDIRECT.map(inst => {
+                      const sel = form.institution.split(',').map(s => s.trim()).includes(inst)
+                      return (
+                        <button key={inst} type="button"
+                          onClick={() => {
+                            const cur = form.institution.split(',').map(s => s.trim()).filter(Boolean)
+                            const next = sel ? cur.filter(s => s !== inst) : [...cur, inst]
+                            setForm(p => ({ ...p, institution: next.join(', ') }))
+                          }}
+                          className={`px-2 py-0.5 rounded text-xs font-medium border transition-colors ${sel ? 'bg-violet-500 text-white border-violet-500' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}>
+                          {inst}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+              {/* 계약금액 */}
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 mb-1 block">💰 계약금액 (원)</label>
+                <input
+                  type="text"
+                  value={form.contract_amount}
+                  onChange={e => setForm(p => ({ ...p, contract_amount: e.target.value }))}
+                  placeholder="예: 3,000,000"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-sky-400"
+                />
+              </div>
+              {/* 시작 단계 */}
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 mb-1 block">📌 시작 단계</label>
+                <select
+                  value={form.stage}
+                  onChange={e => setForm(p => ({ ...p, stage: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-sky-400">
+                  {PIPELINE_STAGES.map(s => (
+                    <option key={s.key} value={s.key}>{s.label}</option>
+                  ))}
+                </select>
+              </div>
+              {/* 메모 */}
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 mb-1 block">📝 메모</label>
+                <textarea
+                  value={form.memo}
+                  onChange={e => setForm(p => ({ ...p, memo: e.target.value }))}
+                  rows={2}
+                  placeholder="특이사항 입력..."
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-sky-400 resize-none"
+                />
+              </div>
+            </div>
+            <div className="px-5 pb-5 flex gap-2">
+              <button onClick={() => setContractingCase(null)}
+                className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50">
+                취소
+              </button>
+              <button onClick={handleContract} disabled={saving || !form.institution}
+                className="flex-1 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
+                {saving ? '처리중...' : '✅ 계약 시작 → 진행중'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 헤더 */}
+      <div className="bg-gradient-to-r from-[#1B2A45] to-sky-700 rounded-xl px-5 py-4 text-white">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="font-bold text-base">🆕 신규DB (뿌토)</h2>
+            <p className="text-white/60 text-xs mt-0.5">대표로부터 배정받은 DB · 계약 처리 시 진행중업체로 자동 이동</p>
+          </div>
+          <span className="bg-white/20 text-white font-black text-xl px-4 py-1.5 rounded-xl">{cases.length}</span>
+        </div>
+      </div>
+
+      {/* 카드 그리드 */}
+      {cases.length === 0 ? (
+        <div className="bg-white rounded-xl border border-[#E8E2D4] p-16 text-center">
+          <p className="text-2xl mb-2">📭</p>
+          <p className="text-sm font-semibold text-gray-400">배정된 신규DB가 없습니다</p>
+          <p className="text-xs text-gray-300 mt-1">대표가 뿌토 DB를 배정하면 여기에 표시됩니다</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+          {cases.map(c => {
+            const company = c.customers?.details?.company || c.customers?.name || '—'
+            const { date } = formatKST(c.created_at || '')
+            return (
+              <div key={c.id}
+                className={`bg-white border rounded-xl p-2.5 cursor-pointer hover:shadow-md transition-all text-center relative ${
+                  openId === c.id ? 'ring-2 ring-sky-400 border-sky-300' : 'border-gray-200 hover:border-sky-300'
+                }`}
+                onClick={() => setOpenId(id => id === c.id ? null : c.id)}
+              >
+                {/* 배정 뱃지 */}
+                <div className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold mb-1 bg-sky-100 text-sky-700">
+                  🆕 배정
+                </div>
+                {/* 업체명 */}
+                <p className="font-bold text-[#1B2A45] text-[11px] leading-snug break-all" style={{ wordBreak: 'break-all' }}>
+                  {company}
+                </p>
+                <p className="text-[10px] text-gray-400 mt-0.5">{c.customers?.name}</p>
+                {c.institution && (
+                  <p className="text-[9px] text-violet-500 mt-0.5 font-medium">🏦 {c.institution.split(',')[0].trim()}</p>
+                )}
+                <p className="text-[9px] text-gray-300 mt-0.5">배정: {date}</p>
+                {/* 계약하기 버튼 */}
+                <button
+                  type="button"
+                  onClick={e => { e.stopPropagation(); openContractModal(c) }}
+                  className="mt-1.5 w-full text-[9px] bg-sky-500 hover:bg-sky-600 text-white rounded py-1 font-semibold transition-colors"
+                >
+                  ✅ 계약하기
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* 상세 드로어 */}
+      {openId && (() => {
+        const c = cases.find(x => x.id === openId)
+        if (!c) return null
+        return (
+          <div className="bg-white border border-sky-200 rounded-2xl p-4 shadow-lg">
+            <div className="flex items-center justify-between mb-3">
+              <span className="font-bold text-[#1B2A45] text-sm">
+                {c.customers?.details?.company || c.customers?.name}
+              </span>
+              <div className="flex gap-2">
+                <button onClick={() => openContractModal(c)}
+                  className="text-xs bg-sky-500 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-sky-600">
+                  ✅ 계약하기
+                </button>
+                <button onClick={() => setOpenId(null)} className="text-gray-400 hover:text-gray-600 text-sm">✕</button>
+              </div>
+            </div>
+            <OpsDetailPanel c={c} onSave={onSave} />
+          </div>
+        )
+      })()}
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────
 // OpsContractTab (관리팀계약 - 거절DB 직접계약)
 // ──────────────────────────────────────────────────────────────────────
 function OpsContractTab({ userName }: { userName: string }) {
@@ -1593,9 +1831,12 @@ export default function OpsDashboard({ userId, userName }: Props) {
       )
     : cases
 
+  const newdbCases     = filteredCases.filter(c => NEWDB_STAGE_KEYS.has(c.progress_stage))
   const activeCases    = filteredCases.filter(c =>
-    ACTIVE_STAGE_KEYS.has(c.progress_stage) ||
-    (!REFUND_STAGE_KEYS.has(c.progress_stage) && !COMPLETED_STAGE_KEYS.has(c.progress_stage) && !c.is_refund && !c.is_completed)
+    !NEWDB_STAGE_KEYS.has(c.progress_stage) && (
+      ACTIVE_STAGE_KEYS.has(c.progress_stage) ||
+      (!REFUND_STAGE_KEYS.has(c.progress_stage) && !COMPLETED_STAGE_KEYS.has(c.progress_stage) && !c.is_refund && !c.is_completed)
+    )
   )
   const refundCases    = filteredCases.filter(c => REFUND_STAGE_KEYS.has(c.progress_stage) || c.is_refund)
   const completedCases = filteredCases.filter(c => COMPLETED_STAGE_KEYS.has(c.progress_stage) || c.is_completed)
@@ -1605,6 +1846,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
     active:       activeCases.length,
     refund:       refundCases.length,
     completed:    completedCases.length,
+    newdb:        newdbCases.length,
     ops_contract: null,
     report:       null,
     profile:      null,
@@ -1830,6 +2072,11 @@ export default function OpsDashboard({ userId, userName }: Props) {
               )
             })}
           </div>
+        )}
+
+        {/* ── 신규DB (뿌토) ── */}
+        {activeTab === 'newdb' && (
+          <OpsNewDbTab cases={newdbCases} userName={userName} onSave={handleSave} />
         )}
 
         {/* ── 관리팀계약 ── */}
