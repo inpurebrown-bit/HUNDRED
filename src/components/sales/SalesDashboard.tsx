@@ -275,41 +275,47 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   // ── Derived values ────────────────────────────────────────────────
   const now = new Date()
   const thisMonth = now.toISOString().slice(0, 7)
-  const monthContracts = contracts.filter(c => c.created_at?.slice(0, 7) === thisMonth)
-  const monthContractCount = monthContracts.length
 
-  const monthlyGoal = MONTHLY_GOALS[username] ?? 30
   const yr = now.getFullYear()
   const mo = now.getMonth()
   const dayOfMonth = now.getDate()
   const bizTotal = getBusinessDaysInMonth(yr, mo)
   const bizElapsed = getElapsedBusinessDays(yr, mo, dayOfMonth)
   const bizRemaining = getRemainingBusinessDays(yr, mo, dayOfMonth)
+
+  // ── 공급 설정 기반 통계 ──────────────────────────────────
+  const mySupplyCfg = supplyConfig?.[userName] ?? null
+
+  // 이번달 계약: contract_date 기준으로만 (created_at 폴백 없음 → 월 혼입 방지)
+  const thisMonthContracted = customers.filter(c =>
+    c.status === 'contracted' &&
+    (c.sales_user_name === userName || (c as any).details?.sales_user_name === userName) &&
+    ((c as any).details?.contract_date || '').slice(0, 7) === thisMonth
+  )
+  // 가중 계약수 (입금액 33만원 이하 = 0.5개)
+  const myDbContracted = thisMonthContracted.reduce(
+    (sum, c) => sum + contractWeight((c as any).details?.payment_amount), 0
+  )
+  const myTotalContracted = mySupplyCfg ? mySupplyCfg.base + myDbContracted : myDbContracted
+
+  // 월 목표: supply_config.goal 우선, 없으면 MONTHLY_GOALS 폴백
+  const monthlyGoal = mySupplyCfg?.goal ?? MONTHLY_GOALS[username] ?? 30
+  // 달성률은 가중 계약수 기준
+  const monthContractCount = myTotalContracted
+
+  const supplyNotice = notices.find(n => n.notice_type === 'supply_count')
+  const todaySupply = supplyNotice ? parseInt(supplyNotice.content) || 0 : 0
+
+  const contractRate = mySupplyCfg && mySupplyCfg.supplied > 0
+    ? Math.round(myTotalContracted / mySupplyCfg.supplied * 100)
+    : todaySupply > 0 ? Math.round(myDbContracted / todaySupply * 100) : 0
+  const tomorrowSupplyNeeded = calcRecommendedSupply(contractRate, bizElapsed)
+
   const achievementRate = Math.min(100, Math.round(monthContractCount / monthlyGoal * 100))
   const remaining = Math.max(0, monthlyGoal - monthContractCount)
   const dailyPaceNeeded = bizRemaining > 0 ? (remaining / bizRemaining).toFixed(1) : '0'
   const onPaceCount = bizTotal > 0 ? Math.round((monthlyGoal / bizTotal) * bizElapsed) : 0
   const isAhead = monthContractCount >= onPaceCount
-
-  const supplyNotice = notices.find(n => n.notice_type === 'supply_count')
-  const todaySupply = supplyNotice ? parseInt(supplyNotice.content) || 0 : 0
-
-  // ── 인당 공급 통계 (supply_config 기반) ──────────────────
-  const mySupplyCfg = supplyConfig?.[userName] ?? null
-  const myDbContracted = mySupplyCfg !== null
-    ? customers
-        .filter(c =>
-          c.status === 'contracted' &&
-          (c.sales_user_name === userName || (c as any).details?.sales_user_name === userName) &&
-          ((c as any).details?.contract_date || (c as any).created_at || '').slice(0, 7) === thisMonth
-        )
-        .reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount), 0)
-    : 0
-  const myTotalContracted = mySupplyCfg ? mySupplyCfg.base + myDbContracted : myDbContracted
-  const contractRate = mySupplyCfg && mySupplyCfg.supplied > 0
-    ? Math.round(myTotalContracted / mySupplyCfg.supplied * 100)
-    : todaySupply > 0 ? Math.round(monthContractCount / todaySupply * 100) : 0
-  const tomorrowSupplyNeeded = calcRecommendedSupply(contractRate, bizElapsed)
 
   // ── Filtered lists ────────────────────────────────────────────────
   const db010List = customers.filter(c => c.status === 'db010')
@@ -342,15 +348,47 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
       )
     : []
 
-  // Revenue tab totals
-  // 총 매출: my_revenue 합산 (본인 수익 기준)
+  // ── 매출 집계 ──────────────────────────────────────────────
+  function pNum(s: string | number | undefined) {
+    return parseInt(String(s || '0').replace(/[^0-9]/g, ''), 10) || 0
+  }
+  function fmtWon(n: number) {
+    if (n <= 0) return '—'
+    if (n >= 100000000) return (n / 100000000).toFixed(1).replace(/\.0$/, '') + '억'
+    if (n >= 10000) return Math.round(n / 10000) + '만원'
+    return n.toLocaleString() + '원'
+  }
+
+  // 이번달 매출 집계 (contract_date 기준)
+  const thisMonthRevenue = revenueCustomers.filter(c =>
+    !c.details?.is_cancelled &&
+    ((c as any).details?.contract_date || '').slice(0, 7) === thisMonth
+  )
+  const thisMonthTotalRevenue = thisMonthRevenue.reduce((sum, c) => sum + pNum((c as any).details?.my_revenue), 0)
+  const thisMonthTotalPaid    = thisMonthRevenue.reduce((sum, c) => sum + pNum((c as any).details?.payment_amount), 0)
+  const thisMonthContractCount = thisMonthRevenue.reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount), 0)
+
+  // 전체 합계
   const totalRevenue = revenueCustomers
     .filter(c => !c.details?.is_cancelled)
-    .reduce((sum, c) => {
-      const n = parseInt(String((c as any).details?.my_revenue || '0').replace(/[^0-9]/g, ''), 10) || 0
-      return sum + n
-    }, 0)
+    .reduce((sum, c) => sum + pNum((c as any).details?.my_revenue), 0)
   const cancelledCount = revenueCustomers.filter(c => c.details?.is_cancelled).length
+
+  // 월별 그룹 (계약일 기준 내림차순)
+  const revenueByMonth = (() => {
+    const sorted = [...revenueCustomers].sort((a, b) => {
+      const da = (a as any).details?.contract_date || ''
+      const db2 = (b as any).details?.contract_date || ''
+      return db2.localeCompare(da)
+    })
+    const groups: Record<string, typeof sorted> = {}
+    for (const c of sorted) {
+      const month = ((c as any).details?.contract_date || '').slice(0, 7) || '날짜미입력'
+      if (!groups[month]) groups[month] = []
+      groups[month].push(c)
+    }
+    return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a))
+  })()
 
   // ── Tabs ──────────────────────────────────────────────────────────
   const tabs: { key: SalesTab; label: string; count?: number }[] = [
@@ -501,9 +539,9 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   <p className="text-xs font-semibold text-gray-500 mb-0.5">{thisMonth} 월간 목표</p>
                   <div className="flex items-baseline gap-2">
                     <span className={`text-4xl font-black ${isAhead ? 'text-emerald-600' : achievementRate >= 70 ? 'text-amber-600' : 'text-red-600'}`}>
-                      {monthContractCount}
+                      {Number.isInteger(monthContractCount) ? monthContractCount : monthContractCount.toFixed(1)}
                     </span>
-                    <span className="text-lg text-gray-400 font-medium">/ {monthlyGoal}건</span>
+                    <span className="text-lg text-gray-400 font-medium">/ {monthlyGoal}개</span>
                     <span className={`text-sm font-bold px-2 py-0.5 rounded-full ${isAhead ? 'bg-emerald-100 text-emerald-700' : achievementRate >= 70 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'}`}>
                       {achievementRate}%
                     </span>
@@ -523,8 +561,8 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 />
               </div>
               <div className="flex items-center justify-between text-xs text-gray-500">
-                <span>남은 목표 <strong className="text-gray-800">{remaining}건</strong></span>
-                <span>페이스 기준 <strong className={isAhead ? 'text-emerald-600' : 'text-red-500'}>{onPaceCount}건</strong> 위치</span>
+                <span>남은 목표 <strong className="text-gray-800">{remaining % 1 === 0 ? remaining : remaining.toFixed(1)}개</strong></span>
+                <span>페이스 기준 <strong className={isAhead ? 'text-emerald-600' : 'text-red-500'}>{onPaceCount}개</strong> 위치</span>
                 <span>남은 영업일 <strong className="text-gray-800">{bizRemaining}일</strong></span>
               </div>
               <p className={`text-xs font-semibold mt-2 text-center ${isAhead ? 'text-emerald-600' : achievementRate >= 50 ? 'text-amber-600' : 'text-red-500'}`}>
@@ -840,77 +878,123 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         {/* ══════════ 매출 ══════════ */}
         {activeTab === 'revenue' && (
           <div className="space-y-4">
-            <h2 className="text-sm font-bold text-gray-700">
-              💰 매출 현황 <span className="text-gray-400 font-normal">({revenueCustomers.length}건 전송)</span>
-            </h2>
+            <h2 className="text-sm font-bold text-gray-700">💰 매출 현황</h2>
 
-            {/* Summary cards */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-center">
-                <p className="text-[10px] text-gray-400 mb-0.5">전송건수</p>
-                <p className="text-2xl font-black text-emerald-700">{revenueCustomers.length}건</p>
-              </div>
-              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-center">
-                <p className="text-[10px] text-gray-400 mb-0.5">총 계약금</p>
-                <p className="text-xl font-black text-blue-700">
-                  {totalRevenue > 0 ? `${(totalRevenue / 10000).toFixed(0)}만원` : '—'}
-                </p>
-              </div>
-              <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center">
-                <p className="text-[10px] text-gray-400 mb-0.5">취소건수</p>
-                <p className="text-2xl font-black text-red-600">{cancelledCount}건</p>
+            {/* ── 이번달 요약 카드 ── */}
+            <div className="bg-gradient-to-r from-[#1B2A45] to-blue-900 rounded-2xl px-5 py-4 text-white">
+              <p className="text-[10px] font-bold text-white/50 uppercase tracking-wide mb-3">📅 {thisMonth} 이번달</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: '계약 갯수', value: thisMonthContractCount % 1 === 0 ? `${thisMonthContractCount}개` : `${thisMonthContractCount.toFixed(1)}개`, sub: '입금액 기준 가중치', color: 'text-[#C5A258]' },
+                  { label: '본인 매출', value: fmtWon(thisMonthTotalRevenue), sub: 'my_revenue 합산', color: 'text-emerald-400' },
+                  { label: '총 입금액', value: fmtWon(thisMonthTotalPaid), sub: '실입금 합계', color: 'text-sky-400' },
+                  { label: '취소건수', value: `${cancelledCount}건`, sub: '이번달 취소', color: 'text-red-400' },
+                ].map(s => (
+                  <div key={s.label} className="bg-white/10 rounded-xl px-3 py-2.5">
+                    <p className="text-[10px] text-white/50 mb-0.5">{s.label}</p>
+                    <p className={`text-lg font-black ${s.color}`}>{s.value}</p>
+                    <p className="text-[9px] text-white/30">{s.sub}</p>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Revenue list */}
+            {/* ── 전체 누적 ── */}
+            <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3">
+              <div className="flex-1 text-center border-r border-gray-100">
+                <p className="text-[10px] text-gray-400">전체 계약</p>
+                <p className="text-lg font-black text-gray-800">{revenueCustomers.length}건</p>
+              </div>
+              <div className="flex-1 text-center border-r border-gray-100">
+                <p className="text-[10px] text-gray-400">전체 본인매출</p>
+                <p className="text-lg font-black text-emerald-700">{fmtWon(totalRevenue)}</p>
+              </div>
+              <div className="flex-1 text-center">
+                <p className="text-[10px] text-gray-400">취소</p>
+                <p className="text-lg font-black text-red-500">{cancelledCount}건</p>
+              </div>
+            </div>
+
+            {/* ── 월별 리스트 ── */}
             {loading ? (
               <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
             ) : revenueCustomers.length === 0 ? (
               <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
-                관리팀으로 전송된 계약 업체가 없습니다.
+                계약 업체가 없습니다.
               </div>
             ) : (
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
-                  <div className="grid grid-cols-6 gap-2 text-[10px] font-semibold text-gray-500">
-                    <span className="col-span-2">업체명</span>
-                    <span>계약금</span>
-                    <span>수수료율</span>
-                    <span>세금계산서</span>
-                    <span>상태</span>
-                  </div>
-                </div>
-                <div className="divide-y divide-gray-50">
-                  {revenueCustomers.map(c => {
-                    const cancelled = c.details?.is_cancelled
-                    return (
-                      <div key={c.id} className={`px-5 py-3 grid grid-cols-6 gap-2 items-center ${cancelled ? 'bg-gray-50' : ''}`}>
-                        <div className="col-span-2 min-w-0">
-                          <p className={`text-sm font-semibold truncate ${cancelled ? 'line-through text-gray-400' : 'text-gray-800'}`}>
-                            {c.company || '(업체명 없음)'}
-                          </p>
-                          <p className="text-[10px] text-gray-400 truncate">{c.name}</p>
+              <div className="space-y-4">
+                {revenueByMonth.map(([month, list]) => {
+                  const mRevenue  = list.filter(c => !c.details?.is_cancelled).reduce((s, c) => s + pNum((c as any).details?.my_revenue), 0)
+                  const mPaid     = list.filter(c => !c.details?.is_cancelled).reduce((s, c) => s + pNum((c as any).details?.payment_amount), 0)
+                  const mCount    = list.filter(c => !c.details?.is_cancelled).reduce((s, c) => s + contractWeight((c as any).details?.payment_amount), 0)
+                  const isThisM   = month === thisMonth
+                  return (
+                    <div key={month} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                      {/* 월 헤더 */}
+                      <div className={`px-5 py-3 flex items-center justify-between border-b ${isThisM ? 'bg-emerald-50 border-emerald-100' : 'bg-gray-50 border-gray-100'}`}>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm font-bold ${isThisM ? 'text-emerald-700' : 'text-gray-600'}`}>
+                            {month === '날짜미입력' ? '📌 계약일 미입력' : `📅 ${month}`}
+                            {isThisM && <span className="ml-1.5 text-[10px] bg-emerald-500 text-white px-1.5 py-0.5 rounded-full">이번달</span>}
+                          </span>
                         </div>
-                        <p className={`text-xs ${cancelled ? 'line-through text-gray-400' : 'text-gray-700'}`}>
-                          {c.details?.contract_fee || '—'}
-                        </p>
-                        <p className={`text-xs ${cancelled ? 'line-through text-gray-400' : 'text-gray-700'}`}>
-                          {c.details?.commission_rate || '—'}
-                        </p>
-                        <p className={`text-xs ${cancelled ? 'text-gray-400' : c.details?.tax_invoice === '발급' ? 'text-emerald-600 font-medium' : 'text-gray-500'}`}>
-                          {c.details?.tax_invoice || '—'}
-                        </p>
-                        <div>
-                          {cancelled ? (
-                            <span className="inline-block bg-red-100 text-red-600 text-[10px] font-semibold px-2 py-0.5 rounded-full">취소</span>
-                          ) : (
-                            <span className="inline-block bg-emerald-100 text-emerald-700 text-[10px] font-semibold px-2 py-0.5 rounded-full">정상</span>
-                          )}
+                        <div className="flex items-center gap-3 text-[10px] text-gray-500">
+                          <span className="font-semibold text-[#C5A258]">{mCount % 1 === 0 ? mCount : mCount.toFixed(1)}개</span>
+                          <span>입금 {fmtWon(mPaid)}</span>
+                          <span className="text-emerald-600 font-semibold">매출 {fmtWon(mRevenue)}</span>
                         </div>
                       </div>
-                    )
-                  })}
-                </div>
+                      {/* 행 목록 */}
+                      <div className="divide-y divide-gray-50">
+                        {list.map(c => {
+                          const cancelled = c.details?.is_cancelled
+                          const weight = contractWeight((c as any).details?.payment_amount)
+                          const payAmt = pNum((c as any).details?.payment_amount)
+                          const myRev  = pNum((c as any).details?.my_revenue)
+                          const fee    = pNum((c as any).details?.contract_fee)
+                          return (
+                            <div key={c.id} className={`px-5 py-3 ${cancelled ? 'bg-gray-50/60' : ''}`}>
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <p className={`text-sm font-semibold truncate ${cancelled ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+                                    {(c as any).details?.company || c.company || c.name || '(업체명 없음)'}
+                                  </p>
+                                  <p className="text-[10px] text-gray-400 mt-0.5">
+                                    {(c as any).details?.contract_date || '날짜미입력'} · 대표 {c.name}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                                    weight === 0.5 ? 'bg-amber-100 text-amber-700' : 'bg-sky-100 text-sky-700'
+                                  }`}>{weight}개</span>
+                                  {cancelled
+                                    ? <span className="text-[10px] bg-red-100 text-red-600 font-semibold px-1.5 py-0.5 rounded-full">취소</span>
+                                    : <span className="text-[10px] bg-emerald-100 text-emerald-700 font-semibold px-1.5 py-0.5 rounded-full">정상</span>
+                                  }
+                                </div>
+                              </div>
+                              <div className={`grid grid-cols-3 gap-2 mt-2 text-[11px] ${cancelled ? 'opacity-40' : ''}`}>
+                                <div className="bg-gray-50 rounded-lg px-2 py-1.5">
+                                  <p className="text-[9px] text-gray-400 mb-0.5">계약금</p>
+                                  <p className="font-semibold text-gray-700">{fee > 0 ? fmtWon(fee) : '—'}</p>
+                                </div>
+                                <div className="bg-sky-50 rounded-lg px-2 py-1.5">
+                                  <p className="text-[9px] text-gray-400 mb-0.5">입금액</p>
+                                  <p className="font-semibold text-sky-700">{payAmt > 0 ? fmtWon(payAmt) : '—'}</p>
+                                </div>
+                                <div className="bg-emerald-50 rounded-lg px-2 py-1.5">
+                                  <p className="text-[9px] text-gray-400 mb-0.5">본인 매출</p>
+                                  <p className="font-semibold text-emerald-700">{myRev > 0 ? fmtWon(myRev) : '—'}</p>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
