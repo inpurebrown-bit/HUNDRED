@@ -451,7 +451,8 @@ export default function ReportTab({ userId, userName }: Props) {
       {/* ── 오전보고 폼 ── */}
       {activeReport === 'morning' && (
         <div className="space-y-4">
-          <form onSubmit={submitMorning} className="bg-white rounded-xl border border-gray-100 p-5 space-y-4">
+          <form onSubmit={submitMorning} className="bg-white rounded-xl border border-gray-100 p-5 space-y-4"
+            onKeyDown={e => { if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') e.preventDefault() }}>
             {editDate && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center justify-between">
                 <span className="text-xs text-amber-700 font-medium">✏️ 수정 중 — {editDate}</span>
@@ -533,7 +534,8 @@ export default function ReportTab({ userId, userName }: Props) {
       {/* ── 마감보고 폼 ── */}
       {activeReport === 'daily' && (
         <div className="space-y-4">
-          <form onSubmit={submitDaily} className="space-y-5">
+          <form onSubmit={submitDaily} className="space-y-5"
+            onKeyDown={e => { if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') e.preventDefault() }}>
 
             {/* 기본 정보 */}
             <div className="bg-white rounded-xl border border-gray-100 p-5">

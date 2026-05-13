@@ -97,6 +97,12 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
 
   // 영업팀 실제 이름 목록 (DB 트레이드용)
   const [salesUserNames, setSalesUserNames] = useState<string[]>([])
+  // 관리팀 직원 목록 (전송 담당자 배정용)
+  const [opsUserList, setOpsUserList] = useState<{ id: string; name: string }[]>([])
+  // 관리팀 전송 모달 상태
+  const [opsTransferModal, setOpsTransferModal] = useState<{ customer: Customer | null; opsUserId: string; opsUserName: string }>({
+    customer: null, opsUserId: '', opsUserName: '',
+  })
   const [installPrompt, setInstallPrompt] = useState<any>(null)
   const [installable, setInstallable] = useState(false)
 
@@ -138,7 +144,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
     const [cRes, conRes, nRes, scRes] = await Promise.all([
       fetch('/api/customers'),
       fetch('/api/contracts'),
-      fetch('/api/notices?team=sales'),
+      fetch('/api/notices?team=sales&_t=' + Date.now()),
       fetch('/api/supply-config'),
     ])
     const [cData, conData, nData, scData] = await Promise.all([cRes.json(), conRes.json(), nRes.json(), scRes.json()])
@@ -199,7 +205,8 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
     await patchCustomer(id, patch)
   }, [patchCustomer])
 
-  const transferToOps = useCallback(async (customer: Customer) => {
+  // 내부 실제 전송 함수 (owner_id 포함)
+  const doTransferToOps = useCallback(async (customer: Customer, opsUserId?: string, opsUserName?: string) => {
     const details: any = customer.details || {}
     const memo = [
       details.company && `업체: ${details.company}`,
@@ -210,14 +217,11 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
       details.tax_invoice && `세금계산서: ${details.tax_invoice}`,
     ].filter(Boolean).join(' / ')
 
-    // ⚡ 핵심 수정: full details 스프레드 금지 → ops_transferred 플래그만 전송
-    // (details 스프레드 시 stale sub_status가 DB에 재기입되어 계약업체가 고객DB로 역행하는 버그 발생)
     await patchCustomer(customer.id, { details: { ops_transferred: true } })
 
     const anyDetails = details as any
     const revenue = parseInt(String(anyDetails.my_revenue || '0').replace(/[^0-9]/g, ''), 10) || 0
 
-    // 영업팀 call_timeline → ops_case 초기 timeline에 임베딩 (source: 'sales' 마킹)
     const salesTimeline = ((customer as any).call_timeline || []).map((e: any) => ({
       ...e,
       source: 'sales',
@@ -227,17 +231,27 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        // API가 기대하는 필드명으로 전송 (progress_stage → stage, progress_memo → memo)
         customer_name: (anyDetails.company as string) || customer.company || customer.name || '',
         phone: customer.phone || '',
         stage: '서류받는중',
         memo,
         revenue,
+        owner_id: opsUserId || null,
         timeline: salesTimeline.length > 0 ? salesTimeline : undefined,
       }),
     })
     await loadAll()
   }, [patchCustomer])
+
+  // transferToOps — 관리팀 직원 목록이 있으면 담당자 선택 모달 표시
+  const transferToOps = useCallback(async (customer: Customer) => {
+    if (opsUserList.length > 0) {
+      setOpsTransferModal({ customer, opsUserId: '', opsUserName: '' })
+    } else {
+      // ops 직원 없으면 미배정으로 바로 전송
+      await doTransferToOps(customer)
+    }
+  }, [opsUserList, doTransferToOps])
 
   // ── 인콜 데이터 → API 페이로드 변환 ────────────────────────────────
   function buildPayload(data: InCallData, status: string) {
@@ -365,12 +379,10 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
       .then(r => r.json())
       .then(d => {
         const names: string[] = (d.users || []).map((u: any) => u.name).filter(Boolean)
-        // 현재 로그인 유저가 없으면 추가 (fallback)
         if (!names.includes(userName)) names.push(userName)
         setSalesUserNames(names)
       })
       .catch(() => {
-        // fallback: customers 데이터에서 추출
         const names = Array.from(new Set(
           customers.map((c: any) => c.details?.sales_user_name || c.sales_user_name).filter(Boolean)
         )) as string[]
@@ -378,6 +390,14 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         setSalesUserNames(names)
       })
   }, [userName])
+
+  // 관리팀 직원 목록 로드
+  useEffect(() => {
+    fetch('/api/users?role=ops')
+      .then(r => r.json())
+      .then(d => setOpsUserList(d.users || []))
+      .catch(() => {})
+  }, [])
 
   // ── Filtered lists ────────────────────────────────────────────────
   const db010List = customers.filter(c => c.status === 'db010')
@@ -468,6 +488,59 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   // ── Render ────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#FAF8F3]">
+      {/* ── 관리팀 전송 담당자 선택 모달 ── */}
+      {opsTransferModal.customer && (
+        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4"
+          onClick={e => { if (e.target === e.currentTarget) setOpsTransferModal({ customer: null, opsUserId: '', opsUserName: '' }) }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h2 className="font-bold text-[#1B2A45] text-sm">📤 관리팀 담당자 배정</h2>
+                <p className="text-[11px] text-gray-400 mt-0.5">{(opsTransferModal.customer as any).details?.company || opsTransferModal.customer.company || opsTransferModal.customer.name}</p>
+              </div>
+              <button onClick={() => setOpsTransferModal({ customer: null, opsUserId: '', opsUserName: '' })}
+                className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-xs text-gray-500 font-medium">담당 관리팀 직원을 선택하세요</p>
+              <div className="flex flex-wrap gap-2">
+                {opsUserList.map(u => (
+                  <button key={u.id}
+                    onClick={() => setOpsTransferModal(p => ({ ...p, opsUserId: u.id, opsUserName: u.name }))}
+                    className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-colors ${
+                      opsTransferModal.opsUserId === u.id
+                        ? 'bg-amber-500 text-white border-amber-500'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-amber-300'
+                    }`}>
+                    {u.name}
+                  </button>
+                ))}
+              </div>
+              {opsUserList.length === 0 && (
+                <p className="text-xs text-gray-400 text-center py-2">등록된 관리팀 직원이 없습니다<br />(미배정으로 전송됩니다)</p>
+              )}
+            </div>
+            <div className="px-5 pb-5 flex gap-2">
+              <button onClick={() => setOpsTransferModal({ customer: null, opsUserId: '', opsUserName: '' })}
+                className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50">
+                취소
+              </button>
+              <button
+                onClick={async () => {
+                  const { customer, opsUserId, opsUserName } = opsTransferModal
+                  if (!customer) return
+                  setOpsTransferModal({ customer: null, opsUserId: '', opsUserName: '' })
+                  await doTransferToOps(customer, opsUserId || undefined, opsUserName || undefined)
+                  showToast('✅ 관리팀 전송 완료!')
+                }}
+                className="flex-1 bg-amber-500 hover:bg-amber-600 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
+                📤 {opsTransferModal.opsUserId ? `${opsTransferModal.opsUserName}에게 전송` : '미배정으로 전송'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── 토스트 알림 ── */}
       {toast && (
         <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[9999] px-5 py-3 rounded-xl shadow-2xl text-sm font-semibold text-white transition-all animate-bounce-once max-w-sm text-center ${

@@ -41,7 +41,8 @@ export async function GET(req: NextRequest) {
   }
 
   let query = supabaseAdmin.from('ops_cases').select('*')
-  if (user.role === 'ops') query = query.eq('owner_id', user.id) as any
+  // ops 사용자는 본인 케이스 + 미배정(owner_id null) 케이스 모두 조회
+  if (user.role === 'ops') query = query.or(`owner_id.eq.${user.id},owner_id.is.null`) as any
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
