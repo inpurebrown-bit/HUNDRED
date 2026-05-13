@@ -385,7 +385,8 @@ export default function OverviewTabNew() {
         setSalesGoals(a(goalsData).sales_goals ?? a(goalsData).goals ?? [])
         setLastMonthGoals(a(lastGoalsData).sales_goals ?? a(lastGoalsData).goals ?? [])
         setAsRequests(a(asData).as_requests ?? a(asData).requests ?? [])
-        setSupplyConfigMap(a(supplyData).config ?? {})
+        // config 형식: { month, people: { 이름: { goal, base, supplied } } }
+        setSupplyConfigMap(a(supplyData).config?.people ?? a(supplyData).config ?? {})
       } catch {
         // silently ignore
       } finally {

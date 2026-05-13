@@ -152,6 +152,8 @@ export default function ReportTab({ userId, userName }: Props) {
   const [lockedMorning, setLockedMorning] = useState<Record<string, boolean>>({})
   // 계약 자동집계용 고객 데이터
   const [allCustomers, setAllCustomers] = useState<any[]>([])
+  // 목표 개수 (supply_config에서 로드)
+  const [supplyGoal, setSupplyGoal] = useState<number | null>(null)
 
   // 오전보고 상태
   const [morning, setMorning] = useState<MorningData>({
@@ -180,6 +182,18 @@ export default function ReportTab({ userId, userName }: Props) {
   useEffect(() => {
     fetch('/api/customers').then(r => r.json()).then(d => setAllCustomers(d.customers || []))
   }, [])
+
+  // supply_config에서 목표 개수 로드
+  useEffect(() => {
+    fetch('/api/supply-config').then(r => r.json()).then(d => {
+      const cfg = d.config
+      if (!cfg) return
+      // 형식: { month, people: { 이름: { goal, ... } } } 또는 { 이름: { goal } }
+      const people = cfg.people || cfg
+      const mine = people[userName]
+      if (mine?.goal) setSupplyGoal(Number(mine.goal))
+    }).catch(() => {})
+  }, [userName])
 
   // ── 이번달/오늘 계약 자동집계 ───────────────────────────
   function contractWeight(paymentAmount: string | number | undefined): number {
@@ -554,6 +568,7 @@ export default function ReportTab({ userId, userName }: Props) {
                     ...p,
                     today_contracts: String(autoTodayContracts),
                     month_contracts: String(autoMonthContracts),
+                    ...(supplyGoal !== null && p.goal === '' ? { goal: String(supplyGoal) } : {}),
                   }))}
                   className="ml-auto shrink-0 text-[11px] bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-semibold transition-colors">
                   ↓ 자동입력
@@ -585,10 +600,20 @@ export default function ReportTab({ userId, userName }: Props) {
                   </div>
                 </div>
                 <div>
-                  <label className={label}>월 목표 개수</label>
-                  <input type="number" className={inp} placeholder="0"
-                    value={daily.goal}
-                    onChange={e => setDaily(p => ({ ...p, goal: e.target.value }))} />
+                  <label className={label}>
+                    월 목표 개수
+                    {supplyGoal !== null && (
+                      <span className="ml-1 text-[9px] text-blue-400 font-normal">(설정값: {supplyGoal})</span>
+                    )}
+                  </label>
+                  <div className="relative">
+                    <input type="number" className={inp} placeholder="0"
+                      value={daily.goal}
+                      onChange={e => setDaily(p => ({ ...p, goal: e.target.value }))} />
+                    {daily.goal === '' && supplyGoal !== null && (
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-blue-400 pointer-events-none">{supplyGoal}</span>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className={label}>목표까지 남은 수</label>

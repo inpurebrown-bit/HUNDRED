@@ -73,6 +73,28 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
     if (typeof window !== 'undefined') localStorage.setItem('daily-notepad', val)
   }
   const [supplyConfig, setSupplyConfig] = useState<Record<string, { supplied: number; goal: number; base: number }> | null>(null)
+  const [goalEditOpen, setGoalEditOpen] = useState(false)
+  const [goalEditValue, setGoalEditValue] = useState('')
+  const [goalSaving, setGoalSaving] = useState(false)
+
+  async function saveGoal() {
+    const num = parseInt(goalEditValue)
+    if (isNaN(num) || num < 0) return
+    setGoalSaving(true)
+    await fetch('/api/supply-config', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ selfGoal: num }),
+    })
+    // 로컬 state 즉시 반영
+    setSupplyConfig(prev => prev
+      ? { ...prev, [userName]: { ...(prev[userName] || { supplied: 0, base: 0 }), goal: num } }
+      : { [userName]: { supplied: 0, goal: num, base: 0 } }
+    )
+    setGoalSaving(false)
+    setGoalEditOpen(false)
+  }
+
   // 영업팀 실제 이름 목록 (DB 트레이드용)
   const [salesUserNames, setSalesUserNames] = useState<string[]>([])
   const [installPrompt, setInstallPrompt] = useState<any>(null)
@@ -565,7 +587,33 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             <div className={`rounded-2xl p-5 border ${isAhead ? 'bg-emerald-50 border-emerald-200' : achievementRate >= 70 ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200'}`}>
               <div className="flex items-start justify-between mb-3">
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 mb-0.5">{thisMonth} 월간 목표</p>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <p className="text-xs font-semibold text-gray-500">{thisMonth} 월간 목표</p>
+                    {/* 목표 인라인 편집 */}
+                    {!goalEditOpen ? (
+                      <button
+                        onClick={() => { setGoalEditValue(String(monthlyGoal)); setGoalEditOpen(true) }}
+                        className="text-[10px] text-gray-400 hover:text-blue-500 px-1.5 py-0.5 rounded hover:bg-blue-50 transition-colors font-medium"
+                      >✏️ 목표 설정</button>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          value={goalEditValue}
+                          onChange={e => setGoalEditValue(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') saveGoal(); if (e.key === 'Escape') setGoalEditOpen(false) }}
+                          className="w-14 text-xs border border-blue-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-400 text-gray-800"
+                          autoFocus
+                        />
+                        <button onClick={saveGoal} disabled={goalSaving}
+                          className="text-[10px] bg-blue-500 text-white px-2 py-0.5 rounded font-semibold hover:bg-blue-600 disabled:opacity-50">
+                          {goalSaving ? '…' : '저장'}
+                        </button>
+                        <button onClick={() => setGoalEditOpen(false)}
+                          className="text-[10px] text-gray-400 hover:text-gray-600 px-1">✕</button>
+                      </div>
+                    )}
+                  </div>
                   <div className="flex items-baseline gap-2">
                     <span className={`text-4xl font-black ${isAhead ? 'text-emerald-600' : achievementRate >= 70 ? 'text-amber-600' : 'text-red-600'}`}>
                       {Number.isInteger(monthContractCount) ? monthContractCount : monthContractCount.toFixed(1)}
@@ -910,19 +958,18 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             <h2 className="text-sm font-bold text-gray-700">💰 매출 현황</h2>
 
             {/* ── 이번달 요약 카드 ── */}
-            <div className="bg-gradient-to-r from-[#1B2A45] to-blue-900 rounded-2xl px-5 py-4 text-white">
-              <p className="text-[10px] font-bold text-white/50 uppercase tracking-wide mb-3">📅 {thisMonth} 이번달</p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">📅 {thisMonth} 이번달</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
-                  { label: '계약 갯수', value: thisMonthContractCount % 1 === 0 ? `${thisMonthContractCount}개` : `${thisMonthContractCount.toFixed(1)}개`, sub: '입금액 기준 가중치', color: 'text-[#C5A258]' },
-                  { label: '본인 매출', value: fmtWon(thisMonthTotalRevenue), sub: 'my_revenue 합산', color: 'text-emerald-400' },
-                  { label: '총 입금액', value: fmtWon(thisMonthTotalPaid), sub: '실입금 합계', color: 'text-sky-400' },
-                  { label: '취소건수', value: `${cancelledCount}건`, sub: '이번달 취소', color: 'text-red-400' },
+                  { label: '계약 갯수', value: thisMonthContractCount % 1 === 0 ? `${thisMonthContractCount}개` : `${thisMonthContractCount.toFixed(1)}개`, color: 'text-[#C5A258]' },
+                  { label: '본인 매출', value: fmtWon(thisMonthTotalRevenue), color: 'text-emerald-600' },
+                  { label: '총 입금액', value: fmtWon(thisMonthTotalPaid), color: 'text-sky-600' },
+                  { label: '취소건수', value: `${cancelledCount}건`, color: 'text-red-500' },
                 ].map(s => (
-                  <div key={s.label} className="bg-white/10 rounded-xl px-3 py-2.5">
-                    <p className="text-[10px] text-white/50 mb-0.5">{s.label}</p>
-                    <p className={`text-lg font-black ${s.color}`}>{s.value}</p>
-                    <p className="text-[9px] text-white/30">{s.sub}</p>
+                  <div key={s.label} className="bg-gray-50 rounded-lg px-3 py-2 text-center">
+                    <p className="text-[9px] text-gray-400 mb-0.5">{s.label}</p>
+                    <p className={`text-sm font-bold ${s.color}`}>{s.value}</p>
                   </div>
                 ))}
               </div>

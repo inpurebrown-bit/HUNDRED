@@ -524,21 +524,28 @@ function OpsDetailPanel({ c, onSave }: { c: OpsCase; onSave: (id: string, patch:
             <div className="text-center py-8 text-gray-400 text-xs">불러오는 중...</div>
           ) : incallData ? (
             <div className="space-y-3">
-              {/* incall timeline from customers table */}
+              {/* incall timeline from customers table (call_timeline 필드) */}
               {(() => {
-                const logs: any[] = incallData.details?.incall_logs || incallData.incall_logs || []
+                const logs: any[] = (
+                  incallData.call_timeline ||
+                  incallData.details?.call_timeline ||
+                  incallData.details?.incall_logs ||
+                  incallData.incall_logs ||
+                  []
+                )
                 return logs.length === 0 ? (
                   <p className="text-xs text-gray-400 text-center py-4">영업팀 인콜일지가 없습니다</p>
                 ) : (
                   <div className="relative pl-4 border-l-2 border-violet-200 space-y-2">
                     {[...logs].reverse().map((log: any, i: number) => {
                       const kst = formatKST(log.created_at || log.date || '')
+                      const author = log.user || log.author || log.user_name || '담당자'
                       return (
                         <div key={i} className="relative">
                           <div className="absolute -left-[21px] top-1.5 w-3 h-3 rounded-full bg-violet-400 border-2 border-white" />
                           <div className="bg-violet-50 rounded-lg px-3 py-2">
                             <div className="flex items-center gap-2 mb-0.5">
-                              <span className="text-[10px] font-bold text-violet-700">{log.author || log.user_name || '담당자'}</span>
+                              <span className="text-[10px] font-bold text-violet-700">{author}</span>
                               <span className="text-[10px] text-gray-400">{kst.date} {kst.time}</span>
                               {log.call_result && (
                                 <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-medium">{log.call_result}</span>
