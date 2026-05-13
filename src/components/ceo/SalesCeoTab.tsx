@@ -648,7 +648,7 @@ export default function SalesCeoTab() {
       total: mine.length,
       lead: mine.filter((c: any) => ['lead', 'consulting'].includes(c.status)).length,
       db010: mine.filter((c: any) => c.status === 'db010').length,
-      contracted: contracted.length,
+      contracted: contracted.reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount), 0),
       revenue: contracted.reduce((sum, c) => sum + parseNum((c as any).details?.my_revenue), 0),
     }
   }), [customers, salesPeople])
@@ -1245,7 +1245,7 @@ export default function SalesCeoTab() {
                     <span className="ml-auto text-[10px] text-white/40">{pct}%</span>
                   </div>
                   <p className="text-base font-black text-[#C5A258]">{fmtWon(p.revenue)}</p>
-                  <p className="text-[10px] text-white/40 mt-0.5">계약 {p.contracted}건 · DB {p.lead}</p>
+                  <p className="text-[10px] text-white/40 mt-0.5">계약 {p.contracted % 1 === 0 ? p.contracted : p.contracted.toFixed(1)}건 · DB {p.lead}</p>
                   {/* 점유율 바 */}
                   <div className="mt-1.5 h-1 bg-white/10 rounded-full overflow-hidden">
                     <div className="h-full bg-[#C5A258] rounded-full transition-all" style={{ width: `${pct}%` }} />
@@ -1319,7 +1319,7 @@ export default function SalesCeoTab() {
               <div className={"flex gap-2 mt-1.5 text-[10px] " + (personTab === p.name ? 'text-white/70' : 'text-gray-400')}>
                 <span>매출 <b className={personTab === p.name ? 'text-[#C5A258]' : 'text-emerald-600'}>{fmtWon(p.revenue)}</b></span>
                 <span>·</span>
-                <span>계약 {p.contracted}</span>
+                <span>계약 {p.contracted % 1 === 0 ? p.contracted : p.contracted.toFixed(1)}</span>
               </div>
             </button>
           ))}

@@ -15,7 +15,7 @@ import {
   getElapsedBusinessDays as _bizElapsed,
   getRemainingBusinessDays as _bizRemaining,
 } from '@/lib/businessDays'
-import { SUPPLY_RATE_TABLE, isActiveRow } from '@/lib/supplyRules'
+import { SUPPLY_RATE_TABLE, isActiveRow, contractWeight } from '@/lib/supplyRules'
 
 // ─── Interfaces ───────────────────────────────────────────
 
@@ -185,11 +185,11 @@ function EmployeeTable({ rows, loading }: { rows: EmployeeRow[]; loading: boolea
                   row.goal + '건'
                 )}
               </td>
-              <td className="py-2.5 px-3 font-semibold text-[#1B2A45]">{row.contracted}건</td>
+              <td className="py-2.5 px-3 font-semibold text-[#1B2A45]">{row.contracted % 1 === 0 ? row.contracted : row.contracted.toFixed(1)}건</td>
               <td className="py-2.5 px-3 text-[#1B2A45]/60">{row.elapsed}일</td>
               <td className="py-2.5 px-3 text-[#1B2A45]/60">{row.remaining}일</td>
               <td className="py-2.5 px-3 text-[#1B2A45]/70">
-                {row.projected !== null ? row.projected + '건' : '-'}
+                {row.projected !== null ? (row.projected % 1 === 0 ? row.projected : row.projected.toFixed(1)) + '건' : '-'}
               </td>
               <td className="py-2.5 px-3">
                 {row.dailyNeeded !== null ? (
@@ -228,7 +228,7 @@ function MonthSection({
   employeeRows,
 }: MonthSectionProps) {
   const stats = [
-    { label: '이번달 총 계약 수', value: contractCount + '건' },
+    { label: '이번달 총 계약 수', value: (contractCount % 1 === 0 ? contractCount : contractCount.toFixed(1)) + '건' },
     { label: '진행중 건수', value: inProgressCount + '건' },
     { label: '발생 세금 (매출 10%)', value: taxAmount > 0 ? (taxAmount / 10000).toFixed(0) + '만원' : '-' },
   ]
@@ -297,6 +297,7 @@ export default function OverviewTabNew() {
   const [lastMonthGoals, setLastMonthGoals] = useState<SalesGoal[]>([])
   const [asRequests, setAsRequests] = useState<AsRequest[]>([])
   const [markingId, setMarkingId] = useState<string | null>(null)
+  const [supplyConfigMap, setSupplyConfigMap] = useState<Record<string, { base?: number }>>({})
 
   // Section refs for scroll-to
   const chartRef = useRef<HTMLDivElement>(null)
@@ -331,6 +332,7 @@ export default function OverviewTabNew() {
           goalsRes,
           lastGoalsRes,
           asRes,
+          supplyRes,
         ] = await Promise.all([
           fetch('/api/revenue').catch(() => null),
           fetch('/api/assign').catch(() => null),
@@ -342,6 +344,7 @@ export default function OverviewTabNew() {
           fetch(`/api/sales-goals?year_month=${thisMonthStr}`).catch(() => null),
           fetch(`/api/sales-goals?year_month=${lastMonthStr}`).catch(() => null),
           fetch('/api/as-requests?status=pending').catch(() => null),
+          fetch('/api/supply-config').catch(() => null),
         ])
 
         const [
@@ -355,6 +358,7 @@ export default function OverviewTabNew() {
           goalsData,
           lastGoalsData,
           asData,
+          supplyData,
         ] = await Promise.all([
           revRes?.json().catch(() => ({})) ?? {},
           assignRes?.json().catch(() => ({})) ?? {},
@@ -366,6 +370,7 @@ export default function OverviewTabNew() {
           goalsRes?.json().catch(() => ({})) ?? {},
           lastGoalsRes?.json().catch(() => ({})) ?? {},
           asRes?.json().catch(() => ({})) ?? {},
+          supplyRes?.json().catch(() => ({})) ?? {},
         ])
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -380,6 +385,7 @@ export default function OverviewTabNew() {
         setSalesGoals(a(goalsData).sales_goals ?? a(goalsData).goals ?? [])
         setLastMonthGoals(a(lastGoalsData).sales_goals ?? a(lastGoalsData).goals ?? [])
         setAsRequests(a(asData).as_requests ?? a(asData).requests ?? [])
+        setSupplyConfigMap(a(supplyData).config ?? {})
       } catch {
         // silently ignore
       } finally {
@@ -483,22 +489,24 @@ export default function OverviewTabNew() {
     contracts: Contract[],
     goals: SalesGoal[],
     elapsed: number,
-    remaining: number
+    remaining: number,
+    addBase = false
   ): EmployeeRow[] {
     const userMap: Record<string, { name: string; count: number }> = {}
     for (const c of contracts) {
       const uid = c.sales_user_id
       if (!uid) continue
       if (!userMap[uid]) userMap[uid] = { name: c.sales_user_name ?? uid, count: 0 }
-      userMap[uid].count++
+      userMap[uid].count += contractWeight(c.contract_amount)
     }
 
     return Object.values(userMap).map(u => {
       const goalEntry = goals.find(g => g.user_name === u.name)
       const goal = goalEntry ? Number(goalEntry.goal_count) : null
-      const contracted = u.count
+      const base = addBase ? (supplyConfigMap[u.name]?.base ?? 0) : 0
+      const contracted = u.count + base
       const projected =
-        elapsed > 0 ? Math.round((contracted / elapsed) * (elapsed + remaining)) : null
+        elapsed > 0 ? Math.round((contracted / elapsed) * (elapsed + remaining) * 10) / 10 : null
       const dailyNeeded =
         remaining > 0 && goal !== null && goal > contracted
           ? Math.ceil((goal - contracted) / remaining)
@@ -516,8 +524,8 @@ export default function OverviewTabNew() {
     })
   }
 
-  const thisMonthRows = buildRows(thisMonthContracts, salesGoals, thisElapsed, thisRemaining)
-  const lastMonthRows = buildRows(lastMonthContracts, lastMonthGoals, lastElapsed, lastRemaining)
+  const thisMonthRows = buildRows(thisMonthContracts, salesGoals, thisElapsed, thisRemaining, true)
+  const lastMonthRows = buildRows(lastMonthContracts, lastMonthGoals, lastElapsed, lastRemaining, false)
 
   // ── A/S confirm ─────────────────────────────────────────
 
@@ -619,7 +627,7 @@ export default function OverviewTabNew() {
         <MonthSection
           title={`${thisMonth}월 현황`}
           loading={loading}
-          contractCount={thisMonthContracts.length}
+          contractCount={thisMonthContracts.reduce((s, c) => s + contractWeight(c.contract_amount), 0)}
           inProgressCount={thisInProgress}
           taxAmount={thisMonthTax}
           employeeRows={thisMonthRows}
@@ -631,7 +639,7 @@ export default function OverviewTabNew() {
         <MonthSection
           title={`${lastMonth}월 현황`}
           loading={loading}
-          contractCount={lastMonthContracts.length}
+          contractCount={lastMonthContracts.reduce((s, c) => s + contractWeight(c.contract_amount), 0)}
           inProgressCount={lastInProgress}
           taxAmount={lastMonthTax}
           employeeRows={lastMonthRows}

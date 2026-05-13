@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+
+export const dynamic = 'force-dynamic'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendPushNotification } from '@/lib/pushNotify'

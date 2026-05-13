@@ -182,24 +182,25 @@ export default function ReportTab({ userId, userName }: Props) {
   }, [])
 
   // ── 이번달/오늘 계약 자동집계 ───────────────────────────
+  function contractWeight(paymentAmount: string | number | undefined): number {
+    const amt = typeof paymentAmount === 'number'
+      ? paymentAmount
+      : parseFloat(String(paymentAmount || '0').replace(/[^0-9.]/g, ''))
+    return (!isNaN(amt) && amt > 0 && amt <= 330000) ? 0.5 : 1
+  }
+
   const todayStr   = today()
   const monthStr   = todayStr.slice(0, 7)
   const myContracts = allCustomers.filter((c: any) => {
     const owner = c.details?.sales_user_name || c.sales_user_name || ''
     return c.status === 'contracted' && owner === userName
   })
-  const autoTodayContracts = myContracts.filter((c: any) =>
-    (c.details?.contract_date || '').startsWith(todayStr)
-  ).length
-  const autoMonthContracts = myContracts.filter((c: any) =>
-    (c.details?.contract_date || '').startsWith(monthStr)
-  ).length
-  const autoMonthRevenue = myContracts
+  const autoTodayContracts = myContracts
+    .filter((c: any) => (c.details?.contract_date || '').startsWith(todayStr))
+    .reduce((sum: number, c: any) => sum + contractWeight(c.details?.payment_amount), 0)
+  const autoMonthContracts = myContracts
     .filter((c: any) => (c.details?.contract_date || '').startsWith(monthStr))
-    .reduce((sum: number, c: any) => {
-      const r = parseFloat((c.details?.my_revenue || '0').replace(/[^0-9.]/g, ''))
-      return sum + (isNaN(r) ? 0 : r)
-    }, 0)
+    .reduce((sum: number, c: any) => sum + contractWeight(c.details?.payment_amount), 0)
 
   const [showYesterdayPreview, setShowYesterdayPreview] = useState(false)
 
@@ -542,13 +543,10 @@ export default function ReportTab({ userId, userName }: Props) {
                 </div>
                 <div className="flex flex-wrap gap-3 text-[11px]">
                   <span className="bg-white border border-emerald-200 rounded-full px-2.5 py-1 font-semibold text-emerald-700">
-                    오늘 계약 {autoTodayContracts}건
+                    오늘 계약 {autoTodayContracts % 1 === 0 ? autoTodayContracts : autoTodayContracts.toFixed(1)}건
                   </span>
                   <span className="bg-white border border-blue-200 rounded-full px-2.5 py-1 font-semibold text-blue-700">
-                    이번달 {autoMonthContracts}건
-                  </span>
-                  <span className="bg-white border border-violet-200 rounded-full px-2.5 py-1 font-semibold text-violet-700">
-                    이번달 매출 {autoMonthRevenue > 0 ? autoMonthRevenue.toLocaleString() + '원' : '—'}
+                    이번달 {autoMonthContracts % 1 === 0 ? autoMonthContracts : autoMonthContracts.toFixed(1)}건
                   </span>
                 </div>
                 <button type="button"
@@ -571,7 +569,7 @@ export default function ReportTab({ userId, userName }: Props) {
                       value={daily.today_contracts}
                       onChange={e => setDaily(p => ({ ...p, today_contracts: e.target.value }))} />
                     {daily.today_contracts === '' && autoTodayContracts > 0 && (
-                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-emerald-400 pointer-events-none">{autoTodayContracts}</span>
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-emerald-400 pointer-events-none">{autoTodayContracts % 1 === 0 ? autoTodayContracts : autoTodayContracts.toFixed(1)}</span>
                     )}
                   </div>
                 </div>
@@ -582,7 +580,7 @@ export default function ReportTab({ userId, userName }: Props) {
                       value={daily.month_contracts}
                       onChange={e => setDaily(p => ({ ...p, month_contracts: e.target.value }))} />
                     {daily.month_contracts === '' && autoMonthContracts > 0 && (
-                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-blue-400 pointer-events-none">{autoMonthContracts}</span>
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-blue-400 pointer-events-none">{autoMonthContracts % 1 === 0 ? autoMonthContracts : autoMonthContracts.toFixed(1)}</span>
                     )}
                   </div>
                 </div>

@@ -61,6 +61,17 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  // ── 메모장 ──────────────────────────────────────────────
+  const [notepadOpen, setNotepadOpen] = useState(false)
+  const [notepadText, setNotepadText] = useState(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('daily-notepad') || ''
+    return ''
+  })
+  const [notepadOpacity, setNotepadOpacity] = useState(90)
+  function saveNotepad(val: string) {
+    setNotepadText(val)
+    if (typeof window !== 'undefined') localStorage.setItem('daily-notepad', val)
+  }
   const [supplyConfig, setSupplyConfig] = useState<Record<string, { supplied: number; goal: number; base: number }> | null>(null)
   // 영업팀 실제 이름 목록 (DB 트레이드용)
   const [salesUserNames, setSalesUserNames] = useState<string[]>([])
@@ -480,6 +491,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               </div>
             )}
           </div>
+          {/* 메모장 버튼 */}
+          <button
+            onClick={() => setNotepadOpen(v => !v)}
+            className={`text-[11px] px-2 py-1.5 rounded-lg transition-colors whitespace-nowrap ${notepadOpen ? 'bg-amber-400/80 text-white' : 'text-white/50 hover:text-white hover:bg-white/10'}`}
+            title="오늘 할일 메모장">
+            📝
+          </button>
           {/* 대시보드로 돌아가기 */}
           <button
             onClick={() => setActiveTab('board')}
@@ -910,21 +928,6 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               </div>
             </div>
 
-            {/* ── 전체 누적 ── */}
-            <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3">
-              <div className="flex-1 text-center border-r border-gray-100">
-                <p className="text-[10px] text-gray-400">전체 계약</p>
-                <p className="text-lg font-black text-gray-800">{revenueCustomers.length}건</p>
-              </div>
-              <div className="flex-1 text-center border-r border-gray-100">
-                <p className="text-[10px] text-gray-400">전체 본인매출</p>
-                <p className="text-lg font-black text-emerald-700">{fmtWon(totalRevenue)}</p>
-              </div>
-              <div className="flex-1 text-center">
-                <p className="text-[10px] text-gray-400">취소</p>
-                <p className="text-lg font-black text-red-500">{cancelledCount}건</p>
-              </div>
-            </div>
 
             {/* ── 월별 리스트 ── */}
             {loading ? (
@@ -1022,6 +1025,36 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         )}
 
       </div>
+
+      {/* ── 플로팅 메모장 ── */}
+      {notepadOpen && (
+        <div
+          className="fixed bottom-20 right-4 z-[300] bg-amber-50 border border-amber-200 rounded-2xl shadow-2xl flex flex-col"
+          style={{ width: 280, maxHeight: 380, opacity: notepadOpacity / 100 }}
+        >
+          {/* 헤더 */}
+          <div className="flex items-center justify-between px-3 py-2 bg-amber-400 rounded-t-2xl">
+            <span className="text-[11px] font-bold text-white">📝 오늘 할일 메모장</span>
+            <button onClick={() => setNotepadOpen(false)} className="text-white/80 hover:text-white text-sm leading-none">✕</button>
+          </div>
+          {/* 텍스트 */}
+          <textarea
+            value={notepadText}
+            onChange={e => saveNotepad(e.target.value)}
+            className="flex-1 resize-none bg-transparent px-3 py-2.5 text-xs text-gray-800 placeholder-gray-400 focus:outline-none"
+            placeholder="오늘 연락할 업체, 할일 등 메모..."
+            style={{ minHeight: 220 }}
+          />
+          {/* 불투명도 조절 */}
+          <div className="px-3 py-2 border-t border-amber-200 flex items-center gap-2">
+            <span className="text-[9px] text-amber-600 font-semibold shrink-0">투명도</span>
+            <input type="range" min={20} max={100} value={notepadOpacity}
+              onChange={e => setNotepadOpacity(Number(e.target.value))}
+              className="flex-1 h-1 accent-amber-400" />
+            <span className="text-[9px] text-amber-600 font-semibold w-6 text-right">{notepadOpacity}%</span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

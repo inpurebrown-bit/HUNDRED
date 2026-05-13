@@ -587,26 +587,6 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
             {noRefund && <span className="text-[10px] bg-red-500 text-white px-2 py-0.5 rounded-full font-bold ml-auto">환불불가</span>}
           </label>
 
-          {/* 체크리스트 */}
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 space-y-2.5">
-            <p className="text-[10px] font-bold text-amber-700">📋 계약 후 체크리스트</p>
-            <label className="flex items-center gap-2.5 cursor-pointer">
-              <input type="checkbox" checked={groupChatInvited} onChange={e => setGroupChatInvited(e.target.checked)}
-                className="w-4 h-4 rounded accent-emerald-500" />
-              <span className={`text-xs font-medium ${groupChatInvited ? 'text-emerald-700 line-through' : 'text-gray-700'}`}>
-                단톡방 초대 완료
-              </span>
-              {groupChatInvited && <span className="text-[10px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full font-semibold">✓</span>}
-            </label>
-            <label className="flex items-center gap-2.5 cursor-pointer">
-              <input type="checkbox" checked={coopRequestSent} onChange={e => setCoopRequestSent(e.target.checked)}
-                className="w-4 h-4 rounded accent-emerald-500" />
-              <span className={`text-xs font-medium ${coopRequestSent ? 'text-emerald-700 line-through' : 'text-gray-700'}`}>
-                업무협조 요청서 발송 완료
-              </span>
-              {coopRequestSent && <span className="text-[10px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full font-semibold">✓</span>}
-            </label>
-          </div>
         </div>
 
         {/* Footer */}
@@ -626,10 +606,12 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
 }
 
 // ── 날짜 기준 그룹핑 ───────────────────────────────────────────────────
-function groupByDate(customers: Customer[]): { date: string; items: Customer[] }[] {
+function groupByDate(customers: Customer[], useContractDate = false): { date: string; items: Customer[] }[] {
   const map = new Map<string, Customer[]>()
   for (const c of customers) {
-    const date = c.details?.reception_date?.slice(0, 10) || '__none__'
+    const date = useContractDate
+      ? (c.details?.contract_date?.slice(0, 10) || '__none__')
+      : (c.details?.reception_date?.slice(0, 10) || '__none__')
     if (!map.has(date)) map.set(date, [])
     map.get(date)!.push(c)
   }
@@ -690,8 +672,13 @@ function CustomerCard({
   const [logEditMode, setLogEditMode] = useState(false)
   const [logDraft, setLogDraft] = useState<Record<string, string>>({})
   const [logSaving, setLogSaving] = useState(false)
-  const menuRef  = useRef<HTMLDivElement>(null)
-  const tradeRef = useRef<HTMLDivElement>(null)
+  const [emotionalOpen, setEmotionalOpen] = useState(false)
+  const [emotionalMood, setEmotionalMood] = useState<'상'|'중'|'하'|''>('')
+  const [trashOpen, setTrashOpen] = useState(false)
+  const [trashReason, setTrashReason] = useState('')
+  const menuRef    = useRef<HTMLDivElement>(null)
+  const tradeRef   = useRef<HTMLDivElement>(null)
+  const expandedRef = useRef<HTMLDivElement>(null)
 
   function openLogEdit() {
     const d = c.details || {} as any
@@ -768,6 +755,13 @@ function CustomerCard({
 
   const c = customer
   const expanded = expandedId === c.id
+
+  useEffect(() => {
+    if (expanded && expandedRef.current) {
+      setTimeout(() => expandedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80)
+    }
+  }, [expanded])
+
   const leadType = c.details?.lead_type
   const ownerName = c.sales_user_name || c.details?.sales_user_name || userName
   const inspectionStatus = c.details?.inspection_status
@@ -804,6 +798,24 @@ function CustomerCard({
     const orig = (c.call_timeline || []).length - 1 - reversedIdx
     const updated = (c.call_timeline || []).filter((_, i) => i !== orig)
     await onUpdate(c.id, { call_timeline: updated })
+  }
+
+  async function handleEmotional() {
+    if (emotionalMood) {
+      await onUpdate(c.id, { details: { rejection_mood: emotionalMood } })
+    }
+    await onStatusChange(c.id, 'emotional')
+    setEmotionalOpen(false)
+    onExpand(null)
+  }
+
+  async function handleTrash() {
+    if (trashReason.trim()) {
+      await onUpdate(c.id, { details: { self_rejection_reason: trashReason.trim() } })
+    }
+    await onStatusChange(c.id, 'trash')
+    setTrashOpen(false)
+    onExpand(null)
   }
 
   async function handleQuickTransfer() {
@@ -887,6 +899,89 @@ function CustomerCard({
         </div>
       )}
 
+      {/* 감성톡(거절업체) 감도 선택 모달 */}
+      {emotionalOpen && (
+        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4"
+          onClick={e => { if (e.target === e.currentTarget) setEmotionalOpen(false) }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h2 className="font-bold text-[#1B2A45] text-sm">💬 거절업체 이동</h2>
+                <p className="text-[11px] text-gray-400 mt-0.5">{c.company || c.name}</p>
+              </div>
+              <button onClick={() => setEmotionalOpen(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-xs font-bold text-gray-700 mb-3">통화 감도를 선택해주세요</p>
+              <div className="grid grid-cols-3 gap-2">
+                {(['상', '중', '하'] as const).map(mood => (
+                  <button key={mood} type="button"
+                    onClick={() => setEmotionalMood(mood)}
+                    className={`py-3 rounded-xl text-sm font-bold border-2 transition-all ${
+                      emotionalMood === mood
+                        ? mood === '상' ? 'bg-red-500 text-white border-red-500'
+                          : mood === '중' ? 'bg-orange-400 text-white border-orange-400'
+                          : 'bg-gray-400 text-white border-gray-400'
+                        : 'bg-gray-50 text-gray-500 border-gray-200 hover:border-gray-300'
+                    }`}>
+                    감도 {mood}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="px-5 pb-5 flex gap-2">
+              <button onClick={() => setEmotionalOpen(false)}
+                className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50">
+                취소
+              </button>
+              <button onClick={handleEmotional}
+                disabled={!emotionalMood}
+                className="flex-1 bg-violet-500 hover:bg-violet-600 disabled:opacity-40 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
+                거절업체로 이동
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 자체거절 사유 입력 모달 */}
+      {trashOpen && (
+        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4"
+          onClick={e => { if (e.target === e.currentTarget) setTrashOpen(false) }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h2 className="font-bold text-[#1B2A45] text-sm">🗑 자체거절 처리</h2>
+                <p className="text-[11px] text-gray-400 mt-0.5">{c.company || c.name}</p>
+              </div>
+              <button onClick={() => setTrashOpen(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-xs font-bold text-gray-700 mb-2">자체거절 사유를 입력해주세요</p>
+              <textarea
+                value={trashReason}
+                onChange={e => setTrashReason(e.target.value)}
+                rows={3}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300/50 resize-none"
+                placeholder="거절 사유 입력..."
+                autoFocus
+              />
+            </div>
+            <div className="px-5 pb-5 flex gap-2">
+              <button onClick={() => setTrashOpen(false)}
+                className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50">
+                취소
+              </button>
+              <button onClick={handleTrash}
+                disabled={!trashReason.trim()}
+                className="flex-1 bg-gray-500 hover:bg-gray-600 disabled:opacity-40 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
+                자체거절 확정
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 계약완료 모달 */}
       {contractModalOpen && (
         <ContractModal
@@ -928,13 +1023,13 @@ function CustomerCard({
                 </button>
               )}
               {tabType !== 'emotional' && (
-                <button type="button" onClick={() => { onStatusChange(c.id, 'emotional'); setMenuOpen(false) }}
+                <button type="button" onClick={() => { setEmotionalMood(''); setEmotionalOpen(true); setMenuOpen(false) }}
                   className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-violet-600 font-medium">
                   💬 감성톡(거절업체)
                 </button>
               )}
               {tabType !== 'trash' && (
-                <button type="button" onClick={() => { onStatusChange(c.id, 'trash'); setMenuOpen(false) }}
+                <button type="button" onClick={() => { setTrashReason(''); setTrashOpen(true); setMenuOpen(false) }}
                   className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-gray-500 font-medium">
                   🗑 자체거절
                 </button>
@@ -1001,19 +1096,42 @@ function CustomerCard({
           </div>
         )}
 
-        {/* 결정전 결과 + 클로징 결과 — 가로 나란히 */}
-        <div className="mt-1.5 flex gap-1 justify-center flex-wrap" onClick={e => e.stopPropagation()}>
-          <BadgeDropdown
-            value={c.details?.call_result || ''}
-            options={CALL_RESULTS}
-            onChange={(val) => onUpdate(c.id, { details: { call_result: val } })}
-          />
-          <BadgeDropdown
-            value={c.details?.closing_result || ''}
-            options={CLOSING_RESULTS}
-            onChange={(val) => onUpdate(c.id, { details: { closing_result: val } })}
-            placeholder="클로징"
-          />
+        {/* 거절업체 감도 */}
+        {c.details?.rejection_mood && (
+          <div className="mt-1 flex justify-center">
+            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+              c.details.rejection_mood === '상' ? 'bg-red-100 text-red-600' :
+              c.details.rejection_mood === '중' ? 'bg-orange-100 text-orange-600' :
+              'bg-gray-100 text-gray-500'
+            }`}>감도 {c.details.rejection_mood}</span>
+          </div>
+        )}
+
+        {/* 자체거절 사유 */}
+        {c.details?.self_rejection_reason && (
+          <p className="mt-1 text-[9px] text-gray-400 leading-tight text-center break-all" style={{ wordBreak: 'break-all' }}>
+            {c.details.self_rejection_reason}
+          </p>
+        )}
+
+        {/* 결정전 결과 + 클로징 결과 — 레이블 포함 2열 */}
+        <div className="mt-1.5 grid grid-cols-2 gap-1" onClick={e => e.stopPropagation()}>
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="text-[9px] text-gray-400 font-medium leading-none">결정전</span>
+            <BadgeDropdown
+              value={c.details?.call_result || ''}
+              options={CALL_RESULTS}
+              onChange={(val) => onUpdate(c.id, { details: { call_result: val } })}
+            />
+          </div>
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="text-[9px] text-gray-400 font-medium leading-none">클로징</span>
+            <BadgeDropdown
+              value={c.details?.closing_result || ''}
+              options={CLOSING_RESULTS}
+              onChange={(val) => onUpdate(c.id, { details: { closing_result: val } })}
+            />
+          </div>
         </div>
 
         {/* 재통화 일정 */}
@@ -1049,7 +1167,7 @@ function CustomerCard({
 
       {/* ── 확장 패널 (col-span-full) ── */}
       {expanded && (
-        <div className="col-span-full bg-[#FAFAF8] border border-blue-100 rounded-xl">
+        <div ref={expandedRef} className="col-span-full bg-[#FAFAF8] border border-blue-100 rounded-xl">
 
           {/* 상단 액션 바 */}
           <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b border-gray-100 bg-white">
@@ -1063,13 +1181,13 @@ function CustomerCard({
               </button>
             )}
             {tabType !== 'emotional' && (
-              <button type="button" onClick={() => { onStatusChange(c.id, 'emotional'); onExpand(null) }}
+              <button type="button" onClick={() => { setEmotionalMood(''); setEmotionalOpen(true) }}
                 className="px-2.5 py-1 rounded text-[11px] font-semibold bg-violet-500 text-white">
                 💬 감성톡(거절업체)
               </button>
             )}
             {tabType !== 'trash' && (
-              <button type="button" onClick={() => { onStatusChange(c.id, 'trash'); onExpand(null) }}
+              <button type="button" onClick={() => { setTrashReason(''); setTrashOpen(true) }}
                 className="px-2.5 py-1 rounded text-[11px] font-semibold bg-gray-400 text-white">
                 🗑 자체거절
               </button>
@@ -1452,7 +1570,12 @@ export default function InCallTableView({
   showOwner = false,
 }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const groups = groupByDate(customers)
+  const groups = tabType === 'emotional'
+    ? (['상', '중', '하', ''] as const).map(mood => ({
+        date: mood || '__none__',
+        items: customers.filter(c => (c.details?.rejection_mood || '') === mood),
+      })).filter(g => g.items.length > 0)
+    : groupByDate(customers, tabType === 'contracted')
 
   if (customers.length === 0) {
     return (
@@ -1465,7 +1588,12 @@ export default function InCallTableView({
   return (
     <div className="space-y-4">
       {groups.map(({ date, items }) => {
-        const display = date === '__none__'
+        const display = tabType === 'emotional'
+          ? date === '__none__' ? '💬 감도 미설정'
+            : date === '상' ? '🔴 감도 상'
+            : date === '중' ? '🟠 감도 중'
+            : '⚪ 감도 하'
+          : date === '__none__'
           ? '📅 날짜 미정'
           : `📅 ${date.slice(0, 7).replace('-', '년 ')}월  ${date.slice(8, 10)}일`
 
