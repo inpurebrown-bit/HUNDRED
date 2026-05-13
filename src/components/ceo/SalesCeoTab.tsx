@@ -431,14 +431,20 @@ export default function SalesCeoTab() {
   const [personTab, setPersonTab] = useState<string>('all')
   const [statusTab, setStatusTab] = useState<StatusKey>('lead')
   const [inspDetail, setInspDetail] = useState<Customer | null>(null)
+  const [opsUsers, setOpsUsers] = useState<string[]>([])
 
   useEffect(() => {
     async function load() {
       setLoading(true)
       try {
-        const res = await fetch('/api/customers')
-        const data = await res.json()
-        setCustomers(data.customers || [])
+        const [cRes, oRes] = await Promise.all([fetch('/api/customers'), fetch('/api/ops-cases')])
+        const [cData, oData] = await Promise.all([cRes.json(), oRes.json()])
+        setCustomers(cData.customers || [])
+        // ops_user_name이 없는 경우 owner_id(이름 저장)로 fallback
+        const names = Array.from(new Set(
+          (oData.cases || []).map((c: any) => c.ops_user_name || c.owner_id).filter((v: any) => v && typeof v === 'string' && v.length < 50)
+        )) as string[]
+        setOpsUsers(names)
       } catch {}
       setLoading(false)
     }
@@ -539,6 +545,47 @@ export default function SalesCeoTab() {
   async function deleteCustomer(id: string) {
     await fetch('/api/customers/' + id, { method: 'DELETE' })
     setCustomers(prev => prev.filter(c => c.id !== id))
+  }
+
+  // ── 카드 한 장 DB 이동 (대표 전용) ──────────────────────────────────
+  async function handleCeoTransfer(id: string, destPerson: string, destBucket: string, destRole: 'sales' | 'ops') {
+    if (destRole === 'sales') {
+      // 1. 담당자 변경
+      await updateCustomer(id, {
+        details: {
+          sales_user_name: destPerson,
+          transfer_history: [
+            ...((customers.find(x => x.id === id) as any)?.details?.transfer_history || []),
+            { from: (customers.find(x => x.id === id) as any)?.details?.sales_user_name || '—', to: destPerson, at: new Date().toISOString().slice(0, 10), by: 'CEO' },
+          ],
+        },
+      })
+      // 2. 상태(버킷) 변경
+      if (destBucket) await changeStatus(id, destBucket)
+    } else {
+      // 관리팀으로 이동: ops_case 생성
+      const c = customers.find(x => x.id === id)!
+      const details: any = c.details || {}
+      const isNewDb = destBucket === 'new_db'
+      const revenue = parseInt(String(details.my_revenue || '0').replace(/[^0-9]/g, ''), 10) || 0
+      await fetch('/api/ops-cases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_name: details.company || c.company || c.name || '',
+          phone: c.phone || '',
+          stage: isNewDb ? 'new_db' : destBucket,
+          memo: `대표 배정 → ${destPerson}`,
+          revenue,
+          owner_id: destPerson,   // ops_cases에 담당자 이름 저장
+        }),
+      })
+      await updateCustomer(id, { details: { ops_transferred: true } })
+    }
+    // 데이터 갱신
+    const res = await fetch('/api/customers')
+    const data = await res.json()
+    setCustomers(data.customers || [])
   }
 
   // 심사 승인/반려
@@ -901,11 +948,13 @@ export default function SalesCeoTab() {
           allCustomers={customers}
           tabType={statusTab}
           salesUsers={salesPeople}
+          opsUsers={opsUsers}
           userName="ceo"
           showOwner={personTab === 'all'}
           onUpdate={updateCustomer}
           onStatusChange={changeStatus}
           onDelete={deleteCustomer}
+          onCeoTransfer={handleCeoTransfer}
         />
       )}
       </>)}

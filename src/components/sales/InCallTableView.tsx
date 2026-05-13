@@ -125,12 +125,168 @@ export interface Props {
   opsContracts?: { customer_id: string; ops_user_name?: string }[] // 자금담당자 표시용
   tabType: 'db010' | 'lead' | 'contracted' | 'emotional' | 'trash'
   salesUsers: string[]
+  opsUsers?: string[]         // 대표 전용 DB 이동용 관리팀 목록
   userName: string
   onUpdate: (id: string, patch: Record<string, any>) => Promise<void>
   onStatusChange: (id: string, newStatus: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
   onTransferToOps?: (customer: Customer) => Promise<void>
+  onCeoTransfer?: (id: string, destPerson: string, destBucket: string, destRole: 'sales' | 'ops') => Promise<void>
   showOwner?: boolean
+}
+
+// ── CEO 카드 이동 모달 ────────────────────────────────────────────────
+const SALES_BUCKETS = [
+  { label: '고객DB',   value: 'lead',       color: 'bg-sky-500 text-white' },
+  { label: '010DB',    value: 'db010',      color: 'bg-violet-500 text-white' },
+  { label: '계약업체', value: 'contracted', color: 'bg-emerald-500 text-white' },
+  { label: '감성톡',   value: 'emotional',  color: 'bg-pink-500 text-white' },
+  { label: '거절',     value: 'trash',      color: 'bg-gray-400 text-white' },
+]
+const OPS_BUCKETS = [
+  { label: '신규DB',     value: 'new_db',       color: 'bg-sky-500 text-white' },
+  { label: '서류받는중', value: '서류받는중',   color: 'bg-orange-500 text-white' },
+  { label: '진행중',     value: '진행중',       color: 'bg-blue-500 text-white' },
+]
+
+function CeoMoveModal({
+  customer,
+  salesUsers,
+  opsUsers,
+  onClose,
+  onConfirm,
+}: {
+  customer: Customer
+  salesUsers: string[]
+  opsUsers: string[]
+  onClose: () => void
+  onConfirm: (destPerson: string, destBucket: string, destRole: 'sales' | 'ops') => Promise<void>
+}) {
+  const [selPerson, setSelPerson] = useState<string>('')
+  const [selRole, setSelRole] = useState<'sales' | 'ops' | null>(null)
+  const [selBucket, setSelBucket] = useState<string>('')
+  const [customPerson, setCustomPerson] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const buckets = selRole === 'ops' ? OPS_BUCKETS : SALES_BUCKETS
+  const finalPerson = customPerson.trim() || selPerson
+  const canMove = finalPerson && selBucket
+
+  async function handleMove() {
+    if (!canMove || !selRole) return
+    setLoading(true)
+    await onConfirm(finalPerson, selBucket, selRole)
+    setLoading(false)
+    onClose()
+  }
+
+  const company = (customer as any).details?.company || customer.company || customer.name
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[300] flex items-center justify-center p-4"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+        {/* 헤더 */}
+        <div className="bg-gradient-to-r from-[#1B2A45] to-blue-700 px-5 py-4 text-white flex items-start justify-between">
+          <div>
+            <p className="font-bold text-sm">🔀 DB 이동</p>
+            <p className="text-white/70 text-xs mt-0.5 break-all">{company}</p>
+          </div>
+          <button onClick={onClose} className="text-white/60 hover:text-white text-lg leading-none ml-4">✕</button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {/* STEP 1: 이동 대상 선택 */}
+          <div>
+            <p className="text-[10px] font-bold text-gray-400 mb-2">STEP 1 · 이동 대상 선택</p>
+
+            {salesUsers.length > 0 && (
+              <div className="mb-2">
+                <p className="text-[9px] font-bold text-blue-500 mb-1.5">📂 영업팀</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {salesUsers.map(u => (
+                    <button key={u} onClick={() => { setSelPerson(u); setSelRole('sales'); setSelBucket(''); setCustomPerson('') }}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${selPerson === u && selRole === 'sales' ? 'bg-[#1B2A45] text-white border-[#1B2A45]' : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-blue-300'}`}>
+                      {u}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {opsUsers.length > 0 && (
+              <div className="mb-2">
+                <p className="text-[9px] font-bold text-violet-500 mb-1.5">📂 관리팀</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {opsUsers.map(u => (
+                    <button key={u} onClick={() => { setSelPerson(u); setSelRole('ops'); setSelBucket(''); setCustomPerson('') }}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${selPerson === u && selRole === 'ops' ? 'bg-violet-600 text-white border-violet-600' : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-violet-300'}`}>
+                      {u}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 관리팀 직접입력 */}
+            <div className="flex gap-2 items-center mt-1">
+              <div className="flex gap-1">
+                <button onClick={() => { setSelRole('sales'); setSelPerson(''); setSelBucket('') }}
+                  className={`text-[9px] px-2 py-1 rounded border font-semibold ${selRole === 'sales' && !selPerson ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>영업팀</button>
+                <button onClick={() => { setSelRole('ops'); setSelPerson(''); setSelBucket('') }}
+                  className={`text-[9px] px-2 py-1 rounded border font-semibold ${selRole === 'ops' && !selPerson ? 'bg-violet-500 text-white border-violet-500' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>관리팀</button>
+              </div>
+              <input
+                placeholder="직접 입력 (팀 선택 후)"
+                value={customPerson}
+                onChange={e => { setCustomPerson(e.target.value); setSelPerson('') }}
+                className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+              />
+            </div>
+          </div>
+
+          {/* STEP 2: 메뉴(버킷) 선택 */}
+          {selRole && (
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 mb-2">
+                STEP 2 · <span className={selRole === 'ops' ? 'text-violet-600' : 'text-blue-600'}>
+                  {finalPerson || (selRole === 'ops' ? '관리팀' : '영업팀')}
+                </span> 메뉴 선택
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {buckets.map(b => (
+                  <button key={b.value} onClick={() => setSelBucket(b.value)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${selBucket === b.value ? b.color + ' border-transparent' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}>
+                    {b.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 이동 경로 요약 */}
+          {canMove && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700 font-medium">
+              📍 이동 경로: <span className="font-bold">{company}</span> →{' '}
+              <span className="font-bold">{finalPerson}</span>의{' '}
+              <span className="font-bold">{buckets.find(b => b.value === selBucket)?.label}</span>
+            </div>
+          )}
+        </div>
+
+        {/* 실행 버튼 */}
+        <div className="px-4 pb-4 flex gap-2">
+          <button onClick={onClose} className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50">
+            취소
+          </button>
+          <button onClick={handleMove} disabled={!canMove || loading}
+            className="flex-1 bg-[#C5A258] hover:bg-[#C5A258]/90 disabled:opacity-40 text-white py-2.5 rounded-xl text-sm font-bold transition-colors">
+            {loading ? '이동중...' : '🔀 이동하기'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 /** 이번달 특정 영업사원의 기존 누적매출 합산 */
@@ -477,6 +633,7 @@ function groupByDate(customers: Customer[]): { date: string; items: Customer[] }
 interface CardProps {
   customer: Customer
   salesUsers: string[]
+  opsUsers?: string[]
   userName: string
   tabType: Props['tabType']
   showOwner?: boolean
@@ -488,6 +645,7 @@ interface CardProps {
   onStatusChange: Props['onStatusChange']
   onDelete: Props['onDelete']
   onTransferToOps?: Props['onTransferToOps']
+  onCeoTransfer?: Props['onCeoTransfer']
 }
 
 function CustomerCard({
@@ -497,6 +655,7 @@ function CustomerCard({
   tabType,
   showOwner,
   opsUserName,
+  opsUsers,
   cumulativeBase,
   expandedId,
   onExpand,
@@ -504,8 +663,10 @@ function CustomerCard({
   onStatusChange,
   onDelete,
   onTransferToOps,
+  onCeoTransfer,
 }: CardProps) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [ceoMoveOpen, setCeoMoveOpen] = useState(false)
   const [contractModalOpen, setContractModalOpen] = useState(false)
   const [quickTransferOpen, setQuickTransferOpen] = useState(false)
   const [qtCheckedGroup, setQtCheckedGroup] = useState(false)
@@ -586,6 +747,19 @@ function CustomerCard({
 
   return (
     <>
+      {/* CEO 카드 이동 모달 */}
+      {ceoMoveOpen && onCeoTransfer && (
+        <CeoMoveModal
+          customer={c}
+          salesUsers={salesUsers}
+          opsUsers={opsUsers || []}
+          onClose={() => setCeoMoveOpen(false)}
+          onConfirm={async (destPerson, destBucket, destRole) => {
+            await onCeoTransfer(c.id, destPerson, destBucket, destRole)
+          }}
+        />
+      )}
+
       {/* 관리팀 빠른 전송 모달 */}
       {quickTransferOpen && (
         <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4"
@@ -688,6 +862,16 @@ function CustomerCard({
                   className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-amber-600 font-medium">
                   📤 자금팀전송
                 </button>
+              )}
+              {/* 대표 전용: 카드 이동 */}
+              {userName === 'ceo' && onCeoTransfer && (
+                <>
+                  <div className="border-t border-gray-100 my-0.5" />
+                  <button type="button" onClick={() => { setCeoMoveOpen(true); setMenuOpen(false) }}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-amber-50 text-amber-600 font-semibold">
+                    🔀 DB 이동
+                  </button>
+                </>
               )}
               <div className="border-t border-gray-100 my-0.5" />
               <button type="button"
@@ -1064,11 +1248,13 @@ export default function InCallTableView({
   opsContracts = [],
   tabType,
   salesUsers,
+  opsUsers,
   userName,
   onUpdate,
   onStatusChange,
   onDelete,
   onTransferToOps,
+  onCeoTransfer,
   showOwner = false,
 }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -1110,6 +1296,7 @@ export default function InCallTableView({
                     key={c.id}
                     customer={c}
                     salesUsers={salesUsers}
+                    opsUsers={opsUsers}
                     userName={userName}
                     tabType={tabType}
                     showOwner={showOwner}
@@ -1121,6 +1308,7 @@ export default function InCallTableView({
                     onStatusChange={onStatusChange}
                     onDelete={onDelete}
                     onTransferToOps={onTransferToOps}
+                    onCeoTransfer={onCeoTransfer}
                   />
                 )
               })}
