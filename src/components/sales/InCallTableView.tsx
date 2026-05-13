@@ -380,11 +380,13 @@ function BadgeDropdown({ value, options, onChange, placeholder }: BadgeDropdownP
   }, [open])
 
   return (
-    <div className="relative w-full" ref={ref}>
+    <div className="relative w-full overflow-hidden" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
-        className={`w-full block text-center px-1 py-0.5 rounded text-[9px] font-bold cursor-pointer select-none leading-tight break-keep ${current.color}`}
+        title={current.key || placeholder || '—'}
+        className={`w-full block text-center px-0.5 py-0.5 rounded text-[8px] font-bold cursor-pointer select-none leading-tight overflow-hidden whitespace-nowrap ${current.color}`}
+        style={{ textOverflow: 'ellipsis' }}
       >
         {current.key || placeholder || '—'}
       </button>
