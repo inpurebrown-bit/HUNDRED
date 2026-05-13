@@ -414,6 +414,92 @@ function TransferModeView({
   )
 }
 
+// ── 이름 불일치 데이터 정리 컴포넌트 ─────────────────────────
+function UnknownOwnerCleanup({
+  unknownOwners,
+  officialUsers,
+  customers,
+  onReassignDone,
+}: {
+  unknownOwners: string[]
+  officialUsers: string[]
+  customers: any[]
+  onReassignDone: (updated: any[]) => void
+}) {
+  const [reassignMap, setReassignMap] = useState<Record<string, string>>({})
+  const [reassigning, setReassigning] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(false)
+
+  async function doReassign(oldName: string) {
+    const newName = reassignMap[oldName]
+    if (!newName) return alert('이동할 담당자를 선택하세요')
+    const targets = customers.filter((c: any) =>
+      (c.details?.sales_user_name || c.sales_user_name || '').normalize('NFC').trim() === oldName.normalize('NFC').trim()
+    )
+    if (!targets.length) return
+    if (!confirm(`"${oldName}" ${targets.length}건을 "${newName}"으로 재배정하시겠습니까?`)) return
+    setReassigning(oldName)
+    let updated = [...customers]
+    for (const c of targets) {
+      try {
+        await fetch(`/api/customers/${c.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sales_user_name: newName }),
+        })
+        updated = updated.map(x => x.id === c.id
+          ? { ...x, sales_user_name: newName, details: { ...(x.details || {}), sales_user_name: newName } }
+          : x
+        )
+      } catch {}
+    }
+    onReassignDone(updated)
+    setReassigning(null)
+  }
+
+  const countByOwner = (name: string) => customers.filter((c: any) =>
+    (c.details?.sales_user_name || c.sales_user_name || '').normalize('NFC').trim() === name.normalize('NFC').trim()
+  ).length
+
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-xl overflow-hidden">
+      <button onClick={() => setExpanded(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-amber-100/50 transition-colors">
+        <span className="text-xs font-bold text-amber-700">
+          ⚠️ 등록되지 않은 담당자 이름 {unknownOwners.length}개 발견 — 재배정 필요
+        </span>
+        <span className="text-amber-600 text-xs">{expanded ? '▲ 닫기' : '▼ 펼치기'}</span>
+      </button>
+      {expanded && (
+        <div className="px-4 pb-4 space-y-2">
+          {unknownOwners.map(name => (
+            <div key={name} className="bg-white rounded-lg border border-amber-100 px-3 py-2 flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-semibold text-gray-700">"{name}"</span>
+              <span className="text-[10px] text-gray-400">{countByOwner(name)}건</span>
+              <span className="text-gray-300 text-xs">→</span>
+              <select
+                value={reassignMap[name] || ''}
+                onChange={e => setReassignMap(prev => ({ ...prev, [name]: e.target.value }))}
+                className="flex-1 min-w-[120px] border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none"
+              >
+                <option value="">이동할 담당자 선택</option>
+                {officialUsers.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+              <button
+                onClick={() => doReassign(name)}
+                disabled={!reassignMap[name] || reassigning === name}
+                className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold disabled:opacity-40 transition-colors"
+              >
+                {reassigning === name ? '...' : '재배정'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 type StatusKey = 'lead' | 'db010' | 'contracted' | 'emotional' | 'trash'
 
 const STATUS_TABS = [
@@ -446,18 +532,24 @@ export default function SalesCeoTab() {
   const [supplyEditMode, setSupplyEditMode] = useState(false)
   const [supplyDraft, setSupplyDraft] = useState<Record<string, { supplied: string; goal: string; base: string }>>({})
   const [supplySaving, setSupplySaving] = useState(false)
+  // 실제 영업팀 사용자 목록 (DB의 users 테이블 기준)
+  const [officialSalesUsers, setOfficialSalesUsers] = useState<string[]>([])
 
   useEffect(() => {
     async function load() {
       setLoading(true)
       try {
-        const [cRes, oRes, scRes] = await Promise.all([
+        const [cRes, oRes, scRes, uRes] = await Promise.all([
           fetch('/api/customers'),
           fetch('/api/ops-cases'),
           fetch('/api/supply-config'),
+          fetch('/api/users?role=sales'),
         ])
-        const [cData, oData, scData] = await Promise.all([cRes.json(), oRes.json(), scRes.json()])
+        const [cData, oData, scData, uData] = await Promise.all([cRes.json(), oRes.json(), scRes.json(), uRes.json()])
         setCustomers(cData.customers || [])
+        // 실제 영업팀 사용자 이름 목록 저장
+        const salesUserNames = (uData.users || []).map((u: any) => u.name).filter(Boolean) as string[]
+        setOfficialSalesUsers(salesUserNames)
         // ops_user_name이 없는 경우 owner_id(이름 저장)로 fallback
         const names = Array.from(new Set(
           (oData.cases || []).map((c: any) => c.ops_user_name || c.owner_id).filter((v: any) => v && typeof v === 'string' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v))
@@ -488,19 +580,38 @@ export default function SalesCeoTab() {
   }, [])
 
   const salesPeople = useMemo(() => {
+    if (officialSalesUsers.length > 0) {
+      // 실제 users 테이블에 있는 영업팀 이름만 표시 (순서: 가나다순)
+      return [...officialSalesUsers].sort()
+    }
+    // fallback: 고객 데이터에서 유니코드 정규화 후 추출
     const names = Array.from(
       new Set(
         customers
-          .map((c: any) => (c.details?.sales_user_name || c.sales_user_name || '').trim())
+          .map((c: any) => (c.details?.sales_user_name || c.sales_user_name || '').normalize('NFC').trim())
           .filter(Boolean)
       )
     ).sort() as string[]
     return names
-  }, [customers])
+  }, [customers, officialSalesUsers])
+
+  // 공식 영업팀 외 이름이 있는 이상한 데이터 감지
+  const unknownOwners = useMemo(() => {
+    if (officialSalesUsers.length === 0) return []
+    const officialSet = new Set(officialSalesUsers.map(n => n.normalize('NFC').trim()))
+    const unknown = Array.from(new Set(
+      customers
+        .map((c: any) => (c.details?.sales_user_name || c.sales_user_name || '').normalize('NFC').trim())
+        .filter(name => name && !officialSet.has(name))
+    )) as string[]
+    return unknown
+  }, [customers, officialSalesUsers])
 
   const personCustomers = useMemo(() => {
     if (personTab === 'all') return customers
-    return customers.filter((c: any) => (c.details?.sales_user_name || c.sales_user_name || '').trim() === personTab)
+    return customers.filter((c: any) =>
+      (c.details?.sales_user_name || c.sales_user_name || '').normalize('NFC').trim() === personTab.normalize('NFC').trim()
+    )
   }, [customers, personTab])
 
   const statusCustomers = useMemo(() => {
@@ -1214,6 +1325,16 @@ export default function SalesCeoTab() {
           ))}
         </div>
       </div>
+
+      {/* ── 이름 불일치 데이터 정리 배너 ── */}
+      {unknownOwners.length > 0 && (
+        <UnknownOwnerCleanup
+          unknownOwners={unknownOwners}
+          officialUsers={officialSalesUsers}
+          customers={customers}
+          onReassignDone={(updatedCustomers) => setCustomers(updatedCustomers)}
+        />
+      )}
 
       {/* ── 상태 탭 ── */}
       <div className="flex gap-1.5 flex-wrap">
