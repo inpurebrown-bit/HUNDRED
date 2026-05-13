@@ -1147,8 +1147,23 @@ function CustomerCard({
           </div>
         )}
 
-        {/* 거절업체 감도 */}
-        {c.details?.rejection_mood && (
+        {/* 거절업체 감도 — emotional 탭: 클릭으로 변경 가능 */}
+        {tabType === 'emotional' && (
+          <div className="mt-1 flex gap-0.5 justify-center w-full" onClick={e => e.stopPropagation()}>
+            {(['상', '중', '하'] as const).map(m => (
+              <button key={m} type="button"
+                onClick={() => onUpdate(c.id, { details: { rejection_mood: c.details?.rejection_mood === m ? '' : m } })}
+                className={`text-[8px] font-bold px-1 py-0.5 rounded transition-colors ${
+                  c.details?.rejection_mood === m
+                    ? m === '상' ? 'bg-red-500 text-white'
+                      : m === '중' ? 'bg-orange-400 text-white'
+                      : 'bg-gray-400 text-white'
+                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                }`}>{m}</button>
+            ))}
+          </div>
+        )}
+        {tabType !== 'emotional' && c.details?.rejection_mood && (
           <div className="mt-1 flex justify-center w-full">
             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
               c.details.rejection_mood === '상' ? 'bg-red-100 text-red-600' :
@@ -1500,6 +1515,31 @@ function CustomerCard({
                   />
                   {!(c as any).details?.contract_date && (
                     <p className="text-[9px] text-red-500 mt-1 font-medium">⚠️ 계약일 미입력 — 반드시 입력해야 해당 월 매출에 반영됩니다</p>
+                  )}
+                </div>
+              )}
+
+              {/* 감성톡 감도 — emotional 탭 전용 */}
+              {tabType === 'emotional' && (
+                <div className="bg-pink-50 border border-pink-200 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                  <label className="text-[10px] text-pink-700 mb-2 block font-bold">💬 감도 설정</label>
+                  <div className="flex gap-2">
+                    {(['상', '중', '하'] as const).map(m => (
+                      <button key={m} type="button"
+                        onClick={() => onUpdate(c.id, { details: { rejection_mood: c.details?.rejection_mood === m ? '' : m } })}
+                        className={`flex-1 py-1.5 rounded-lg text-xs font-bold border-2 transition-all ${
+                          c.details?.rejection_mood === m
+                            ? m === '상' ? 'bg-red-500 text-white border-red-500'
+                              : m === '중' ? 'bg-orange-400 text-white border-orange-400'
+                              : 'bg-gray-400 text-white border-gray-400'
+                            : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
+                        }`}>
+                        감도 {m}
+                      </button>
+                    ))}
+                  </div>
+                  {!c.details?.rejection_mood && (
+                    <p className="text-[9px] text-pink-500 mt-1.5 font-medium">⚠️ 감도 미설정 — 그룹 분류를 위해 선택해주세요</p>
                   )}
                 </div>
               )}
