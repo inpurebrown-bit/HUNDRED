@@ -706,18 +706,17 @@ export default function SalesCeoTab() {
   const supplyStats = useMemo(() => {
     return salesPeople.map(name => {
       const cfg = supplyConfig[name] || { supplied: 0, goal: 30, base: 0 }
-      // 이번달 계약된 고객 중 해당 영업사원의 계약 가중치 합산
+      // 전체 계약된 고객 중 해당 영업사원의 계약 가중치 합산 (월 필터 없음)
       const dbContracted = customers
         .filter(c =>
           c.status === 'contracted' &&
-          (c.sales_user_name === name || (c as any).details?.sales_user_name === name) &&
-          ((c as any).details?.contract_date || c.created_at || '').slice(0, 7) === thisMonthStr
+          (c.sales_user_name === name || (c as any).details?.sales_user_name === name)
         )
         .reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount), 0)
       const totalContracted = cfg.base + dbContracted
-      const rate = cfg.supplied > 0 ? Math.round(totalContracted / cfg.supplied * 100) : 0
+      const rate = cfg.supplied > 0 ? parseFloat((totalContracted / cfg.supplied * 100).toFixed(2)) : 0
       const recommended = calcRecommendedSupply(rate, bizElapsed)
-      const achievePct = cfg.goal > 0 ? Math.round(totalContracted / cfg.goal * 100) : 0
+      const achievePct = cfg.goal > 0 ? parseFloat((totalContracted / cfg.goal * 100).toFixed(2)) : 0
       return { name, cfg, dbContracted, totalContracted, rate, recommended, achievePct }
     })
   }, [salesPeople, supplyConfig, customers, thisMonthStr, bizElapsed])
@@ -1152,7 +1151,7 @@ export default function SalesCeoTab() {
                       <p className="text-[10px] text-gray-400 mb-0.5">계약율</p>
                       <p className={`text-base font-black ${
                         s.rate >= 17 ? 'text-emerald-700' : s.rate >= 13 ? 'text-amber-700' : 'text-red-600'
-                      }`}>{s.rate}%</p>
+                      }`}>{s.rate.toFixed(2)}%</p>
                     </div>
                   </div>
 
@@ -1204,7 +1203,7 @@ export default function SalesCeoTab() {
                   }`}>
                     <div>
                       <p className="text-[10px] text-gray-500 font-semibold">권장 내일 공급</p>
-                      <p className="text-[10px] text-gray-400">계약율 {s.rate}% 기준</p>
+                      <p className="text-[10px] text-gray-400">계약율 {s.rate.toFixed(2)}% 기준</p>
                     </div>
                     <p className={`text-2xl font-black ${
                       s.recommended >= 5 ? 'text-emerald-700' :
