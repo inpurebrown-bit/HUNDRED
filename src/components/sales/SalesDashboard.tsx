@@ -883,10 +883,20 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         {/* ══════════ 010 DB ══════════ */}
         {activeTab === 'db010' && (
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold text-gray-700">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-sm font-bold text-gray-700 mr-auto">
                 010 DB <span className="text-gray-400 font-normal">({db010List.length}건)</span>
               </h2>
+              {db010List.length > 0 && (
+                <button
+                  onClick={async () => {
+                    if (!confirm(`010DB ${db010List.length}건을 전부 신규고객으로 이동할까요?`)) return
+                    for (const c of db010List) await moveCustomer(c.id, 'lead')
+                  }}
+                  className="bg-sky-500 hover:bg-sky-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
+                  👤 전체 신규고객으로 이동
+                </button>
+              )}
               <button onClick={() => setShow010Form(v => !v)}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
                 {show010Form ? '✕ 취소' : '+ 010DB 등록'}
