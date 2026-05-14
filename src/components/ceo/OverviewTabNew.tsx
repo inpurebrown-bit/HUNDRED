@@ -540,7 +540,7 @@ export default function OverviewTabNew() {
       )
       .reduce((s: number, c: any) => s + contractWeight(c.contract_amount), 0)
     const totalContracted = base + dbContracted
-    const rate = supplied > 0 ? Math.round(totalContracted / supplied * 100) : 0
+    const rate = supplied > 0 ? Math.floor(totalContracted / supplied * 10000) / 100 : 0
     const recommended = calcRecommendedSupply(rate, bizElapsed)
     return { name, rate, totalContracted, recommended }
   })
@@ -633,7 +633,7 @@ export default function OverviewTabNew() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[#1B2A45]">{s.name.replace(' 수석팀장', '')}</p>
                   <p className="text-[10px] text-[#1B2A45]/50">
-                    결제율 {s.rate}% · 이달 계약 {s.totalContracted % 1 === 0 ? s.totalContracted : s.totalContracted.toFixed(1)}건
+                    결제율 {s.rate.toFixed(2)}% · 이달 계약 {s.totalContracted % 1 === 0 ? s.totalContracted : s.totalContracted.toFixed(1)}건
                   </p>
                 </div>
                 <div className="text-right shrink-0">
