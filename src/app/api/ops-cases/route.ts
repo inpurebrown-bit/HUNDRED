@@ -131,28 +131,16 @@ export async function POST(req: NextRequest) {
     ...(ops_user_name ? { ops_user_name } : {}),
   }
 
-  // 컬럼 없을 때 INSERT 실패 방지: 오류 시 없는 컬럼 제거 후 재시도 (최대 3단계)
-  const OPTIONAL_COLS = ['ops_user_name', 'customer_id', 'details']
-  const tryInsert = async (row: Record<string, any>): Promise<ReturnType<typeof supabaseAdmin.from<'ops_cases', any>['insert']>> => {
-    const res = await (supabaseAdmin.from('ops_cases') as any).insert(row).select().single()
-    if (res.error && res.error.message?.includes('column')) {
-      // 오류 메시지에서 문제 컬럼명 추출
-      const match = res.error.message.match(/'(\w+)'/)
-      const badCol = match?.[1]
-      if (badCol && row[badCol] !== undefined) {
-        const next = { ...row }
-        delete next[badCol]
-        return tryInsert(next)
-      }
-      // 추출 실패 시 옵셔널 컬럼 전부 제거
-      const fallback = { ...row }
-      for (const col of OPTIONAL_COLS) delete fallback[col]
-      return (supabaseAdmin.from('ops_cases') as any).insert(fallback).select().single()
-    }
-    return res
+  // 컬럼 없을 때 INSERT 실패 방지: 오류 시 옵셔널 컬럼 제거 후 재시도
+  let result = await supabaseAdmin.from('ops_cases').insert(baseRow as any).select().single()
+  if (result.error && result.error.message?.includes('column')) {
+    const fallback: Record<string, any> = { ...baseRow }
+    delete fallback.details
+    delete fallback.customer_id
+    delete fallback.ops_user_name
+    result = await supabaseAdmin.from('ops_cases').insert(fallback as any).select().single()
   }
-
-  const { data, error } = await tryInsert(baseRow)
+  const { data, error } = result
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ case: normalize(data) }, { status: 201 })
