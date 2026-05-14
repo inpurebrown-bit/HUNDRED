@@ -62,7 +62,15 @@ export async function GET(req: NextRequest) {
   }
 
   let query = supabaseAdmin.from('ops_cases').select('*')
-  if (user.role === 'ops') query = query.or(`owner_id.eq.${user.id},owner_id.is.null`) as any
+  if (user.role === 'ops') {
+    // owner_id로 배정된 케이스 OR 이름으로 배정된 케이스 OR 미배정(owner_id null + ops_user_name null)
+    const userName = user.name || ''
+    if (userName) {
+      query = query.or(`owner_id.eq.${user.id},ops_user_name.eq.${userName},and(owner_id.is.null,ops_user_name.is.null)`) as any
+    } else {
+      query = query.or(`owner_id.eq.${user.id},owner_id.is.null`) as any
+    }
+  }
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -98,7 +106,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { customer_name, phone, stage, memo, revenue, owner_id, timeline, customer_id, details } = body
+  const { customer_name, phone, stage, progress_stage, memo, revenue, owner_id, ops_user_name, timeline, customer_id, details } = body
 
   const { data, error } = await supabaseAdmin
     .from('ops_cases')
@@ -106,13 +114,14 @@ export async function POST(req: NextRequest) {
       customer_name:    customer_name ?? '',
       phone:            phone         ?? '',
       owner_id:         owner_id      ?? null,
-      stage:            stage         ?? '서류받는중',
+      stage:            stage ?? progress_stage ?? '서류받는중',
       memo:             memo          ?? '',
       revenue:          revenue       ?? 0,
       institution_type: 'new',
-      ...(timeline    ? { timeline }     : {}),
-      ...(customer_id ? { customer_id }  : {}),
-      ...(details     ? { details }      : {}),
+      ...(ops_user_name ? { ops_user_name } : {}),
+      ...(timeline      ? { timeline }      : {}),
+      ...(customer_id   ? { customer_id }   : {}),
+      ...(details       ? { details }       : {}),
     })
     .select()
     .single()

@@ -64,6 +64,8 @@ function TransferModeView({
   const [dir, setDir] = useState<TransferDir>('sales_to_sales')
   const [opsCases, setOpsCases] = useState<any[]>([])
   const [opsUsers, setOpsUsers] = useState<string[]>([])
+  // ops 유저 ID 맵 { 이름: UUID }
+  const [opsUserIdMap, setOpsUserIdMap] = useState<Record<string, string>>({})
   const [searchQuery, setSearchQuery] = useState('')
   const [filterPerson, setFilterPerson] = useState<string>('all')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -74,11 +76,23 @@ function TransferModeView({
   const [result, setResult] = useState<{ ok: number; fail: number } | null>(null)
 
   useEffect(() => {
+    // ops 케이스 목록 로드
     fetch('/api/ops-cases').then(r => r.json()).then(d => {
       const cases = d.cases || []
       setOpsCases(cases)
       const names = Array.from(new Set(cases.map((c: any) => c.ops_user_name).filter(Boolean))) as string[]
       setOpsUsers(names)
+    }).catch(() => {})
+    // ops 직원 ID 맵 로드 (owner_id 배정용)
+    fetch('/api/users?role=ops').then(r => r.json()).then(d => {
+      const map: Record<string, string> = {}
+      ;(d.users || []).forEach((u: any) => { if (u.name && u.id) map[u.name] = u.id })
+      setOpsUserIdMap(map)
+      setOpsUsers(prev => {
+        const fromUsers = Object.keys(map)
+        const merged = Array.from(new Set([...prev, ...fromUsers]))
+        return merged
+      })
     }).catch(() => {})
   }, [])
 
@@ -158,10 +172,14 @@ function TransferModeView({
         } else if (dir === 'sales_to_ops') {
           const stage = isPuto ? 'new_db' : 'assigned'
           const msg = isPuto ? `대표 뿌토DB 배정 → ${dest}` : `대표 강제 배정 → ${dest}`
+          const ownerId = opsUserIdMap[dest] || null
           const r = await fetch('/api/ops-cases', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              customer_id: id, ops_user_name: dest, progress_stage: stage,
+              customer_id: id,
+              ops_user_name: dest,
+              owner_id: ownerId,
+              stage,
               details: { forced_assign: !isPuto, is_puto: isPuto, forced_by: 'CEO', forced_at: nowKST2() },
               timeline: [{ user: 'CEO', content: msg, created_at: nowKST2() }],
             }),
