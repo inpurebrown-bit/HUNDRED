@@ -320,6 +320,12 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             loan_history: customer.loan_history || '',
             sales_user_name: anyDetails.sales_user_name || opsUserName || '',
             innovation: anyDetails.innovation || '',
+            // 영업팀 계약 정보 → 관리팀 기타재무에 표시
+            contract_fee:    anyDetails.contract_fee    || '',
+            commission_rate: anyDetails.commission_rate || '',
+            payment_amount:  anyDetails.payment_amount  || '',
+            unpaid_amount:   anyDetails.unpaid_amount   || '',
+            tax_invoice:     anyDetails.tax_invoice     || '',
           }
         },
       }),
