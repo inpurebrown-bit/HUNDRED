@@ -117,8 +117,7 @@ export async function POST(req: NextRequest) {
     ...(customer_id   ? { customer_id }   : {}),
   }
 
-  // 컬럼이 존재할 경우에도 동시에 저장 (ALTER TABLE 실행 후 자동 활성화)
-  const insertRow: Record<string, any> = {
+  const baseRow: Record<string, any> = {
     customer_name:    customer_name ?? '',
     phone:            phone         ?? '',
     owner_id:         owner_id      ?? null,
@@ -127,22 +126,24 @@ export async function POST(req: NextRequest) {
     revenue:          revenue       ?? 0,
     institution_type: 'new',
     details:          mergedDetails,
+    ...(timeline      ? { timeline }      : {}),
+    ...(customer_id   ? { customer_id }   : {}),
+    ...(ops_user_name ? { ops_user_name } : {}),
   }
-  if (timeline)    insertRow.timeline    = timeline
-  if (customer_id) insertRow.customer_id = customer_id
-  if (ops_user_name) insertRow.ops_user_name = ops_user_name
 
-  // 컬럼 없을 때 INSERT 실패 방지: 컬럼 오류면 해당 필드 제외 후 재시도
-  let { data, error } = await supabaseAdmin.from('ops_cases').insert(insertRow).select().single()
-  if (error && error.message?.includes('column')) {
-    delete insertRow.customer_id
-    delete insertRow.ops_user_name
-    const retry = await supabaseAdmin.from('ops_cases').insert(insertRow).select().single()
-    data  = retry.data
-    error = retry.error
+  // 컬럼 없을 때 INSERT 실패 방지: 오류 시 해당 필드 제외 후 재시도
+  const tryInsert = async (row: Record<string, any>) => {
+    const res = await supabaseAdmin.from('ops_cases').insert(row).select().single()
+    if (res.error && res.error.message?.includes('column')) {
+      const fallback = { ...row }
+      delete fallback.customer_id
+      delete fallback.ops_user_name
+      return supabaseAdmin.from('ops_cases').insert(fallback).select().single()
+    }
+    return res
   }
-    .select()
-    .single()
+
+  const { data, error } = await tryInsert(baseRow)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ case: normalize(data) }, { status: 201 })
