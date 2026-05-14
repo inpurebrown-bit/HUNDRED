@@ -1085,6 +1085,18 @@ function CustomerCard({
                   🗑 자체거절
                 </button>
               )}
+              {tabType === 'db010' && (
+                <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); setMenuOpen(false) }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-blue-600 font-medium">
+                  📤 공가DB로 전송
+                </button>
+              )}
+              {tabType === 'lead' && (
+                <button type="button" onClick={() => { onStatusChange(c.id, 'db010'); setMenuOpen(false) }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-indigo-600 font-medium">
+                  📥 직가DB로 전송
+                </button>
+              )}
               {tabType !== 'lead' && tabType !== 'db010' && (
                 <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); setMenuOpen(false) }}
                   className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-blue-500 font-medium">
@@ -1269,7 +1281,13 @@ function CustomerCard({
             {tabType === 'db010' && (
               <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); onExpand(null) }}
                 className="px-2.5 py-1 rounded text-[11px] font-semibold bg-blue-600 text-white hover:bg-blue-700">
-                👤 신규고객으로 이동
+                📤 공가DB로 전송
+              </button>
+            )}
+            {tabType === 'lead' && (
+              <button type="button" onClick={() => { onStatusChange(c.id, 'db010'); onExpand(null) }}
+                className="px-2.5 py-1 rounded text-[11px] font-semibold bg-indigo-600 text-white hover:bg-indigo-700">
+                📥 직가DB로 전송
               </button>
             )}
             {tabType !== 'lead' && tabType !== 'db010' && (
