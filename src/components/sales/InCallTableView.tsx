@@ -1136,10 +1136,16 @@ function CustomerCard({
                   </button>
                 )}
                 {tabType !== 'lead' && tabType !== 'db010' && (
-                  <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); setMenuOpen(false) }}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-blue-500 font-medium">
-                    ↩ 신규복구
-                  </button>
+                  <>
+                    <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); setMenuOpen(false) }}
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 text-blue-600 font-medium">
+                      ↩ 공급으로 돌리기
+                    </button>
+                    <button type="button" onClick={() => { onStatusChange(c.id, 'db010'); setMenuOpen(false) }}
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-indigo-50 text-indigo-600 font-medium">
+                      ↩ 직접으로 돌리기
+                    </button>
+                  </>
                 )}
                 {tabType === 'contracted' && onTransferToOps && (
                   <button type="button" onClick={() => { onTransferToOps(c); setMenuOpen(false) }}
@@ -1344,10 +1350,16 @@ function CustomerCard({
                   </button>
                 )}
                 {tabType !== 'lead' && tabType !== 'db010' && (
-                  <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); onExpand(null) }}
-                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-blue-500 text-white">
-                    ↩ 신규복구
-                  </button>
+                  <>
+                    <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); onExpand(null) }}
+                      className="px-2.5 py-1 rounded text-[11px] font-semibold bg-blue-500 text-white hover:bg-blue-600">
+                      ↩ 공급
+                    </button>
+                    <button type="button" onClick={() => { onStatusChange(c.id, 'db010'); onExpand(null) }}
+                      className="px-2.5 py-1 rounded text-[11px] font-semibold bg-indigo-500 text-white hover:bg-indigo-600">
+                      ↩ 직접
+                    </button>
+                  </>
                 )}
                 {onTransferToOps && tabType === 'contracted' && (
                   <button type="button" onClick={() => { onTransferToOps(c); onExpand(null) }}
