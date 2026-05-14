@@ -177,6 +177,7 @@ const EMPTY_HK = {
 function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
   const [entries, setEntries] = useState<HankyungEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [collapsed, setCollapsed] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [form, setForm] = useState({ ...EMPTY_HK })
@@ -288,12 +289,20 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
         subtitle="내부 DB — 담당자 배정 후 전화 인콜"
         count={entries.length}
         action={
-          <button
-            onClick={() => setShowForm(v => !v)}
-            className="px-4 py-2 bg-[#1B2A45] text-white text-xs font-semibold rounded-xl hover:bg-[#2D4070] transition-colors"
-          >
-            {showForm ? '✕ 닫기' : '+ 한경연 DB 추가'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCollapsed(v => !v)}
+              className="px-3 py-2 bg-gray-100 text-gray-600 text-xs font-semibold rounded-xl hover:bg-gray-200 transition-colors"
+            >
+              {collapsed ? '▼ 펼치기' : '▲ 접기'}
+            </button>
+            <button
+              onClick={() => setShowForm(v => !v)}
+              className="px-4 py-2 bg-[#1B2A45] text-white text-xs font-semibold rounded-xl hover:bg-[#2D4070] transition-colors"
+            >
+              {showForm ? '✕ 닫기' : '+ 한경연 DB 추가'}
+            </button>
+          </div>
         }
       />
 
@@ -366,7 +375,7 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
       )}
 
       {/* 목록 */}
-      {loading ? <LoadingBlock /> : entries.length === 0 ? (
+      {!collapsed && (loading ? <LoadingBlock /> : entries.length === 0 ? (
         <EmptyBlock message="등록된 한경연 DB가 없습니다." />
       ) : (
         <div className="bg-white rounded-2xl border border-[#E8E2D4] shadow-sm overflow-hidden">
@@ -469,7 +478,7 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
             })}
           </div>
         </div>
-      )}
+      ))}
     </div>
   )
 }
@@ -1285,8 +1294,6 @@ export default function AssignBoard() {
 
       <Divider />
 
-      {/* Section 3: 계약 배정 대기 */}
-      <ContractAssignSection opsUsers={usersLoading ? [] : opsUsers} />
     </div>
   )
 }

@@ -17,6 +17,9 @@ export async function POST(req: NextRequest) {
       taxStatus && taxStatus !== '없음' ? `세금체납: ${taxStatus}` : '',
     ].filter(Boolean).join('\n')
 
+    // owner_id NOT NULL 제약 → 대표 계정을 임시 owner로 지정 (리드폼 배정 전 상태)
+    const CEO_USER_ID = '46db4a3e-dc4d-4082-9756-1a892a41c0bb'
+
     const { data, error } = await supabaseAdmin
       .from('customers')
       .insert({
@@ -24,6 +27,7 @@ export async function POST(req: NextRequest) {
         phone: phone.trim(),
         status: 'active',
         source: 'lead_form',
+        owner_id: CEO_USER_ID,
         memo: notes,
         details: {
           sub_status: 'lead',
