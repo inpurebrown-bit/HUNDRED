@@ -216,7 +216,7 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
         name: form.name,
         phone: form.phone,
         company: form.company,
-        status: 'db010',
+        status: 'lead',
         details: {
           db_source: '한경연',
           business_reg_no: form.business_no,
@@ -267,7 +267,7 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
         body: JSON.stringify({
           sales_user_id: selectedUser.id,
           sales_user_name: selectedUser.name,
-          status: 'db010',
+          status: 'lead',
         }),
       })
       const json = await res.json()
