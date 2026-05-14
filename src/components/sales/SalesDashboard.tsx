@@ -283,8 +283,6 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
       details.tax_invoice && `세금계산서: ${details.tax_invoice}`,
     ].filter(Boolean).join(' / ')
 
-    await patchCustomer(customer.id, { details: { ops_transferred: true } })
-
     const anyDetails = details as any
     const revenue = parseInt(String(anyDetails.my_revenue || '0').replace(/[^0-9]/g, ''), 10) || 0
 
@@ -293,7 +291,8 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
       source: 'sales',
     }))
 
-    await fetch('/api/ops-cases', {
+    // ops_case 먼저 생성, 성공하면 ops_transferred 플래그 설정
+    const opsRes = await fetch('/api/ops-cases', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -303,7 +302,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         memo,
         revenue,
         owner_id: opsUserId || null,
-        ops_user_name: opsUserName || null,   // ← 관리팀 직원 이름 저장 (필수)
+        ops_user_name: opsUserName || null,
         timeline: salesTimeline.length > 0 ? salesTimeline : undefined,
         customer_id: customer.id,
         details: {
@@ -325,6 +324,15 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         },
       }),
     })
+
+    if (!opsRes.ok) {
+      const errData = await opsRes.json().catch(() => ({}))
+      alert(`자금팀 전송 실패: ${errData.error || opsRes.status}\n다시 시도해주세요.`)
+      return
+    }
+
+    // ops_case 생성 성공 후 전송 완료 플래그 설정
+    await patchCustomer(customer.id, { details: { ops_transferred: true } })
     await loadAll()
   }, [patchCustomer])
 

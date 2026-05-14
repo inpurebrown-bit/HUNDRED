@@ -71,10 +71,11 @@ export async function GET(req: NextRequest) {
     const myId   = String(user.id).trim()
     const myName = (user.name || '').trim()
     cases = cases.filter(c => {
-      const ownerMatch = c.owner_id != null && String(c.owner_id).trim() === myId
-      const nameMatch  = c.ops_user_name && c.ops_user_name.trim() === myName
-      const unassigned = c.owner_id == null && !c.ops_user_name
-      return ownerMatch || nameMatch || unassigned
+      const ownerMatch    = c.owner_id != null && String(c.owner_id).trim() === myId
+      const nameMatch     = c.ops_user_name && c.ops_user_name.trim() === myName
+      const detailsMatch  = c.details?.ops_user_name && String(c.details.ops_user_name).trim() === myName
+      const unassigned    = c.owner_id == null && !c.ops_user_name && !c.details?.ops_user_name
+      return ownerMatch || nameMatch || detailsMatch || unassigned
     })
   }
 
@@ -109,6 +110,12 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const { customer_name, phone, stage, progress_stage, memo, revenue, owner_id, ops_user_name, timeline, customer_id, details } = body
 
+  // ops_user_name을 details 안에 저장 (별도 컬럼 없어도 동작)
+  const mergedDetails = {
+    ...(details || {}),
+    ...(ops_user_name ? { ops_user_name } : {}),
+  }
+
   const { data, error } = await supabaseAdmin
     .from('ops_cases')
     .insert({
@@ -119,10 +126,9 @@ export async function POST(req: NextRequest) {
       memo:             memo          ?? '',
       revenue:          revenue       ?? 0,
       institution_type: 'new',
-      ...(ops_user_name ? { ops_user_name } : {}),
-      ...(timeline      ? { timeline }      : {}),
-      ...(customer_id   ? { customer_id }   : {}),
-      ...(details       ? { details }       : {}),
+      details:          mergedDetails,
+      ...(timeline    ? { timeline }    : {}),
+      ...(customer_id ? { customer_id } : {}),
     })
     .select()
     .single()
