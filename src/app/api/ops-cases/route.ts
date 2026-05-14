@@ -63,10 +63,10 @@ export async function GET(req: NextRequest) {
 
   let query = supabaseAdmin.from('ops_cases').select('*')
   if (user.role === 'ops') {
-    // owner_id로 배정된 케이스 OR 이름으로 배정된 케이스 OR 미배정(owner_id null + ops_user_name null)
-    const userName = user.name || ''
+    // owner_id 일치 OR ops_user_name 일치 OR 미배정(owner_id null)
+    const userName = (user.name || '').replace(/'/g, "''")
     if (userName) {
-      query = query.or(`owner_id.eq.${user.id},ops_user_name.eq.${userName},and(owner_id.is.null,ops_user_name.is.null)`) as any
+      query = query.or(`owner_id.eq.${user.id},ops_user_name.eq.${userName},owner_id.is.null`) as any
     } else {
       query = query.or(`owner_id.eq.${user.id},owner_id.is.null`) as any
     }
