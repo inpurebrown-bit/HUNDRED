@@ -208,7 +208,7 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
   const [local, setLocal] = useState<OpsCase>({ ...c })
   const [activeDetailTab, setActiveDetailTab] = useState<DetailTab>('진행현황')
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [pwVisible, setPwVisible] = useState<Record<string, boolean>>({})
+  // pwVisible 제거됨 — 기관ID/PW 필드는 항상 평문 표시
   const [salesLogOpen, setSalesLogOpen] = useState(false)
   // 인콜일지 입력 상태
   const [opsIncallInput, setOpsIncallInput] = useState('')
@@ -644,8 +644,6 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
             const idKey  = `cred_${cred.key}_id`
             const pwKey  = `cred_${cred.key}_pw`
             const pw2Key = `cred_${cred.key}_pw2`
-            const isPwVisible  = pwVisible[`${cred.key}_pw`]  || false
-            const isPw2Visible = pwVisible[`${cred.key}_pw2`] || false
             const colCount = [cred.hasId, cred.hasPw, cred.hasPw2].filter(Boolean).length
             return (
               <div key={cred.key} className="bg-gray-50 rounded-lg p-3">
@@ -653,28 +651,16 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
                 <div className={`grid grid-cols-${colCount} gap-2`}>
                   {cred.hasId && (
                     <div><label className={lbl}>ID</label>
-                      <input type="text" value={d[idKey] || ''} onChange={e => detailField(idKey, e.target.value)} className={inp} placeholder={`${cred.label} 아이디`} /></div>
+                      <input type="text" autoComplete="off" value={d[idKey] || ''} onChange={e => detailField(idKey, e.target.value)} className={inp} placeholder={`${cred.label} 아이디`} /></div>
                   )}
                   {cred.hasPw && (
                     <div><label className={lbl}>PW</label>
-                      <div className="relative">
-                        <input type={isPwVisible ? 'text' : 'password'} value={d[pwKey] || ''} onChange={e => detailField(pwKey, e.target.value)} className={inp + ' pr-7'} placeholder={`${cred.label} 비밀번호`} />
-                        <button type="button" onClick={() => setPwVisible(p => ({ ...p, [`${cred.key}_pw`]: !isPwVisible }))}
-                          className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-[11px]">
-                          {isPwVisible ? '🙈' : '👁'}
-                        </button>
-                      </div>
+                      <input type="text" autoComplete="off" value={d[pwKey] || ''} onChange={e => detailField(pwKey, e.target.value)} className={inp} placeholder={`${cred.label} 비밀번호`} />
                     </div>
                   )}
                   {cred.hasPw2 && (
                     <div><label className={lbl}>2차PW</label>
-                      <div className="relative">
-                        <input type={isPw2Visible ? 'text' : 'password'} value={d[pw2Key] || ''} onChange={e => detailField(pw2Key, e.target.value)} className={inp + ' pr-7'} placeholder={`${cred.label} 2차 비밀번호`} />
-                        <button type="button" onClick={() => setPwVisible(p => ({ ...p, [`${cred.key}_pw2`]: !isPw2Visible }))}
-                          className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-[11px]">
-                          {isPw2Visible ? '🙈' : '👁'}
-                        </button>
-                      </div>
+                      <input type="text" autoComplete="off" value={d[pw2Key] || ''} onChange={e => detailField(pw2Key, e.target.value)} className={inp} placeholder={`${cred.label} 2차 비밀번호`} />
                     </div>
                   )}
                 </div>
@@ -2814,7 +2800,15 @@ export default function OpsDashboard({ userId, userName }: Props) {
         </div>
       )}
 
-      {/* ── 우측 슬라이딩 패널 (backdrop 없음 → 카드 사라짐 버그 수정 #20) ── */}
+      {/* ── 배경 오버레이 (패널 열릴 때) ── */}
+      {openPanelIds.length > 0 && (
+        <div
+          className="fixed inset-0 bg-black/40 z-[99]"
+          onClick={() => setOpenPanelIds([])}
+        />
+      )}
+
+      {/* ── 우측 슬라이딩 패널 ── */}
       {openPanelIds.map((id, panelIndex) => {
         const c = cases.find(x => x.id === id)
         if (!c) return null
