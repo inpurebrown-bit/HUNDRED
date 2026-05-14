@@ -196,10 +196,10 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
       const res = await fetch('/api/customers')
       const data = await res.json()
       const all: HankyungEntry[] = data.customers || []
-      // 한경연 DB: db010 상태 전체 + status=lead & db_source=한경연
+      // 한경연 DB: 미배정 항목만 표시 (배정 완료 후 이력 남기지 않음)
       setEntries(all.filter(c =>
-        c.status === 'db010' ||
-        (c.status === 'lead' && (c as any).details?.db_source === '한경연')
+        (c.status === 'db010' || (c.status === 'lead' && (c as any).details?.db_source === '한경연')) &&
+        !c.sales_user_id
       ))
     } catch { /* ignore */ } finally { setLoading(false) }
   }, [])
