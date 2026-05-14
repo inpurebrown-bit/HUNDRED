@@ -62,15 +62,7 @@ export async function GET(req: NextRequest) {
   }
 
   let query = supabaseAdmin.from('ops_cases').select('*')
-  if (user.role === 'ops') {
-    // owner_id 일치 OR ops_user_name 일치 OR 미배정(owner_id null)
-    const userName = (user.name || '').replace(/'/g, "''")
-    if (userName) {
-      query = query.or(`owner_id.eq.${user.id},ops_user_name.eq.${userName},owner_id.is.null`) as any
-    } else {
-      query = query.or(`owner_id.eq.${user.id},owner_id.is.null`) as any
-    }
-  }
+  if (user.role === 'ops') query = query.or(`owner_id.eq.${user.id},owner_id.is.null`) as any
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
