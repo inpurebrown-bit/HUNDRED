@@ -380,7 +380,7 @@ function BadgeDropdown({ value, options, onChange, placeholder }: BadgeDropdownP
   }, [open])
 
   return (
-    <div className="relative w-full overflow-hidden" ref={ref}>
+    <div className="relative w-full" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
