@@ -72,18 +72,6 @@ interface SalesGoal {
   goal_count: number | string
 }
 
-interface AsRequest {
-  id: string
-  company_name?: string
-  company?: string
-  request_type?: string
-  type?: string
-  sales_user_name?: string
-  assigned_user_name?: string
-  manager?: string
-  created_at?: string
-}
-
 interface EmployeeRow {
   name: string
   goal: number | null
@@ -295,16 +283,12 @@ export default function OverviewTabNew() {
   const [opsCases, setOpsCases] = useState<OpsCase[]>([])
   const [salesGoals, setSalesGoals] = useState<SalesGoal[]>([])
   const [lastMonthGoals, setLastMonthGoals] = useState<SalesGoal[]>([])
-  const [asRequests, setAsRequests] = useState<AsRequest[]>([])
-  const [markingId, setMarkingId] = useState<string | null>(null)
   const [supplyConfigMap, setSupplyConfigMap] = useState<Record<string, { base?: number }>>({})
 
   // Section refs for scroll-to
   const chartRef = useRef<HTMLDivElement>(null)
   const thisMonthRef = useRef<HTMLDivElement>(null)
   const lastMonthRef = useRef<HTMLDivElement>(null)
-  const asRef = useRef<HTMLDivElement>(null)
-
   // Date calculations
   const now = new Date()
   const thisYear = now.getFullYear()
@@ -331,7 +315,6 @@ export default function OverviewTabNew() {
           opsRes,
           goalsRes,
           lastGoalsRes,
-          asRes,
           supplyRes,
         ] = await Promise.all([
           fetch('/api/revenue').catch(() => null),
@@ -343,7 +326,6 @@ export default function OverviewTabNew() {
           fetch('/api/ops-cases').catch(() => null),
           fetch(`/api/sales-goals?year_month=${thisMonthStr}`).catch(() => null),
           fetch(`/api/sales-goals?year_month=${lastMonthStr}`).catch(() => null),
-          fetch('/api/as-requests?status=pending').catch(() => null),
           fetch('/api/supply-config').catch(() => null),
         ])
 
@@ -357,7 +339,6 @@ export default function OverviewTabNew() {
           opsData,
           goalsData,
           lastGoalsData,
-          asData,
           supplyData,
         ] = await Promise.all([
           revRes?.json().catch(() => ({})) ?? {},
@@ -369,7 +350,6 @@ export default function OverviewTabNew() {
           opsRes?.json().catch(() => ({})) ?? {},
           goalsRes?.json().catch(() => ({})) ?? {},
           lastGoalsRes?.json().catch(() => ({})) ?? {},
-          asRes?.json().catch(() => ({})) ?? {},
           supplyRes?.json().catch(() => ({})) ?? {},
         ])
 
@@ -384,7 +364,6 @@ export default function OverviewTabNew() {
         setOpsCases(a(opsData).cases ?? [])
         setSalesGoals(a(goalsData).sales_goals ?? a(goalsData).goals ?? [])
         setLastMonthGoals(a(lastGoalsData).sales_goals ?? a(lastGoalsData).goals ?? [])
-        setAsRequests(a(asData).as_requests ?? a(asData).requests ?? [])
         // config 형식: { month, people: { 이름: { goal, base, supplied } } }
         setSupplyConfigMap(a(supplyData).config?.people ?? a(supplyData).config ?? {})
       } catch {
@@ -545,23 +524,6 @@ export default function OverviewTabNew() {
     return { name, rate, totalContracted, recommended }
   })
 
-  // ── A/S confirm ─────────────────────────────────────────
-
-  async function handleConfirm(id: string) {
-    setMarkingId(id)
-    try {
-      await fetch(`/api/as-requests?id=${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'reviewed' }),
-      })
-      setAsRequests(prev => prev.filter(r => r.id !== id))
-    } catch {
-      // silently ignore
-    } finally {
-      setMarkingId(null)
-    }
-  }
 
   // ── Scroll helpers ───────────────────────────────────────
 
@@ -672,84 +634,8 @@ export default function OverviewTabNew() {
         />
       </div>
 
-      {/* ═══ 5. A/S 요청 섹션 ═══════════════════════════════ */}
-      <div ref={asRef}>
-        <section className="bg-amber-50 border border-amber-100 rounded-xl p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-[#1B2A45] text-base">A/S 요청</h2>
-            {!loading && (
-              <span className="text-xs bg-amber-200 text-amber-800 px-2.5 py-0.5 rounded-full font-semibold">
-                {asRequests.length}건 대기
-              </span>
-            )}
-          </div>
-
-          {loading ? (
-            <div className="space-y-2">
-              {[...Array(3)].map((_, i) => (
-                <Skeleton key={i} className="h-12" />
-              ))}
-            </div>
-          ) : asRequests.length === 0 ? (
-            <p className="text-sm text-[#1B2A45]/40 text-center py-6">대기 중인 A/S 요청 없음</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-amber-200">
-                    {['업체명', '요청 유형', '담당 영업', '접수일', ''].map(h => (
-                      <th
-                        key={h}
-                        className="text-left py-2 px-3 text-xs text-[#1B2A45]/50 font-medium whitespace-nowrap"
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {asRequests.map(req => (
-                    <tr
-                      key={req.id}
-                      className="border-b border-amber-100 hover:bg-amber-100/50 transition-colors"
-                    >
-                      <td className="py-2.5 px-3 font-medium text-[#1B2A45] whitespace-nowrap">
-                        {req.company_name ?? req.company ?? '-'}
-                      </td>
-                      <td className="py-2.5 px-3 text-[#1B2A45]/70">
-                        {req.request_type ?? req.type ?? '-'}
-                      </td>
-                      <td className="py-2.5 px-3 text-[#1B2A45]/70">
-                        {req.sales_user_name ?? req.assigned_user_name ?? req.manager ?? '-'}
-                      </td>
-                      <td className="py-2.5 px-3 text-[#1B2A45]/50 text-xs whitespace-nowrap">
-                        {req.created_at
-                          ? new Date(req.created_at).toLocaleDateString('ko-KR')
-                          : '-'}
-                      </td>
-                      <td className="py-2.5 px-3">
-                        <button
-                          onClick={() => handleConfirm(req.id)}
-                          disabled={markingId === req.id}
-                          className="text-xs bg-[#1B2A45] hover:bg-[#253B5E] disabled:opacity-50 text-white px-3 py-1 rounded-lg font-medium transition-colors whitespace-nowrap"
-                        >
-                          {markingId === req.id ? '처리 중...' : '확인완료'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      </div>
-
       {/* ═══ 6. 공지사항 ════════════════════════════════════ */}
       <NoticeSection />
-
-      {/* ═══ 6.5. DB 중복 쓰레기통 ═════════════════════════ */}
-      <DuplicateTrashSection />
 
       {/* ═══ 7. 공급기준표 ══════════════════════════════════ */}
       <div className="bg-white rounded-xl border border-[#E8E2D4] overflow-hidden">
@@ -904,130 +790,3 @@ function NoticeSection() {
   )
 }
 
-// ─── DB 중복 쓰레기통 ─────────────────────────────────────────
-function DuplicateTrashSection() {
-  const [duplicates, setDuplicates] = useState<any[][]>([])
-  const [loading, setLoading] = useState(false)
-  const [scanned, setScanned] = useState(false)
-  const [trashing, setTrashing] = useState<string | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
-
-  function toast_(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000) }
-
-  async function scan() {
-    setLoading(true)
-    try {
-      const res = await fetch('/api/customers')
-      const data = await res.json()
-      const all: any[] = (data.customers || []).filter((c: any) =>
-        // 활발히 진행 중인 건 제외: contracted, emotional은 제외
-        !['contracted', 'trash'].includes(c.status)
-      )
-
-      // 전화번호 기준으로 그룹화 (정규화: 숫자만)
-      const byPhone: Record<string, any[]> = {}
-      for (const c of all) {
-        const phone = (c.phone || '').replace(/\D/g, '')
-        if (!phone) continue
-        if (!byPhone[phone]) byPhone[phone] = []
-        byPhone[phone].push(c)
-      }
-
-      // 2건 이상인 그룹만 추출
-      const groups = Object.values(byPhone).filter(g => g.length >= 2)
-      setDuplicates(groups)
-      setScanned(true)
-    } catch {}
-    setLoading(false)
-  }
-
-  async function moveToTrash(id: string) {
-    setTrashing(id)
-    try {
-      const res = await fetch(`/api/customers/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'trash' }),
-      })
-      if (res.ok) {
-        setDuplicates(prev => prev
-          .map(group => group.filter(c => c.id !== id))
-          .filter(group => group.length >= 2)
-        )
-        toast_('🗑 쓰레기통으로 이동')
-      }
-    } catch {}
-    setTrashing(null)
-  }
-
-  const totalDups = duplicates.reduce((s, g) => s + g.length - 1, 0)
-
-  return (
-    <div className="bg-white rounded-xl border border-[#E8E2D4] overflow-hidden">
-      {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] px-5 py-3 rounded-xl shadow-2xl text-sm font-semibold text-white bg-red-500">{toast}</div>}
-      <div className="px-5 py-3 border-b border-[#E8E2D4] flex items-center justify-between">
-        <div>
-          <h2 className="font-semibold text-[#1B2A45] text-base">🗑 DB 중복 쓰레기통</h2>
-          <p className="text-[11px] text-[#1B2A45]/40 mt-0.5">같은 전화번호의 중복 고객카드 감지</p>
-        </div>
-        <button
-          onClick={scan}
-          disabled={loading}
-          className="text-xs bg-[#1B2A45] hover:bg-[#1B2A45]/80 text-white px-4 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-40"
-        >
-          {loading ? '스캔 중...' : '중복 스캔'}
-        </button>
-      </div>
-
-      {!scanned ? (
-        <div className="px-5 py-8 text-center text-sm text-gray-400">
-          "중복 스캔" 버튼을 눌러 중복 업체를 찾아보세요
-        </div>
-      ) : duplicates.length === 0 ? (
-        <div className="px-5 py-8 text-center text-sm text-emerald-600 font-medium">
-          ✅ 중복 업체 없음 (계약/거절 제외)
-        </div>
-      ) : (
-        <div className="divide-y divide-[#E8E2D4]/50">
-          <div className="px-5 py-2 bg-red-50">
-            <p className="text-xs text-red-600 font-semibold">⚠️ {duplicates.length}개 그룹 / {totalDups}건 중복 감지 (계약·거절·쓰레기통 제외)</p>
-          </div>
-          {duplicates.map((group, gi) => (
-            <div key={gi} className="px-5 py-3 space-y-2">
-              <p className="text-[10px] font-bold text-gray-400">📞 {(group[0].phone || '').replace(/\D/g, '').replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3')}</p>
-              <div className="space-y-1.5">
-                {group.map((c: any, ci: number) => {
-                  const company = c.details?.company || c.company || c.name || '—'
-                  const owner = c.details?.sales_user_name || c.sales_user_name || '미배정'
-                  const status = c.status || '—'
-                  const isFirst = ci === 0
-                  return (
-                    <div key={c.id} className={`flex items-center justify-between gap-3 px-3 py-2 rounded-lg ${isFirst ? 'bg-blue-50 border border-blue-100' : 'bg-red-50 border border-red-100'}`}>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {isFirst && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-200 text-blue-700 font-bold">원본</span>}
-                          <span className="text-xs font-semibold text-[#1B2A45] truncate">{company}</span>
-                          <span className="text-[10px] text-gray-500">{owner}</span>
-                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${status === 'db010' ? 'bg-violet-100 text-violet-700' : status === 'lead' ? 'bg-sky-100 text-sky-700' : 'bg-gray-100 text-gray-500'}`}>{status === 'db010' ? '010DB' : status === 'lead' ? '신규고객' : status}</span>
-                        </div>
-                      </div>
-                      {!isFirst && (
-                        <button
-                          onClick={() => moveToTrash(c.id)}
-                          disabled={trashing === c.id}
-                          className="shrink-0 text-[10px] px-2.5 py-1 rounded-lg bg-red-500 hover:bg-red-600 text-white font-semibold disabled:opacity-40 transition-colors"
-                        >
-                          {trashing === c.id ? '...' : '🗑 이동'}
-                        </button>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
