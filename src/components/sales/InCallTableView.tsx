@@ -555,38 +555,24 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
             </div>
           </div>
 
-          {/* 성공보수율 — 승인금액 기준, 자금팀 확인용 */}
+          {/* 수수료율 */}
           <div className="bg-violet-50 rounded-xl p-3 space-y-2.5 border border-violet-100">
             <p className="text-[10px] text-violet-700 font-bold">
-              💼 성공보수 <span className="text-violet-400 font-normal">(승인금액의 %, 자금팀에 전달)</span>
+              💼 수수료율
             </p>
-            {/* 승인예상금액 */}
             <div>
-              <label className="text-[10px] text-gray-500 mb-1 block">승인예상금액</label>
-              <NumberInput value={approvedAmount} onChange={setApprovedAmount} className={INP} placeholder="100,000,000" />
-            </div>
-            {/* 성공보수율 */}
-            <div>
-              <label className="text-[10px] text-gray-500 mb-1 block">성공보수율</label>
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <input
-                    type="number"
-                    value={commissionRate}
-                    onChange={e => setCommissionRate(e.target.value)}
-                    placeholder="예: 6"
-                    className={INP + ' pr-6'}
-                  />
-                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
-                </div>
-                {commissionRate && approvedNum > 0 && (
-                  <span className="text-xs font-black text-violet-700 whitespace-nowrap">
-                    = {Math.round(approvedNum * parseFloat(commissionRate || '0') / 100).toLocaleString()}원
-                  </span>
-                )}
+              <label className="text-[10px] text-gray-500 mb-1 block">수수료율</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  value={commissionRate}
+                  onChange={e => setCommissionRate(e.target.value)}
+                  placeholder="예: 6"
+                  className={INP + ' pr-6'}
+                />
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
               </div>
             </div>
-            <p className="text-[9px] text-violet-400">예: 승인 1억 × 6% = 600만원 성공보수</p>
           </div>
 
           {/* ③ 자동계산 박스 */}
