@@ -212,6 +212,13 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
   // 인콜일지 입력 상태
   const [opsIncallInput, setOpsIncallInput] = useState('')
   const [opsIncallResult, setOpsIncallResult] = useState('')
+  // 인콜일지 편집 상태 (index → {content, call_result})
+  const [editingIncallIdx, setEditingIncallIdx] = useState<number | null>(null)
+  const [editIncallContent, setEditIncallContent] = useState('')
+  const [editIncallResult, setEditIncallResult] = useState('')
+  // 영업팀 로그 보충 상태 (index → 보충 텍스트)
+  const [supplementIdx, setSupplementIdx] = useState<number | null>(null)
+  const [supplementText, setSupplementText] = useState('')
 
   useEffect(() => { setLocal({ ...c }) }, [c.id])
 
@@ -278,6 +285,34 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
     detailField('ops_incall_logs', logs)
     setOpsIncallInput('')
     setOpsIncallResult('')
+  }
+  function saveEditIncall(realIdx: number) {
+    const logs = [...(local.details?.ops_incall_logs || [])]
+    logs[realIdx] = { ...logs[realIdx], content: editIncallContent, call_result: editIncallResult }
+    detailField('ops_incall_logs', logs)
+    setEditingIncallIdx(null)
+  }
+  function deleteOpsIncall(realIdx: number) {
+    if (!confirm('이 기록을 삭제하시겠습니까?')) return
+    const logs = (local.details?.ops_incall_logs || []).filter((_: any, i: number) => i !== realIdx)
+    detailField('ops_incall_logs', logs)
+    if (editingIncallIdx === realIdx) setEditingIncallIdx(null)
+  }
+  function addSupplement(salesLogIdx: number) {
+    if (!supplementText.trim()) return
+    const origLogs: any[] = (local.timeline || []).filter((e: any) => e.source === 'sales')
+    const orig = [...origLogs].reverse()[salesLogIdx]
+    const entry = {
+      date: nowKST(),
+      content: `[보충] ${supplementText.trim()}`,
+      call_result: '',
+      author: '관리팀',
+      ref_date: orig?.date || orig?.created_at || '',
+    }
+    const logs = [...(local.details?.ops_incall_logs || []), entry]
+    detailField('ops_incall_logs', logs)
+    setSupplementIdx(null)
+    setSupplementText('')
   }
   function handleStageChange(nextStage: string) {
     // 관리팀 직원은 환불/종료를 직접 선택 불가 → 예정 단계로 자동 전환
@@ -670,14 +705,35 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
                       <div key={i} className="relative">
                         <div className="absolute -left-[21px] top-1.5 w-3 h-3 rounded-full bg-violet-400 border-2 border-white" />
                         <div className="bg-violet-50 rounded-lg px-3 py-2">
-                          <div className="flex items-center gap-2 mb-0.5">
+                          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                             <span className="text-[10px] font-bold text-violet-700">{author}</span>
                             <span className="text-[10px] text-gray-400">{kst.date} {kst.time}</span>
                             {log.call_result && (
                               <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-medium">{log.call_result}</span>
                             )}
+                            <button type="button"
+                              onClick={() => { setSupplementIdx(supplementIdx === i ? null : i); setSupplementText('') }}
+                              className="ml-auto text-[9px] px-2 py-0.5 bg-violet-100 hover:bg-violet-200 text-violet-600 rounded-full font-semibold">
+                              {supplementIdx === i ? '취소' : '+ 보충'}
+                            </button>
                           </div>
                           {log.content && <p className="text-xs text-gray-700">{log.content}</p>}
+                          {supplementIdx === i && (
+                            <div className="mt-2 space-y-1.5">
+                              <textarea
+                                value={supplementText}
+                                onChange={e => setSupplementText(e.target.value)}
+                                placeholder="보충·수정 내용 입력..."
+                                rows={2}
+                                className="w-full border border-violet-200 rounded px-2 py-1.5 text-xs focus:outline-none bg-white resize-none"
+                              />
+                              <button type="button" onClick={() => addSupplement(i)}
+                                disabled={!supplementText.trim()}
+                                className="text-[10px] px-3 py-1 bg-violet-600 hover:bg-violet-700 text-white rounded font-semibold disabled:opacity-40">
+                                보충 추가
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )
@@ -719,26 +775,61 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
                 </button>
               </div>
             </div>
-            {/* 기존 관리팀 기록 목록 */}
+            {/* 기존 관리팀 기록 목록 — 수정/삭제 가능 */}
             {(d.ops_incall_logs || []).length === 0 ? (
               <p className="text-[10px] text-gray-300 text-center py-2">기록된 인콜일지가 없습니다 — 위 양식으로 추가하세요</p>
             ) : (
               <div className="relative pl-4 border-l-2 border-gray-200 space-y-2">
-                {[...(d.ops_incall_logs || [])].reverse().map((log: any, i: number) => {
-                  const kst = formatKST(log.date || log.created_at || '')
+                {[...(d.ops_incall_logs || [])].map((log: any, reversedI: number) => {
+                  const realIdx = (d.ops_incall_logs || []).length - 1 - reversedI
+                  const actualLog = (d.ops_incall_logs || [])[realIdx]
+                  const kst = formatKST(actualLog.date || actualLog.created_at || '')
+                  const isEditing = editingIncallIdx === realIdx
                   return (
-                    <div key={i} className="relative">
+                    <div key={realIdx} className="relative">
                       <div className="absolute -left-[21px] top-1.5 w-3 h-3 rounded-full bg-gray-400 border-2 border-white" />
-                      <div className="bg-gray-50 rounded-lg px-3 py-2">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-[10px] font-bold text-gray-600">{log.author || '관리팀'}</span>
-                          <span className="text-[10px] text-gray-400">{kst.date} {kst.time}</span>
-                          {log.call_result && (
-                            <span className="text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full font-medium">{log.call_result}</span>
-                          )}
+                      {isEditing ? (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 space-y-2">
+                          <textarea
+                            value={editIncallContent}
+                            onChange={e => setEditIncallContent(e.target.value)}
+                            rows={3}
+                            className="w-full border border-yellow-200 rounded px-2 py-1.5 text-xs focus:outline-none bg-white resize-none"
+                          />
+                          <div className="flex items-center gap-2">
+                            <select value={editIncallResult} onChange={e => setEditIncallResult(e.target.value)} className={inp + ' flex-1'}>
+                              <option value="">통화결과 선택</option>
+                              <option value="상담완료">상담완료</option>
+                              <option value="재통화">재통화</option>
+                              <option value="부재중">부재중</option>
+                              <option value="거절">거절</option>
+                              <option value="기타">기타</option>
+                            </select>
+                            <button type="button" onClick={() => saveEditIncall(realIdx)}
+                              className="text-[10px] px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold">저장</button>
+                            <button type="button" onClick={() => setEditingIncallIdx(null)}
+                              className="text-[10px] px-3 py-1.5 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded font-semibold">취소</button>
+                          </div>
                         </div>
-                        {log.content && <p className="text-xs text-gray-700 whitespace-pre-wrap">{log.content}</p>}
-                      </div>
+                      ) : (
+                        <div className="bg-gray-50 rounded-lg px-3 py-2 group">
+                          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                            <span className="text-[10px] font-bold text-gray-600">{actualLog.author || '관리팀'}</span>
+                            <span className="text-[10px] text-gray-400">{kst.date} {kst.time}</span>
+                            {actualLog.call_result && (
+                              <span className="text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full font-medium">{actualLog.call_result}</span>
+                            )}
+                            <div className="ml-auto flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button type="button"
+                                onClick={() => { setEditingIncallIdx(realIdx); setEditIncallContent(actualLog.content || ''); setEditIncallResult(actualLog.call_result || '') }}
+                                className="text-[9px] px-2 py-0.5 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded font-semibold">수정</button>
+                              <button type="button" onClick={() => deleteOpsIncall(realIdx)}
+                                className="text-[9px] px-2 py-0.5 bg-red-100 hover:bg-red-200 text-red-500 rounded font-semibold">삭제</button>
+                            </div>
+                          </div>
+                          {actualLog.content && <p className="text-xs text-gray-700 whitespace-pre-wrap">{actualLog.content}</p>}
+                        </div>
+                      )}
                     </div>
                   )
                 })}

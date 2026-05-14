@@ -154,7 +154,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle }: {
   })).filter(g => g.items.length > 0)
 
   const unassigned = cases.filter(c => !c.institution || c.institution.trim() === '')
-  if (unassigned.length > 0) instGroups.push({ inst: '미배정', items: unassigned })
+  if (unassigned.length > 0) instGroups.unshift({ inst: '미배정', items: unassigned })
 
   if (instGroups.length === 0) {
     return <div className="bg-white rounded-xl border border-[#E8E2D4] p-12 text-center text-[#1B2A45]/40 text-sm">진행중인 업체가 없습니다</div>
