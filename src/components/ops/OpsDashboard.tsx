@@ -125,6 +125,28 @@ const CRED_TYPES = [
 const inp = 'w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400/50 bg-white'
 const lbl = 'text-[10px] text-gray-400 mb-0.5 block font-medium'
 
+// 인콜일지 결과 배지 옵션 (영업팀과 동일)
+const INCALL_CALL_RESULTS = [
+  { key: '원콜클로징', color: 'bg-emerald-500 text-white' },
+  { key: '심사요청',   color: 'bg-violet-500 text-white' },
+  { key: '고민중',     color: 'bg-orange-400 text-white' },
+  { key: '클로징대기', color: 'bg-blue-500 text-white' },
+  { key: '부재',       color: 'bg-slate-400 text-white' },
+  { key: '대기',       color: 'bg-yellow-400 text-gray-800' },
+  { key: '거절',       color: 'bg-red-500 text-white' },
+  { key: '자체거절',   color: 'bg-gray-400 text-white' },
+  { key: '',           color: 'bg-gray-100 text-gray-400' },
+]
+const INCALL_CLOSING_RESULTS = [
+  { key: '결정업체',   color: 'bg-emerald-500 text-white' },
+  { key: '고민중',     color: 'bg-orange-400 text-white' },
+  { key: '부재',       color: 'bg-slate-400 text-white' },
+  { key: '재통화',     color: 'bg-sky-400 text-white' },
+  { key: '거절',       color: 'bg-red-500 text-white' },
+  { key: '자체거절',   color: 'bg-gray-400 text-white' },
+  { key: '',           color: 'bg-gray-100 text-gray-400' },
+]
+
 // ── Tab types ──────────────────────────────────────────────────────────
 type OpsTab = 'dashboard' | 'active' | 'refund' | 'completed' | 'newdb' | 'ops_contract' | 'report' | 'profile'
 
@@ -210,16 +232,8 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // pwVisible 제거됨 — 기관ID/PW 필드는 항상 평문 표시
   const [salesLogOpen, setSalesLogOpen] = useState(false)
-  // 인콜일지 입력 상태
-  const [opsIncallInput, setOpsIncallInput] = useState('')
-  const [opsIncallResult, setOpsIncallResult] = useState('')
-  // 인콜일지 편집 상태 (index → {content, call_result})
-  const [editingIncallIdx, setEditingIncallIdx] = useState<number | null>(null)
-  const [editIncallContent, setEditIncallContent] = useState('')
-  const [editIncallResult, setEditIncallResult] = useState('')
-  // 영업팀 로그 보충 상태 (index → 보충 텍스트)
-  const [supplementIdx, setSupplementIdx] = useState<number | null>(null)
-  const [supplementText, setSupplementText] = useState('')
+  // 인콜일지 타임라인 입력
+  const [tlInput, setTlInput] = useState('')
 
   useEffect(() => { setLocal({ ...c }) }, [c.id])
 
@@ -279,39 +293,25 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
       })
     } catch {}
   }
-  function addOpsIncall() {
-    if (!opsIncallInput.trim()) return
-    const entry = { date: nowKST(), content: opsIncallInput.trim(), call_result: opsIncallResult, author: '관리팀' }
-    const logs = [...(local.details?.ops_incall_logs || []), entry]
-    detailField('ops_incall_logs', logs)
-    setOpsIncallInput('')
-    setOpsIncallResult('')
+  // 인콜일지 필드 저장 (details.incall_journal 에 저장)
+  function incallField(key: string, val: any) {
+    const ij = local.details?.incall_journal || {}
+    detailField('incall_journal', { ...ij, [key]: val })
   }
-  function saveEditIncall(realIdx: number) {
-    const logs = [...(local.details?.ops_incall_logs || [])]
-    logs[realIdx] = { ...logs[realIdx], content: editIncallContent, call_result: editIncallResult }
-    detailField('ops_incall_logs', logs)
-    setEditingIncallIdx(null)
+  // 인콜일지 타임라인 추가
+  function addIncallTimeline() {
+    if (!tlInput.trim()) return
+    const ij = local.details?.incall_journal || {}
+    const tl = [...(ij.timeline || []), { user: '관리팀', content: tlInput.trim(), created_at: nowKST() }]
+    detailField('incall_journal', { ...ij, timeline: tl })
+    setTlInput('')
   }
-  function deleteOpsIncall(realIdx: number) {
+  // 인콜일지 타임라인 삭제 (관리팀 추가분만)
+  function deleteIncallTimeline(idx: number) {
     if (!confirm('이 기록을 삭제하시겠습니까?')) return
-    const logs = (local.details?.ops_incall_logs || []).filter((_: any, i: number) => i !== realIdx)
-    detailField('ops_incall_logs', logs)
-    if (editingIncallIdx === realIdx) setEditingIncallIdx(null)
-  }
-  function addSupplement(salesLogIdx: number) {
-    if (!supplementText.trim()) return
-    const entry = {
-      date: nowKST(),
-      content: `[보충] ${supplementText.trim()}`,
-      call_result: '',
-      author: '관리팀',
-      ref_sales_idx: salesLogIdx,
-    }
-    const logs = [...(local.details?.ops_incall_logs || []), entry]
-    detailField('ops_incall_logs', logs)
-    setSupplementIdx(null)
-    setSupplementText('')
+    const ij = local.details?.incall_journal || {}
+    const tl = (ij.timeline || []).filter((_: any, i: number) => i !== idx)
+    detailField('incall_journal', { ...ij, timeline: tl })
   }
   function handleStageChange(nextStage: string) {
     // 관리팀 직원은 환불/종료를 직접 선택 불가 → 예정 단계로 자동 전환
@@ -672,206 +672,175 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
 
       {/* ── 인콜일지 ── */}
       {activeDetailTab === '인콜일지' && (
-        <div className="space-y-4">
-
-          {/* ── 영업팀 인콜일지 (customers 테이블 실시간 데이터 기반) ── */}
+        <div className="space-y-0">
           {(() => {
             const cd = local.customers?.details || {}
-            // call_timeline: API에서 customers 테이블 조인으로 항상 포함됨
+            const ij = d.incall_journal || {}
+            // customers 테이블 우선, 없으면 incall_journal 저장값
+            const gv = (ijKey: string, cdKey?: string) =>
+              ij[ijKey] !== undefined && ij[ijKey] !== ''
+                ? ij[ijKey]
+                : (cdKey ? (cd[cdKey] ?? '') : '')
+
             const callTimeline: any[] = (local.customers as any)?.call_timeline || []
-            // ops_case timeline에 source=sales로 저장된 것도 fallback으로 사용
             const salesTimeline: any[] = callTimeline.length > 0
               ? callTimeline
               : (local.timeline || []).filter((e: any) => e.source === 'sales')
 
             const company        = cd.company        || local.customers?.company || local.customers?.name || ''
             const representative = cd.representative || local.customers?.name    || ''
-            const phone          = cd.phone          || local.customers?.phone   || ''
-            const businessType   = cd.business_type  || ''
-            const region         = cd.region         || ''
-            const loanHistory    = cd.loan_history   || local.customers?.loan_history || ''
-            const callResult     = cd.call_result    || ''
-            const closingResult  = cd.closing_result || ''
-            const subcallDate    = cd.subcall_date   || ''
-            const salesUserName  = cd.sales_user_name|| ''
-            const memo           = cd.memo           || (local.customers as any)?.memo || ''
-            const createdAt      = cd.created_at     || ''
+            // 각 필드: incall_journal 저장값 우선, 없으면 customers 테이블 값
+            const fields = [
+              { label: '업체명',    k: 'company',           cv: cd.company       || local.customers?.company || local.customers?.name || '' },
+              { label: '대표자',    k: 'representative',    cv: local.customers?.name || '' },
+              { label: '연락처',    k: 'phone',             cv: local.customers?.phone || '' },
+              { label: '지역',      k: 'region',            cv: cd.region         || '' },
+              { label: '접수일',    k: 'reception_date',    cv: cd.reception_date || (cd.created_at ? formatKST(cd.created_at).date : '') },
+              { label: '업종',      k: 'business_type',     cv: cd.business_type  || '' },
+              { label: '실제업무',  k: 'real_work',          cv: cd.real_work      || '' },
+              { label: '업력',      k: 'years_in_business', cv: cd.years_in_business || cd.biz_size || '' },
+              { label: '직원수',    k: 'employee_count',    cv: cd.employee_count || '' },
+              { label: '기보대출',  k: 'loan_kibo',         cv: cd.loan_kibo      || cd.loan_policy || '' },
+              { label: '신보대출',  k: 'loan_shinbo',       cv: cd.loan_shinbo    || '' },
+              { label: '재단대출',  k: 'loan_jaedan',       cv: cd.loan_jaedan    || '' },
+              { label: '중진공',    k: 'loan_jinjong',      cv: cd.loan_jinjong   || '' },
+              { label: '소진공',    k: 'loan_sojin',        cv: cd.loan_sojin     || '' },
+              { label: '신용/담보', k: 'loan_other',        cv: cd.loan_other     || cd.loan_credit || '' },
+              { label: '기대출합계',k: 'loan_total',        cv: cd.loan_total     || '' },
+              { label: 'KCB점수',   k: 'credit_kcb',        cv: cd.credit_kcb     || cd.credit_score || '' },
+              { label: 'NICE점수',  k: 'credit_nice',       cv: cd.credit_nice    || '' },
+              { label: '세금체납',  k: 'tax_status',         cv: cd.tax_status     || cd.tax_delinquency || '' },
+              { label: '25년매출',  k: 'revenue_2025',      cv: cd.revenue_2025   || '' },
+              { label: '24년매출',  k: 'revenue_2024',      cv: cd.revenue_2024   || '' },
+              { label: '23년매출',  k: 'revenue_2023',      cv: cd.revenue_2023   || '' },
+              { label: '자산',      k: 'assets',            cv: cd.assets         || '' },
+              { label: '필요자금',  k: 'required_funds',    cv: cd.required_funds || '' },
+              { label: '솔루션',    k: 'solution',          cv: cd.solution       || '' },
+            ]
+            const callResult    = ij.call_result    ?? cd.call_result    ?? ''
+            const closingResult = ij.closing_result ?? cd.closing_result ?? ''
+            const subcallDate   = ij.subcall_date   ?? cd.subcall_date   ?? ''
+            const combinedTl = [
+              ...salesTimeline.map((e: any) => ({ ...e, _src: 'sales' })),
+              ...(ij.timeline || []).map((e: any) => ({ ...e, _src: 'ops' })),
+            ].sort((a: any, b: any) =>
+              new Date(a.created_at || a.date || 0).getTime() - new Date(b.created_at || b.date || 0).getTime()
+            )
 
             return (
-              <div className="bg-violet-50 border border-violet-200 rounded-xl overflow-hidden">
-                {/* 헤더 */}
-                <div className="bg-violet-600 px-3 py-2 flex items-center gap-2">
-                  <span className="text-white font-bold text-xs">📋 영업팀 인콜일지</span>
-                  {salesUserName && (
-                    <span className="text-violet-200 text-[10px]">담당: {salesUserName}</span>
-                  )}
+              <div className="flex flex-col md:flex-row gap-0 divide-y md:divide-y-0 md:divide-x divide-gray-100">
+
+                {/* ── 왼쪽: 고객 정보 필드 ── */}
+                <div className="md:w-[45%] overflow-y-auto">
+                  <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-100">
+                    <span className="text-[11px] font-bold text-gray-600">📋 인콜일지</span>
+                  </div>
+                  {fields.map(({ label, k, cv }) => {
+                    const val = ij[k] !== undefined && ij[k] !== '' ? ij[k] : cv
+                    return (
+                      <div key={k} className="flex items-center border-b border-gray-50 px-3 py-1.5 hover:bg-gray-50 transition-colors">
+                        <span className="text-[10px] text-gray-400 w-[68px] shrink-0 font-medium">{label}</span>
+                        <input
+                          type="text"
+                          value={val}
+                          onChange={e => incallField(k, e.target.value)}
+                          placeholder="—"
+                          className="flex-1 text-xs text-gray-800 bg-transparent border-0 focus:outline-none focus:bg-white rounded px-1 py-0.5 placeholder-gray-300"
+                        />
+                      </div>
+                    )
+                  })}
                 </div>
 
-                <div className="p-3 space-y-3">
-                  {/* 고객 기본정보 */}
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 bg-white rounded-lg p-2.5 border border-violet-100">
-                    {company && (
-                      <div className="col-span-2">
-                        <span className="text-[9px] text-gray-400 block">업체명</span>
-                        <span className="text-xs font-bold text-gray-800">{company}</span>
-                      </div>
-                    )}
-                    {representative && representative !== company && (
-                      <div>
-                        <span className="text-[9px] text-gray-400 block">대표자</span>
-                        <span className="text-xs text-gray-700">{representative}</span>
-                      </div>
-                    )}
-                    {phone && (
-                      <div>
-                        <span className="text-[9px] text-gray-400 block">연락처</span>
-                        <span className="text-xs text-gray-700">{phone}</span>
-                      </div>
-                    )}
-                    {businessType && (
-                      <div>
-                        <span className="text-[9px] text-gray-400 block">업종</span>
-                        <span className="text-xs text-gray-700">{businessType}</span>
-                      </div>
-                    )}
-                    {region && (
-                      <div>
-                        <span className="text-[9px] text-gray-400 block">지역</span>
-                        <span className="text-xs text-gray-700">{region}</span>
-                      </div>
-                    )}
-                    {createdAt && (
-                      <div>
-                        <span className="text-[9px] text-gray-400 block">접수일</span>
-                        <span className="text-xs text-gray-700">{formatKST(createdAt).date}</span>
-                      </div>
-                    )}
-                    {loanHistory && (
-                      <div className="col-span-2">
-                        <span className="text-[9px] text-gray-400 block">기대출</span>
-                        <span className="text-xs text-gray-700">{loanHistory}</span>
-                      </div>
-                    )}
-                    {memo && (
-                      <div className="col-span-2">
-                        <span className="text-[9px] text-gray-400 block">메모</span>
-                        <span className="text-xs text-gray-700 whitespace-pre-wrap">{memo}</span>
-                      </div>
-                    )}
+                {/* ── 오른쪽: 인콜결과 + 타임라인 ── */}
+                <div className="md:flex-1 p-3 space-y-4 overflow-y-auto">
+
+                  {/* 결정전 결과 */}
+                  <div>
+                    <p className="text-[10px] text-gray-500 font-medium mb-2">결정전 결과</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {INCALL_CALL_RESULTS.map(opt => (
+                        <button key={opt.key} type="button"
+                          onClick={() => incallField('call_result', callResult === opt.key ? '' : opt.key)}
+                          className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all ${
+                            callResult === opt.key
+                              ? opt.color + ' border-transparent scale-105'
+                              : 'bg-gray-100 text-gray-400 border-gray-200 hover:border-gray-400'
+                          }`}>
+                          {opt.key || '—'}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
-                  {/* 인콜결과 배지 */}
-                  {(callResult || closingResult || subcallDate) && (
-                    <div className="flex items-center gap-3 flex-wrap">
-                      {callResult && (
-                        <div className="flex flex-col items-center">
-                          <span className="text-[9px] text-gray-400 mb-0.5">결정전 결과</span>
-                          <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{callResult}</span>
-                        </div>
-                      )}
-                      {closingResult && (
-                        <div className="flex flex-col items-center">
-                          <span className="text-[9px] text-gray-400 mb-0.5">클로징 결과</span>
-                          <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">{closingResult}</span>
-                        </div>
-                      )}
-                      {subcallDate && (
-                        <div className="flex flex-col items-center">
-                          <span className="text-[9px] text-gray-400 mb-0.5">재통화 일정</span>
-                          <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">📅 {subcallDate}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* 타임라인 (영업팀 인콜 기록) */}
+                  {/* 클로징 결과 */}
                   <div>
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <span className="text-[9px] font-bold text-violet-500 uppercase tracking-wide">인콜 타임라인</span>
-                      <div className="flex-1 h-px bg-violet-200" />
+                    <p className="text-[10px] text-gray-500 font-medium mb-2">클로징 결과</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {INCALL_CLOSING_RESULTS.map(opt => (
+                        <button key={opt.key} type="button"
+                          onClick={() => incallField('closing_result', closingResult === opt.key ? '' : opt.key)}
+                          className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all ${
+                            closingResult === opt.key
+                              ? opt.color + ' border-transparent scale-105'
+                              : 'bg-gray-100 text-gray-400 border-gray-200 hover:border-gray-400'
+                          }`}>
+                          {opt.key || '—'}
+                        </button>
+                      ))}
                     </div>
-                    {salesTimeline.length === 0 ? (
-                      <p className="text-[10px] text-gray-300 text-center py-2">인콜 기록 없음</p>
+                  </div>
+
+                  {/* 재통화 일정 */}
+                  <div>
+                    <p className="text-[10px] text-gray-500 font-medium mb-1">재통화 일정</p>
+                    <input type="date" value={subcallDate}
+                      onChange={e => incallField('subcall_date', e.target.value)}
+                      className={inp} />
+                  </div>
+
+                  {/* 타임라인 */}
+                  <div>
+                    <p className="text-[10px] text-gray-500 font-medium mb-2">🕐 타임라인</p>
+                    <div className="flex gap-1 mb-2">
+                      <input
+                        value={tlInput}
+                        onChange={e => setTlInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') addIncallTimeline() }}
+                        placeholder="기록 입력 후 Enter..."
+                        className="flex-1 border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400/50"
+                      />
+                      <button type="button" onClick={addIncallTimeline}
+                        className="px-3 py-1.5 bg-gray-700 text-white text-xs font-bold rounded hover:bg-gray-800">추가</button>
+                    </div>
+                    {combinedTl.length === 0 ? (
+                      <p className="text-[10px] text-gray-300 text-center py-3">기록 없음</p>
                     ) : (
-                      <div className="relative pl-4 border-l-2 border-violet-200 space-y-2">
-                        {[...salesTimeline].reverse().map((log: any, i: number) => {
-                          const origIdx = salesTimeline.length - 1 - i
-                          const kst = formatKST(log.created_at || log.date || '')
-                          const author = log.user || log.author || log.user_name || '영업팀'
-                          const supplements: any[] = (d.ops_incall_logs || []).filter(
-                            (s: any) => s.ref_sales_idx === origIdx
+                      <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
+                        {[...combinedTl].reverse().map((entry: any, i: number) => {
+                          const isSales = entry._src === 'sales'
+                          const kst = formatKST(entry.created_at || entry.date || '')
+                          const opsTlIdx = isSales ? -1 : (ij.timeline || []).findIndex((e: any) =>
+                            e.created_at === entry.created_at && e.content === entry.content
                           )
                           return (
-                            <div key={i} className="relative">
-                              <div className="absolute -left-[21px] top-1.5 w-3 h-3 rounded-full bg-violet-400 border-2 border-white" />
-                              <div className="bg-white border border-violet-100 rounded-lg px-3 py-2">
-                                <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                                  <span className="text-[10px] font-bold text-violet-700">{author}</span>
-                                  <span className="text-[10px] text-gray-400">{kst.date} {kst.time}</span>
-                                  {log.call_result && (
-                                    <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-medium">{log.call_result}</span>
-                                  )}
-                                  <button type="button"
-                                    onClick={() => { setSupplementIdx(supplementIdx === origIdx ? null : origIdx); setSupplementText('') }}
-                                    className="ml-auto text-[9px] px-2 py-0.5 bg-violet-100 hover:bg-violet-200 text-violet-600 rounded-full font-semibold">
-                                    {supplementIdx === origIdx ? '취소' : '+ 보충'}
-                                  </button>
-                                </div>
-                                {log.content && <p className="text-xs text-gray-700 whitespace-pre-wrap">{log.content}</p>}
-                                {supplementIdx === origIdx && (
-                                  <div className="mt-2 space-y-1.5 border-t border-violet-100 pt-2">
-                                    <textarea
-                                      value={supplementText}
-                                      onChange={e => setSupplementText(e.target.value)}
-                                      placeholder="보충·수정 내용 입력..."
-                                      rows={2}
-                                      className="w-full border border-violet-200 rounded px-2 py-1.5 text-xs focus:outline-none bg-white resize-none"
-                                    />
-                                    <button type="button" onClick={() => addSupplement(origIdx)}
-                                      disabled={!supplementText.trim()}
-                                      className="text-[10px] px-3 py-1 bg-violet-600 hover:bg-violet-700 text-white rounded font-semibold disabled:opacity-40">
-                                      보충 저장
-                                    </button>
-                                  </div>
-                                )}
-                                {supplements.length > 0 && (
-                                  <div className="mt-2 space-y-1 border-t border-violet-100 pt-2">
-                                    {supplements.map((sup: any, si: number) => {
-                                      const supIdx = (d.ops_incall_logs || []).indexOf(sup)
-                                      const supKst = formatKST(sup.date || sup.created_at || '')
-                                      const isEditingSup = editingIncallIdx === supIdx
-                                      return isEditingSup ? (
-                                        <div key={si} className="bg-yellow-50 border border-yellow-200 rounded px-2 py-1.5 space-y-1">
-                                          <textarea value={editIncallContent} onChange={e => setEditIncallContent(e.target.value)}
-                                            rows={2} className="w-full border border-yellow-200 rounded px-2 py-1 text-xs focus:outline-none bg-white resize-none" />
-                                          <div className="flex gap-1">
-                                            <button type="button" onClick={() => saveEditIncall(supIdx)}
-                                              className="text-[10px] px-2 py-1 bg-blue-600 text-white rounded font-semibold">저장</button>
-                                            <button type="button" onClick={() => setEditingIncallIdx(null)}
-                                              className="text-[10px] px-2 py-1 bg-gray-300 text-gray-700 rounded font-semibold">취소</button>
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        <div key={si} className="bg-amber-50 border border-amber-100 rounded px-2 py-1.5 group flex items-start gap-2">
-                                          <div className="flex-1">
-                                            <div className="flex items-center gap-1.5 mb-0.5">
-                                              <span className="text-[9px] font-bold text-amber-700">관리팀 보충</span>
-                                              <span className="text-[9px] text-gray-400">{supKst.date} {supKst.time}</span>
-                                            </div>
-                                            <p className="text-xs text-gray-700 whitespace-pre-wrap">{sup.content?.replace(/^\[보충\]\s*/, '')}</p>
-                                          </div>
-                                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                            <button type="button" onClick={() => { setEditingIncallIdx(supIdx); setEditIncallContent(sup.content?.replace(/^\[보충\]\s*/, '') || '') }}
-                                              className="text-[9px] px-1.5 py-0.5 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded font-semibold">수정</button>
-                                            <button type="button" onClick={() => deleteOpsIncall(supIdx)}
-                                              className="text-[9px] px-1.5 py-0.5 bg-red-100 hover:bg-red-200 text-red-500 rounded font-semibold">삭제</button>
-                                          </div>
-                                        </div>
-                                      )
-                                    })}
-                                  </div>
-                                )}
+                            <div key={i} className={`flex gap-2 items-start rounded-lg px-2 py-1.5 group ${isSales ? 'bg-violet-50' : 'bg-gray-50'}`}>
+                              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white shrink-0 mt-0.5 ${isSales ? 'bg-violet-400' : 'bg-gray-500'}`}>
+                                {isSales ? '영' : '관'}
                               </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`text-[10px] font-semibold ${isSales ? 'text-violet-600' : 'text-gray-600'}`}>
+                                    {entry.user || entry.author || (isSales ? '영업팀' : '관리팀')}
+                                  </span>
+                                  <span className="text-[10px] text-gray-300">{kst.date} {kst.time}</span>
+                                </div>
+                                <p className="text-xs text-gray-700 mt-0.5">{entry.content || entry.text || ''}</p>
+                              </div>
+                              {!isSales && opsTlIdx >= 0 && (
+                                <button type="button" onClick={() => deleteIncallTimeline(opsTlIdx)}
+                                  className="text-[9px] text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">✕</button>
+                              )}
                             </div>
                           )
                         })}
@@ -882,100 +851,6 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
               </div>
             )
           })()}
-
-          {/* ── 관리팀 인콜 기록 ── */}
-          <div>
-            <div className="flex items-center gap-1.5 mb-2">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">관리팀 인콜 기록</span>
-              <div className="flex-1 h-px bg-gray-100" />
-            </div>
-            {/* 입력 폼 */}
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2 mb-3">
-              <textarea
-                value={opsIncallInput}
-                onChange={e => setOpsIncallInput(e.target.value)}
-                placeholder="인콜 내용을 입력하세요..."
-                rows={3}
-                className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-400/50 bg-white resize-none"
-              />
-              <div className="flex items-center gap-2">
-                <select value={opsIncallResult} onChange={e => setOpsIncallResult(e.target.value)} className={inp + ' flex-1'}>
-                  <option value="">통화결과 선택</option>
-                  <option value="상담완료">상담완료</option>
-                  <option value="재통화">재통화</option>
-                  <option value="부재중">부재중</option>
-                  <option value="거절">거절</option>
-                  <option value="기타">기타</option>
-                </select>
-                <button type="button" onClick={addOpsIncall}
-                  className="px-4 py-1.5 bg-gray-700 hover:bg-gray-800 text-white text-xs font-bold rounded transition-colors whitespace-nowrap">
-                  + 기록 추가
-                </button>
-              </div>
-            </div>
-            {/* 관리팀 직접 작성 기록 (보충 아닌 것만) */}
-            {(() => {
-              const directLogs = (d.ops_incall_logs || []).filter((log: any) => log.ref_sales_idx === undefined)
-              return directLogs.length === 0 ? (
-                <p className="text-[10px] text-gray-300 text-center py-2">기록된 인콜일지가 없습니다 — 위 양식으로 추가하세요</p>
-              ) : (
-                <div className="relative pl-4 border-l-2 border-gray-200 space-y-2">
-                  {[...directLogs].reverse().map((log: any, reversedI: number) => {
-                    const realIdx = (d.ops_incall_logs || []).indexOf(log)
-                    const kst = formatKST(log.date || log.created_at || '')
-                    const isEditing = editingIncallIdx === realIdx
-                    return (
-                      <div key={realIdx} className="relative">
-                        <div className="absolute -left-[21px] top-1.5 w-3 h-3 rounded-full bg-gray-400 border-2 border-white" />
-                        {isEditing ? (
-                          <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 space-y-2">
-                            <textarea
-                              value={editIncallContent}
-                              onChange={e => setEditIncallContent(e.target.value)}
-                              rows={3}
-                              className="w-full border border-yellow-200 rounded px-2 py-1.5 text-xs focus:outline-none bg-white resize-none"
-                            />
-                            <div className="flex items-center gap-2">
-                              <select value={editIncallResult} onChange={e => setEditIncallResult(e.target.value)} className={inp + ' flex-1'}>
-                                <option value="">통화결과 선택</option>
-                                <option value="상담완료">상담완료</option>
-                                <option value="재통화">재통화</option>
-                                <option value="부재중">부재중</option>
-                                <option value="거절">거절</option>
-                                <option value="기타">기타</option>
-                              </select>
-                              <button type="button" onClick={() => saveEditIncall(realIdx)}
-                                className="text-[10px] px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold">저장</button>
-                              <button type="button" onClick={() => setEditingIncallIdx(null)}
-                                className="text-[10px] px-3 py-1.5 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded font-semibold">취소</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="bg-gray-50 rounded-lg px-3 py-2 group">
-                            <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                              <span className="text-[10px] font-bold text-gray-600">{log.author || '관리팀'}</span>
-                              <span className="text-[10px] text-gray-400">{kst.date} {kst.time}</span>
-                              {log.call_result && (
-                                <span className="text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full font-medium">{log.call_result}</span>
-                              )}
-                              <div className="ml-auto flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button type="button"
-                                  onClick={() => { setEditingIncallIdx(realIdx); setEditIncallContent(log.content || ''); setEditIncallResult(log.call_result || '') }}
-                                  className="text-[9px] px-2 py-0.5 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded font-semibold">수정</button>
-                                <button type="button" onClick={() => deleteOpsIncall(realIdx)}
-                                  className="text-[9px] px-2 py-0.5 bg-red-100 hover:bg-red-200 text-red-500 rounded font-semibold">삭제</button>
-                              </div>
-                            </div>
-                            {log.content && <p className="text-xs text-gray-700 whitespace-pre-wrap">{log.content}</p>}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )
-            })()}
-          </div>
         </div>
       )}
 
