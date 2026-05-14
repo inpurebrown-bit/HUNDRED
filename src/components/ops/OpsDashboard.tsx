@@ -241,7 +241,20 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
   // 인콜일지 수정모드
   const [incallEditing, setIncallEditing] = useState(false)
 
-  useEffect(() => { setLocal({ ...c }) }, [c.id])
+  useEffect(() => {
+    const next = { ...c }
+    // 영업팀 인계 정보가 있고, 기타재무 필드가 비어있으면 자동 주입
+    const sci = (c.details as any)?.sales_customer_info
+    if (sci) {
+      const d = { ...(c.details || {}) } as Record<string, any>
+      if (!d.contract_amount_vat && sci.contract_fee)   d.contract_amount_vat = sci.contract_fee
+      if (!d.unpaid_amount       && sci.unpaid_amount)  d.unpaid_amount       = sci.unpaid_amount
+      if (!d.deposit_amount_vat  && sci.payment_amount) d.deposit_amount_vat  = sci.payment_amount
+      if (!d.commission_rate     && sci.commission_rate) d.commission_rate     = sci.commission_rate
+      next.details = d
+    }
+    setLocal(next)
+  }, [c.id])
 
   function field<K extends keyof OpsCase>(key: K, val: OpsCase[K]) {
     const next = { ...local, [key]: val }
@@ -902,56 +915,18 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
               <div className="flex-1 h-px bg-gray-100" />
             </div>
 
-            {/* 영업팀 인계 정보 (읽기전용) */}
-            {(() => {
-              const sci = local.details?.sales_customer_info as any
-              const hasInfo = sci && (sci.contract_fee || sci.commission_rate || sci.payment_amount)
-              if (!hasInfo) return null
-              return (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-3">
-                  <p className="text-[10px] font-bold text-amber-700 mb-2">📋 영업팀 인계 내용 (읽기전용)</p>
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
-                    {sci.contract_fee && (
-                      <div>
-                        <span className="text-gray-400 text-[10px]">계약금</span>
-                        <p className="font-semibold text-gray-800">{sci.contract_fee}</p>
-                      </div>
-                    )}
-                    {sci.commission_rate && (
-                      <div>
-                        <span className="text-gray-400 text-[10px]">수수료율</span>
-                        <p className="font-semibold text-gray-800">{sci.commission_rate}%</p>
-                      </div>
-                    )}
-                    {sci.payment_amount && (
-                      <div>
-                        <span className="text-gray-400 text-[10px]">입금액</span>
-                        <p className="font-semibold text-gray-800">{sci.payment_amount}</p>
-                      </div>
-                    )}
-                    {sci.unpaid_amount && (
-                      <div>
-                        <span className="text-gray-400 text-[10px]">미입금</span>
-                        <p className="font-semibold text-gray-800">{sci.unpaid_amount}</p>
-                      </div>
-                    )}
-                    {sci.tax_invoice && (
-                      <div className="col-span-2">
-                        <span className="text-gray-400 text-[10px]">세금계산서</span>
-                        <p className="font-semibold text-gray-800">{sci.tax_invoice}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-            })()}
-
             <div className="grid grid-cols-2 gap-x-2 gap-y-2">
-              <div><label className={lbl}>미입금액</label><input type="text" value={d.unpaid_amount || ''} onChange={e => detailField('unpaid_amount', e.target.value)} className={inp} placeholder="0원" /></div>
               <div><label className={lbl}>계약금(VAT포함)</label><input type="text" value={d.contract_amount_vat || ''} onChange={e => detailField('contract_amount_vat', e.target.value)} className={inp} placeholder="0원" /></div>
               <div><label className={lbl}>계약금(VAT제외)</label><input type="text" value={d.contract_amount || ''} onChange={e => detailField('contract_amount', e.target.value)} className={inp} placeholder="0원" /></div>
               <div><label className={lbl}>입금액(VAT포함)</label><input type="text" value={d.deposit_amount_vat || ''} onChange={e => detailField('deposit_amount_vat', e.target.value)} className={inp} placeholder="0원" /></div>
               <div><label className={lbl}>입금액(VAT제외)</label><input type="text" value={d.deposit_amount || ''} onChange={e => detailField('deposit_amount', e.target.value)} className={inp} placeholder="0원" /></div>
+              <div><label className={lbl}>미입금액</label><input type="text" value={d.unpaid_amount || ''} onChange={e => detailField('unpaid_amount', e.target.value)} className={inp} placeholder="0원" /></div>
+              <div><label className={lbl}>수수료율</label>
+                <div className="relative">
+                  <input type="text" value={d.commission_rate || ''} onChange={e => detailField('commission_rate', e.target.value)} className={inp + ' pr-5'} placeholder="%" />
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">%</span>
+                </div>
+              </div>
             </div>
           </div>
 
