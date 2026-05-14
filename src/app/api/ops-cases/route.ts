@@ -131,14 +131,23 @@ export async function POST(req: NextRequest) {
     ...(ops_user_name ? { ops_user_name } : {}),
   }
 
-  // 컬럼 없을 때 INSERT 실패 방지: 오류 시 해당 필드 제외 후 재시도
-  const tryInsert = async (row: Record<string, any>) => {
-    const res = await supabaseAdmin.from('ops_cases').insert(row).select().single()
+  // 컬럼 없을 때 INSERT 실패 방지: 오류 시 없는 컬럼 제거 후 재시도 (최대 3단계)
+  const OPTIONAL_COLS = ['ops_user_name', 'customer_id', 'details']
+  const tryInsert = async (row: Record<string, any>): Promise<ReturnType<typeof supabaseAdmin.from<'ops_cases', any>['insert']>> => {
+    const res = await (supabaseAdmin.from('ops_cases') as any).insert(row).select().single()
     if (res.error && res.error.message?.includes('column')) {
+      // 오류 메시지에서 문제 컬럼명 추출
+      const match = res.error.message.match(/'(\w+)'/)
+      const badCol = match?.[1]
+      if (badCol && row[badCol] !== undefined) {
+        const next = { ...row }
+        delete next[badCol]
+        return tryInsert(next)
+      }
+      // 추출 실패 시 옵셔널 컬럼 전부 제거
       const fallback = { ...row }
-      delete fallback.customer_id
-      delete fallback.ops_user_name
-      return supabaseAdmin.from('ops_cases').insert(fallback).select().single()
+      for (const col of OPTIONAL_COLS) delete fallback[col]
+      return (supabaseAdmin.from('ops_cases') as any).insert(fallback).select().single()
     }
     return res
   }
