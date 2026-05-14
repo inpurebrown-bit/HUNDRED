@@ -226,7 +226,6 @@ export default function CeoDashboard() {
     { key: 'calendar',      label: '📅 일정관리' },
     { key: 'ailogs',        label: '🔍 AI 질문 로그' },
     { key: 'trash',         label: '🗑 거절 DB' },
-    { key: 'dbmanage',      label: '♻️ 중복 DB' },
   ]
 
   return (
