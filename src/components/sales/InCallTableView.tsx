@@ -119,10 +119,19 @@ function ResultMemoField({ value, onChange }: { value: string; onChange: (v: str
   )
 }
 
+export type OpsStatus = {
+  stage: string
+  institution?: string
+  memo?: string
+  is_refund?: boolean
+  is_completed?: boolean
+}
+
 export interface Props {
   customers: Customer[]
   allCustomers?: Customer[]   // 누적매출 계산용 (전체 고객)
   opsContracts?: { customer_id: string; ops_user_name?: string }[] // 자금담당자 표시용
+  opsStatusMap?: Record<string, OpsStatus>   // 자금팀 진행현황 (읽기전용)
   tabType: 'db010' | 'lead' | 'contracted' | 'emotional' | 'trash'
   salesUsers: string[]
   opsUsers?: string[]         // 대표 전용 DB 이동용 관리팀 목록
@@ -133,6 +142,18 @@ export interface Props {
   onTransferToOps?: (customer: Customer) => Promise<void>
   onCeoTransfer?: (id: string, destPerson: string, destBucket: string, destRole: 'sales' | 'ops') => Promise<void>
   showOwner?: boolean
+}
+
+// ── ops 진행단계 스타일 ──────────────────────────────────────────
+function getOpsStageStyle(stage: string): { bg: string; label: string } {
+  if (!stage) return { bg: 'bg-gray-300 text-white', label: '대기중' }
+  if (stage === '환불')     return { bg: 'bg-rose-600 text-white',   label: '💸 환불' }
+  if (stage === '환불예정') return { bg: 'bg-rose-400 text-white',   label: '⏳ 환불예정' }
+  if (stage === '종료예정') return { bg: 'bg-orange-400 text-white', label: '⏳ 종료예정' }
+  if (stage === '종료' || stage === '완료') return { bg: 'bg-gray-400 text-white', label: '✅ ' + stage }
+  if (stage === '승인')     return { bg: 'bg-emerald-500 text-white', label: '✅ 승인' }
+  if (['서류받는중', '접수전'].includes(stage)) return { bg: 'bg-gray-400 text-white', label: stage }
+  return { bg: 'bg-blue-500 text-white', label: stage }
 }
 
 // ── CEO 카드 이동 모달 ────────────────────────────────────────────────
@@ -696,6 +717,7 @@ interface CardProps {
   tabType: Props['tabType']
   showOwner?: boolean
   opsUserName?: string   // 자금담당자
+  opsStatus?: OpsStatus  // 자금팀 진행현황 (전송 후 읽기전용)
   cumulativeBase: number
   expandedId: string | null
   onExpand: (id: string | null) => void
@@ -713,6 +735,7 @@ function CustomerCard({
   tabType,
   showOwner,
   opsUserName,
+  opsStatus,
   opsUsers,
   cumulativeBase,
   expandedId,
@@ -819,6 +842,7 @@ function CustomerCard({
 
   const c = customer
   const expanded = expandedId === c.id
+  const isTransferred = !!(c.details as any)?.ops_transferred
 
   useEffect(() => {
     if (expanded && expandedRef.current) {
@@ -1065,82 +1089,84 @@ function CustomerCard({
         }`}
         onClick={() => onExpand(expanded ? null : c.id)}
       >
-        {/* 3-dot 메뉴 — 우상단 */}
-        <div
-          className="absolute top-1.5 right-1.5"
-          ref={menuRef}
-          onClick={e => e.stopPropagation()}
-        >
-          <button
-            type="button"
-            onClick={() => setMenuOpen(v => !v)}
-            className="text-gray-300 hover:text-gray-600 px-1 py-0.5 rounded hover:bg-gray-100 font-bold leading-none text-sm"
+        {/* 3-dot 메뉴 — 자금팀 전송 전만 표시 */}
+        {!isTransferred && (
+          <div
+            className="absolute top-1.5 right-1.5"
+            ref={menuRef}
+            onClick={e => e.stopPropagation()}
           >
-            ⋮
-          </button>
-          {menuOpen && (
-            <div className="absolute right-0 z-50 top-full mt-1 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[140px] py-1">
-              {tabType !== 'contracted' && (
-                <button type="button" onClick={() => { setContractModalOpen(true); setMenuOpen(false) }}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-emerald-600 font-medium">
-                  ✅ 계약완료
-                </button>
-              )}
-              {tabType !== 'emotional' && (
-                <button type="button" onClick={() => { setEmotionalMood(''); setEmotionalOpen(true); setMenuOpen(false) }}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-violet-600 font-medium">
-                  💬 감성톡(거절업체)
-                </button>
-              )}
-              {tabType !== 'trash' && (
-                <button type="button" onClick={() => { setTrashReason(''); setTrashOpen(true); setMenuOpen(false) }}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-gray-500 font-medium">
-                  🗑 자체거절
-                </button>
-              )}
-              {tabType === 'db010' && (
-                <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); setMenuOpen(false) }}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-blue-600 font-medium">
-                  📤 공가DB로 전송
-                </button>
-              )}
-              {tabType === 'lead' && (
-                <button type="button" onClick={() => { onStatusChange(c.id, 'db010'); setMenuOpen(false) }}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-indigo-600 font-medium">
-                  📥 직가DB로 전송
-                </button>
-              )}
-              {tabType !== 'lead' && tabType !== 'db010' && (
-                <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); setMenuOpen(false) }}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-blue-500 font-medium">
-                  ↩ 신규복구
-                </button>
-              )}
-              {tabType === 'contracted' && onTransferToOps && (
-                <button type="button" onClick={() => { onTransferToOps(c); setMenuOpen(false) }}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-amber-600 font-medium">
-                  📤 자금팀전송
-                </button>
-              )}
-              {/* 대표 전용: 카드 이동 */}
-              {userName === 'ceo' && onCeoTransfer && (
-                <>
-                  <div className="border-t border-gray-100 my-0.5" />
-                  <button type="button" onClick={() => { setCeoMoveOpen(true); setMenuOpen(false) }}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-amber-50 text-amber-600 font-semibold">
-                    🔀 DB 이동
+            <button
+              type="button"
+              onClick={() => setMenuOpen(v => !v)}
+              className="text-gray-300 hover:text-gray-600 px-1 py-0.5 rounded hover:bg-gray-100 font-bold leading-none text-sm"
+            >
+              ⋮
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 z-50 top-full mt-1 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[140px] py-1">
+                {tabType !== 'contracted' && (
+                  <button type="button" onClick={() => { setContractModalOpen(true); setMenuOpen(false) }}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-emerald-600 font-medium">
+                    ✅ 계약완료
                   </button>
-                </>
-              )}
-              <div className="border-t border-gray-100 my-0.5" />
-              <button type="button"
-                onClick={() => { if (confirm('삭제하시겠습니까?')) { onDelete(c.id); setMenuOpen(false) } }}
-                className="w-full text-left px-3 py-2 text-xs hover:bg-red-50 text-red-500 font-medium">
-                🗑 삭제
-              </button>
-            </div>
-          )}
-        </div>
+                )}
+                {tabType !== 'emotional' && (
+                  <button type="button" onClick={() => { setEmotionalMood(''); setEmotionalOpen(true); setMenuOpen(false) }}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-violet-600 font-medium">
+                    💬 감성톡(거절업체)
+                  </button>
+                )}
+                {tabType !== 'trash' && (
+                  <button type="button" onClick={() => { setTrashReason(''); setTrashOpen(true); setMenuOpen(false) }}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-gray-500 font-medium">
+                    🗑 자체거절
+                  </button>
+                )}
+                {tabType === 'db010' && (
+                  <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); setMenuOpen(false) }}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-blue-600 font-medium">
+                    📤 공가DB로 전송
+                  </button>
+                )}
+                {tabType === 'lead' && (
+                  <button type="button" onClick={() => { onStatusChange(c.id, 'db010'); setMenuOpen(false) }}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-indigo-600 font-medium">
+                    📥 직가DB로 전송
+                  </button>
+                )}
+                {tabType !== 'lead' && tabType !== 'db010' && (
+                  <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); setMenuOpen(false) }}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-blue-500 font-medium">
+                    ↩ 신규복구
+                  </button>
+                )}
+                {tabType === 'contracted' && onTransferToOps && (
+                  <button type="button" onClick={() => { onTransferToOps(c); setMenuOpen(false) }}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-amber-600 font-medium">
+                    📤 자금팀전송
+                  </button>
+                )}
+                {/* 대표 전용: 카드 이동 */}
+                {userName === 'ceo' && onCeoTransfer && (
+                  <>
+                    <div className="border-t border-gray-100 my-0.5" />
+                    <button type="button" onClick={() => { setCeoMoveOpen(true); setMenuOpen(false) }}
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-amber-50 text-amber-600 font-semibold">
+                      🔀 DB 이동
+                    </button>
+                  </>
+                )}
+                <div className="border-t border-gray-100 my-0.5" />
+                <button type="button"
+                  onClick={() => { if (confirm('삭제하시겠습니까?')) { onDelete(c.id); setMenuOpen(false) } }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-red-50 text-red-500 font-medium">
+                  🗑 삭제
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 직가/공가 뱃지 */}
         {leadType && (
@@ -1245,8 +1271,8 @@ function CustomerCard({
           </p>
         )}
 
-        {/* 계약업체 전송 빠른버튼 */}
-        {tabType === 'contracted' && onTransferToOps && !c.details?.ops_transferred && (
+        {/* 계약업체 전송 빠른버튼 / 전송 후 진행현황 배지 */}
+        {tabType === 'contracted' && !isTransferred && onTransferToOps && (
           <button
             type="button"
             onClick={e => {
@@ -1259,8 +1285,19 @@ function CustomerCard({
             📤 관리팀 전송
           </button>
         )}
-        {tabType === 'contracted' && c.details?.ops_transferred && (
-          <p className="mt-1.5 text-[9px] text-emerald-600 font-semibold">✅ 전송완료</p>
+        {tabType === 'contracted' && isTransferred && (
+          <div className="mt-1.5 space-y-1">
+            {opsStatus?.stage ? (
+              <span className={`block w-full text-center text-[9px] font-bold px-1 py-0.5 rounded ${getOpsStageStyle(opsStatus.stage).bg}`}>
+                {getOpsStageStyle(opsStatus.stage).label}
+              </span>
+            ) : (
+              <span className="block w-full text-center text-[9px] text-emerald-600 font-semibold">✅ 자금팀 전송완료</span>
+            )}
+            {opsStatus?.institution && (
+              <p className="text-[8px] text-gray-400 text-center truncate">{opsStatus.institution}</p>
+            )}
+          </div>
         )}
       </div>
 
@@ -1273,77 +1310,88 @@ function CustomerCard({
             <span className="text-xs font-bold text-[#1B2A45] mr-2">
               {c.details?.company || c.company || c.name}
             </span>
-            {tabType !== 'contracted' && (
-              <button type="button" onClick={() => setContractModalOpen(true)}
-                className="px-2.5 py-1 rounded text-[11px] font-semibold bg-emerald-500 text-white hover:bg-emerald-600">
-                ✅ 계약완료
-              </button>
-            )}
-            {tabType !== 'emotional' && (
-              <button type="button" onClick={() => { setEmotionalMood(''); setEmotionalOpen(true) }}
-                className="px-2.5 py-1 rounded text-[11px] font-semibold bg-violet-500 text-white">
-                💬 감성톡(거절업체)
-              </button>
-            )}
-            {tabType !== 'trash' && (
-              <button type="button" onClick={() => { setTrashReason(''); setTrashOpen(true) }}
-                className="px-2.5 py-1 rounded text-[11px] font-semibold bg-gray-400 text-white">
-                🗑 자체거절
-              </button>
-            )}
-            {tabType === 'db010' && (
-              <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); onExpand(null) }}
-                className="px-2.5 py-1 rounded text-[11px] font-semibold bg-blue-600 text-white hover:bg-blue-700">
-                📤 공가DB로 전송
-              </button>
-            )}
-            {tabType === 'lead' && (
-              <button type="button" onClick={() => { onStatusChange(c.id, 'db010'); onExpand(null) }}
-                className="px-2.5 py-1 rounded text-[11px] font-semibold bg-indigo-600 text-white hover:bg-indigo-700">
-                📥 직가DB로 전송
-              </button>
-            )}
-            {tabType !== 'lead' && tabType !== 'db010' && (
-              <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); onExpand(null) }}
-                className="px-2.5 py-1 rounded text-[11px] font-semibold bg-blue-500 text-white">
-                ↩ 신규복구
-              </button>
-            )}
-            {onTransferToOps && tabType === 'contracted' && (
-              <button type="button" onClick={() => { onTransferToOps(c); onExpand(null) }}
-                className="px-2.5 py-1 rounded text-[11px] font-semibold bg-amber-500 text-white">
-                📤 자금팀 전송
-              </button>
-            )}
-            {/* DB 트레이드 */}
-            <div className="relative" ref={tradeRef}>
-              <button type="button" onClick={() => setTradeOpen(v => !v)}
-                className="px-2.5 py-1 rounded text-[11px] font-semibold bg-sky-500 hover:bg-sky-600 text-white">
-                🔄 DB 트레이드
-              </button>
-              {tradeOpen && (
-                <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 py-1 z-50 min-w-[160px]">
-                  <p className="text-[10px] text-gray-400 px-3 py-1.5 font-semibold border-b border-gray-50">담당자 변경</p>
-                  {salesUsers.filter(u => u !== (c.sales_user_name || c.details?.sales_user_name)).map(u => (
-                    <button key={u} type="button"
-                      onClick={() => {
-                        onUpdate(c.id, { details: {
-                          sales_user_name: u,
-                          trade_from: c.sales_user_name || c.details?.sales_user_name || '',
-                          trade_date: new Date().toISOString().slice(0, 10),
-                        }})
-                        setTradeOpen(false)
-                      }}
-                      className="w-full text-left px-3 py-2.5 text-xs hover:bg-sky-50 text-sky-700 font-semibold flex items-center gap-2">
-                      <span className="text-gray-300 text-[10px]">→</span> {u}
-                    </button>
-                  ))}
-                  {salesUsers.filter(u => u !== (c.sales_user_name || c.details?.sales_user_name)).length === 0 && (
-                    <p className="text-[11px] text-gray-400 px-3 py-2 italic">다른 영업사원 없음</p>
+            {/* 자금팀 전송 후: 액션 버튼 모두 숨김 */}
+            {!isTransferred && (
+              <>
+                {tabType !== 'contracted' && (
+                  <button type="button" onClick={() => setContractModalOpen(true)}
+                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-emerald-500 text-white hover:bg-emerald-600">
+                    ✅ 계약완료
+                  </button>
+                )}
+                {tabType !== 'emotional' && (
+                  <button type="button" onClick={() => { setEmotionalMood(''); setEmotionalOpen(true) }}
+                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-violet-500 text-white">
+                    💬 감성톡(거절업체)
+                  </button>
+                )}
+                {tabType !== 'trash' && (
+                  <button type="button" onClick={() => { setTrashReason(''); setTrashOpen(true) }}
+                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-gray-400 text-white">
+                    🗑 자체거절
+                  </button>
+                )}
+                {tabType === 'db010' && (
+                  <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); onExpand(null) }}
+                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-blue-600 text-white hover:bg-blue-700">
+                    📤 공가DB로 전송
+                  </button>
+                )}
+                {tabType === 'lead' && (
+                  <button type="button" onClick={() => { onStatusChange(c.id, 'db010'); onExpand(null) }}
+                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-indigo-600 text-white hover:bg-indigo-700">
+                    📥 직가DB로 전송
+                  </button>
+                )}
+                {tabType !== 'lead' && tabType !== 'db010' && (
+                  <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); onExpand(null) }}
+                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-blue-500 text-white">
+                    ↩ 신규복구
+                  </button>
+                )}
+                {onTransferToOps && tabType === 'contracted' && (
+                  <button type="button" onClick={() => { onTransferToOps(c); onExpand(null) }}
+                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-amber-500 text-white">
+                    📤 자금팀 전송
+                  </button>
+                )}
+                {/* DB 트레이드 */}
+                <div className="relative" ref={tradeRef}>
+                  <button type="button" onClick={() => setTradeOpen(v => !v)}
+                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-sky-500 hover:bg-sky-600 text-white">
+                    🔄 DB 트레이드
+                  </button>
+                  {tradeOpen && (
+                    <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 py-1 z-50 min-w-[160px]">
+                      <p className="text-[10px] text-gray-400 px-3 py-1.5 font-semibold border-b border-gray-50">담당자 변경</p>
+                      {salesUsers.filter(u => u !== (c.sales_user_name || c.details?.sales_user_name)).map(u => (
+                        <button key={u} type="button"
+                          onClick={() => {
+                            onUpdate(c.id, { details: {
+                              sales_user_name: u,
+                              trade_from: c.sales_user_name || c.details?.sales_user_name || '',
+                              trade_date: new Date().toISOString().slice(0, 10),
+                            }})
+                            setTradeOpen(false)
+                          }}
+                          className="w-full text-left px-3 py-2.5 text-xs hover:bg-sky-50 text-sky-700 font-semibold flex items-center gap-2">
+                          <span className="text-gray-300 text-[10px]">→</span> {u}
+                        </button>
+                      ))}
+                      {salesUsers.filter(u => u !== (c.sales_user_name || c.details?.sales_user_name)).length === 0 && (
+                        <p className="text-[11px] text-gray-400 px-3 py-2 italic">다른 영업사원 없음</p>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
+              </>
+            )}
+            {/* 자금팀 전송됨 알림 */}
+            {isTransferred && opsStatus?.stage && (
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${getOpsStageStyle(opsStatus.stage).bg}`}>
+                {getOpsStageStyle(opsStatus.stage).label}
+              </span>
+            )}
             <button type="button" onClick={() => onExpand(null)}
               className="text-gray-400 hover:text-gray-600 text-sm font-bold px-1 ml-auto">✕</button>
           </div>
@@ -1353,17 +1401,22 @@ function CustomerCard({
 
             {/* ── 좌측: 인콜일지 ── */}
             <div className="p-4 flex flex-col" style={{ maxHeight: 520 }}>
-              {/* 헤더 + 수정 버튼 (우측 위) */}
+              {/* 헤더 + 수정 버튼 (자금팀 전송 전만) */}
               <div className="flex items-center justify-between mb-2 shrink-0">
                 <p className="text-[10px] font-bold text-[#1B2A45] uppercase tracking-wide">📋 인콜일지</p>
-                <button type="button" onClick={logEditMode ? () => setLogEditMode(false) : openLogEdit}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-semibold transition-colors ${
-                    logEditMode
-                      ? 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
-                      : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
-                  }`}>
-                  {logEditMode ? '✕ 취소' : '✏️ 수정'}
-                </button>
+                {!isTransferred && (
+                  <button type="button" onClick={logEditMode ? () => setLogEditMode(false) : openLogEdit}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-semibold transition-colors ${
+                      logEditMode
+                        ? 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+                        : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                    }`}>
+                    {logEditMode ? '✕ 취소' : '✏️ 수정'}
+                  </button>
+                )}
+                {isTransferred && (
+                  <span className="text-[9px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">읽기전용</span>
+                )}
               </div>
               {/* 스크롤 영역 */}
               <div className="flex-1 overflow-y-auto min-h-0">
@@ -1484,209 +1537,266 @@ function CustomerCard({
                 />
               </div>
               </div>{/* end scroll area */}
-              {/* ── 하단 버튼 바: 저장(항상) + 삭제(우측 하단) ── */}
-              <div className="flex items-center justify-between pt-2 mt-1 border-t border-gray-100 shrink-0">
-                <button type="button" onClick={saveLogEdit} disabled={logSaving || !logEditMode}
-                  className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
-                    logEditMode
-                      ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                      : 'bg-gray-100 text-gray-300 cursor-not-allowed'
-                  }`}>
-                  {logSaving ? '저장중…' : '💾 저장'}
-                </button>
-                <button type="button"
-                  onClick={() => { if (confirm('이 고객을 삭제하시겠습니까?')) { onDelete(c.id); onExpand(null) } }}
-                  className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-red-50 text-red-400 hover:bg-red-100 border border-red-100 transition-colors">
-                  🗑 삭제
-                </button>
-              </div>
+              {/* ── 하단 버튼 바: 자금팀 전송 전만 표시 ── */}
+              {!isTransferred && (
+                <div className="flex items-center justify-between pt-2 mt-1 border-t border-gray-100 shrink-0">
+                  <button type="button" onClick={saveLogEdit} disabled={logSaving || !logEditMode}
+                    className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
+                      logEditMode
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                        : 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                    }`}>
+                    {logSaving ? '저장중…' : '💾 저장'}
+                  </button>
+                  <button type="button"
+                    onClick={() => { if (confirm('이 고객을 삭제하시겠습니까?')) { onDelete(c.id); onExpand(null) } }}
+                    className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-red-50 text-red-400 hover:bg-red-100 border border-red-100 transition-colors">
+                    🗑 삭제
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* ── 우측: 인콜결과 ── */}
+            {/* ── 우측: 인콜결과 또는 자금팀 현황 ── */}
             <div className="p-4 overflow-y-auto max-h-[520px] space-y-4">
               {/* 담당자 (자동 - 읽기 전용) */}
               <div className="flex items-center justify-between">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">📞 인콜결과</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">
+                  {isTransferred ? '🏢 자금팀 진행현황' : '📞 인콜결과'}
+                </p>
                 <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
                   담당: {c.sales_user_name || c.details?.sales_user_name || userName}
                 </span>
               </div>
 
-              {/* 결정전 결과 */}
-              <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">결정전 결과</label>
-                <BadgeDropdown
-                  value={c.details?.call_result || ''}
-                  options={CALL_RESULTS}
-                  onChange={(val) => onUpdate(c.id, { details: { call_result: val } })}
-                />
-              </div>
+              {/* ── 자금팀 전송 후: 진행현황 표시 (읽기전용) ── */}
+              {isTransferred && (
+                <div className="space-y-3">
+                  {/* 현재 단계 */}
+                  <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                    <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">현재 진행단계</label>
+                    {opsStatus?.stage ? (
+                      <span className={`inline-block px-3 py-1 rounded-lg text-xs font-bold ${getOpsStageStyle(opsStatus.stage).bg}`}>
+                        {getOpsStageStyle(opsStatus.stage).label}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">자금팀 업데이트 대기중</span>
+                    )}
+                  </div>
 
-              {/* 클로징 결과 */}
-              <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">클로징 결과</label>
-                <BadgeDropdown
-                  value={c.details?.closing_result || ''}
-                  options={CLOSING_RESULTS}
-                  onChange={(val) => onUpdate(c.id, { details: { closing_result: val } })}
-                />
-              </div>
+                  {/* 신청 기관 */}
+                  {opsStatus?.institution && (
+                    <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                      <label className="text-[10px] text-blue-700 mb-1 block font-bold">신청 기관</label>
+                      <p className="text-xs font-semibold text-gray-800">{opsStatus.institution}</p>
+                    </div>
+                  )}
 
-              {/* ★ 계약 일자 (contracted 탭 - 항상 편집 가능) */}
-              {tabType === 'contracted' && (
-                <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                  <label className="text-[10px] text-red-700 mb-1.5 block font-bold">
-                    📅 계약 일자 <span className="text-red-400 font-normal">(매출 월 기준 — 수정 가능)</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={(c as any).details?.contract_date || ''}
-                    onChange={e => onUpdate(c.id, { details: { contract_date: e.target.value } })}
-                    className="w-full border border-red-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-red-400/50 text-gray-800 bg-white"
-                  />
-                  {!(c as any).details?.contract_date && (
-                    <p className="text-[9px] text-red-500 mt-1 font-medium">⚠️ 계약일 미입력 — 반드시 입력해야 해당 월 매출에 반영됩니다</p>
+                  {/* 자금팀 메모 */}
+                  {opsStatus?.memo && (
+                    <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                      <label className="text-[10px] text-blue-700 mb-1 block font-bold">자금팀 메모</label>
+                      <p className="text-xs text-gray-600 whitespace-pre-wrap leading-relaxed">{opsStatus.memo}</p>
+                    </div>
+                  )}
+
+                  {/* 환불/종료 예정 안내 */}
+                  {opsStatus?.stage && ['환불예정', '종료예정', '환불', '종료', '완료'].includes(opsStatus.stage) && (
+                    <div className={`rounded-xl p-3 border text-xs font-semibold ${
+                      ['환불', '환불예정'].includes(opsStatus.stage)
+                        ? 'bg-rose-50 border-rose-200 text-rose-700'
+                        : 'bg-orange-50 border-orange-200 text-orange-700'
+                    }`}>
+                      {opsStatus.stage === '환불예정' && '⏳ 환불 진행 예정 — 대표 승인 대기중입니다'}
+                      {opsStatus.stage === '환불'     && '💸 환불 처리가 완료되었습니다'}
+                      {opsStatus.stage === '종료예정' && '⏳ 종료 예정 — 대표 승인 대기중입니다'}
+                      {(opsStatus.stage === '종료' || opsStatus.stage === '완료') && '✅ 업무가 종료되었습니다'}
+                    </div>
+                  )}
+
+                  {/* 아직 진행정보 없음 */}
+                  {!opsStatus?.stage && (
+                    <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-center">
+                      <p className="text-xs text-amber-700 font-semibold">📤 자금팀으로 전송 완료</p>
+                      <p className="text-[10px] text-amber-500 mt-0.5">자금팀에서 진행사항을 업데이트하면 여기에 표시됩니다</p>
+                    </div>
                   )}
                 </div>
               )}
 
-              {/* 감성톡 감도 — emotional 탭 전용 */}
-              {tabType === 'emotional' && (
-                <div className="bg-pink-50 border border-pink-200 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                  <label className="text-[10px] text-pink-700 mb-2 block font-bold">💬 감도 설정</label>
-                  <div className="flex gap-2">
-                    {(['상', '중', '하'] as const).map(m => (
-                      <button key={m} type="button"
-                        onClick={() => onUpdate(c.id, { details: { rejection_mood: c.details?.rejection_mood === m ? '' : m } })}
-                        className={`flex-1 py-1.5 rounded-lg text-xs font-bold border-2 transition-all ${
-                          c.details?.rejection_mood === m
-                            ? m === '상' ? 'bg-red-500 text-white border-red-500'
-                              : m === '중' ? 'bg-orange-400 text-white border-orange-400'
-                              : 'bg-gray-400 text-white border-gray-400'
-                            : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
-                        }`}>
-                        감도 {m}
+              {/* 자금팀 전송 전: 기존 인콜결과 섹션 */}
+              {!isTransferred && (
+                <>
+                  {/* 결정전 결과 */}
+                  <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                    <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">결정전 결과</label>
+                    <BadgeDropdown
+                      value={c.details?.call_result || ''}
+                      options={CALL_RESULTS}
+                      onChange={(val) => onUpdate(c.id, { details: { call_result: val } })}
+                    />
+                  </div>
+
+                  {/* 클로징 결과 */}
+                  <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                    <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">클로징 결과</label>
+                    <BadgeDropdown
+                      value={c.details?.closing_result || ''}
+                      options={CLOSING_RESULTS}
+                      onChange={(val) => onUpdate(c.id, { details: { closing_result: val } })}
+                    />
+                  </div>
+
+                  {/* ★ 계약 일자 (contracted 탭) */}
+                  {tabType === 'contracted' && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                      <label className="text-[10px] text-red-700 mb-1.5 block font-bold">
+                        📅 계약 일자 <span className="text-red-400 font-normal">(매출 월 기준 — 수정 가능)</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={(c as any).details?.contract_date || ''}
+                        onChange={e => onUpdate(c.id, { details: { contract_date: e.target.value } })}
+                        className="w-full border border-red-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-red-400/50 text-gray-800 bg-white"
+                      />
+                      {!(c as any).details?.contract_date && (
+                        <p className="text-[9px] text-red-500 mt-1 font-medium">⚠️ 계약일 미입력 — 반드시 입력해야 해당 월 매출에 반영됩니다</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 감성톡 감도 — emotional 탭 전용 */}
+                  {tabType === 'emotional' && (
+                    <div className="bg-pink-50 border border-pink-200 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                      <label className="text-[10px] text-pink-700 mb-2 block font-bold">💬 감도 설정</label>
+                      <div className="flex gap-2">
+                        {(['상', '중', '하'] as const).map(m => (
+                          <button key={m} type="button"
+                            onClick={() => onUpdate(c.id, { details: { rejection_mood: c.details?.rejection_mood === m ? '' : m } })}
+                            className={`flex-1 py-1.5 rounded-lg text-xs font-bold border-2 transition-all ${
+                              c.details?.rejection_mood === m
+                                ? m === '상' ? 'bg-red-500 text-white border-red-500'
+                                  : m === '중' ? 'bg-orange-400 text-white border-orange-400'
+                                  : 'bg-gray-400 text-white border-gray-400'
+                                : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
+                            }`}>
+                            감도 {m}
+                          </button>
+                        ))}
+                      </div>
+                      {!c.details?.rejection_mood && (
+                        <p className="text-[9px] text-pink-500 mt-1.5 font-medium">⚠️ 감도 미설정 — 그룹 분류를 위해 선택해주세요</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 재통화 일정 */}
+                  <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                    <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">재통화 일정</label>
+                    <input
+                      type="date"
+                      value={c.details?.follow_up_date || ''}
+                      onChange={e => onUpdate(c.id, { details: { follow_up_date: e.target.value } })}
+                      className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50 text-gray-800"
+                    />
+                  </div>
+
+                  {/* A/S 요청 + 심사 요청 */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {c.details?.as_requested ? (
+                      <span className="inline-flex items-center gap-1 bg-orange-100 text-orange-700 border border-orange-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
+                        🔧 A/S 요청됨 {c.details.as_request_date ? `(${c.details.as_request_date})` : ''}
+                      </span>
+                    ) : (
+                      <button type="button"
+                        onClick={() => onUpdate(c.id, { details: {
+                          as_requested: true,
+                          as_request_date: new Date().toISOString().slice(0, 10),
+                        }})}
+                        className="inline-flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors"
+                      >
+                        🔧 A/S 요청
                       </button>
-                    ))}
-                  </div>
-                  {!c.details?.rejection_mood && (
-                    <p className="text-[9px] text-pink-500 mt-1.5 font-medium">⚠️ 감도 미설정 — 그룹 분류를 위해 선택해주세요</p>
-                  )}
-                </div>
-              )}
-
-              {/* 재통화 일정 */}
-              <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">재통화 일정</label>
-                <input
-                  type="date"
-                  value={c.details?.follow_up_date || ''}
-                  onChange={e => onUpdate(c.id, { details: { follow_up_date: e.target.value } })}
-                  className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50 text-gray-800"
-                />
-              </div>
-
-              {/* A/S 요청 + 심사 요청 */}
-              <div className="flex flex-wrap items-center gap-2">
-                {/* A/S 요청 → 대표에게 */}
-                {c.details?.as_requested ? (
-                  <span className="inline-flex items-center gap-1 bg-orange-100 text-orange-700 border border-orange-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
-                    🔧 A/S 요청됨 {c.details.as_request_date ? `(${c.details.as_request_date})` : ''}
-                  </span>
-                ) : (
-                  <button type="button"
-                    onClick={() => onUpdate(c.id, { details: {
-                      as_requested: true,
-                      as_request_date: new Date().toISOString().slice(0, 10),
-                    }})}
-                    className="inline-flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors"
-                  >
-                    🔧 A/S 요청
-                  </button>
-                )}
-
-                {/* 심사 요청 → 대표에게 */}
-                {(tabType === 'lead' || tabType === 'db010') && (
-                  inspectionStatus === 'pending' ? (
-                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
-                      ⏳ 심사요청 중
-                    </span>
-                  ) : inspectionStatus === 'approved' ? (
-                    <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
-                      ✅ 심사 승인
-                    </span>
-                  ) : inspectionStatus === 'rejected' ? (
-                    <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 border border-red-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
-                      ❌ 심사 반려
-                    </span>
-                  ) : (
-                    <button type="button" onClick={handleInspectionRequest}
-                      className="inline-flex items-center gap-1 bg-violet-500 hover:bg-violet-600 text-white px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors"
-                    >
-                      🔍 심사 요청
-                    </button>
-                  )
-                )}
-              </div>
-
-              {/* 타임라인 */}
-              <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                <p className="text-[10px] font-bold text-blue-700 mb-2">📝 타임라인</p>
-                {/* 추가 입력 */}
-                <div className="flex gap-2 mb-3">
-                  <input
-                    type="text"
-                    value={tlText}
-                    onChange={e => setTlText(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTimelineEntry() } }}
-                    placeholder="기록 입력 후 Enter…"
-                    className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50"
-                  />
-                  <button
-                    type="button"
-                    onClick={addTimelineEntry}
-                    disabled={!tlText.trim()}
-                    className="shrink-0 bg-[#1B2A45] hover:bg-[#243959] disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors"
-                  >
-                    추가
-                  </button>
-                </div>
-                {c.call_timeline && c.call_timeline.length > 0 ? (
-                  <div className="space-y-2">
-                    {(c.call_timeline as any[]).slice().reverse().map((entry: any, i: number) => {
-                      const { date, time } = formatKST(entry.created_at || '')
-                      const initials = entry.user ? entry.user.slice(-2) : '??'
-                      return (
-                        <div key={i} className="flex gap-2.5 group">
-                          {/* 아바타 */}
-                          <div className="shrink-0 w-6 h-6 rounded-full bg-[#1B2A45] flex items-center justify-center mt-0.5">
-                            <span className="text-[9px] font-bold text-white">{initials}</span>
-                          </div>
-                          {/* 내용 */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-baseline gap-1.5 flex-wrap">
-                              <span className="text-[10px] font-bold text-[#1B2A45]">{entry.user || '—'}</span>
-                              <span className="text-[9px] text-gray-300">·</span>
-                              <span className="text-[9px] font-mono text-gray-400">{date}</span>
-                              <span className="text-[9px] font-mono text-gray-400">{time}</span>
-                            </div>
-                            <p className="text-[11px] text-gray-600 whitespace-pre-wrap leading-relaxed mt-0.5">{entry.content}</p>
-                          </div>
-                          {/* 삭제 버튼 */}
-                          <button
-                            type="button"
-                            onClick={() => { if (confirm('이 기록을 삭제하시겠습니까?')) deleteTimelineEntry(i) }}
-                            className="shrink-0 opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-xs px-1 py-0.5 rounded self-start mt-0.5"
-                            title="삭제"
-                          >✕</button>
-                        </div>
+                    )}
+                    {(tabType === 'lead' || tabType === 'db010') && (
+                      inspectionStatus === 'pending' ? (
+                        <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
+                          ⏳ 심사요청 중
+                        </span>
+                      ) : inspectionStatus === 'approved' ? (
+                        <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
+                          ✅ 심사 승인
+                        </span>
+                      ) : inspectionStatus === 'rejected' ? (
+                        <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 border border-red-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
+                          ❌ 심사 반려
+                        </span>
+                      ) : (
+                        <button type="button" onClick={handleInspectionRequest}
+                          className="inline-flex items-center gap-1 bg-violet-500 hover:bg-violet-600 text-white px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors"
+                        >
+                          🔍 심사 요청
+                        </button>
                       )
-                    })}
+                    )}
                   </div>
-                ) : (
-                  <p className="text-[11px] text-gray-300 italic text-center py-3">기록 없음</p>
-                )}
-              </div>
+
+                  {/* 타임라인 */}
+                  <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                    <p className="text-[10px] font-bold text-blue-700 mb-2">📝 타임라인</p>
+                    <div className="flex gap-2 mb-3">
+                      <input
+                        type="text"
+                        value={tlText}
+                        onChange={e => setTlText(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTimelineEntry() } }}
+                        placeholder="기록 입력 후 Enter…"
+                        className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50"
+                      />
+                      <button
+                        type="button"
+                        onClick={addTimelineEntry}
+                        disabled={!tlText.trim()}
+                        className="shrink-0 bg-[#1B2A45] hover:bg-[#243959] disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors"
+                      >
+                        추가
+                      </button>
+                    </div>
+                    {c.call_timeline && c.call_timeline.length > 0 ? (
+                      <div className="space-y-2">
+                        {(c.call_timeline as any[]).slice().reverse().map((entry: any, i: number) => {
+                          const { date, time } = formatKST(entry.created_at || '')
+                          const initials = entry.user ? entry.user.slice(-2) : '??'
+                          return (
+                            <div key={i} className="flex gap-2.5 group">
+                              <div className="shrink-0 w-6 h-6 rounded-full bg-[#1B2A45] flex items-center justify-center mt-0.5">
+                                <span className="text-[9px] font-bold text-white">{initials}</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-baseline gap-1.5 flex-wrap">
+                                  <span className="text-[10px] font-bold text-[#1B2A45]">{entry.user || '—'}</span>
+                                  <span className="text-[9px] text-gray-300">·</span>
+                                  <span className="text-[9px] font-mono text-gray-400">{date}</span>
+                                  <span className="text-[9px] font-mono text-gray-400">{time}</span>
+                                </div>
+                                <p className="text-[11px] text-gray-600 whitespace-pre-wrap leading-relaxed mt-0.5">{entry.content}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => { if (confirm('이 기록을 삭제하시겠습니까?')) deleteTimelineEntry(i) }}
+                                className="shrink-0 opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-xs px-1 py-0.5 rounded self-start mt-0.5"
+                                title="삭제"
+                              >✕</button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-gray-300 italic text-center py-3">기록 없음</p>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1700,6 +1810,7 @@ export default function InCallTableView({
   customers,
   allCustomers = [],
   opsContracts = [],
+  opsStatusMap = {},
   tabType,
   salesUsers,
   opsUsers,
@@ -1765,6 +1876,7 @@ export default function InCallTableView({
                     tabType={tabType}
                     showOwner={showOwner}
                     opsUserName={opsUserName}
+                    opsStatus={opsStatusMap[c.id]}
                     cumulativeBase={cumBase}
                     expandedId={expandedId}
                     onExpand={setExpandedId}

@@ -58,6 +58,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [contracts, setContracts] = useState<Contract[]>([])
   const [notices, setNotices] = useState<Notice[]>([])
+  const [opsStatusMap, setOpsStatusMap] = useState<Record<string, { stage: string; institution?: string; memo?: string; is_refund?: boolean; is_completed?: boolean }>>({})
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -192,13 +193,34 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
       fetch('/api/supply-config'),
     ])
     const [cData, conData, nData, scData] = await Promise.all([cRes.json(), conRes.json(), nRes.json(), scRes.json()])
-    setCustomers(cData.customers || [])
+    const loadedCustomers: Customer[] = cData.customers || []
+    setCustomers(loadedCustomers)
     setContracts(conData.contracts || [])
     setNotices(nData.notices || [])
     const thisMonth = new Date().toISOString().slice(0, 7)
     if (scData.config?.month === thisMonth) {
       setSupplyConfig(scData.config.people || {})
     }
+
+    // 자금팀 전송된 고객들의 진행현황 조회
+    const transferredIds = loadedCustomers
+      .filter((c: any) => c.details?.ops_transferred)
+      .map((c: any) => c.id)
+      .filter(Boolean)
+    if (transferredIds.length > 0) {
+      const osRes = await fetch(`/api/ops-status?ids=${transferredIds.join(',')}`)
+      if (osRes.ok) {
+        const osData = await osRes.json()
+        const map: Record<string, { stage: string; institution?: string; memo?: string; is_refund?: boolean; is_completed?: boolean }> = {}
+        for (const s of (osData.statuses || [])) {
+          if (s.customer_id) map[s.customer_id] = s
+        }
+        setOpsStatusMap(map)
+      }
+    } else {
+      setOpsStatusMap({})
+    }
+
     setLoading(false)
   }
 
@@ -1034,6 +1056,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   onStatusChange={async (id, status) => moveCustomer(id, status as any)}
                   onDelete={async (id) => deleteCustomer(id)}
                   onTransferToOps={transferToOps as any}
+                  opsStatusMap={opsStatusMap}
                 />
               </>
             )}
