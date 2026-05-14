@@ -1,16 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { calcRecommendedSupply, contractWeight } from '@/lib/supplyRules'
+import { getElapsedBusinessDays } from '@/lib/businessDays'
 
-// ─── 타입 정의 ────────────────────────────────────────────
-
-interface SummaryRow {
-  employee_count: number
-  target_count: number
-  payment_count: number
-  working_days_elapsed: number
-  total_working_days: number
-}
+// ── 타입 ──────────────────────────────────────────────────────────────────────
+interface PersonSupply { supplied: number; goal: number; base: number }
+type SupplyConfig = Record<string, PersonSupply>
 
 interface EmployeeRow {
   name: string
@@ -21,812 +17,908 @@ interface EmployeeRow {
   direct_payment: number
 }
 
-interface SalesEmployee {
-  name: string
-  sales_vat_incl: number
+interface SalesEmp { name: string; sales_vat_incl: number; contracts: number }
+interface OpsEmp   { name: string; fee_vat_incl: number; contract_vat_incl: number }
+interface OtherCost {
+  ad_marketing: number; db: number; rent: number
+  mgmt: number; sales_fixed: number; sales_other: number
 }
 
-interface OpsEmployee {
-  name: string
-  fee_vat_incl: number
-  contract_vat_incl: number
-}
+// ── 상수 ──────────────────────────────────────────────────────────────────────
+const TESTER = 'TESTER'
 
-interface OtherCosts {
-  ad_marketing: number
-  db: number
-  rent: number
-  mgmt: number
-  sales_fixed: number
-  sales_other: number
-}
+// ── 헬퍼 ──────────────────────────────────────────────────────────────────────
+function todayStr()     { return new Date().toISOString().slice(0, 10) }
+function thisMonthStr() { return new Date().toISOString().slice(0, 7) }
 
-const INPUT_CLS = 'border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 w-full'
-const CALC_CLS = 'bg-gray-50 text-gray-600 text-sm px-2 py-1 text-right whitespace-nowrap'
-const GOOD_CLS = 'bg-emerald-500 text-white text-xs px-2 py-0.5 rounded font-bold'
-const BAD_CLS = 'bg-red-500 text-white text-xs px-2 py-0.5 rounded font-bold'
-
-const todayStr = (): string => new Date().toISOString().slice(0, 10)
-
-// ─── 영업일 계산 헬퍼 ─────────────────────────────────────
 function calcWorkingDays(dateStr: string): { total: number; elapsed: number } {
-  const d = new Date(dateStr)
-  const year = d.getFullYear()
+  const d     = new Date(dateStr)
+  const year  = d.getFullYear()
   const month = d.getMonth()
-  const today = new Date(d)
-
-  let total = 0
-  let elapsed = 0
-  const firstDay = new Date(year, month, 1)
-  const lastDay = new Date(year, month + 1, 0)
-
-  for (let day = new Date(firstDay); day <= lastDay; day.setDate(day.getDate() + 1)) {
+  let total = 0, elapsed = 0
+  for (let day = new Date(year, month, 1); day <= new Date(year, month + 1, 0); day.setDate(day.getDate() + 1)) {
     const dow = day.getDay()
-    if (dow !== 0 && dow !== 6) {
-      total++
-      if (day <= today) elapsed++
-    }
+    if (dow !== 0 && dow !== 6) { total++; if (day <= d) elapsed++ }
   }
   return { total, elapsed }
 }
 
-// ─── 점수 계산 (1-10) ─────────────────────────────────────
+function fmtN(n: number, dec = 2): string {
+  if (!isFinite(n)) return '-'
+  return Number.isInteger(n) || dec === 0 ? n.toLocaleString('ko-KR') : n.toFixed(dec)
+}
+
 function calcScore(actual: number, actualDays: number, target: number, totalDays: number): number {
   if (actualDays === 0 || totalDays === 0 || target === 0) return 0
   const pace = (actual / actualDays) / (target / totalDays)
   return Math.min(10, Math.max(1, Math.round(pace * 5)))
 }
 
-function ScoreBadge({ score }: { score: number }) {
-  if (score === 0) return <span className="text-gray-400 text-xs">-</span>
-  const color = score >= 9 ? 'bg-emerald-500 text-white' :
-                score >= 7 ? 'bg-blue-500 text-white' :
-                score >= 4 ? 'bg-amber-400 text-white' :
-                             'bg-red-500 text-white'
-  return <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${color}`}>{score}</span>
+// ── 공통 컴포넌트 ──────────────────────────────────────────────────────────────
+function PaceBadge({ status, score }: { status: string; score?: number }) {
+  if (status === '-' || !status) return <span className="text-gray-300 text-xs">—</span>
+  const isGood = status === 'GOOD'
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className={`px-2.5 py-0.5 rounded-full text-xs font-black tracking-wide ${
+        isGood ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'
+      }`}>{status}</span>
+      {score !== undefined && score > 0 && (
+        <span className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center ${
+          score >= 9 ? 'bg-emerald-100 text-emerald-700' :
+          score >= 7 ? 'bg-blue-100 text-blue-700' :
+          score >= 4 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+        }`}>{score}</span>
+      )}
+    </div>
+  )
 }
 
-// ─── 결제율 서브뷰 ────────────────────────────────────────
+// ── 깔끔한 숫자 입력 ──────────────────────────────────────────────────────────
+function NumInput({
+  label, value, onChange, unit = '',
+  color = 'gray', auto = false, size = 'md',
+}: {
+  label: string; value: number | string; onChange?: (v: number) => void
+  unit?: string; color?: string; auto?: boolean; size?: 'sm' | 'md' | 'lg'
+}) {
+  const bg = {
+    gray:    'bg-slate-50',
+    green:   'bg-emerald-50',
+    blue:    'bg-blue-50',
+    sky:     'bg-sky-50',
+    amber:   'bg-amber-50',
+    white:   'bg-white border border-gray-100',
+    editable: 'bg-white border-2 border-gray-100 hover:border-blue-300 transition-colors',
+  }[color] || 'bg-slate-50'
 
+  const textColor = {
+    gray:    'text-slate-800',
+    green:   'text-emerald-700',
+    blue:    'text-blue-700',
+    sky:     'text-sky-700',
+    amber:   'text-amber-700',
+    white:   'text-gray-800',
+    editable: 'text-gray-800',
+  }[color] || 'text-slate-800'
+
+  const labelColor = {
+    gray:    'text-slate-400',
+    green:   'text-emerald-500',
+    blue:    'text-blue-500',
+    sky:     'text-sky-500',
+    amber:   'text-amber-500',
+    white:   'text-gray-400',
+    editable: 'text-gray-400',
+  }[color] || 'text-slate-400'
+
+  const numSize = size === 'lg' ? 'text-2xl' : size === 'sm' ? 'text-base' : 'text-xl'
+  const inputW  = size === 'lg' ? 'w-20' : size === 'sm' ? 'w-12' : 'w-16'
+
+  return (
+    <div className={`rounded-2xl px-3 py-2.5 flex flex-col items-center gap-0.5 ${bg}`}>
+      <p className={`text-[10px] font-medium uppercase tracking-wide ${labelColor}`}>{label}</p>
+      {auto || !onChange ? (
+        <p className={`${numSize} font-black ${textColor} leading-tight`}>
+          {typeof value === 'number' ? fmtN(value) : value}
+          {unit && <span className={`text-xs font-normal ml-0.5 opacity-60`}>{unit}</span>}
+        </p>
+      ) : (
+        <div className="flex items-baseline gap-0.5">
+          <input
+            type="number" min={0} value={value}
+            onChange={e => onChange(Number(e.target.value))}
+            className={`${inputW} ${numSize} font-black ${textColor} text-center bg-transparent
+              border-b-2 border-current/20 focus:border-current focus:outline-none
+              [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+          />
+          {unit && <span className={`text-xs font-normal opacity-60 ${textColor}`}>{unit}</span>}
+        </div>
+      )}
+      {auto && <span className="text-[9px] bg-white/70 text-current opacity-70 rounded-full px-1.5 py-0.5 font-semibold">자동</span>}
+    </div>
+  )
+}
+
+// ── 직원 입력 카드 ─────────────────────────────────────────────────────────────
+function EmpCard({
+  row, idx, we, tw,
+  onChange, onRemove,
+}: {
+  row: EmployeeRow; idx: number; we: number; tw: number
+  onChange: (i: number, f: keyof EmployeeRow, v: number | string) => void
+  onRemove: (i: number) => void
+}) {
+  const total     = Number(row.supply_payment) + Number(row.direct_payment)
+  const supplyTot = Number(row.supply_count)   + Number(row.direct_count)
+  const supplyRate = Number(row.supply_count) > 0
+    ? (total / Number(row.supply_count) * 100) : null
+  const totalRate  = supplyTot > 0 ? (total / supplyTot * 100) : null
+  const needed     = Number(row.target) - total
+  const status     = we > 0 && tw > 0 ? (total / we >= Number(row.target) / tw ? 'GOOD' : 'BAD') : '-'
+  const score      = calcScore(total, we, Number(row.target), tw)
+  const achievePct = Number(row.target) > 0 ? Math.round(total / Number(row.target) * 100) : 0
+
+  const FIELDS: { key: keyof EmployeeRow; label: string }[] = [
+    { key: 'target',          label: '목표' },
+    { key: 'supply_count',    label: '공급수' },
+    { key: 'supply_payment',  label: '공급결제' },
+    { key: 'direct_count',    label: '직접수' },
+    { key: 'direct_payment',  label: '직접결제' },
+  ]
+
+  return (
+    <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
+      {/* 헤더 */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-[#1B2A45] text-white flex items-center justify-center text-sm font-bold shrink-0">
+            {(row.name || '?').charAt(0)}
+          </div>
+          <input
+            type="text" value={row.name}
+            onChange={e => onChange(idx, 'name', e.target.value)}
+            placeholder="직원명"
+            className="font-bold text-gray-800 bg-transparent border-b border-transparent
+              hover:border-gray-300 focus:border-blue-500 focus:outline-none text-sm w-24"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <PaceBadge status={status} score={score} />
+          <button onClick={() => onRemove(idx)}
+            className="text-gray-300 hover:text-red-400 text-xs transition-colors">✕</button>
+        </div>
+      </div>
+
+      {/* 5개 입력칸 */}
+      <div className="grid grid-cols-5 gap-1.5">
+        {FIELDS.map(({ key, label }) => (
+          <div key={key} className="flex flex-col items-center gap-0.5">
+            <p className="text-[9px] text-gray-400 font-medium">{label}</p>
+            <input
+              type="number" min={0} value={row[key] as number}
+              onChange={e => onChange(idx, key, Number(e.target.value))}
+              className="w-full text-center text-sm font-bold text-gray-800 bg-white rounded-xl
+                border border-gray-200 px-1 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300
+                [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* 목표 진행바 */}
+      <div>
+        <div className="flex justify-between mb-1">
+          <span className="text-[10px] text-gray-400">목표 달성률</span>
+          <span className="text-[10px] font-bold text-gray-600">{total} / {Number(row.target)}개 · {achievePct}%</span>
+        </div>
+        <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+          <div className={`h-full rounded-full transition-all ${achievePct >= 100 ? 'bg-emerald-500' : achievePct >= 60 ? 'bg-blue-500' : 'bg-amber-400'}`}
+            style={{ width: `${Math.min(100, achievePct)}%` }} />
+        </div>
+      </div>
+
+      {/* 결과 3칸 */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-emerald-50 rounded-xl py-2 text-center">
+          <p className="text-[9px] text-emerald-500">총결제</p>
+          <p className="text-base font-black text-emerald-700">{total}</p>
+        </div>
+        <div className="bg-blue-50 rounded-xl py-2 text-center">
+          <p className="text-[9px] text-blue-500">공급대비율</p>
+          <p className="text-base font-black text-blue-700">
+            {supplyRate !== null ? supplyRate.toFixed(1) + '%' : '—'}
+          </p>
+        </div>
+        <div className={`rounded-xl py-2 text-center ${needed > 0 ? 'bg-rose-50' : 'bg-gray-100'}`}>
+          <p className={`text-[9px] ${needed > 0 ? 'text-rose-400' : 'text-gray-400'}`}>목표까지</p>
+          <p className={`text-base font-black ${needed > 0 ? 'text-rose-600' : 'text-gray-500'}`}>
+            {needed > 0 ? `${needed}개` : '완료'}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+//  결제율 대시보드
+// ════════════════════════════════════════════════════════════════════════════════
 function PayRateSubView() {
-  const [date, setDate] = useState<string>(todayStr())
-  const [saving, setSaving] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [msg, setMsg] = useState('')
-  const [autoStats, setAutoStats] = useState<{name: string; contracted: number; target: number}[]>([])
+  const today = todayStr()
+  const month = thisMonthStr()
+  const now   = new Date()
+  const { total: tw, elapsed: we }  = calcWorkingDays(today)
+  const bizElapsed = getElapsedBusinessDays(now.getFullYear(), now.getMonth(), now.getDate())
 
-  const [summary, setSummary] = useState<SummaryRow>({
-    employee_count: 0,
-    target_count: 0,
-    payment_count: 0,
-    working_days_elapsed: 0,
-    total_working_days: 0,
-  })
+  // ── 상태 ──
+  const [saving,       setSaving]       = useState(false)
+  const [saveMsg,      setSaveMsg]      = useState('')
+  const [customers,    setCustomers]    = useState<any[]>([])
+  const [salesPeople,  setSalesPeople]  = useState<string[]>([])
+  const [autoStats,    setAutoStats]    = useState<{ name: string; contracted: number }[]>([])
 
-  const defaultEmployee = (): EmployeeRow => ({
-    name: '',
-    target: 0,
-    supply_count: 0,
-    supply_payment: 0,
-    direct_count: 0,
-    direct_payment: 0,
-  })
+  // 공급 현황
+  const [supplyConfig,   setSupplyConfig]   = useState<SupplyConfig>({})
+  const [supplyDraft,    setSupplyDraft]    = useState<SupplyConfig>({})
+  const [supplyEditMode, setSupplyEditMode] = useState(false)
+  const [supplySaving,   setSupplySaving]   = useState(false)
 
-  const [employees, setEmployees] = useState<EmployeeRow[]>([
-    { ...defaultEmployee(), name: '손제후' },
-    { ...defaultEmployee(), name: '김윤지' },
-    defaultEmployee(),
-    defaultEmployee(),
-  ])
+  // 영업일 기준
+  const [targetCount,    setTargetCount]    = useState(0)
+  const [paymentCount,   setPaymentCount]   = useState(0)
+  const [employeeCount,  setEmployeeCount]  = useState(0)
 
-  // 자동계산 — 테이블 A
-  const ec = Number(summary.employee_count)
-  const tc = Number(summary.target_count)
-  const pc = Number(summary.payment_count)
-  const we = Number(summary.working_days_elapsed)
-  const tw = Number(summary.total_working_days)
+  // 직원별
+  const mkRow = (name = ''): EmployeeRow => ({ name, target: 0, supply_count: 0, supply_payment: 0, direct_count: 0, direct_payment: 0 })
+  const [employees, setEmployees] = useState<EmployeeRow[]>([])
 
-  const remaining = tw - we
-  const expected = we > 0 ? (pc / we) * tw : 0
-  const expectedPerPersonMonth = ec > 0 ? expected / ec : 0
-  const expectedPerPersonDay = we > 0 && ec > 0 ? pc / we / ec : 0
-  const targetPerPersonMonth = ec > 0 ? tc / ec : 0
-  const targetPerPersonDay = tw > 0 && ec > 0 ? tc / tw / ec : 0
-  const statusA = we > 0 && tw > 0
-    ? (pc / we >= tc / tw ? 'GOOD' : 'BAD')
-    : '-'
-
-  function fmtNum(n: number): string {
-    if (!isFinite(n)) return '-'
-    return Number.isInteger(n) ? n.toLocaleString('ko-KR') : n.toFixed(2)
-  }
-
-  // 자동계산 — 테이블 B per employee
-  function calcEmployee(row: EmployeeRow) {
-    const total = Number(row.supply_payment) + Number(row.direct_payment)
-    const supplyTotal = Number(row.supply_count) + Number(row.direct_count)
-    const supplyRate = Number(row.supply_count) > 0
-      ? (total / Number(row.supply_count) * 100).toFixed(2) + '%'
-      : '-'
-    const directRate = Number(row.direct_count) > 0
-      ? (Number(row.direct_payment) / Number(row.direct_count) * 100).toFixed(2) + '%'
-      : '-'
-    const totalRate = supplyTotal > 0
-      ? (total / supplyTotal * 100).toFixed(2) + '%'
-      : '-'
-    const needed = Number(row.target) - total
-    const neededRate = supplyTotal > 0
-      ? (needed / supplyTotal * 100).toFixed(2) + '%'
-      : '-'
-    const st = we > 0 && tw > 0
-      ? (total / we >= Number(row.target) / tw ? 'GOOD' : 'BAD')
-      : '-'
-    return { total, supplyRate, directRate, totalRate, needed, neededRate, status: st }
-  }
-
-  // 합계 행
-  const totalTarget = employees.reduce((s, r) => s + Number(r.target), 0)
-  const totalSupplyCount = employees.reduce((s, r) => s + Number(r.supply_count), 0)
-  const totalSupplyPay = employees.reduce((s, r) => s + Number(r.supply_payment), 0)
-  const totalDirectCount = employees.reduce((s, r) => s + Number(r.direct_count), 0)
-  const totalDirectPay = employees.reduce((s, r) => s + Number(r.direct_payment), 0)
-  const totalPayment = totalSupplyPay + totalDirectPay
-  const totalAllCount = totalSupplyCount + totalDirectCount
-  const totalSupplyRate = totalSupplyCount > 0 ? (totalPayment / totalSupplyCount * 100).toFixed(2) + '%' : '-'
-  const totalDirectRate = totalDirectCount > 0 ? (totalDirectPay / totalDirectCount * 100).toFixed(2) + '%' : '-'
-  const totalTotalRate = totalAllCount > 0 ? (totalPayment / totalAllCount * 100).toFixed(2) + '%' : '-'
-  const totalNeeded = totalTarget - totalPayment
-  const totalNeededRate = totalAllCount > 0 ? (totalNeeded / totalAllCount * 100).toFixed(2) + '%' : '-'
-
-  function updateEmployee(i: number, field: keyof EmployeeRow, value: string) {
-    setEmployees(prev => {
-      const next = [...prev]
-      next[i] = {
-        ...next[i],
-        [field]: field === 'name' ? value : Number(value),
-      }
-      return next
-    })
-  }
-
-  async function handleLoad() {
-    setLoading(true)
-    setMsg('')
-    const res = await fetch(`/api/payrate?date=${date}`)
-    const json = await res.json()
-    if (json.record) {
-      const r = json.record
-      setSummary({
-        employee_count: r.employee_count ?? 0,
-        target_count: r.target_count ?? 0,
-        payment_count: r.payment_count ?? 0,
-        working_days_elapsed: r.working_days_elapsed ?? 0,
-        total_working_days: r.total_working_days ?? 0,
-      })
-      if (Array.isArray(r.employee_details) && r.employee_details.length > 0) {
-        setEmployees(r.employee_details)
-      }
-      setMsg('불러오기 완료')
-    } else {
-      setMsg('저장된 데이터가 없습니다.')
-    }
-    setLoading(false)
-  }
-
-  // 날짜 변경 시 자동 로드 + 영업일 자동계산
+  // ── 초기 로드 ──
   useEffect(() => {
-    handleLoad()
-    if (date) {
-      const { total, elapsed } = calcWorkingDays(date)
-      setSummary(prev => ({ ...prev, working_days_elapsed: elapsed, total_working_days: total }))
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date])
+    async function load() {
+      try {
+        const [payRes, scRes, custRes, userRes] = await Promise.all([
+          fetch(`/api/payrate?date=${today}`),
+          fetch('/api/supply-config'),
+          fetch('/api/customers'),
+          fetch('/api/users?role=sales'),
+        ])
+        const [payJson, scJson, custJson, userJson] = await Promise.all([
+          payRes.json(), scRes.json(), custRes.json(), userRes.json()
+        ])
 
-  // FreelancerTab에서 영업사원 수 자동 가져오기
-  useEffect(() => {
-    fetch('/api/payslip-settings')
-      .then(r => r.json())
-      .then(d => {
-        const emps: any[] = d.settings?.employees || []
-        const salesCount = emps.filter(e => (e.team || 'sales') === 'sales' && e.name?.trim()).length
-        if (salesCount > 0) {
-          setSummary(prev => ({ ...prev, employee_count: salesCount }))
-        }
-        // 이름 자동 채우기 (데이터 없을 때만)
-        if (emps.length > 0) {
-          setEmployees(prev => {
-            const hasData = prev.some(e => e.name.trim() && (e.supply_count > 0 || e.direct_count > 0))
-            if (hasData) return prev
-            const salesEmps = emps.filter(e => (e.team || 'sales') === 'sales' && e.name?.trim())
-            if (salesEmps.length === 0) return prev
-            return salesEmps.map(e => ({ name: e.name, target: 0, supply_count: 0, supply_payment: 0, direct_count: 0, direct_payment: 0 }))
-          })
-        }
-      })
-      .catch(() => {})
-  }, [])
+        // 고객 (TESTER 제외)
+        const allCust = (custJson.customers || []).filter((c: any) =>
+          (c.details?.sales_user_name || c.sales_user_name || '').trim() !== TESTER
+        )
+        setCustomers(allCust)
 
-  // 이번달 계약 자동집계
-  useEffect(() => {
-    fetch('/api/customers')
-      .then(r => r.json())
-      .then(d => {
-        const customers = d.customers || []
-        const thisMonth = new Date().toISOString().slice(0, 7)
+        // 영업팀 사람 (TESTER 제외)
+        const people: string[] = (userJson.users || [])
+          .filter((u: any) => u.name && u.name !== TESTER)
+          .map((u: any) => u.name as string)
+        setSalesPeople(people)
+        setEmployeeCount(people.length)
+
+        // 이번달 계약 자동집계 (TESTER 제외)
         const byPerson: Record<string, number> = {}
-        customers
-          .filter((c: any) => c.status === 'contracted' &&
-            (c.details?.contract_date || c.created_at || '').startsWith(thisMonth))
+        allCust
+          .filter((c: any) =>
+            c.status === 'contracted' &&
+            (c.details?.contract_date || c.created_at || '').startsWith(month)
+          )
           .forEach((c: any) => {
             const name = (c.details?.sales_user_name || c.sales_user_name || '').trim()
-            if (name) byPerson[name] = (byPerson[name] || 0) + 1
+            if (name && name !== TESTER) byPerson[name] = (byPerson[name] || 0) + 1
           })
-        setAutoStats(Object.entries(byPerson).map(([name, contracted]) => ({ name, contracted, target: 0 })))
-        // 총 계약건수를 payment_count에 자동 반영
-        const totalContracted = Object.values(byPerson).reduce((s, v) => s + v, 0)
-        setSummary(prev => ({ ...prev, payment_count: totalContracted }))
-      })
-      .catch(() => {/* 무시 */})
+        const stats = Object.entries(byPerson).map(([name, contracted]) => ({ name, contracted }))
+        setAutoStats(stats)
+        setPaymentCount(stats.reduce((s, v) => s + v.contracted, 0))
+
+        // 공급 설정 (TESTER 제외)
+        if (scJson.config?.month === month) {
+          const cfg: SupplyConfig = {}
+          for (const [k, v] of Object.entries(scJson.config.people || {})) {
+            if (k !== TESTER) cfg[k] = v as PersonSupply
+          }
+          setSupplyConfig(cfg)
+        }
+
+        // 결제율 레코드
+        if (payJson.record) {
+          const r = payJson.record
+          setTargetCount(r.target_count ?? 0)
+          const empDetails = (r.employee_details || []).filter((e: EmployeeRow) => e.name !== TESTER)
+          if (empDetails.length > 0) {
+            setEmployees(empDetails)
+          } else if (people.length > 0) {
+            setEmployees(people.map(name => mkRow(name)))
+          }
+        } else if (people.length > 0) {
+          setEmployees(people.map(name => mkRow(name)))
+        }
+      } catch {}
+    }
+    load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // ── 공급 현황 계산 ──
+  const supplyStats = useMemo(() =>
+    salesPeople.map(name => {
+      const cfg = supplyConfig[name] || { supplied: 0, goal: 30, base: 0 }
+      const dbContracted = customers
+        .filter(c =>
+          c.status === 'contracted' &&
+          (c.details?.sales_user_name || '').trim() === name &&
+          (c.details?.contract_date || c.created_at || '').slice(0, 7) === month
+        )
+        .reduce((sum, c) => sum + contractWeight(c.details?.payment_amount), 0)
+      const totalContracted = cfg.base + dbContracted
+      const rate       = cfg.supplied > 0 ? Math.floor(totalContracted / cfg.supplied * 10000) / 100 : 0
+      const achievePct = cfg.goal     > 0 ? Math.round(totalContracted / cfg.goal * 100) : 0
+      const recommended = calcRecommendedSupply(rate, bizElapsed)
+      return { name, cfg, dbContracted, totalContracted, rate, achievePct, recommended }
+    }),
+  [salesPeople, supplyConfig, customers, month, bizElapsed])
+
+  // ── 영업일 기준 계산 ──
+  const pc = paymentCount, ec = employeeCount
+  const remaining           = tw - we
+  const expected            = we > 0 ? (pc / we) * tw : 0
+  const expPerPersonMonth   = ec > 0 ? expected / ec : 0
+  const expPerPersonDay     = we > 0 && ec > 0 ? pc / we / ec : 0
+  const tgtPerPersonDay     = tw > 0 && ec > 0 ? targetCount / tw / ec : 0
+  const paceStatus          = we > 0 && tw > 0 ? (pc / we >= targetCount / tw ? 'GOOD' : 'BAD') : '-'
+  const paceScore           = calcScore(pc, we, targetCount, tw)
+
+  // ── 공급 저장 ──
+  function openSupplyEdit() {
+    const draft: SupplyConfig = {}
+    for (const name of salesPeople) {
+      draft[name] = { ...(supplyConfig[name] || { supplied: 0, goal: 30, base: 0 }) }
+    }
+    setSupplyDraft(draft)
+    setSupplyEditMode(true)
+  }
+  async function saveSupply() {
+    setSupplySaving(true)
+    await fetch('/api/supply-config', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ month, people: supplyDraft }),
+    })
+    setSupplyConfig({ ...supplyDraft })
+    setSupplyEditMode(false)
+    setSupplySaving(false)
+  }
+
+  // ── 직원별 업데이트 ──
+  function updateEmp(i: number, f: keyof EmployeeRow, v: number | string) {
+    setEmployees(prev => { const n = [...prev]; n[i] = { ...n[i], [f]: f === 'name' ? v : Number(v) }; return n })
+  }
+  function removeEmp(i: number) { setEmployees(prev => prev.filter((_, idx) => idx !== i)) }
+
+  // ── 결제율 저장 ──
   async function handleSave() {
-    setSaving(true)
-    setMsg('')
+    setSaving(true); setSaveMsg('')
     const res = await fetch('/api/payrate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        date,
-        ...summary,
+        date: today, employee_count: employeeCount,
+        target_count: targetCount, payment_count: paymentCount,
+        working_days_elapsed: we, total_working_days: tw,
         employee_details: employees,
       }),
     })
     const json = await res.json()
-    setMsg(json.record ? '저장 완료' : ('저장 실패: ' + json.error))
+    setSaveMsg(json.record ? '✅ 저장 완료' : '❌ 저장 실패')
     setSaving(false)
+    setTimeout(() => setSaveMsg(''), 3000)
   }
 
+  // ── 직원별 합계 ──
+  const totTarget   = employees.reduce((s, r) => s + Number(r.target),          0)
+  const totSupply   = employees.reduce((s, r) => s + Number(r.supply_count),    0)
+  const totPayment  = employees.reduce((s, r) => s + Number(r.supply_payment) + Number(r.direct_payment), 0)
+  const totSupRate  = totSupply > 0 ? (totPayment / totSupply * 100) : null
+
   return (
-    <div className="space-y-6 pb-8">
-      {/* 이번달 계약 자동집계 배너 */}
+    <div className="space-y-5 pb-8">
+
+      {/* ─── 이번달 계약 자동집계 ─────────────────────────────────────────── */}
       {autoStats.length > 0 && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 mb-3">
-          <p className="text-[10px] font-bold text-emerald-700 mb-2">🤖 이번달 계약 자동집계</p>
+        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 rounded-2xl p-4">
+          <p className="text-[11px] font-bold text-emerald-700 mb-3">🤖 이번달 계약 자동집계</p>
           <div className="flex gap-3 flex-wrap">
             {autoStats.map(s => (
-              <div key={s.name} className="bg-white rounded-lg px-3 py-2 border border-emerald-100 text-center">
-                <p className="text-[10px] text-gray-400">{s.name.replace(' 수석팀장', '')}</p>
-                <p className="text-lg font-black text-emerald-700">{s.contracted}<span className="text-xs font-normal">건</span></p>
+              <div key={s.name} className="bg-white rounded-xl px-4 py-3 border border-emerald-100 text-center shadow-sm min-w-[80px]">
+                <p className="text-[10px] text-gray-400 mb-0.5">{s.name}</p>
+                <p className="text-2xl font-black text-emerald-700">
+                  {s.contracted}<span className="text-xs font-normal text-gray-400 ml-0.5">건</span>
+                </p>
               </div>
             ))}
+            {autoStats.length > 1 && (
+              <div className="bg-emerald-600 rounded-xl px-4 py-3 text-center shadow-sm min-w-[80px]">
+                <p className="text-[10px] text-white/70 mb-0.5">합계</p>
+                <p className="text-2xl font-black text-white">
+                  {autoStats.reduce((s, v) => s + v.contracted, 0)}<span className="text-xs font-normal text-white/70 ml-0.5">건</span>
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* 날짜 / 버튼 */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <input
-          type="date"
-          value={date}
-          onChange={e => setDate(e.target.value)}
-          className="border border-gray-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-        />
-        {loading && <span className="text-xs text-blue-500">불러오는 중...</span>}
+      {/* ─── 📊 공급 현황 ────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-sm font-bold text-gray-800">📊 공급 현황</h3>
+            <p className="text-[11px] text-gray-400 mt-0.5">{month} · 계약율 기준 내일 권장 공급량</p>
+          </div>
+          {!supplyEditMode ? (
+            <button onClick={openSupplyEdit}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700
+                border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 transition-colors">
+              ✏️ 수정
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <button onClick={() => setSupplyEditMode(false)}
+                className="px-3 py-1.5 rounded-xl bg-gray-100 text-gray-500 text-xs font-semibold hover:bg-gray-200 transition-colors">
+                취소
+              </button>
+              <button onClick={saveSupply} disabled={supplySaving}
+                className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-60">
+                {supplySaving ? '저장중…' : '💾 저장'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {supplyStats.length === 0 ? (
+          <p className="text-center text-gray-400 text-sm py-6">등록된 영업사원이 없습니다</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {supplyStats.map(s => (
+              <div key={s.name} className="bg-gray-50 rounded-2xl p-4 space-y-3">
+                {/* 이름 + 달성 */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-[#1B2A45] text-white flex items-center justify-center text-sm font-bold shrink-0">
+                      {s.name.charAt(0)}
+                    </div>
+                    <span className="font-bold text-gray-800">{s.name}</span>
+                  </div>
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                    s.achievePct >= 100 ? 'bg-emerald-100 text-emerald-700' :
+                    s.achievePct >= 70  ? 'bg-blue-100 text-blue-700' :
+                    s.achievePct >= 40  ? 'bg-amber-100 text-amber-700' :
+                    'bg-red-50 text-red-600'
+                  }`}>달성 {s.achievePct}%</span>
+                </div>
+
+                {/* 핵심 3수치 */}
+                <div className="grid grid-cols-3 gap-2">
+                  {/* 공급수 */}
+                  <div className="bg-sky-50 rounded-xl py-2.5 text-center">
+                    <p className="text-[9px] text-sky-500 mb-0.5">공급수</p>
+                    {supplyEditMode ? (
+                      <input type="number" min="0"
+                        value={supplyDraft[s.name]?.supplied ?? s.cfg.supplied}
+                        onChange={e => setSupplyDraft(prev => ({
+                          ...prev, [s.name]: { ...(prev[s.name] || { supplied: 0, goal: 30, base: 0 }), supplied: Number(e.target.value) }
+                        }))}
+                        className="w-full text-center text-base font-black text-sky-700 bg-transparent
+                          border-b-2 border-sky-400 focus:outline-none
+                          [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                    ) : (
+                      <p className="text-base font-black text-sky-700">{s.cfg.supplied}</p>
+                    )}
+                  </div>
+                  {/* 결제수 */}
+                  <div className="bg-emerald-50 rounded-xl py-2.5 text-center">
+                    <p className="text-[9px] text-emerald-500 mb-0.5">결제수</p>
+                    <p className="text-base font-black text-emerald-700">{s.totalContracted.toFixed(1)}</p>
+                    {s.cfg.base > 0 && (
+                      <p className="text-[8px] text-gray-400">기존{s.cfg.base}+DB{s.dbContracted.toFixed(1)}</p>
+                    )}
+                  </div>
+                  {/* 계약율 */}
+                  <div className={`rounded-xl py-2.5 text-center ${
+                    s.rate >= 17 ? 'bg-emerald-50' : s.rate >= 13 ? 'bg-amber-50' : 'bg-red-50'
+                  }`}>
+                    <p className="text-[9px] text-gray-400 mb-0.5">계약율</p>
+                    <p className={`text-base font-black ${
+                      s.rate >= 17 ? 'text-emerald-700' : s.rate >= 13 ? 'text-amber-700' : 'text-red-600'
+                    }`}>{s.rate.toFixed(1)}%</p>
+                  </div>
+                </div>
+
+                {/* 목표 진행바 */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] text-gray-400 font-medium">목표 달성</span>
+                    <div className="flex items-center gap-0.5 text-[10px]">
+                      <span className="text-gray-400">{s.totalContracted.toFixed(1)} / </span>
+                      {supplyEditMode ? (
+                        <input type="number" min="0"
+                          value={supplyDraft[s.name]?.goal ?? s.cfg.goal}
+                          onChange={e => setSupplyDraft(prev => ({
+                            ...prev, [s.name]: { ...(prev[s.name] || { supplied: 0, goal: 30, base: 0 }), goal: Number(e.target.value) }
+                          }))}
+                          className="w-10 text-center font-bold text-gray-800 bg-transparent border-b border-gray-400
+                            focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                      ) : (
+                        <span className="font-bold text-gray-700">{s.cfg.goal}개</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-emerald-500 transition-all"
+                      style={{ width: `${Math.min(100, s.achievePct)}%` }} />
+                  </div>
+                </div>
+
+                {/* 오프셋 (수정모드) */}
+                {supplyEditMode && (
+                  <div className="flex items-center gap-2 bg-white rounded-xl px-3 py-2 border border-gray-100">
+                    <span className="text-[10px] text-gray-400 flex-1">시스템 전 결제수 (오프셋)</span>
+                    <input type="number" min="0" step="0.5"
+                      value={supplyDraft[s.name]?.base ?? s.cfg.base}
+                      onChange={e => setSupplyDraft(prev => ({
+                        ...prev, [s.name]: { ...(prev[s.name] || { supplied: 0, goal: 30, base: 0 }), base: Number(e.target.value) }
+                      }))}
+                      className="w-16 text-center text-xs font-bold text-gray-800 bg-gray-50 border border-gray-200
+                        rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-emerald-400
+                        [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                  </div>
+                )}
+
+                {/* 권장 내일 공급 */}
+                <div className={`rounded-xl px-4 py-3 flex items-center justify-between ${
+                  s.recommended >= 5 ? 'bg-emerald-50 border border-emerald-100' :
+                  s.recommended >= 3 ? 'bg-blue-50 border border-blue-100' :
+                  s.recommended >= 1 ? 'bg-amber-50 border border-amber-100' :
+                  'bg-red-50 border border-red-100'
+                }`}>
+                  <div>
+                    <p className="text-[11px] font-bold text-gray-600">권장 내일 공급</p>
+                    <p className="text-[9px] text-gray-400">계약율 {s.rate.toFixed(1)}% 기준</p>
+                  </div>
+                  <p className={`text-3xl font-black ${
+                    s.recommended >= 5 ? 'text-emerald-700' :
+                    s.recommended >= 3 ? 'text-blue-700' :
+                    s.recommended >= 1 ? 'text-amber-700' : 'text-red-600'
+                  }`}>{s.recommended}<span className="text-sm font-normal opacity-60">개</span></p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ─── 📈 영업일 기준 ──────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-bold text-gray-800">📈 영업일 기준</h3>
+          <span className="text-[11px] text-gray-300">{today}</span>
+        </div>
+
+        {/* 핵심 4개 카드 */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+          <NumInput label="인원수"   value={employeeCount} color="gray"  auto unit="명" />
+          <NumInput label="목표개수" value={targetCount}   color="editable" unit="개"
+            onChange={v => setTargetCount(v)} />
+          <NumInput label="결제개수" value={paymentCount}  color="green" auto unit="개" />
+          <div className="bg-slate-50 rounded-2xl px-3 py-2.5 flex flex-col items-center gap-0.5">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">진행 영업일</p>
+            <p className="text-xl font-black text-slate-800 leading-tight">
+              {we}<span className="text-sm text-slate-400 font-normal"> / {tw}일</span>
+            </p>
+            <span className="text-[9px] bg-amber-100 text-amber-600 rounded-full px-1.5 py-0.5 font-semibold">잔여 {remaining}일</span>
+          </div>
+        </div>
+
+        {/* 예측 지표 5개 */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          <NumInput label="예상개수"    value={fmtN(expected)}           color="gray" />
+          <NumInput label="인당이번달"  value={fmtN(expPerPersonMonth)}  color="gray" />
+          <NumInput label="인당하루"    value={fmtN(expPerPersonDay)}    color="gray" />
+          <NumInput label="목표인당하루" value={fmtN(tgtPerPersonDay)}   color="blue" />
+          <div className="bg-amber-50 rounded-2xl px-3 py-2.5 flex flex-col items-center gap-1">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-amber-500">진행상태</p>
+            <PaceBadge status={paceStatus} score={paceScore} />
+          </div>
+        </div>
+      </div>
+
+      {/* ─── 👥 직원별 현황 ──────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+        <h3 className="text-sm font-bold text-gray-800 mb-4">👥 직원별 현황</h3>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {employees.filter(r => r.name !== TESTER).map((row, i) => (
+            <EmpCard key={i} row={row} idx={i} we={we} tw={tw} onChange={updateEmp} onRemove={removeEmp} />
+          ))}
+
+          {/* 직원 추가 */}
+          <button onClick={() => setEmployees(prev => [...prev, mkRow()])}
+            className="min-h-[160px] border-2 border-dashed border-gray-200 rounded-2xl text-gray-300
+              hover:border-blue-300 hover:text-blue-400 transition-colors flex flex-col items-center justify-center gap-2">
+            <span className="text-2xl">＋</span>
+            <span className="text-sm font-medium">직원 추가</span>
+          </button>
+        </div>
+
+        {/* 합계 바 */}
+        {employees.length >= 2 && (
+          <div className="mt-4 bg-[#1B2A45] rounded-2xl p-4 grid grid-cols-3 gap-3 text-white text-center">
+            <div>
+              <p className="text-[10px] text-white/50 mb-0.5">총 목표</p>
+              <p className="text-lg font-black">{totTarget}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-white/50 mb-0.5">총 결제</p>
+              <p className="text-lg font-black text-emerald-400">{totPayment}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-white/50 mb-0.5">공급대비율</p>
+              <p className="text-lg font-black text-blue-400">
+                {totSupRate !== null ? totSupRate.toFixed(1) + '%' : '—'}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ─── 저장 ────────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-end gap-3">
+        {saveMsg && (
+          <span className={`text-sm font-medium ${saveMsg.includes('✅') ? 'text-emerald-600' : 'text-red-500'}`}>
+            {saveMsg}
+          </span>
+        )}
         <button onClick={handleSave} disabled={saving}
-          className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white px-4 py-1.5 rounded text-sm font-medium">
-          {saving ? '저장 중...' : '저장'}
-        </button>
-        {msg && <span className="text-xs text-gray-500">{msg}</span>}
-      </div>
-
-      {/* 테이블 A — 영업일 기준 */}
-      <div>
-        <h3 className="text-sm font-bold text-gray-700 mb-2">영업일 기준</h3>
-        <div className="overflow-x-auto rounded-xl border border-gray-100">
-          <table className="min-w-max w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">인원수</th>
-                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">목표개수</th>
-                <th className="px-3 py-2 text-xs font-semibold text-center whitespace-nowrap border-r border-gray-100 bg-emerald-50 text-emerald-700">결제개수</th>
-                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">진행된영업일수</th>
-                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">이달의영업일</th>
-                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">잔여영업일</th>
-                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">예상개수</th>
-                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">예상인당이번달결제</th>
-                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">예상인당하루결제</th>
-                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">목표인당이번달결제</th>
-                <th className="px-3 py-2 text-xs font-semibold text-center whitespace-nowrap border-r border-gray-100 bg-blue-50 text-blue-700">목표인당하루결제</th>
-                <th className="px-3 py-2 text-xs font-semibold text-center whitespace-nowrap border-r border-gray-100 bg-amber-50 text-amber-700">진행상태</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="bg-white">
-                {/* 인원수 — 자동 */}
-                <td className="px-2 py-1 border-r border-gray-100">
-                  <div className="flex items-center gap-1">
-                    <span className="text-sm font-medium text-gray-700 min-w-[2rem] text-center">{summary.employee_count}</span>
-                    <span className="text-[10px] bg-blue-100 text-blue-600 rounded px-1 py-0.5 font-semibold">자동</span>
-                  </div>
-                </td>
-                {/* 목표개수 — 수동 입력 */}
-                <td className="px-2 py-1 border-r border-gray-100">
-                  <input
-                    type="number"
-                    value={summary.target_count}
-                    onChange={e => setSummary(prev => ({ ...prev, target_count: Number(e.target.value) }))}
-                    className={INPUT_CLS}
-                    min="0"
-                  />
-                </td>
-                {/* 결제개수 — 자동, 강조 */}
-                <td className="px-2 py-1 border-r border-gray-100 bg-emerald-50">
-                  <div className="flex items-center gap-1">
-                    <span className="text-sm font-bold text-emerald-700 min-w-[2rem] text-center">{summary.payment_count}</span>
-                    <span className="text-[10px] bg-emerald-200 text-emerald-700 rounded px-1 py-0.5 font-semibold">자동</span>
-                  </div>
-                </td>
-                {/* 진행된영업일수 — 자동 */}
-                <td className="px-2 py-1 border-r border-gray-100">
-                  <div className="flex items-center gap-1">
-                    <span className="text-sm font-medium text-gray-700 min-w-[2rem] text-center">{summary.working_days_elapsed}</span>
-                    <span className="text-[10px] bg-blue-100 text-blue-600 rounded px-1 py-0.5 font-semibold">자동</span>
-                  </div>
-                </td>
-                {/* 이달의영업일 — 자동 */}
-                <td className="px-2 py-1 border-r border-gray-100">
-                  <div className="flex items-center gap-1">
-                    <span className="text-sm font-medium text-gray-700 min-w-[2rem] text-center">{summary.total_working_days}</span>
-                    <span className="text-[10px] bg-blue-100 text-blue-600 rounded px-1 py-0.5 font-semibold">자동</span>
-                  </div>
-                </td>
-                <td className={CALC_CLS + ' border-r border-gray-100'}>{fmtNum(remaining)}</td>
-                <td className={CALC_CLS + ' border-r border-gray-100'}>{fmtNum(expected)}</td>
-                <td className={CALC_CLS + ' border-r border-gray-100'}>{fmtNum(expectedPerPersonMonth)}</td>
-                <td className={CALC_CLS + ' border-r border-gray-100'}>{fmtNum(expectedPerPersonDay)}</td>
-                <td className={CALC_CLS + ' border-r border-gray-100'}>{fmtNum(targetPerPersonMonth)}</td>
-                <td className={CALC_CLS + ' bg-blue-50 border-r border-gray-100'}>{fmtNum(targetPerPersonDay)}</td>
-                <td className="px-2 py-2 text-center bg-amber-50">
-                  <div className="flex items-center justify-center gap-1.5">
-                    {statusA === '-' ? <span className="text-gray-400 text-xs">-</span> :
-                      <span className={statusA === 'GOOD' ? GOOD_CLS : BAD_CLS}>{statusA}</span>}
-                    <ScoreBadge score={calcScore(pc, we, tc, tw)} />
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* 테이블 B — 직원별 */}
-      <div>
-        <h3 className="text-sm font-bold text-gray-700 mb-2">DB 기준 (직원별)</h3>
-        <div className="overflow-x-auto rounded-xl border border-gray-100">
-          <table className="min-w-max w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">연번</th>
-                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">직원명</th>
-                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">목표개수</th>
-                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">공급개수</th>
-                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">공급결제개수</th>
-                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">직접(소개)개수</th>
-                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">직접결제개수</th>
-                <th className="px-3 py-2 text-xs font-semibold text-center whitespace-nowrap border-r border-gray-100 bg-emerald-50 text-emerald-700">총결제개수</th>
-                <th className="px-3 py-2 text-xs font-semibold text-center whitespace-nowrap border-r border-gray-100 bg-blue-50 text-blue-700">공급대비결제율</th>
-                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">직접대비결제율</th>
-                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">총결제율</th>
-                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">목표까지필요개수</th>
-                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap border-r border-gray-100">목표까지필요결제율</th>
-                <th className="px-3 py-2 text-xs font-semibold text-center whitespace-nowrap border-r border-gray-100 bg-amber-50 text-amber-700">진행상태</th>
-                <th className="px-3 py-2 text-xs text-gray-500 font-semibold text-center whitespace-nowrap"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {employees.map((row, i) => {
-                const calc = calcEmployee(row)
-                const empScore = calcScore(calc.total, we, Number(row.target), tw)
-                return (
-                  <tr key={i} className="border-t border-gray-100 bg-white hover:bg-gray-50">
-                    <td className="px-3 py-1 text-center text-gray-500 border-r border-gray-100">{i + 1}</td>
-                    <td className="px-2 py-1 border-r border-gray-100 min-w-[80px]">
-                      <input type="text" value={row.name} onChange={e => updateEmployee(i, 'name', e.target.value)} className={INPUT_CLS} placeholder="직원명" />
-                    </td>
-                    {(['target','supply_count','supply_payment','direct_count','direct_payment'] as (keyof EmployeeRow)[]).map(field => (
-                      <td key={field} className="px-2 py-1 border-r border-gray-100 min-w-[70px]">
-                        <input type="number" value={row[field] as number} onChange={e => updateEmployee(i, field, e.target.value)} className={INPUT_CLS} min="0" />
-                      </td>
-                    ))}
-                    <td className="bg-emerald-50 px-2 py-1 text-right text-sm font-bold text-emerald-700 border-r border-gray-100 whitespace-nowrap">{calc.total.toLocaleString('ko-KR')}</td>
-                    <td className="bg-blue-50 px-2 py-1 text-right text-sm text-blue-700 border-r border-gray-100 whitespace-nowrap">{calc.supplyRate}</td>
-                    <td className={CALC_CLS + ' border-r border-gray-100'}>{calc.directRate}</td>
-                    <td className={CALC_CLS + ' border-r border-gray-100'}>{calc.totalRate}</td>
-                    <td className={CALC_CLS + ' border-r border-gray-100'}>{calc.needed.toLocaleString('ko-KR')}</td>
-                    <td className={CALC_CLS + ' border-r border-gray-100'}>{calc.neededRate}</td>
-                    <td className="px-2 py-1 text-center bg-amber-50 border-r border-gray-100">
-                      <div className="flex items-center justify-center gap-1.5">
-                        {calc.status === '-' ? <span className="text-gray-400 text-xs">-</span> :
-                          <span className={calc.status === 'GOOD' ? GOOD_CLS : BAD_CLS}>{calc.status}</span>}
-                        <ScoreBadge score={empScore} />
-                      </div>
-                    </td>
-                    <td className="px-2 py-1 border-l border-gray-100">
-                      <button onClick={() => setEmployees(prev => prev.filter((_, idx) => idx !== i))}
-                        className="text-red-400 hover:text-red-600 text-xs px-1">삭제</button>
-                    </td>
-                  </tr>
-                )
-              })}
-
-              {/* 합계 행 */}
-              <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
-                <td className="px-3 py-1 text-center text-gray-500 border-r border-gray-100" colSpan={2}>계</td>
-                <td className={CALC_CLS + ' border-r border-gray-100'}>{totalTarget.toLocaleString('ko-KR')}</td>
-                <td className={CALC_CLS + ' border-r border-gray-100'}>{totalSupplyCount.toLocaleString('ko-KR')}</td>
-                <td className={CALC_CLS + ' border-r border-gray-100'}>{totalSupplyPay.toLocaleString('ko-KR')}</td>
-                <td className={CALC_CLS + ' border-r border-gray-100'}>{totalDirectCount.toLocaleString('ko-KR')}</td>
-                <td className={CALC_CLS + ' border-r border-gray-100'}>{totalDirectPay.toLocaleString('ko-KR')}</td>
-                <td className="bg-emerald-50 text-emerald-700 text-sm px-2 py-1 text-right font-bold whitespace-nowrap border-r border-gray-100">{totalPayment.toLocaleString('ko-KR')}</td>
-                <td className="bg-blue-50 text-blue-700 text-sm px-2 py-1 text-right whitespace-nowrap border-r border-gray-100">{totalSupplyRate}</td>
-                <td className={CALC_CLS + ' border-r border-gray-100'}>{totalDirectRate}</td>
-                <td className={CALC_CLS + ' border-r border-gray-100'}>{totalTotalRate}</td>
-                <td className={CALC_CLS + ' border-r border-gray-100'}>{totalNeeded.toLocaleString('ko-KR')}</td>
-                <td className={CALC_CLS + ' border-r border-gray-100'}>{totalNeededRate}</td>
-                <td className="bg-amber-50 border-r border-gray-100" />
-                <td />
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <button
-          onClick={() => setEmployees(prev => [...prev, defaultEmployee()])}
-          className="mt-2 text-sm text-blue-600 hover:text-blue-800 border border-blue-200 rounded px-3 py-1">
-          + 직원 추가
+          className="bg-[#1B2A45] hover:bg-[#263d66] disabled:opacity-40 text-white
+            px-7 py-2.5 rounded-2xl text-sm font-bold shadow-sm transition-colors">
+          {saving ? '저장 중…' : '💾 저장'}
         </button>
       </div>
     </div>
   )
 }
 
-// ─── 손익계산서 서브뷰 ────────────────────────────────────
-
-interface SalesEmp {
-  name: string
-  sales_vat_incl: number
-  contracts: number
-}
-
-interface OpsEmp {
-  name: string
-  fee_vat_incl: number
-  contract_vat_incl: number
-}
-
-interface OtherCost {
-  ad_marketing: number
-  db: number
-  rent: number
-  mgmt: number
-  sales_fixed: number
-  sales_other: number
-}
-
+// ════════════════════════════════════════════════════════════════════════════════
+//  손익계산 뷰 (날짜 없이 오늘 자동 사용)
+// ════════════════════════════════════════════════════════════════════════════════
 function PnlSubView() {
-  const [date, setDate] = useState<string>(todayStr())
-  const [saving, setSaving] = useState(false)
+  const today = todayStr()
+  const [saving,  setSaving]  = useState(false)
   const [loading, setLoading] = useState(false)
-  const [msg, setMsg] = useState('')
+  const [msg,     setMsg]     = useState('')
 
-  const [salesEmps, setSalesEmps] = useState<SalesEmp[]>([])
-  const [opsEmps, setOpsEmps] = useState<OpsEmp[]>([])
-  const [otherCosts, setOtherCosts] = useState<OtherCost>({
-    ad_marketing: 0,
-    db: 0,
-    rent: 0,
-    mgmt: 0,
-    sales_fixed: 0,
-    sales_other: 0,
+  const [salesEmps,   setSalesEmps]   = useState<SalesEmp[]>([])
+  const [opsEmps,     setOpsEmps]     = useState<OpsEmp[]>([])
+  const [otherCosts,  setOtherCosts]  = useState<OtherCost>({
+    ad_marketing: 0, db: 0, rent: 0, mgmt: 0, sales_fixed: 0, sales_other: 0,
   })
-  const [ceoSalary, setCeoSalary] = useState<number>(0)
+  const [ceoSalary, setCeoSalary] = useState(0)
+  const [dbCount,        setDbCount]        = useState(0)
+  const [dbUnitPrice,    setDbUnitPrice]    = useState(0)
+  const [dbPurchaseCost, setDbPurchaseCost] = useState(0)
 
-  // 매출 계산 (직접 부가세 제외 금액 입력)
-  // sales_vat_incl 필드를 부가세 제외 금액으로 직접 사용
-  const salesTotal = salesEmps.reduce((s, e) => s + Number(e.sales_vat_incl), 0)
-  // 관리팀 합계 (fee_vat_incl, contract_vat_incl 도 부가세 제외 금액)
-  const opsFeeTotal = opsEmps.reduce((s, e) => s + Number(e.fee_vat_incl), 0)
-  const opsContractTotal = opsEmps.reduce((s, e) => s + Number(e.contract_vat_incl), 0)
-  // 총 매출
-  const totalRevenue = salesTotal + opsFeeTotal + opsContractTotal
+  // 계산
+  const salesTotal      = salesEmps.reduce((s, e) => s + Number(e.sales_vat_incl), 0)
+  const opsFeeTotal     = opsEmps.reduce((s, e) => s + Number(e.fee_vat_incl), 0)
+  const opsContractTotal= opsEmps.reduce((s, e) => s + Number(e.contract_vat_incl), 0)
+  const totalRevenue    = salesTotal + opsFeeTotal + opsContractTotal
 
-  // 프로모션 급여 계산
-  function calcPromo(revenue: number, contracts: number): { baseRate: number; bonus: number; promoWage: number } {
+  function calcPromo(revenue: number, contracts: number) {
     const c = Number(contracts)
     const baseRate = c >= 12 ? 0.30 : 0.25
-    const bonus = c >= 40 ? 1500000 : c >= 30 ? 1000000 : c >= 23 ? 700000 : c >= 20 ? 500000 : 0
-    const promoWage = revenue * baseRate + bonus
-    return { baseRate, bonus, promoWage }
+    const bonus    = c >= 40 ? 1500000 : c >= 30 ? 1000000 : c >= 23 ? 700000 : c >= 20 ? 500000 : 0
+    return { baseRate, bonus, promoWage: revenue * baseRate + bonus }
   }
 
-  // 매입 — 영업팀
-  const salesTax = salesTotal * 0.10
-  // salesWage = sum of individual promoWage; fallback to 30% if no contracts entered
+  const salesTax  = salesTotal * 0.10
   const salesWage = salesEmps.length > 0
     ? salesEmps.reduce((s, e) => {
-        const hasContracts = Number(e.contracts) > 0
-        const revenue = Number(e.sales_vat_incl)
-        if (hasContracts) {
-          return s + calcPromo(revenue, e.contracts).promoWage
-        }
-        return s + revenue * 0.30
+        const has = Number(e.contracts) > 0
+        const r   = Number(e.sales_vat_incl)
+        return s + (has ? calcPromo(r, e.contracts).promoWage : r * 0.30)
       }, 0)
     : salesTotal * 0.30
-  // 매입 — 관리팀 (고정급은 별도 입력 없이 0 기본)
-  // 기타 운영비 합계
-  const otherTotal = Object.values(otherCosts).reduce((s, v) => s + Number(v), 0)
-  // 총 매입
-  const totalCost = salesTax + salesWage + otherTotal
-  // 순이익
-  const netProfit = totalRevenue - totalCost
-
-  // DB 미니계산기
-  const [dbCount, setDbCount] = useState(0)
-  const [dbUnitPrice, setDbUnitPrice] = useState(0)
-  const [dbPurchaseCost, setDbPurchaseCost] = useState(0)
-  const ifRevenue = Number(dbCount) * Number(dbUnitPrice)
-  const ifTax = ifRevenue * 0.10
-  const ifProfit = ifRevenue - ifTax - Number(dbPurchaseCost) - Number(ceoSalary)
+  const otherTotal  = Object.values(otherCosts).reduce((s, v) => s + Number(v), 0)
+  const totalCost   = salesTax + salesWage + otherTotal
+  const netProfit   = totalRevenue - totalCost
   const personalProfit = netProfit - Number(ceoSalary)
+  const ifRevenue   = Number(dbCount) * Number(dbUnitPrice)
+  const ifProfit    = ifRevenue - ifRevenue * 0.10 - Number(dbPurchaseCost) - Number(ceoSalary)
+
+  const iClass = 'w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300'
+  const rClass = 'bg-gray-50 text-gray-600 text-sm px-2 py-1.5 rounded-lg text-right whitespace-nowrap'
 
   async function handleLoad() {
-    setLoading(true)
-    setMsg('')
-    const res = await fetch(`/api/pnl?date=${date}`)
+    setLoading(true); setMsg('')
+    const res  = await fetch(`/api/pnl?date=${today}`)
     const json = await res.json()
     if (json.record) {
       const r = json.record
       if (Array.isArray(r.sales_employees)) setSalesEmps(r.sales_employees)
-      if (Array.isArray(r.ops_employees)) setOpsEmps(r.ops_employees)
-      if (r.other_costs) setOtherCosts(r.other_costs)
+      if (Array.isArray(r.ops_employees))   setOpsEmps(r.ops_employees)
+      if (r.other_costs)   setOtherCosts(r.other_costs)
       if (r.ceo_salary !== undefined) setCeoSalary(r.ceo_salary)
       setMsg('불러오기 완료')
-    } else {
-      setMsg('저장된 데이터가 없습니다.')
-    }
+    } else { setMsg('저장된 데이터 없음') }
     setLoading(false)
+    setTimeout(() => setMsg(''), 3000)
   }
-
-  // 날짜 변경 시 자동 로드
-  useEffect(() => {
-    handleLoad()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date])
 
   async function handleSave() {
-    setSaving(true)
-    setMsg('')
-    const res = await fetch('/api/pnl', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date, sales_employees: salesEmps, ops_employees: opsEmps, other_costs: otherCosts, ceo_salary: ceoSalary }),
+    setSaving(true); setMsg('')
+    const res  = await fetch('/api/pnl', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date: today, sales_employees: salesEmps, ops_employees: opsEmps, other_costs: otherCosts, ceo_salary: ceoSalary }),
     })
     const json = await res.json()
-    setMsg(json.record ? '저장 완료' : ('저장 실패: ' + json.error))
+    setMsg(json.record ? '✅ 저장 완료' : '❌ 저장 실패')
     setSaving(false)
+    setTimeout(() => setMsg(''), 3000)
   }
 
-  function updateSalesEmp(i: number, field: keyof SalesEmp, value: string) {
-    setSalesEmps(prev => {
-      const next = [...prev]
-      next[i] = { ...next[i], [field]: field === 'name' ? value : Number(value) }
-      return next
-    })
+  function updSales(i: number, f: keyof SalesEmp, v: string) {
+    setSalesEmps(prev => { const n = [...prev]; n[i] = { ...n[i], [f]: f === 'name' ? v : Number(v) }; return n })
+  }
+  function updOps(i: number, f: keyof OpsEmp, v: string) {
+    setOpsEmps(prev => { const n = [...prev]; n[i] = { ...n[i], [f]: f === 'name' ? v : Number(v) }; return n })
   }
 
-
-  function updateOpsEmp(i: number, field: keyof OpsEmp, value: string) {
-    setOpsEmps(prev => {
-      const next = [...prev]
-      next[i] = { ...next[i], [field]: field === 'name' ? value : Number(value) }
-      return next
-    })
-  }
+  useEffect(() => { handleLoad() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="space-y-6 pb-8">
-      {/* 날짜 / 버튼 */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <input type="date" value={date} onChange={e => setDate(e.target.value)}
-          className="border border-gray-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
-        {loading && <span className="text-xs text-blue-500">불러오는 중...</span>}
-        <button onClick={handleSave} disabled={saving}
-          className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white px-4 py-1.5 rounded text-sm font-medium">
-          {saving ? '저장 중...' : '저장'}
-        </button>
-        {msg && <span className="text-xs text-gray-500">{msg}</span>}
+    <div className="space-y-5 pb-8">
+      {/* 헤더 */}
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] text-gray-400">{today}</p>
+        <div className="flex items-center gap-3">
+          {loading && <span className="text-xs text-blue-400">불러오는 중…</span>}
+          {msg && <span className={`text-sm font-medium ${msg.includes('✅') ? 'text-emerald-600' : msg.includes('❌') ? 'text-red-500' : 'text-gray-500'}`}>{msg}</span>}
+          <button onClick={handleSave} disabled={saving}
+            className="bg-[#1B2A45] hover:bg-[#263d66] text-white px-5 py-2 rounded-xl text-sm font-bold disabled:opacity-40 transition-colors">
+            {saving ? '저장 중…' : '💾 저장'}
+          </button>
+        </div>
       </div>
 
-      {/* 2열 레이아웃 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* 매출 섹션 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* 매출 */}
         <div className="space-y-4">
           <h3 className="text-sm font-bold text-gray-700">매출</h3>
 
           {/* 영업팀 */}
-          <div className="bg-white rounded-xl border border-gray-100 p-3">
-            <h4 className="text-xs font-semibold text-gray-500 mb-2">영업팀</h4>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-gray-400">
-                    <th className="text-left pb-1 pr-1">직원명</th>
-                    <th className="text-right pb-1 pr-1">매출(부가세제외)</th>
-                    <th className="text-right pb-1 pr-1">계약수</th>
-                    <th className="text-right pb-1 pr-1">기본율</th>
-                    <th className="text-right pb-1 pr-1">보너스</th>
-                    <th className="text-right pb-1 pr-1">프로모급여</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {salesEmps.map((e, i) => {
-                    const promo = calcPromo(Number(e.sales_vat_incl), e.contracts)
-                    const hasContracts = Number(e.contracts) > 0
-                    return (
-                      <tr key={i} className="border-t border-gray-50">
-                        <td className="pr-1 py-0.5">
-                          <input type="text" value={e.name} onChange={ev => updateSalesEmp(i, 'name', ev.target.value)}
-                            className="border border-gray-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 w-full" placeholder="직원명" />
-                        </td>
-                        <td className="pr-1 py-0.5">
-                          <input type="number" value={e.sales_vat_incl} onChange={ev => updateSalesEmp(i, 'sales_vat_incl', ev.target.value)}
-                            className="border border-gray-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 w-full" min="0" placeholder="0" />
-                        </td>
-                        <td className="pr-1 py-0.5">
-                          <input type="number" value={e.contracts} onChange={ev => updateSalesEmp(i, 'contracts', ev.target.value)}
-                            className="border border-gray-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 w-16" min="0" placeholder="0" />
-                        </td>
-                        <td className="pr-1 py-0.5 text-right text-gray-500">
-                          {hasContracts ? `${(promo.baseRate * 100).toFixed(0)}%` : '30%*'}
-                        </td>
-                        <td className="pr-1 py-0.5 text-right text-gray-500">
-                          {hasContracts ? promo.bonus.toLocaleString('ko-KR') : '-'}
-                        </td>
-                        <td className="pr-1 py-0.5 text-right font-semibold text-blue-700">
-                          {hasContracts ? Math.round(promo.promoWage).toLocaleString('ko-KR') : Math.round(Number(e.sales_vat_incl) * 0.30).toLocaleString('ko-KR')}
-                        </td>
-                        <td>
-                          <button onClick={() => setSalesEmps(prev => prev.filter((_, idx) => idx !== i))}
-                            className="text-red-400 hover:text-red-600 text-xs ml-1">✕</button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+          <div className="bg-white rounded-2xl border border-gray-100 p-4">
+            <h4 className="text-xs font-bold text-gray-500 mb-3">영업팀</h4>
+            <div className="space-y-2">
+              {salesEmps.map((e, i) => {
+                const promo = calcPromo(Number(e.sales_vat_incl), e.contracts)
+                const has   = Number(e.contracts) > 0
+                return (
+                  <div key={i} className="grid grid-cols-[100px_1fr_64px_auto_auto_auto_24px] gap-1.5 items-center">
+                    <input type="text" value={e.name} onChange={ev => updSales(i, 'name', ev.target.value)}
+                      className={iClass} placeholder="직원명" />
+                    <input type="number" value={e.sales_vat_incl} onChange={ev => updSales(i, 'sales_vat_incl', ev.target.value)}
+                      className={iClass} placeholder="매출(부가세제외)" min={0} />
+                    <input type="number" value={e.contracts} onChange={ev => updSales(i, 'contracts', ev.target.value)}
+                      className={iClass} placeholder="계약수" min={0} />
+                    <span className={rClass}>{has ? `${(promo.baseRate*100).toFixed(0)}%` : '30%'}</span>
+                    <span className={rClass}>{has ? promo.bonus.toLocaleString('ko-KR') : '—'}</span>
+                    <span className="text-sm font-bold text-blue-700 text-right whitespace-nowrap">
+                      {Math.round(has ? promo.promoWage : Number(e.sales_vat_incl)*0.30).toLocaleString('ko-KR')}
+                    </span>
+                    <button onClick={() => setSalesEmps(prev => prev.filter((_, idx) => idx !== i))}
+                      className="text-gray-300 hover:text-red-400 text-xs">✕</button>
+                  </div>
+                )
+              })}
             </div>
-            <p className="text-[10px] text-gray-400 mt-1">* 계약수 미입력시 30% 고정 적용</p>
+            <p className="text-[10px] text-gray-300 mt-2">계약수 미입력 시 30% 고정</p>
             <button onClick={() => setSalesEmps(prev => [...prev, { name: '', sales_vat_incl: 0, contracts: 0 }])}
-              className="mt-2 text-xs text-blue-600 hover:text-blue-800">+ 영업팀 직원 추가</button>
+              className="mt-2 text-xs text-blue-500 hover:text-blue-700 font-medium">+ 영업팀 직원 추가</button>
           </div>
 
           {/* 관리팀 */}
-          <div className="bg-white rounded-xl border border-gray-100 p-3">
-            <h4 className="text-xs font-semibold text-gray-500 mb-2">관리팀</h4>
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-gray-400">
-                  <th className="text-left pb-1 pr-1">직원명</th>
-                  <th className="text-right pb-1 pr-1">수수료(부가세제외)</th>
-                  <th className="text-right pb-1 pr-1">계약(부가세제외)</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {opsEmps.map((e, i) => (
-                  <tr key={i} className="border-t border-gray-50">
-                    <td className="pr-1 py-0.5">
-                      <input type="text" value={e.name} onChange={ev => updateOpsEmp(i, 'name', ev.target.value)}
-                        className="border border-gray-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 w-full" placeholder="직원명" />
-                    </td>
-                    <td className="pr-1 py-0.5">
-                      <input type="number" value={e.fee_vat_incl} onChange={ev => updateOpsEmp(i, 'fee_vat_incl', ev.target.value)}
-                        className="border border-gray-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 w-full" min="0" placeholder="0" />
-                    </td>
-                    <td className="pr-1 py-0.5">
-                      <input type="number" value={e.contract_vat_incl} onChange={ev => updateOpsEmp(i, 'contract_vat_incl', ev.target.value)}
-                        className="border border-gray-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 w-full" min="0" placeholder="0" />
-                    </td>
-                    <td>
-                      <button onClick={() => setOpsEmps(prev => prev.filter((_, idx) => idx !== i))}
-                        className="text-red-400 hover:text-red-600 text-xs ml-1">✕</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="bg-white rounded-2xl border border-gray-100 p-4">
+            <h4 className="text-xs font-bold text-gray-500 mb-3">관리팀</h4>
+            <div className="space-y-2">
+              {opsEmps.map((e, i) => (
+                <div key={i} className="grid grid-cols-[100px_1fr_1fr_24px] gap-1.5 items-center">
+                  <input type="text" value={e.name} onChange={ev => updOps(i, 'name', ev.target.value)}
+                    className={iClass} placeholder="직원명" />
+                  <input type="number" value={e.fee_vat_incl} onChange={ev => updOps(i, 'fee_vat_incl', ev.target.value)}
+                    className={iClass} placeholder="수수료(부가세제외)" min={0} />
+                  <input type="number" value={e.contract_vat_incl} onChange={ev => updOps(i, 'contract_vat_incl', ev.target.value)}
+                    className={iClass} placeholder="계약(부가세제외)" min={0} />
+                  <button onClick={() => setOpsEmps(prev => prev.filter((_, idx) => idx !== i))}
+                    className="text-gray-300 hover:text-red-400 text-xs">✕</button>
+                </div>
+              ))}
+            </div>
             <button onClick={() => setOpsEmps(prev => [...prev, { name: '', fee_vat_incl: 0, contract_vat_incl: 0 }])}
-              className="mt-2 text-xs text-blue-600 hover:text-blue-800">+ 관리팀 직원 추가</button>
+              className="mt-2 text-xs text-blue-500 hover:text-blue-700 font-medium">+ 관리팀 직원 추가</button>
           </div>
         </div>
 
-        {/* 매입 + 기타 */}
+        {/* 매입 + 요약 */}
         <div className="space-y-4">
           <h3 className="text-sm font-bold text-gray-700">매입 / 비용</h3>
 
           {/* 영업팀 매입 */}
-          <div className="bg-white rounded-xl border border-gray-100 p-3">
-            <h4 className="text-xs font-semibold text-gray-500 mb-2">영업팀 매입</h4>
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-gray-400">
-                  <th className="text-left pb-1 pr-1">직원명</th>
-                  <th className="text-right pb-1 pr-1">세금 (10%)</th>
-                  <th className="text-right pb-1 pr-1">프로모급여</th>
-                </tr>
-              </thead>
-              <tbody>
-                {salesEmps.map((e, i) => {
-                  const amt = Number(e.sales_vat_incl)
-                  const hasContracts = Number(e.contracts) > 0
-                  const promo = calcPromo(amt, e.contracts)
-                  const wage = hasContracts ? promo.promoWage : amt * 0.30
-                  return (
-                    <tr key={i} className="border-t border-gray-50">
-                      <td className="pr-1 py-0.5 text-gray-600">{e.name || `직원${i+1}`}</td>
-                      <td className="bg-gray-50 text-gray-600 px-1 py-0.5 text-right whitespace-nowrap">{Math.round(amt * 0.10).toLocaleString('ko-KR')}</td>
-                      <td className="bg-gray-50 text-gray-600 px-1 py-0.5 text-right whitespace-nowrap">{Math.round(wage).toLocaleString('ko-KR')}</td>
-                    </tr>
-                  )
-                })}
-                <tr className="border-t border-gray-200 font-semibold">
-                  <td className="pr-1 py-1 text-gray-500">소계</td>
-                  <td className="bg-gray-50 text-gray-600 px-1 py-0.5 text-right whitespace-nowrap">{Math.round(salesTax).toLocaleString('ko-KR')}</td>
-                  <td className="bg-gray-50 text-gray-600 px-1 py-0.5 text-right whitespace-nowrap">{Math.round(salesWage).toLocaleString('ko-KR')}</td>
-                </tr>
-              </tbody>
-            </table>
+          <div className="bg-white rounded-2xl border border-gray-100 p-4">
+            <h4 className="text-xs font-bold text-gray-500 mb-3">영업팀 매입</h4>
+            <div className="space-y-1">
+              {salesEmps.map((e, i) => {
+                const has  = Number(e.contracts) > 0
+                const amt  = Number(e.sales_vat_incl)
+                const wage = has ? calcPromo(amt, e.contracts).promoWage : amt * 0.30
+                return (
+                  <div key={i} className="grid grid-cols-[100px_1fr_1fr] gap-2 items-center text-sm">
+                    <span className="text-gray-500 text-xs">{e.name || `직원${i+1}`}</span>
+                    <span className={rClass}>{Math.round(amt*0.10).toLocaleString('ko-KR')}</span>
+                    <span className={rClass}>{Math.round(wage).toLocaleString('ko-KR')}</span>
+                  </div>
+                )
+              })}
+              <div className="grid grid-cols-[100px_1fr_1fr] gap-2 items-center border-t border-gray-100 pt-1">
+                <span className="text-xs font-bold text-gray-500">소계</span>
+                <span className={rClass + ' font-bold'}>{Math.round(salesTax).toLocaleString('ko-KR')}</span>
+                <span className={rClass + ' font-bold'}>{Math.round(salesWage).toLocaleString('ko-KR')}</span>
+              </div>
+            </div>
           </div>
 
           {/* 기타 운영비 */}
-          <div className="bg-white rounded-xl border border-gray-100 p-4">
-            <h4 className="text-xs font-semibold text-gray-500 mb-3">기타 운영비</h4>
+          <div className="bg-white rounded-2xl border border-gray-100 p-4">
+            <h4 className="text-xs font-bold text-gray-500 mb-3">기타 운영비</h4>
             <div className="space-y-2">
               {([
                 ['ad_marketing', '광고/마케팅'],
-                ['db', 'DB'],
-                ['rent', '임대료'],
-                ['mgmt', '관리비'],
-                ['sales_fixed', '영업고정비용'],
-                ['sales_other', '영업기타비용'],
-              ] as [keyof OtherCost, string][]).map(([field, label]) => (
-                <div key={field} className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500 w-28 shrink-0">{label}</span>
-                  <input type="number" value={otherCosts[field]}
-                    onChange={e => setOtherCosts(prev => ({ ...prev, [field]: Number(e.target.value) }))}
-                    className={INPUT_CLS} min="0" />
-                  <span className="text-xs text-gray-400 w-28 text-right">
-                    {Number(otherCosts[field]).toLocaleString('ko-KR')}원
+                ['db',           'DB'],
+                ['rent',         '임대료'],
+                ['mgmt',         '관리비'],
+                ['sales_fixed',  '영업고정비용'],
+                ['sales_other',  '영업기타비용'],
+              ] as [keyof OtherCost, string][]).map(([f, label]) => (
+                <div key={f} className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 w-24 shrink-0">{label}</span>
+                  <input type="number" value={otherCosts[f]}
+                    onChange={e => setOtherCosts(prev => ({ ...prev, [f]: Number(e.target.value) }))}
+                    className={iClass} min={0} />
+                  <span className="text-xs text-gray-400 w-28 text-right shrink-0">
+                    {Number(otherCosts[f]).toLocaleString('ko-KR')}원
                   </span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* 요약 카드 */}
-          <div className="bg-gray-900 text-white rounded-xl p-4 space-y-2">
-            <h4 className="text-xs font-semibold text-gray-300 mb-3">손익 요약</h4>
-            <div className="flex justify-between text-sm">
-              <span>총 매출</span>
-              <span className="font-bold">{totalRevenue.toLocaleString('ko-KR')}원</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>총 매입</span>
-              <span className="font-bold">{totalCost.toLocaleString('ko-KR')}원</span>
-            </div>
-            <div className="border-t border-gray-700 pt-2 flex justify-between text-base font-bold">
+          {/* 손익 요약 */}
+          <div className="bg-[#1B2A45] text-white rounded-2xl p-5 space-y-2">
+            <h4 className="text-xs font-bold text-white/50 mb-3 uppercase tracking-wide">손익 요약</h4>
+            {[
+              ['총 매출', totalRevenue, 'text-white'],
+              ['총 매입', totalCost,    'text-white/70'],
+            ].map(([label, val, cls]) => (
+              <div key={label as string} className="flex justify-between text-sm">
+                <span className="text-white/60">{label as string}</span>
+                <span className={`font-bold ${cls as string}`}>{(val as number).toLocaleString('ko-KR')}원</span>
+              </div>
+            ))}
+            <div className="border-t border-white/20 pt-2 flex justify-between text-base font-black">
               <span>순이익</span>
               <span className={netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}>
                 {netProfit.toLocaleString('ko-KR')}원
@@ -834,22 +926,22 @@ function PnlSubView() {
             </div>
           </div>
 
-          {/* 개인 고정 생활비 */}
-          <div className="mt-3">
-            <p className="text-[10px] text-gray-400 font-semibold mb-2 uppercase tracking-wide">개인 고정 생활비</p>
+          {/* 개인 생활비 */}
+          <div className="space-y-2">
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">개인 고정 생활비</p>
             <div className="grid grid-cols-2 gap-2">
-              <div className="bg-rose-50 border border-rose-100 rounded-lg px-3 py-2 flex items-center justify-between">
+              <div className="bg-rose-50 border border-rose-100 rounded-xl px-3 py-2.5 flex items-center justify-between">
                 <span className="text-xs text-rose-600">💳 카드값</span>
-                <span className="text-sm font-bold text-rose-700">300만원</span>
+                <span className="text-sm font-black text-rose-700">300만원</span>
               </div>
-              <div className="bg-orange-50 border border-orange-100 rounded-lg px-3 py-2 flex items-center justify-between">
+              <div className="bg-orange-50 border border-orange-100 rounded-xl px-3 py-2.5 flex items-center justify-between">
                 <span className="text-xs text-orange-600">🏠 집월세</span>
-                <span className="text-sm font-bold text-orange-700">65만원</span>
+                <span className="text-sm font-black text-orange-700">65만원</span>
               </div>
             </div>
-            <div className="mt-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 flex items-center justify-between">
-              <span className="text-xs text-gray-500">순이익 - 생활비</span>
-              <span className={`text-sm font-bold ${(netProfit - 3650000) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+            <div className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 flex items-center justify-between">
+              <span className="text-xs text-gray-500">순이익 − 생활비</span>
+              <span className={`text-sm font-black ${(netProfit - 3650000) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                 {(netProfit - 3650000).toLocaleString('ko-KR')}원
               </span>
             </div>
@@ -858,26 +950,32 @@ function PnlSubView() {
       </div>
 
       {/* DB 미니 계산기 */}
-      <div className="bg-white rounded-xl border border-gray-100 p-4 max-w-md">
-        <h4 className="text-sm font-bold text-gray-700 mb-3">DB 미니 계산기</h4>
-        <div className="space-y-2">
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 max-w-sm">
+        <h4 className="text-sm font-bold text-gray-700 mb-4">DB 미니 계산기</h4>
+        <div className="space-y-2.5">
           {([
-            ['DB개수', dbCount, (v: string) => setDbCount(Number(v))],
-            ['DB단가(원/개)', dbUnitPrice, (v: string) => setDbUnitPrice(Number(v))],
-            ['DB구매비용', dbPurchaseCost, (v: string) => setDbPurchaseCost(Number(v))],
-            ['대표 개인 월급', ceoSalary, (v: string) => setCeoSalary(Number(v))],
-          ] as [string, number, (v: string) => void][]).map(([label, val, setter]) => (
+            ['DB 개수',       dbCount,        setDbCount],
+            ['DB 단가(원/개)', dbUnitPrice,    setDbUnitPrice],
+            ['DB 구매비용',   dbPurchaseCost, setDbPurchaseCost],
+            ['대표 개인 월급', ceoSalary,      setCeoSalary],
+          ] as [string, number, (v: number) => void][]).map(([label, val, setter]) => (
             <div key={label} className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 w-32 shrink-0">{label}</span>
-              <input type="number" value={val} onChange={e => setter(e.target.value)}
-                className={INPUT_CLS} min="0" />
+              <span className="text-xs text-gray-500 w-28 shrink-0">{label}</span>
+              <input type="number" value={val} onChange={e => setter(Number(e.target.value))}
+                className={iClass} min={0} />
             </div>
           ))}
-          <div className="border-t border-gray-100 pt-2 space-y-1 text-sm">
-            <div className="flex justify-between"><span className="text-gray-500">IF 매출</span><span>{ifRevenue.toLocaleString('ko-KR')}원</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">세금 (10%)</span><span>{Math.round(ifTax).toLocaleString('ko-KR')}원</span></div>
-            <div className="flex justify-between font-semibold"><span>IF 수익</span><span className={ifProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}>{Math.round(ifProfit).toLocaleString('ko-KR')}원</span></div>
-            <div className="flex justify-between font-semibold"><span>개인 수익</span><span className={personalProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}>{Math.round(personalProfit).toLocaleString('ko-KR')}원</span></div>
+          <div className="border-t border-gray-100 pt-3 space-y-1.5 text-sm">
+            <div className="flex justify-between"><span className="text-gray-400">IF 매출</span><span className="font-medium">{ifRevenue.toLocaleString('ko-KR')}원</span></div>
+            <div className="flex justify-between"><span className="text-gray-400">세금 10%</span><span className="font-medium">{Math.round(ifRevenue*0.10).toLocaleString('ko-KR')}원</span></div>
+            <div className="flex justify-between font-bold">
+              <span>IF 수익</span>
+              <span className={ifProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}>{Math.round(ifProfit).toLocaleString('ko-KR')}원</span>
+            </div>
+            <div className="flex justify-between font-bold">
+              <span>개인 수익</span>
+              <span className={personalProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}>{Math.round(personalProfit).toLocaleString('ko-KR')}원</span>
+            </div>
           </div>
         </div>
       </div>
@@ -885,34 +983,31 @@ function PnlSubView() {
   )
 }
 
-// ─── 메인 탭 컴포넌트 ────────────────────────────────────
-
+// ════════════════════════════════════════════════════════════════════════════════
+//  메인 탭
+// ════════════════════════════════════════════════════════════════════════════════
 type SubView = '결제율' | '손익계산'
 
 export default function PayRateTab() {
-  const [subView, setSubView] = useState<SubView>('결제율')
+  const [sub, setSub] = useState<SubView>('결제율')
 
   return (
     <div className="space-y-4 pb-8">
-      {/* 서브뷰 전환 버튼 */}
       <div className="flex gap-2">
         {(['결제율', '손익계산'] as SubView[]).map(v => (
-          <button
-            key={v}
-            onClick={() => setSubView(v)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              subView === v
-                ? 'bg-gray-900 text-white'
+          <button key={v} onClick={() => setSub(v)}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+              sub === v
+                ? 'bg-[#1B2A45] text-white'
                 : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-300'
-            }`}
-          >
-            {v}
+            }`}>
+            {v === '결제율' ? '📊 결제율' : '💹 손익계산'}
           </button>
         ))}
       </div>
 
-      {subView === '결제율' && <PayRateSubView />}
-      {subView === '손익계산' && <PnlSubView />}
+      {sub === '결제율'  && <PayRateSubView />}
+      {sub === '손익계산' && <PnlSubView />}
     </div>
   )
 }
