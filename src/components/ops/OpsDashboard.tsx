@@ -2108,15 +2108,53 @@ export default function OpsDashboard({ userId, userName }: Props) {
   const [notices, setNotices] = useState<any[]>([])
   // ── 메모장 ──────────────────────────────────────────────
   const [notepadOpen, setNotepadOpen] = useState(false)
-  const [notepadText, setNotepadText] = useState(() => {
-    if (typeof window !== 'undefined') return localStorage.getItem('ops-daily-notepad') || ''
+  const [notepadOpacity, setNotepadOpacity] = useState(90)
+  const [notepadSize, setNotepadSize] = useState({ w: 300, h: 480 })
+  const [notepadInput, setNotepadInput] = useState('')
+  const [addPeriod, setAddPeriod] = useState<'today' | 'week' | 'month'>('today')
+  const [memoText, setMemoText] = useState(() => {
+    if (typeof window !== 'undefined') { try { return localStorage.getItem('ops-notepad-memo') || '' } catch { return '' } }
     return ''
   })
-  const [notepadOpacity, setNotepadOpacity] = useState(90)
-  function saveNotepad(val: string) {
-    setNotepadText(val)
-    if (typeof window !== 'undefined') localStorage.setItem('ops-daily-notepad', val)
+  const notepadResizeRef = useRef({ active: false, startX: 0, startY: 0, startW: 0, startH: 0 })
+  function onNotepadResizeStart(e: React.MouseEvent) {
+    e.preventDefault()
+    notepadResizeRef.current = { active: true, startX: e.clientX, startY: e.clientY, startW: notepadSize.w, startH: notepadSize.h }
+    function onMove(ev: MouseEvent) {
+      if (!notepadResizeRef.current.active) return
+      setNotepadSize({
+        w: Math.max(240, Math.min(640, notepadResizeRef.current.startW + ev.clientX - notepadResizeRef.current.startX)),
+        h: Math.max(300, Math.min(900, notepadResizeRef.current.startH + ev.clientY - notepadResizeRef.current.startY)),
+      })
+    }
+    function onUp() {
+      notepadResizeRef.current.active = false
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
   }
+  const [todos, setTodos] = useState<{id: string; text: string; checked: boolean; period: 'today' | 'week' | 'month'}[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = JSON.parse(localStorage.getItem('ops-daily-todos') || '[]')
+        return saved.map((t: any) => ({ ...t, period: t.period || 'today' }))
+      } catch { return [] }
+    }
+    return []
+  })
+  function saveTodos(next: typeof todos) {
+    setTodos(next)
+    if (typeof window !== 'undefined') localStorage.setItem('ops-daily-todos', JSON.stringify(next))
+  }
+  function addTodo(text: string, period: 'today' | 'week' | 'month' = 'today') {
+    if (!text.trim()) return
+    saveTodos([...todos, { id: Date.now().toString(), text: text.trim(), checked: false, period }])
+    setNotepadInput('')
+  }
+  function toggleTodo(id: string) { saveTodos(todos.map(t => t.id === id ? { ...t, checked: !t.checked } : t)) }
+  function deleteTodo(id: string) { saveTodos(todos.filter(t => t.id !== id)) }
 
   useEffect(() => {
     const handler = (e: any) => { e.preventDefault(); setInstallPrompt(e); setInstallable(true) }
@@ -2451,26 +2489,82 @@ export default function OpsDashboard({ userId, userName }: Props) {
       {/* ── 플로팅 메모장 ── */}
       {notepadOpen && (
         <div
-          className="fixed bottom-20 right-4 z-[300] bg-amber-50 border border-amber-200 rounded-2xl shadow-2xl flex flex-col"
-          style={{ width: 280, maxHeight: 380, opacity: notepadOpacity / 100 }}
+          className="fixed top-14 right-4 z-[300] bg-amber-50 border border-amber-200 rounded-2xl shadow-2xl flex flex-col overflow-hidden select-none"
+          style={{ width: notepadSize.w, height: notepadSize.h, opacity: notepadOpacity / 100 }}
         >
-          <div className="flex items-center justify-between px-3 py-2 bg-amber-400 rounded-t-2xl">
-            <span className="text-[11px] font-bold text-white">📝 오늘 할일 메모장</span>
+          <div className="flex items-center justify-between px-3 py-2 bg-amber-400 rounded-t-2xl shrink-0">
+            <span className="text-[11px] font-bold text-white">📝 메모장</span>
             <button onClick={() => setNotepadOpen(false)} className="text-white/80 hover:text-white text-sm leading-none">✕</button>
           </div>
-          <textarea
-            value={notepadText}
-            onChange={e => saveNotepad(e.target.value)}
-            className="flex-1 resize-none bg-transparent px-3 py-2.5 text-xs text-gray-800 placeholder-gray-400 focus:outline-none"
-            placeholder="오늘 처리할 업체, 할일 등 메모..."
-            style={{ minHeight: 220 }}
-          />
-          <div className="px-3 py-2 border-t border-amber-200 flex items-center gap-2">
+          <div className="flex-1 overflow-y-auto flex flex-col">
+            <div className="px-2.5 pt-2 pb-2 border-b border-amber-200 shrink-0">
+              <div className="flex gap-1 mb-1.5">
+                {(['today', 'week', 'month'] as const).map(p => {
+                  const lbl = { today: '오늘', week: '이번주', month: '이번달' }[p]
+                  return (
+                    <button key={p} type="button" onClick={() => setAddPeriod(p)}
+                      className={`text-[10px] px-2 py-0.5 rounded-full font-semibold transition-colors ${addPeriod === p ? 'bg-amber-500 text-white' : 'bg-amber-100 text-amber-600 hover:bg-amber-200'}`}>
+                      {lbl}
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="flex gap-1">
+                <input value={notepadInput} onChange={e => setNotepadInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') addTodo(notepadInput, addPeriod) }}
+                  placeholder={`${addPeriod === 'today' ? '오늘' : addPeriod === 'week' ? '이번주' : '이번달'} 할일 추가...`}
+                  className="flex-1 text-xs bg-white border border-amber-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-amber-400/50" />
+                <button onClick={() => addTodo(notepadInput, addPeriod)}
+                  className="text-xs bg-amber-500 hover:bg-amber-600 text-white px-2 py-1 rounded font-semibold">+</button>
+              </div>
+            </div>
+            <div className="px-2.5 py-2 space-y-3 shrink-0">
+              {(['today', 'week', 'month'] as const).map(p => {
+                const sectionLabel = { today: '📅 오늘', week: '📆 이번주', month: '🗓 이번달' }[p]
+                const items = todos.filter(t => t.period === p)
+                return (
+                  <div key={p}>
+                    <p className="text-[9px] font-bold text-amber-600 mb-1">{sectionLabel}</p>
+                    {items.length === 0 ? (
+                      <p className="text-[10px] text-amber-200 italic pl-1">없음</p>
+                    ) : (
+                      <div className="space-y-0.5">
+                        {items.map(t => (
+                          <div key={t.id} className="flex items-center gap-1.5 group py-0.5">
+                            <input type="checkbox" checked={t.checked} onChange={() => toggleTodo(t.id)}
+                              className="w-3.5 h-3.5 accent-amber-500 cursor-pointer shrink-0" />
+                            <span className={`text-xs flex-1 ${t.checked ? 'line-through text-gray-400' : 'text-gray-800'}`}>{t.text}</span>
+                            <button onClick={() => deleteTodo(t.id)}
+                              className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 text-[10px] transition-opacity shrink-0">✕</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            <div className="border-t border-amber-200 px-2.5 pt-2 pb-3 flex flex-col flex-1" style={{ minHeight: 120 }}>
+              <p className="text-[9px] font-bold text-amber-600 mb-1.5">✏️ 자유 메모</p>
+              <textarea value={memoText}
+                onChange={e => { setMemoText(e.target.value); if (typeof window !== 'undefined') localStorage.setItem('ops-notepad-memo', e.target.value) }}
+                placeholder="자유롭게 메모하세요..."
+                className="flex-1 w-full text-xs bg-white border border-amber-200 rounded p-2 focus:outline-none focus:ring-1 focus:ring-amber-400/50 resize-none"
+                style={{ minHeight: 80 }} />
+            </div>
+          </div>
+          <div className="px-3 py-1.5 border-t border-amber-200 flex items-center gap-2 shrink-0">
             <span className="text-[9px] text-amber-600 font-semibold shrink-0">투명도</span>
             <input type="range" min={20} max={100} value={notepadOpacity}
               onChange={e => setNotepadOpacity(Number(e.target.value))}
               className="flex-1 h-1 accent-amber-400" />
             <span className="text-[9px] text-amber-600 font-semibold w-6 text-right">{notepadOpacity}%</span>
+          </div>
+          <div onMouseDown={onNotepadResizeStart}
+            className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize z-10 flex items-end justify-end pb-0.5 pr-0.5" title="드래그하여 크기 조절">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <path d="M9 1L1 9M9 5L5 9M9 9" stroke="#f59e0b" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
           </div>
         </div>
       )}
