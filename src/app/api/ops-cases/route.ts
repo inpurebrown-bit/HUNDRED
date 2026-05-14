@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { customer_name, phone, stage, memo, revenue, owner_id, timeline } = body
+  const { customer_name, phone, stage, memo, revenue, owner_id, timeline, customer_id, details } = body
 
   const { data, error } = await supabaseAdmin
     .from('ops_cases')
@@ -73,7 +73,9 @@ export async function POST(req: NextRequest) {
       memo:             memo          ?? '',
       revenue:          revenue       ?? 0,
       institution_type: 'new',
-      ...(timeline ? { timeline } : {}),
+      ...(timeline    ? { timeline }     : {}),
+      ...(customer_id ? { customer_id }  : {}),
+      ...(details     ? { details }      : {}),
     })
     .select()
     .single()

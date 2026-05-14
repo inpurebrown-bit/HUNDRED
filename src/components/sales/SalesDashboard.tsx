@@ -282,6 +282,23 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         revenue,
         owner_id: opsUserId || null,
         timeline: salesTimeline.length > 0 ? salesTimeline : undefined,
+        customer_id: customer.id,
+        details: {
+          sales_customer_info: {
+            customer_id: customer.id,
+            company: (anyDetails.company as string) || customer.company || customer.name || '',
+            representative: customer.name || '',
+            phone: customer.phone || '',
+            business_type: anyDetails.business_type || '',
+            region: anyDetails.region || '',
+            created_at: (customer as any).created_at || '',
+            call_result: anyDetails.call_result || '',
+            closing_result: anyDetails.closing_result || '',
+            subcall_date: anyDetails.subcall_date || '',
+            loan_history: customer.loan_history || '',
+            sales_user_name: anyDetails.sales_user_name || opsUserName || '',
+          }
+        },
       }),
     })
     await loadAll()
