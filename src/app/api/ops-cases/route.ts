@@ -61,20 +61,22 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
 
-  let query = supabaseAdmin.from('ops_cases').select('*')
-  if (user.role === 'ops') {
-    // owner_id 또는 ops_user_name 으로 매칭 (타입 불일치 방어용 이중 체크)
-    // owner_id.is.null: 미배정 케이스는 모든 ops 직원에게 표시
-    const safeUserName = (user.name || '').replace(/,/g, '')  // 쉼표 방어
-    query = query.or(
-      `owner_id.eq.${user.id},ops_user_name.eq.${safeUserName},owner_id.is.null`
-    ) as any
-  }
-
-  const { data, error } = await query
+  // 전체 케이스 조회 후 JS에서 필터 (owner_id 타입 불일치 방어)
+  const { data: allData, error } = await supabaseAdmin.from('ops_cases').select('*')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const cases = data || []
+  let cases = allData || []
+
+  if (user.role === 'ops') {
+    const myId   = String(user.id).trim()
+    const myName = (user.name || '').trim()
+    cases = cases.filter(c => {
+      const ownerMatch = c.owner_id != null && String(c.owner_id).trim() === myId
+      const nameMatch  = c.ops_user_name && c.ops_user_name.trim() === myName
+      const unassigned = c.owner_id == null && !c.ops_user_name
+      return ownerMatch || nameMatch || unassigned
+    })
+  }
 
   // 전화번호 목록으로 customers 테이블 일괄 조회
   const phones = [...new Set(cases.map((c: any) => c.phone).filter(Boolean))]

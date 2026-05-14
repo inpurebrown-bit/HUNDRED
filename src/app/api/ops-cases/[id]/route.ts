@@ -49,9 +49,11 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   if (!existing) return NextResponse.json({ error: '케이스 없음' }, { status: 404 })
   // ops 직원은 본인 케이스(owner_id 또는 ops_user_name 매칭) 또는 미배정 케이스만 수정 가능
   if (user.role === 'ops') {
-    const isOwnerById   = existing.owner_id === user.id
-    const isOwnerByName = existing.ops_user_name && existing.ops_user_name === user.name
-    const isUnassigned  = existing.owner_id === null && !existing.ops_user_name
+    const myId   = String(user.id).trim()
+    const myName = (user.name || '').trim()
+    const isOwnerById   = existing.owner_id != null && String(existing.owner_id).trim() === myId
+    const isOwnerByName = existing.ops_user_name && existing.ops_user_name.trim() === myName
+    const isUnassigned  = existing.owner_id == null && !existing.ops_user_name
     if (!isOwnerById && !isOwnerByName && !isUnassigned) {
       return NextResponse.json({ error: '권한 없음' }, { status: 403 })
     }
