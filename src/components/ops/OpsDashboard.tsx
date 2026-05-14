@@ -232,8 +232,7 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // pwVisible 제거됨 — 기관ID/PW 필드는 항상 평문 표시
   const [salesLogOpen, setSalesLogOpen] = useState(false)
-  // 인콜일지 타임라인 입력 + 수정모드
-  const [tlInput, setTlInput] = useState('')
+  // 인콜일지 수정모드
   const [incallEditing, setIncallEditing] = useState(false)
 
   useEffect(() => { setLocal({ ...c }) }, [c.id])
@@ -298,21 +297,6 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
   function incallField(key: string, val: any) {
     const ij = local.details?.incall_journal || {}
     detailField('incall_journal', { ...ij, [key]: val })
-  }
-  // 인콜일지 타임라인 추가
-  function addIncallTimeline() {
-    if (!tlInput.trim()) return
-    const ij = local.details?.incall_journal || {}
-    const tl = [...(ij.timeline || []), { user: '관리팀', content: tlInput.trim(), created_at: nowKST() }]
-    detailField('incall_journal', { ...ij, timeline: tl })
-    setTlInput('')
-  }
-  // 인콜일지 타임라인 삭제 (관리팀 추가분만)
-  function deleteIncallTimeline(idx: number) {
-    if (!confirm('이 기록을 삭제하시겠습니까?')) return
-    const ij = local.details?.incall_journal || {}
-    const tl = (ij.timeline || []).filter((_: any, i: number) => i !== idx)
-    detailField('incall_journal', { ...ij, timeline: tl })
   }
   function handleStageChange(nextStage: string) {
     // 관리팀 직원은 환불/종료를 직접 선택 불가 → 예정 단계로 자동 전환
@@ -678,19 +662,9 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
             const cd = local.customers?.details || {}
             const ij = d.incall_journal || {}
             const gv = (k: string, cv: any) => (ij[k] !== undefined && ij[k] !== '') ? ij[k] : (cv ?? '')
-            const callTimeline: any[] = (local.customers as any)?.call_timeline || []
-            const salesTimeline: any[] = callTimeline.length > 0
-              ? callTimeline
-              : (local.timeline || []).filter((e: any) => e.source === 'sales')
             const callResult    = gv('call_result',    cd.call_result    ?? '')
             const closingResult = gv('closing_result', cd.closing_result ?? '')
             const subcallDate   = gv('subcall_date',   cd.subcall_date   ?? '')
-            const combinedTl = [
-              ...salesTimeline.map((e: any) => ({ ...e, _src: 'sales' })),
-              ...(ij.timeline || []).map((e: any) => ({ ...e, _src: 'ops' })),
-            ].sort((a: any, b: any) =>
-              new Date(a.created_at || a.date || 0).getTime() - new Date(b.created_at || b.date || 0).getTime()
-            )
 
             // 섹션별 필드 정의
             const sections = [
@@ -702,6 +676,7 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
                   [['지역', 'region', gv('region', cd.region || '')], ['접수일', 'reception_date', gv('reception_date', cd.reception_date || (cd.created_at ? formatKST(cd.created_at).date : ''))]],
                   [['업종', 'business_type', gv('business_type', cd.business_type || '')], ['실제업무', 'real_work', gv('real_work', cd.real_work || '')]],
                   [['업력', 'years_in_business', gv('years_in_business', cd.years_in_business || cd.biz_size || '')], ['직원수', 'employee_count', gv('employee_count', cd.employee_count || '')]],
+                  [['혁신요건', 'innovation', gv('innovation', cd.innovation || '')]],
                 ],
               },
               {
@@ -826,54 +801,6 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
                   </div>
                 </div>
 
-                {/* ── 타임라인 ── */}
-                <div className="px-3 pt-3 pb-2">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <span className="text-[10px] font-bold text-gray-500">🕐 타임라인</span>
-                    <div className="flex-1 h-px bg-gray-100" />
-                  </div>
-                  <div className="flex gap-1 mb-2">
-                    <input value={tlInput} onChange={e => setTlInput(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') addIncallTimeline() }}
-                      placeholder="기록 입력 후 Enter..."
-                      className="flex-1 border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400/50" />
-                    <button type="button" onClick={addIncallTimeline}
-                      className="px-3 py-1.5 bg-[#1B2A45] text-white text-xs font-bold rounded hover:bg-[#1B2A45]/80">추가</button>
-                  </div>
-                  {combinedTl.length === 0 ? (
-                    <p className="text-[10px] text-gray-300 text-center py-2">기록 없음</p>
-                  ) : (
-                    <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
-                      {[...combinedTl].reverse().map((entry: any, i: number) => {
-                        const isSales = entry._src === 'sales'
-                        const kst = formatKST(entry.created_at || entry.date || '')
-                        const opsTlIdx = isSales ? -1 : (ij.timeline || []).findIndex((e: any) =>
-                          e.created_at === entry.created_at && e.content === entry.content
-                        )
-                        return (
-                          <div key={i} className={`flex gap-2 items-start rounded-lg px-2 py-1.5 group ${isSales ? 'bg-violet-50' : 'bg-gray-50'}`}>
-                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white shrink-0 mt-0.5 ${isSales ? 'bg-violet-400' : 'bg-[#1B2A45]'}`}>
-                              {isSales ? '영' : '관'}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <span className={`text-[10px] font-semibold ${isSales ? 'text-violet-600' : 'text-[#1B2A45]'}`}>
-                                  {entry.user || entry.author || (isSales ? '영업팀' : '관리팀')}
-                                </span>
-                                <span className="text-[10px] text-gray-300">{kst.date} {kst.time}</span>
-                              </div>
-                              <p className="text-xs text-gray-700 mt-0.5">{entry.content || entry.text || ''}</p>
-                            </div>
-                            {!isSales && opsTlIdx >= 0 && (
-                              <button type="button" onClick={() => deleteIncallTimeline(opsTlIdx)}
-                                className="text-[9px] text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">✕</button>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
               </div>
             )
           })()}
@@ -1074,6 +1001,26 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
           ⏳ 대표 승인 대기
         </div>
       )}
+
+      {/* 빠른 일정 표시 */}
+      {(() => {
+        const today = new Date().toISOString().slice(0, 10)
+        const candidates = [
+          { label: '직방문', date: c.details?.direct_visit_date },
+          { label: '간방문', date: c.details?.indirect_visit_date },
+          { label: '직실사', date: c.details?.direct_inspection_date },
+          { label: '간실사', date: c.details?.indirect_inspection_date },
+        ].filter(d => d.date && d.date >= today).sort((a, b) => a.date!.localeCompare(b.date!))
+        const nearest = candidates[0]
+        if (!nearest) return null
+        return (
+          <div className="mt-1.5 flex items-center justify-center gap-0.5">
+            <span className="text-[8px] bg-sky-50 text-sky-600 font-semibold px-1.5 py-0.5 rounded-full border border-sky-200">
+              📅 {nearest.label} {nearest.date!.slice(5)}
+            </span>
+          </div>
+        )
+      })()}
 
       {/* 스크립트 발송 체크 */}
       <div className="mt-1.5 flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
@@ -2388,22 +2335,20 @@ export default function OpsDashboard({ userId, userName }: Props) {
           {opsTabs.find(t => t.key === activeTab)?.label ?? '관리팀 대시보드'}
         </span>
         <div className="flex items-center gap-2 relative">
-          {/* 검색 */}
-          {(activeTab === 'active' || activeTab === 'refund' || activeTab === 'completed') && (
-            <div className="relative">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder="업체명·이름·기관..."
-                className="bg-white/10 text-white placeholder-white/40 text-xs px-3 py-1.5 rounded-lg border border-white/20 focus:outline-none focus:bg-white/20 w-32 md:w-44"
-              />
-              {q.length >= 1 && (
-                <button onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-white/50 hover:text-white text-xs">✕</button>
-              )}
-            </div>
-          )}
+          {/* 검색 — 항상 표시 */}
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="업체명·이름·기관..."
+              className="bg-white/10 text-white placeholder-white/40 text-xs px-3 py-1.5 rounded-lg border border-white/20 focus:outline-none focus:bg-white/20 w-28 md:w-44"
+            />
+            {q.length >= 1 && (
+              <button onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-white/50 hover:text-white text-xs">✕</button>
+            )}
+          </div>
           {/* 메모장 버튼 */}
           <button
             onClick={() => setNotepadOpen(v => !v)}

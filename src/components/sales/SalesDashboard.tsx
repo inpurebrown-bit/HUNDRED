@@ -297,6 +297,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             subcall_date: anyDetails.subcall_date || '',
             loan_history: customer.loan_history || '',
             sales_user_name: anyDetails.sales_user_name || opsUserName || '',
+            innovation: anyDetails.innovation || '',
           }
         },
       }),
