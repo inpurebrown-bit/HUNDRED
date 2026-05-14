@@ -428,7 +428,8 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
   const [vatIncluded, setVatIncluded] = useState(false)
   const [myRevenue,   setMyRevenue]   = useState('')
   const [contractDate, setContractDate] = useState(new Date().toISOString().slice(0, 10))
-  const [paymentMethod, setPaymentMethod] = useState<'카드' | '현금' | '계좌이체' | ''>('')
+  const [paymentMethod, setPaymentMethod] = useState<'카드' | '현금' | ''>('')
+  const [approvedAmount, setApprovedAmount] = useState('')
   const [commissionRate, setCommissionRate] = useState('')
   // 메모 미러링: 통화내용/메모와 동일 필드 (initialMemo로 pre-fill)
   const [opsMemo,     setOpsMemo]     = useState(initialMemo)
@@ -437,9 +438,10 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
   const [coopRequestSent,  setCoopRequestSent]  = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const feeNum   = parseNumber(contractFee)
-  const paidNum  = parseNumber(paidAmount)
-  const myRevNum = parseNumber(myRevenue)
+  const feeNum      = parseNumber(contractFee)
+  const paidNum     = parseNumber(paidAmount)
+  const myRevNum    = parseNumber(myRevenue)
+  const approvedNum = parseNumber(approvedAmount)
 
   // 부가세: 입금액 ÷ 11
   const vat     = vatIncluded && paidNum > 0 ? Math.round(paidNum / 11) : 0
@@ -453,7 +455,8 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
   async function handleConfirm() {
     setSaving(true)
     const commRateNum = parseFloat(commissionRate) || 0
-    const commAmount  = paidNum > 0 && commRateNum > 0 ? Math.round(paidNum * commRateNum / 100) : 0
+    // 성공보수 = 승인예상금액 × 성공보수율% (입금액 기준 아님)
+    const commAmount  = approvedNum > 0 && commRateNum > 0 ? Math.round(approvedNum * commRateNum / 100) : 0
     await onConfirm({
       contract_fee:        formatNumber(feeNum),
       payment_amount:      formatNumber(paidNum),
@@ -464,6 +467,7 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
       my_revenue:          formatNumber(myRevNum),
       cumulative_revenue:  formatNumber(cumulative),
       payment_method:      paymentMethod,
+      approved_amount:     approvedNum > 0 ? formatNumber(approvedNum) : '',
       commission_rate:     commissionRate,
       commission_amount:   commAmount > 0 ? formatNumber(commAmount) : '',
       result_memo:         opsMemo,
@@ -513,46 +517,55 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
             <span className="text-xs text-blue-800 font-medium">입금액에 부가세 포함 (÷11 자동계산)</span>
           </label>
 
-          {/* 결제방식 */}
+          {/* 결제방식 — 카드·현금만 */}
           <div>
             <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">결제방식</label>
             <div className="flex gap-2">
-              {(['카드', '현금', '계좌이체'] as const).map(m => (
+              {(['카드', '현금'] as const).map(m => (
                 <button key={m} type="button"
                   onClick={() => setPaymentMethod(p => p === m ? '' : m)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                  className={`px-4 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
                     paymentMethod === m
                       ? m === '카드' ? 'bg-blue-500 text-white border-blue-500'
-                        : m === '현금' ? 'bg-emerald-500 text-white border-emerald-500'
-                        : 'bg-amber-500 text-white border-amber-500'
+                                     : 'bg-emerald-500 text-white border-emerald-500'
                       : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
                   }`}>{m}</button>
               ))}
             </div>
           </div>
 
-          {/* 수수료율 */}
-          <div>
-            <label className="text-[10px] text-blue-700 mb-1 block font-bold">
-              수수료율 <span className="text-gray-400 font-normal">(% 입력 → 금액 자동계산)</span>
-            </label>
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <input
-                  type="number"
-                  value={commissionRate}
-                  onChange={e => setCommissionRate(e.target.value)}
-                  placeholder="예: 5"
-                  className={INP + ' pr-6'}
-                />
-                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
-              </div>
-              {commissionRate && parseNumber(paidAmount) > 0 && (
-                <span className="text-xs font-bold text-violet-600 whitespace-nowrap">
-                  = {Math.round(parseNumber(paidAmount) * parseFloat(commissionRate || '0') / 100).toLocaleString()}원
-                </span>
-              )}
+          {/* 성공보수율 — 승인금액 기준, 자금팀 확인용 */}
+          <div className="bg-violet-50 rounded-xl p-3 space-y-2.5 border border-violet-100">
+            <p className="text-[10px] text-violet-700 font-bold">
+              💼 성공보수 <span className="text-violet-400 font-normal">(승인금액의 %, 자금팀에 전달)</span>
+            </p>
+            {/* 승인예상금액 */}
+            <div>
+              <label className="text-[10px] text-gray-500 mb-1 block">승인예상금액</label>
+              <NumberInput value={approvedAmount} onChange={setApprovedAmount} className={INP} placeholder="100,000,000" />
             </div>
+            {/* 성공보수율 */}
+            <div>
+              <label className="text-[10px] text-gray-500 mb-1 block">성공보수율</label>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type="number"
+                    value={commissionRate}
+                    onChange={e => setCommissionRate(e.target.value)}
+                    placeholder="예: 6"
+                    className={INP + ' pr-6'}
+                  />
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+                </div>
+                {commissionRate && approvedNum > 0 && (
+                  <span className="text-xs font-black text-violet-700 whitespace-nowrap">
+                    = {Math.round(approvedNum * parseFloat(commissionRate || '0') / 100).toLocaleString()}원
+                  </span>
+                )}
+              </div>
+            </div>
+            <p className="text-[9px] text-violet-400">예: 승인 1억 × 6% = 600만원 성공보수</p>
           </div>
 
           {/* ③ 자동계산 박스 */}
