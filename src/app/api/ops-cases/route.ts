@@ -110,26 +110,37 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const { customer_name, phone, stage, progress_stage, memo, revenue, owner_id, ops_user_name, timeline, customer_id, details } = body
 
-  // ops_user_name을 details 안에 저장 (별도 컬럼 없어도 동작)
+  // ops_user_name, customer_id를 details 안에도 저장 (별도 컬럼 없어도 동작)
   const mergedDetails = {
     ...(details || {}),
     ...(ops_user_name ? { ops_user_name } : {}),
+    ...(customer_id   ? { customer_id }   : {}),
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('ops_cases')
-    .insert({
-      customer_name:    customer_name ?? '',
-      phone:            phone         ?? '',
-      owner_id:         owner_id      ?? null,
-      stage:            stage ?? progress_stage ?? '서류받는중',
-      memo:             memo          ?? '',
-      revenue:          revenue       ?? 0,
-      institution_type: 'new',
-      details:          mergedDetails,
-      ...(timeline    ? { timeline }    : {}),
-      ...(customer_id ? { customer_id } : {}),
-    })
+  // 컬럼이 존재할 경우에도 동시에 저장 (ALTER TABLE 실행 후 자동 활성화)
+  const insertRow: Record<string, any> = {
+    customer_name:    customer_name ?? '',
+    phone:            phone         ?? '',
+    owner_id:         owner_id      ?? null,
+    stage:            stage ?? progress_stage ?? '서류받는중',
+    memo:             memo          ?? '',
+    revenue:          revenue       ?? 0,
+    institution_type: 'new',
+    details:          mergedDetails,
+  }
+  if (timeline)    insertRow.timeline    = timeline
+  if (customer_id) insertRow.customer_id = customer_id
+  if (ops_user_name) insertRow.ops_user_name = ops_user_name
+
+  // 컬럼 없을 때 INSERT 실패 방지: 컬럼 오류면 해당 필드 제외 후 재시도
+  let { data, error } = await supabaseAdmin.from('ops_cases').insert(insertRow).select().single()
+  if (error && error.message?.includes('column')) {
+    delete insertRow.customer_id
+    delete insertRow.ops_user_name
+    const retry = await supabaseAdmin.from('ops_cases').insert(insertRow).select().single()
+    data  = retry.data
+    error = retry.error
+  }
     .select()
     .single()
 
