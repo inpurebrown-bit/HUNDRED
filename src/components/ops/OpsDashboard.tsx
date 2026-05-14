@@ -209,6 +209,9 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [pwVisible, setPwVisible] = useState<Record<string, boolean>>({})
   const [salesLogOpen, setSalesLogOpen] = useState(false)
+  // 인콜일지 입력 상태
+  const [opsIncallInput, setOpsIncallInput] = useState('')
+  const [opsIncallResult, setOpsIncallResult] = useState('')
 
   useEffect(() => { setLocal({ ...c }) }, [c.id])
 
@@ -232,23 +235,49 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
     setLocal(prev => ({ ...prev, institution: val }))
     schedule({ institution: val })
   }
-  async function handleVisitDate(val: string) {
-    detailField('visit_date', val)
+  async function handleDirectVisitDate(val: string) {
+    detailField('direct_visit_date', val)
     if (!val) return
-    const selectedInst = (local.institution || '').split(',').map((s: string) => s.trim()).filter(Boolean)
+    const directInsts = (local.institution || '').split(',').map((s: string) => s.trim()).filter(i => i && !INDIRECT_SET.has(i))
     try {
       await fetch('/api/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: `[방문] ${c.customers?.details?.company || c.customers?.name} — ${selectedInst.join(', ') || '기관미정'}`,
+          title: `[직접방문] ${c.customers?.details?.company || c.customers?.name} — ${directInsts.join(', ') || '기관미정'}`,
           start_date: val, end_date: val,
-          start_time: local.details?.visit_time || null,
-          description: `${c.customers?.name} / ${c.customers?.phone}\n기관: ${selectedInst.join(', ')}`,
-          color: 'violet', is_allday: !local.details?.visit_time,
+          start_time: local.details?.direct_visit_time || null,
+          description: `${c.customers?.name} / ${c.customers?.phone}\n기관: ${directInsts.join(', ')}`,
+          color: 'blue', is_allday: !local.details?.direct_visit_time,
         }),
       })
     } catch {}
+  }
+  async function handleIndirectVisitDate(val: string) {
+    detailField('indirect_visit_date', val)
+    if (!val) return
+    const indirectInsts = (local.institution || '').split(',').map((s: string) => s.trim()).filter(i => i && INDIRECT_SET.has(i))
+    try {
+      await fetch('/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `[간접방문] ${c.customers?.details?.company || c.customers?.name} — ${indirectInsts.join(', ') || '기관미정'}`,
+          start_date: val, end_date: val,
+          start_time: local.details?.indirect_visit_time || null,
+          description: `${c.customers?.name} / ${c.customers?.phone}\n기관: ${indirectInsts.join(', ')}`,
+          color: 'violet', is_allday: !local.details?.indirect_visit_time,
+        }),
+      })
+    } catch {}
+  }
+  function addOpsIncall() {
+    if (!opsIncallInput.trim()) return
+    const entry = { date: nowKST(), content: opsIncallInput.trim(), call_result: opsIncallResult, author: '관리팀' }
+    const logs = [...(local.details?.ops_incall_logs || []), entry]
+    detailField('ops_incall_logs', logs)
+    setOpsIncallInput('')
+    setOpsIncallResult('')
   }
   function handleStageChange(nextStage: string) {
     // 관리팀 직원은 환불/종료를 직접 선택 불가 → 예정 단계로 자동 전환
@@ -260,23 +289,14 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
     const autoEntry = { user: '자동기록', content: `단계 변경: ${prevStage} → ${nextStage}`, created_at: nowKST() }
     const updatedTimeline = [...(local.timeline || []), autoEntry]
 
-    // 재원날짜 자동입력: '승인' 단계 진입 시 오늘 날짜 자동 세팅 (미입력 시에만)
-    const todayKST = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' })
-    const autoFundingDate = nextStage === '승인' && !local.details?.funding_date ? todayKST : undefined
-    const updatedDetails = autoFundingDate
-      ? { ...(local.details || {}), funding_date: autoFundingDate }
-      : local.details || {}
-
     setLocal(prev => ({
       ...prev,
       progress_stage: nextStage,
       timeline: updatedTimeline,
-      details: updatedDetails,
     }))
     schedule({
       progress_stage: nextStage,
       timeline: updatedTimeline,
-      ...(autoFundingDate ? { details: updatedDetails } : {}),
     })
   }
   function handleCeoApprove() {
@@ -386,7 +406,7 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
       {/* 탭 네비게이션 */}
       <div className="flex border-b border-gray-100 overflow-x-auto">
         {DETAIL_TABS.map(tab => (
-          <button key={tab} onClick={() => setActiveDetailTab(tab)}
+          <button key={tab} type="button" onClick={e => { e.stopPropagation(); setActiveDetailTab(tab) }}
             className={`px-3 py-2 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
               activeDetailTab === tab ? 'border-violet-500 text-violet-600' : 'border-transparent text-gray-400 hover:text-gray-600'
             }`}>
@@ -404,32 +424,28 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
                 <p className="text-sm font-bold text-indigo-800">📥 신규 배정 업체</p>
                 <p className="text-xs text-indigo-600 mt-0.5">내용 확인 및 고객과 통화 후 흡수 처리해주세요</p>
               </div>
-              <button onClick={() => field('progress_stage', 'absorbed')}
+              <button type="button" onClick={() => field('progress_stage', 'absorbed')}
                 className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">
                 ✅ 흡수 완료
               </button>
             </div>
           )}
 
-          {/* 진행 단계 + 계약날짜 */}
+          {/* 진행 현황 — 전체 단계 + 계약날짜 */}
           <div>
             <div className="flex items-center gap-1.5 mb-2">
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">진행 현황</span>
               <div className="flex-1 h-px bg-gray-100" />
-              {/* 전달화면 버튼 — 영업팀 인콜 기록 있을 때만 표시 */}
               {(local.timeline || []).some((e: any) => e.source === 'sales') && (
-                <button
-                  type="button"
-                  onClick={() => setSalesLogOpen(true)}
-                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-600 text-[10px] font-bold border border-violet-200 transition-colors whitespace-nowrap"
-                >
+                <button type="button" onClick={() => setSalesLogOpen(true)}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-600 text-[10px] font-bold border border-violet-200 transition-colors whitespace-nowrap">
                   📋 전달화면
                 </button>
               )}
             </div>
             <div className="grid grid-cols-2 gap-x-2 gap-y-2">
               <div>
-                <label className={lbl}>진행 단계</label>
+                <label className={lbl}>전체 진행 단계</label>
                 <select value={local.progress_stage} onChange={e => handleStageChange(e.target.value)} className={inp}>
                   {[
                     ...PIPELINE_STAGES,
@@ -446,43 +462,6 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
                 <label className={lbl}>계약 날짜</label>
                 <input type="date" value={d.contract_date || ''} onChange={e => detailField('contract_date', e.target.value)} className={inp} />
               </div>
-              {/* 재원날짜: 승인 단계 진입 시 자동입력, 수동 수정도 가능 */}
-              <div>
-                <label className={lbl}>
-                  재원날짜
-                  {local.progress_stage === '승인' && d.funding_date && (
-                    <span className="ml-1 text-[9px] text-emerald-600 font-medium">✅ 자동입력</span>
-                  )}
-                </label>
-                <input type="date" value={d.funding_date || ''} onChange={e => detailField('funding_date', e.target.value)} className={inp} />
-              </div>
-              <div>
-                <label className={lbl}>입금 날짜</label>
-                <input type="date" value={d.deposit_date || ''} onChange={e => detailField('deposit_date', e.target.value)} className={inp} />
-              </div>
-              <div className="col-span-2">
-                <label className={lbl}>담당 기관 (복수 선택)</label>
-                <div className="space-y-1.5">
-                  <div className="flex flex-wrap gap-1 items-center">
-                    <span className="text-[10px] text-blue-500 font-medium w-12">직접자금</span>
-                    {INST_DIRECT.map(inst => (
-                      <button key={inst} type="button" onClick={() => toggleInstitution(inst)}
-                        className={`px-2 py-0.5 rounded text-xs font-medium border transition-colors ${
-                          selectedInstitutions.includes(inst) ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
-                        }`}>{inst}</button>
-                    ))}
-                  </div>
-                  <div className="flex flex-wrap gap-1 items-center">
-                    <span className="text-[10px] text-violet-500 font-medium w-12">간접자금</span>
-                    {INST_INDIRECT.map(inst => (
-                      <button key={inst} type="button" onClick={() => toggleInstitution(inst)}
-                        className={`px-2 py-0.5 rounded text-xs font-medium border transition-colors ${
-                          selectedInstitutions.includes(inst) ? 'bg-violet-500 text-white border-violet-500' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
-                        }`}>{inst}</button>
-                    ))}
-                  </div>
-                </div>
-              </div>
               <div className="col-span-2">
                 <label className={lbl}>계약 특이사항</label>
                 <input type="text" value={d.contract_notes || ''} onChange={e => detailField('contract_notes', e.target.value)} className={inp} placeholder="계약 관련 특이사항" />
@@ -490,69 +469,101 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
             </div>
           </div>
 
-          {/* 직접자금 일정 (직접자금 기관 선택 시) */}
-          {selectedInstitutions.some(i => !INDIRECT_SET.has(i)) && (
+          {/* ── 직접자금 섹션 (항상 표시) ── */}
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-3">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-bold text-blue-700">🏦 직접자금</span>
+              <div className="flex-1 h-px bg-blue-200" />
+            </div>
+            {/* 기관 선택 */}
             <div>
-              <div className="flex items-center gap-1.5 mb-2">
-                <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wide">📋 직접자금 일정</span>
-                <div className="flex-1 h-px bg-blue-100" />
+              <label className={lbl}>기관 선택</label>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {INST_DIRECT.map(inst => (
+                  <button key={inst} type="button" onClick={() => toggleInstitution(inst)}
+                    className={`px-2 py-0.5 rounded text-xs font-medium border transition-colors ${
+                      selectedInstitutions.includes(inst) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-300 hover:bg-blue-50'
+                    }`}>{inst}</button>
+                ))}
               </div>
-              <div className="grid grid-cols-2 gap-x-2 gap-y-2">
-                <div>
-                  <label className={lbl}>기관방문일정 📅</label>
-                  <div className="flex gap-1">
-                    <input type="date" value={d.direct_visit_date || ''} onChange={e => {
-                      detailField('direct_visit_date', e.target.value)
-                      if (e.target.value) handleVisitDate(e.target.value)
-                    }} className={inp + ' flex-1'} />
-                    <input type="time" value={d.direct_visit_time || ''} onChange={e => detailField('direct_visit_time', e.target.value)} className={inp + ' w-20'} />
-                  </div>
-                  {d.direct_visit_date && <p className="text-[10px] text-emerald-600 mt-0.5">✅ 캘린더 자동 등록</p>}
+            </div>
+            {/* 직접자금 진행단계 + 일정 */}
+            <div className="grid grid-cols-2 gap-x-2 gap-y-2">
+              <div className="col-span-2">
+                <label className={lbl}>직접자금 진행단계</label>
+                <select value={d.direct_stage || ''} onChange={e => detailField('direct_stage', e.target.value)} className={inp}>
+                  <option value="">— 선택 —</option>
+                  {PIPELINE_STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={lbl}>기관방문 날짜/시간 📅</label>
+                <div className="flex gap-1">
+                  <input type="date" value={d.direct_visit_date || ''} onChange={e => {
+                    if (e.target.value) handleDirectVisitDate(e.target.value)
+                    else detailField('direct_visit_date', '')
+                  }} className={inp + ' flex-1'} />
+                  <input type="time" value={d.direct_visit_time || ''} onChange={e => detailField('direct_visit_time', e.target.value)} className={inp + ' w-20'} />
                 </div>
-                <div>
-                  <label className={lbl}>실사일정 📅</label>
-                  <input type="date" value={d.direct_inspection_date || ''} onChange={e => detailField('direct_inspection_date', e.target.value)} className={inp} />
-                </div>
-                <div className="col-span-2">
-                  <label className={lbl}>직접자금 메모</label>
-                  <textarea value={d.direct_memo || ''} onChange={e => detailField('direct_memo', e.target.value)}
-                    rows={2} className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50 bg-white resize-none" placeholder="직접자금 관련 메모" />
+                {d.direct_visit_date && <p className="text-[10px] text-emerald-600 mt-0.5">✅ 캘린더 자동 등록</p>}
+              </div>
+              <div>
+                <label className={lbl}>실사일정 날짜/시간 📅</label>
+                <div className="flex gap-1">
+                  <input type="date" value={d.direct_inspection_date || ''} onChange={e => detailField('direct_inspection_date', e.target.value)} className={inp + ' flex-1'} />
+                  <input type="time" value={d.direct_inspection_time || ''} onChange={e => detailField('direct_inspection_time', e.target.value)} className={inp + ' w-20'} />
                 </div>
               </div>
             </div>
-          )}
+          </div>
 
-          {/* 간접자금 일정 (간접자금 기관 선택 시) */}
-          {hasIndirect && (
+          {/* ── 간접자금 섹션 (항상 표시) ── */}
+          <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 space-y-3">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-bold text-violet-700">🏛 간접자금</span>
+              <div className="flex-1 h-px bg-violet-200" />
+            </div>
+            {/* 기관 선택 */}
             <div>
-              <div className="flex items-center gap-1.5 mb-2">
-                <span className="text-[10px] font-bold text-violet-500 uppercase tracking-wide">📋 간접자금 일정</span>
-                <div className="flex-1 h-px bg-violet-100" />
+              <label className={lbl}>기관 선택</label>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {INST_INDIRECT.map(inst => (
+                  <button key={inst} type="button" onClick={() => toggleInstitution(inst)}
+                    className={`px-2 py-0.5 rounded text-xs font-medium border transition-colors ${
+                      selectedInstitutions.includes(inst) ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-gray-500 border-gray-300 hover:bg-violet-50'
+                    }`}>{inst}</button>
+                ))}
               </div>
-              <div className="grid grid-cols-2 gap-x-2 gap-y-2">
-                <div>
-                  <label className={lbl}>기관방문일정 📅</label>
-                  <div className="flex gap-1">
-                    <input type="date" value={d.indirect_visit_date || ''} onChange={e => {
-                      detailField('indirect_visit_date', e.target.value)
-                      if (e.target.value) handleVisitDate(e.target.value)
-                    }} className={inp + ' flex-1'} />
-                    <input type="time" value={d.indirect_visit_time || ''} onChange={e => detailField('indirect_visit_time', e.target.value)} className={inp + ' w-20'} />
-                  </div>
-                  {d.indirect_visit_date && <p className="text-[10px] text-emerald-600 mt-0.5">✅ 캘린더 자동 등록</p>}
+            </div>
+            {/* 간접자금 진행단계 + 일정 */}
+            <div className="grid grid-cols-2 gap-x-2 gap-y-2">
+              <div className="col-span-2">
+                <label className={lbl}>간접자금 진행단계</label>
+                <select value={d.indirect_stage || ''} onChange={e => detailField('indirect_stage', e.target.value)} className={inp}>
+                  <option value="">— 선택 —</option>
+                  {PIPELINE_STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={lbl}>기관방문 날짜/시간 📅</label>
+                <div className="flex gap-1">
+                  <input type="date" value={d.indirect_visit_date || ''} onChange={e => {
+                    if (e.target.value) handleIndirectVisitDate(e.target.value)
+                    else detailField('indirect_visit_date', '')
+                  }} className={inp + ' flex-1'} />
+                  <input type="time" value={d.indirect_visit_time || ''} onChange={e => detailField('indirect_visit_time', e.target.value)} className={inp + ' w-20'} />
                 </div>
-                <div>
-                  <label className={lbl}>실사일정 📅</label>
-                  <input type="date" value={d.indirect_inspection_date || ''} onChange={e => detailField('indirect_inspection_date', e.target.value)} className={inp} />
-                </div>
-                <div className="col-span-2">
-                  <label className={lbl}>간접자금 메모</label>
-                  <textarea value={d.indirect_memo || ''} onChange={e => detailField('indirect_memo', e.target.value)}
-                    rows={2} className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400/50 bg-white resize-none" placeholder="간접자금 관련 메모" />
+                {d.indirect_visit_date && <p className="text-[10px] text-emerald-600 mt-0.5">✅ 캘린더 자동 등록</p>}
+              </div>
+              <div>
+                <label className={lbl}>실사일정 날짜/시간 📅</label>
+                <div className="flex gap-1">
+                  <input type="date" value={d.indirect_inspection_date || ''} onChange={e => detailField('indirect_inspection_date', e.target.value)} className={inp + ' flex-1'} />
+                  <input type="time" value={d.indirect_inspection_time || ''} onChange={e => detailField('indirect_inspection_time', e.target.value)} className={inp + ' w-20'} />
                 </div>
               </div>
             </div>
-          )}
+          </div>
 
           {/* 소진공 확인서 */}
           {selectedInstitutions.some(i => i.startsWith('소진공')) && (
@@ -580,7 +591,7 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
             </div>
           )}
 
-          {/* 타임라인 (진행현황 하단) */}
+          {/* 타임라인 */}
           <div>
             <div className="flex items-center gap-1.5 mb-2">
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">타임라인</span>
@@ -642,42 +653,98 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
       {/* ── 인콜일지 ── */}
       {activeDetailTab === '인콜일지' && (
         <div className="space-y-4">
+          {/* 영업팀 전달 인콜일지 */}
           {(() => {
-            // ops_case.timeline에서 source:'sales'로 임베딩된 영업팀 기록 추출
             const salesLogs: any[] = (local.timeline || []).filter((e: any) => e.source === 'sales')
+            return salesLogs.length > 0 ? (
+              <div>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <span className="text-[10px] font-bold text-violet-500 uppercase tracking-wide">영업팀 전달 기록</span>
+                  <div className="flex-1 h-px bg-violet-100" />
+                </div>
+                <div className="relative pl-4 border-l-2 border-violet-200 space-y-2">
+                  {[...salesLogs].reverse().map((log: any, i: number) => {
+                    const kst = formatKST(log.created_at || log.date || '')
+                    const author = log.user || log.author || log.user_name || '영업팀'
+                    return (
+                      <div key={i} className="relative">
+                        <div className="absolute -left-[21px] top-1.5 w-3 h-3 rounded-full bg-violet-400 border-2 border-white" />
+                        <div className="bg-violet-50 rounded-lg px-3 py-2">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-[10px] font-bold text-violet-700">{author}</span>
+                            <span className="text-[10px] text-gray-400">{kst.date} {kst.time}</span>
+                            {log.call_result && (
+                              <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-medium">{log.call_result}</span>
+                            )}
+                          </div>
+                          {log.content && <p className="text-xs text-gray-700">{log.content}</p>}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : (
+              <p className="text-[10px] text-gray-300 text-center py-1">영업팀 전달 인콜일지 없음</p>
+            )
+          })()}
 
-            if (salesLogs.length === 0) {
-              return (
-                <p className="text-xs text-gray-400 text-center py-8">
-                  영업팀 인콜일지가 없습니다<br />
-                  <span className="text-[10px] text-gray-300">(자금팀 전송 후 기록이 연동됩니다)</span>
-                </p>
-              )
-            }
-            return (
-              <div className="relative pl-4 border-l-2 border-violet-200 space-y-2">
-                {[...salesLogs].reverse().map((log: any, i: number) => {
-                  const kst = formatKST(log.created_at || log.date || '')
-                  const author = log.user || log.author || log.user_name || '담당자'
+          {/* 관리팀 인콜일지 입력 */}
+          <div>
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">관리팀 인콜 기록</span>
+              <div className="flex-1 h-px bg-gray-100" />
+            </div>
+            {/* 입력 폼 */}
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2 mb-3">
+              <textarea
+                value={opsIncallInput}
+                onChange={e => setOpsIncallInput(e.target.value)}
+                placeholder="인콜 내용을 입력하세요..."
+                rows={3}
+                className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-400/50 bg-white resize-none"
+              />
+              <div className="flex items-center gap-2">
+                <select value={opsIncallResult} onChange={e => setOpsIncallResult(e.target.value)} className={inp + ' flex-1'}>
+                  <option value="">통화결과 선택</option>
+                  <option value="상담완료">상담완료</option>
+                  <option value="재통화">재통화</option>
+                  <option value="부재중">부재중</option>
+                  <option value="거절">거절</option>
+                  <option value="기타">기타</option>
+                </select>
+                <button type="button" onClick={addOpsIncall}
+                  className="px-4 py-1.5 bg-gray-700 hover:bg-gray-800 text-white text-xs font-bold rounded transition-colors whitespace-nowrap">
+                  + 기록 추가
+                </button>
+              </div>
+            </div>
+            {/* 기존 관리팀 기록 목록 */}
+            {(d.ops_incall_logs || []).length === 0 ? (
+              <p className="text-[10px] text-gray-300 text-center py-2">기록된 인콜일지가 없습니다 — 위 양식으로 추가하세요</p>
+            ) : (
+              <div className="relative pl-4 border-l-2 border-gray-200 space-y-2">
+                {[...(d.ops_incall_logs || [])].reverse().map((log: any, i: number) => {
+                  const kst = formatKST(log.date || log.created_at || '')
                   return (
                     <div key={i} className="relative">
-                      <div className="absolute -left-[21px] top-1.5 w-3 h-3 rounded-full bg-violet-400 border-2 border-white" />
-                      <div className="bg-violet-50 rounded-lg px-3 py-2">
+                      <div className="absolute -left-[21px] top-1.5 w-3 h-3 rounded-full bg-gray-400 border-2 border-white" />
+                      <div className="bg-gray-50 rounded-lg px-3 py-2">
                         <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-[10px] font-bold text-violet-700">{author}</span>
+                          <span className="text-[10px] font-bold text-gray-600">{log.author || '관리팀'}</span>
                           <span className="text-[10px] text-gray-400">{kst.date} {kst.time}</span>
                           {log.call_result && (
-                            <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-medium">{log.call_result}</span>
+                            <span className="text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full font-medium">{log.call_result}</span>
                           )}
                         </div>
-                        {log.content && <p className="text-xs text-gray-700">{log.content}</p>}
+                        {log.content && <p className="text-xs text-gray-700 whitespace-pre-wrap">{log.content}</p>}
                       </div>
                     </div>
                   )
                 })}
               </div>
-            )
-          })()}
+            )}
+          </div>
         </div>
       )}
 
@@ -692,16 +759,84 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
             </div>
           )}
 
-          {/* 재무 */}
+          {/* 입금내역 (복수 입금 지원) */}
           <div>
             <div className="flex items-center gap-1.5 mb-2">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">재무</span>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">입금내역</span>
+              <div className="flex-1 h-px bg-gray-100" />
+              <button type="button"
+                onClick={() => {
+                  const entries: any[] = d.payment_entries || []
+                  detailField('payment_entries', [...entries, { id: Date.now().toString(), date: '', approval_amount: '', fee_rate: '', fee_amount: '' }])
+                }}
+                className="text-[10px] bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded font-bold transition-colors">
+                + 입금내역 추가
+              </button>
+            </div>
+            {/* 기본 첫번째 입금 블록 */}
+            <div className="space-y-2">
+              {/* 기본 단일 입금 (항상 표시) */}
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                <p className="text-[10px] font-bold text-emerald-700 mb-2">💰 1차 입금</p>
+                <div className="grid grid-cols-2 gap-x-2 gap-y-2">
+                  <div className="col-span-2">
+                    <label className={lbl}>입금 날짜</label>
+                    <input type="date" value={d.deposit_date || ''} onChange={e => detailField('deposit_date', e.target.value)} className={inp} />
+                  </div>
+                  <div><label className={lbl}>승인금액</label><input type="text" value={d.approval_amount || ''} onChange={e => detailField('approval_amount', e.target.value)} className={inp} placeholder="0원" /></div>
+                  <div><label className={lbl}>수수료%</label><input type="text" value={d.fee_rate || ''} onChange={e => detailField('fee_rate', e.target.value)} className={inp} placeholder="%" /></div>
+                  <div className="col-span-2"><label className={lbl}>수수료</label><input type="text" value={d.fee_amount || ''} onChange={e => detailField('fee_amount', e.target.value)} className={inp} placeholder="0원" /></div>
+                </div>
+              </div>
+              {/* 추가 입금 블록들 */}
+              {(d.payment_entries || []).map((entry: any, idx: number) => (
+                <div key={entry.id || idx} className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] font-bold text-blue-700">💰 {idx + 2}차 입금</p>
+                    <button type="button"
+                      onClick={() => {
+                        const entries: any[] = d.payment_entries || []
+                        detailField('payment_entries', entries.filter((_: any, i: number) => i !== idx))
+                      }}
+                      className="text-[10px] text-red-400 hover:text-red-600 font-bold">✕ 삭제</button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-2">
+                    <div className="col-span-2">
+                      <label className={lbl}>입금 날짜</label>
+                      <input type="date" value={entry.date || ''} onChange={e => {
+                        const entries: any[] = [...(d.payment_entries || [])]
+                        entries[idx] = { ...entries[idx], date: e.target.value }
+                        detailField('payment_entries', entries)
+                      }} className={inp} />
+                    </div>
+                    <div><label className={lbl}>승인금액</label><input type="text" value={entry.approval_amount || ''} onChange={e => {
+                      const entries: any[] = [...(d.payment_entries || [])]
+                      entries[idx] = { ...entries[idx], approval_amount: e.target.value }
+                      detailField('payment_entries', entries)
+                    }} className={inp} placeholder="0원" /></div>
+                    <div><label className={lbl}>수수료%</label><input type="text" value={entry.fee_rate || ''} onChange={e => {
+                      const entries: any[] = [...(d.payment_entries || [])]
+                      entries[idx] = { ...entries[idx], fee_rate: e.target.value }
+                      detailField('payment_entries', entries)
+                    }} className={inp} placeholder="%" /></div>
+                    <div className="col-span-2"><label className={lbl}>수수료</label><input type="text" value={entry.fee_amount || ''} onChange={e => {
+                      const entries: any[] = [...(d.payment_entries || [])]
+                      entries[idx] = { ...entries[idx], fee_amount: e.target.value }
+                      detailField('payment_entries', entries)
+                    }} className={inp} placeholder="0원" /></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 기타 재무 */}
+          <div>
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">기타 재무</span>
               <div className="flex-1 h-px bg-gray-100" />
             </div>
-            <div className="grid grid-cols-4 gap-x-2 gap-y-2">
-              <div><label className={lbl}>승인금액</label><input type="text" value={d.approval_amount || ''} onChange={e => detailField('approval_amount', e.target.value)} className={inp} placeholder="0원" /></div>
-              <div><label className={lbl}>수수료%</label><input type="text" value={d.fee_rate || ''} onChange={e => detailField('fee_rate', e.target.value)} className={inp} placeholder="%" /></div>
-              <div><label className={lbl}>수수료</label><input type="text" value={d.fee_amount || ''} onChange={e => detailField('fee_amount', e.target.value)} className={inp} placeholder="0원" /></div>
+            <div className="grid grid-cols-2 gap-x-2 gap-y-2">
               <div><label className={lbl}>미입금액</label><input type="text" value={d.unpaid_amount || ''} onChange={e => detailField('unpaid_amount', e.target.value)} className={inp} placeholder="0원" /></div>
               <div><label className={lbl}>계약금(VAT포함)</label><input type="text" value={d.contract_amount_vat || ''} onChange={e => detailField('contract_amount_vat', e.target.value)} className={inp} placeholder="0원" /></div>
               <div><label className={lbl}>계약금(VAT제외)</label><input type="text" value={d.contract_amount || ''} onChange={e => detailField('contract_amount', e.target.value)} className={inp} placeholder="0원" /></div>
@@ -2348,6 +2483,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
         return (
           <div key={id}
             className={`fixed top-0 bottom-0 ${rightOffset} w-full md:w-[520px] bg-white shadow-2xl overflow-y-auto z-[100]`}
+            onClick={e => e.stopPropagation()}
           >
             <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-3 flex items-center justify-between z-10">
               <div>

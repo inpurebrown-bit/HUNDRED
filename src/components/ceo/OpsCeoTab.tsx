@@ -342,6 +342,7 @@ export default function OpsCeoTab() {
         return (
           <div key={id}
             className={`fixed top-0 bottom-0 ${rightOffset} w-full md:w-[520px] bg-white shadow-2xl overflow-y-auto z-[100]`}
+            onClick={e => e.stopPropagation()}
           >
             <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-3 flex items-center justify-between z-10">
               <div>
