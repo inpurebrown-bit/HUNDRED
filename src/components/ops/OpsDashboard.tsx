@@ -677,7 +677,7 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
               {
                 title: '기업 기본정보', bg: 'bg-[#1B2A45]', textColor: 'text-white',
                 fields: [
-                  [['업체명', 'company', gv('company', cd.company || local.customers?.company || local.customers?.name || '')]],
+                  [['업체명', 'company', gv('company', cd.company || local.customers?.company || local.customers?.name || '')], ['담당자', 'sales_user_name', gv('sales_user_name', cd.sales_user_name || '')]],
                   [['대표자', 'representative', gv('representative', local.customers?.name || '')], ['연락처', 'phone', gv('phone', local.customers?.phone || '')]],
                   [['지역', 'region', gv('region', cd.region || '')], ['접수일', 'reception_date', gv('reception_date', cd.reception_date || (cd.created_at ? formatKST(cd.created_at).date : ''))]],
                   [['업종', 'business_type', gv('business_type', cd.business_type || '')], ['실제업무', 'real_work', gv('real_work', cd.real_work || '')]],
