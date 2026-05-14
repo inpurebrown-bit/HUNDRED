@@ -232,8 +232,9 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // pwVisible 제거됨 — 기관ID/PW 필드는 항상 평문 표시
   const [salesLogOpen, setSalesLogOpen] = useState(false)
-  // 인콜일지 타임라인 입력
+  // 인콜일지 타임라인 입력 + 수정모드
   const [tlInput, setTlInput] = useState('')
+  const [incallEditing, setIncallEditing] = useState(false)
 
   useEffect(() => { setLocal({ ...c }) }, [c.id])
 
@@ -676,50 +677,14 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
           {(() => {
             const cd = local.customers?.details || {}
             const ij = d.incall_journal || {}
-            // customers 테이블 우선, 없으면 incall_journal 저장값
-            const gv = (ijKey: string, cdKey?: string) =>
-              ij[ijKey] !== undefined && ij[ijKey] !== ''
-                ? ij[ijKey]
-                : (cdKey ? (cd[cdKey] ?? '') : '')
-
+            const gv = (k: string, cv: any) => (ij[k] !== undefined && ij[k] !== '') ? ij[k] : (cv ?? '')
             const callTimeline: any[] = (local.customers as any)?.call_timeline || []
             const salesTimeline: any[] = callTimeline.length > 0
               ? callTimeline
               : (local.timeline || []).filter((e: any) => e.source === 'sales')
-
-            const company        = cd.company        || local.customers?.company || local.customers?.name || ''
-            const representative = cd.representative || local.customers?.name    || ''
-            // 각 필드: incall_journal 저장값 우선, 없으면 customers 테이블 값
-            const fields = [
-              { label: '업체명',    k: 'company',           cv: cd.company       || local.customers?.company || local.customers?.name || '' },
-              { label: '대표자',    k: 'representative',    cv: local.customers?.name || '' },
-              { label: '연락처',    k: 'phone',             cv: local.customers?.phone || '' },
-              { label: '지역',      k: 'region',            cv: cd.region         || '' },
-              { label: '접수일',    k: 'reception_date',    cv: cd.reception_date || (cd.created_at ? formatKST(cd.created_at).date : '') },
-              { label: '업종',      k: 'business_type',     cv: cd.business_type  || '' },
-              { label: '실제업무',  k: 'real_work',          cv: cd.real_work      || '' },
-              { label: '업력',      k: 'years_in_business', cv: cd.years_in_business || cd.biz_size || '' },
-              { label: '직원수',    k: 'employee_count',    cv: cd.employee_count || '' },
-              { label: '기보대출',  k: 'loan_kibo',         cv: cd.loan_kibo      || cd.loan_policy || '' },
-              { label: '신보대출',  k: 'loan_shinbo',       cv: cd.loan_shinbo    || '' },
-              { label: '재단대출',  k: 'loan_jaedan',       cv: cd.loan_jaedan    || '' },
-              { label: '중진공',    k: 'loan_jinjong',      cv: cd.loan_jinjong   || '' },
-              { label: '소진공',    k: 'loan_sojin',        cv: cd.loan_sojin     || '' },
-              { label: '신용/담보', k: 'loan_other',        cv: cd.loan_other     || cd.loan_credit || '' },
-              { label: '기대출합계',k: 'loan_total',        cv: cd.loan_total     || '' },
-              { label: 'KCB점수',   k: 'credit_kcb',        cv: cd.credit_kcb     || cd.credit_score || '' },
-              { label: 'NICE점수',  k: 'credit_nice',       cv: cd.credit_nice    || '' },
-              { label: '세금체납',  k: 'tax_status',         cv: cd.tax_status     || cd.tax_delinquency || '' },
-              { label: '25년매출',  k: 'revenue_2025',      cv: cd.revenue_2025   || '' },
-              { label: '24년매출',  k: 'revenue_2024',      cv: cd.revenue_2024   || '' },
-              { label: '23년매출',  k: 'revenue_2023',      cv: cd.revenue_2023   || '' },
-              { label: '자산',      k: 'assets',            cv: cd.assets         || '' },
-              { label: '필요자금',  k: 'required_funds',    cv: cd.required_funds || '' },
-              { label: '솔루션',    k: 'solution',          cv: cd.solution       || '' },
-            ]
-            const callResult    = ij.call_result    ?? cd.call_result    ?? ''
-            const closingResult = ij.closing_result ?? cd.closing_result ?? ''
-            const subcallDate   = ij.subcall_date   ?? cd.subcall_date   ?? ''
+            const callResult    = gv('call_result',    cd.call_result    ?? '')
+            const closingResult = gv('closing_result', cd.closing_result ?? '')
+            const subcallDate   = gv('subcall_date',   cd.subcall_date   ?? '')
             const combinedTl = [
               ...salesTimeline.map((e: any) => ({ ...e, _src: 'sales' })),
               ...(ij.timeline || []).map((e: any) => ({ ...e, _src: 'ops' })),
@@ -727,126 +692,187 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
               new Date(a.created_at || a.date || 0).getTime() - new Date(b.created_at || b.date || 0).getTime()
             )
 
-            return (
-              <div className="flex flex-col md:flex-row gap-0 divide-y md:divide-y-0 md:divide-x divide-gray-100">
+            // 섹션별 필드 정의
+            const sections = [
+              {
+                title: '기업 기본정보', bg: 'bg-[#1B2A45]', textColor: 'text-white',
+                fields: [
+                  [['업체명', 'company', gv('company', cd.company || local.customers?.company || local.customers?.name || '')]],
+                  [['대표자', 'representative', gv('representative', local.customers?.name || '')], ['연락처', 'phone', gv('phone', local.customers?.phone || '')]],
+                  [['지역', 'region', gv('region', cd.region || '')], ['접수일', 'reception_date', gv('reception_date', cd.reception_date || (cd.created_at ? formatKST(cd.created_at).date : ''))]],
+                  [['업종', 'business_type', gv('business_type', cd.business_type || '')], ['실제업무', 'real_work', gv('real_work', cd.real_work || '')]],
+                  [['업력', 'years_in_business', gv('years_in_business', cd.years_in_business || cd.biz_size || '')], ['직원수', 'employee_count', gv('employee_count', cd.employee_count || '')]],
+                ],
+              },
+              {
+                title: '대출 현황', bg: 'bg-amber-600', textColor: 'text-white',
+                fields: [
+                  [['기보대출', 'loan_kibo', gv('loan_kibo', cd.loan_kibo || cd.loan_policy || '')], ['신보대출', 'loan_shinbo', gv('loan_shinbo', cd.loan_shinbo || '')]],
+                  [['재단대출', 'loan_jaedan', gv('loan_jaedan', cd.loan_jaedan || '')], ['중진공', 'loan_jinjong', gv('loan_jinjong', cd.loan_jinjong || '')]],
+                  [['소진공', 'loan_sojin', gv('loan_sojin', cd.loan_sojin || '')], ['신용/담보', 'loan_other', gv('loan_other', cd.loan_other || cd.loan_credit || '')]],
+                  [['기대출합계', 'loan_total', gv('loan_total', cd.loan_total || '')]],
+                ],
+              },
+              {
+                title: '신용 / 재무', bg: 'bg-violet-700', textColor: 'text-white',
+                fields: [
+                  [['KCB점수', 'credit_kcb', gv('credit_kcb', cd.credit_kcb || cd.credit_score || '')], ['NICE점수', 'credit_nice', gv('credit_nice', cd.credit_nice || '')]],
+                  [['세금체납', 'tax_status', gv('tax_status', cd.tax_status || cd.tax_delinquency || '')], ['자산', 'assets', gv('assets', cd.assets || '')]],
+                  [['25년매출', 'revenue_2025', gv('revenue_2025', cd.revenue_2025 || '')], ['24년매출', 'revenue_2024', gv('revenue_2024', cd.revenue_2024 || '')]],
+                  [['23년매출', 'revenue_2023', gv('revenue_2023', cd.revenue_2023 || '')], ['필요자금', 'required_funds', gv('required_funds', cd.required_funds || '')]],
+                  [['솔루션', 'solution', gv('solution', cd.solution || '')]],
+                ],
+              },
+            ]
 
-                {/* ── 왼쪽: 고객 정보 필드 ── */}
-                <div className="md:w-[45%] overflow-y-auto">
-                  <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-100">
-                    <span className="text-[11px] font-bold text-gray-600">📋 인콜일지</span>
-                  </div>
-                  {fields.map(({ label, k, cv }) => {
-                    const val = ij[k] !== undefined && ij[k] !== '' ? ij[k] : cv
-                    return (
-                      <div key={k} className="flex items-center border-b border-gray-50 px-3 py-1.5 hover:bg-gray-50 transition-colors">
-                        <span className="text-[10px] text-gray-400 w-[68px] shrink-0 font-medium">{label}</span>
-                        <input
-                          type="text"
-                          value={val}
-                          onChange={e => incallField(k, e.target.value)}
-                          placeholder="—"
-                          className="flex-1 text-xs text-gray-800 bg-transparent border-0 focus:outline-none focus:bg-white rounded px-1 py-0.5 placeholder-gray-300"
-                        />
-                      </div>
-                    )
-                  })}
+            return (
+              <div>
+                {/* ── 헤더: 수정 버튼 ── */}
+                <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-100 sticky top-0 z-10">
+                  <span className="text-[11px] font-bold text-gray-600">📋 인콜일지</span>
+                  <button type="button" onClick={() => setIncallEditing(e => !e)}
+                    className={`text-[10px] px-3 py-1 rounded-full font-bold transition-colors ${
+                      incallEditing
+                        ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                        : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                    }`}>
+                    {incallEditing ? '✓ 저장완료' : '✏️ 수정'}
+                  </button>
                 </div>
 
-                {/* ── 오른쪽: 인콜결과 + 타임라인 ── */}
-                <div className="md:flex-1 p-3 space-y-4 overflow-y-auto">
-
-                  {/* 결정전 결과 */}
-                  <div>
-                    <p className="text-[10px] text-gray-500 font-medium mb-2">결정전 결과</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {INCALL_CALL_RESULTS.map(opt => (
-                        <button key={opt.key} type="button"
-                          onClick={() => incallField('call_result', callResult === opt.key ? '' : opt.key)}
-                          className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all ${
-                            callResult === opt.key
-                              ? opt.color + ' border-transparent scale-105'
-                              : 'bg-gray-100 text-gray-400 border-gray-200 hover:border-gray-400'
-                          }`}>
-                          {opt.key || '—'}
-                        </button>
-                      ))}
+                {/* ── 섹션별 필드 그리드 ── */}
+                {sections.map(sec => (
+                  <div key={sec.title} className="mb-0">
+                    <div className={`${sec.bg} px-3 py-1.5`}>
+                      <span className={`text-[10px] font-bold ${sec.textColor} tracking-wide`}>{sec.title}</span>
                     </div>
-                  </div>
-
-                  {/* 클로징 결과 */}
-                  <div>
-                    <p className="text-[10px] text-gray-500 font-medium mb-2">클로징 결과</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {INCALL_CLOSING_RESULTS.map(opt => (
-                        <button key={opt.key} type="button"
-                          onClick={() => incallField('closing_result', closingResult === opt.key ? '' : opt.key)}
-                          className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all ${
-                            closingResult === opt.key
-                              ? opt.color + ' border-transparent scale-105'
-                              : 'bg-gray-100 text-gray-400 border-gray-200 hover:border-gray-400'
-                          }`}>
-                          {opt.key || '—'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* 재통화 일정 */}
-                  <div>
-                    <p className="text-[10px] text-gray-500 font-medium mb-1">재통화 일정</p>
-                    <input type="date" value={subcallDate}
-                      onChange={e => incallField('subcall_date', e.target.value)}
-                      className={inp} />
-                  </div>
-
-                  {/* 타임라인 */}
-                  <div>
-                    <p className="text-[10px] text-gray-500 font-medium mb-2">🕐 타임라인</p>
-                    <div className="flex gap-1 mb-2">
-                      <input
-                        value={tlInput}
-                        onChange={e => setTlInput(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') addIncallTimeline() }}
-                        placeholder="기록 입력 후 Enter..."
-                        className="flex-1 border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400/50"
-                      />
-                      <button type="button" onClick={addIncallTimeline}
-                        className="px-3 py-1.5 bg-gray-700 text-white text-xs font-bold rounded hover:bg-gray-800">추가</button>
-                    </div>
-                    {combinedTl.length === 0 ? (
-                      <p className="text-[10px] text-gray-300 text-center py-3">기록 없음</p>
-                    ) : (
-                      <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
-                        {[...combinedTl].reverse().map((entry: any, i: number) => {
-                          const isSales = entry._src === 'sales'
-                          const kst = formatKST(entry.created_at || entry.date || '')
-                          const opsTlIdx = isSales ? -1 : (ij.timeline || []).findIndex((e: any) =>
-                            e.created_at === entry.created_at && e.content === entry.content
-                          )
-                          return (
-                            <div key={i} className={`flex gap-2 items-start rounded-lg px-2 py-1.5 group ${isSales ? 'bg-violet-50' : 'bg-gray-50'}`}>
-                              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white shrink-0 mt-0.5 ${isSales ? 'bg-violet-400' : 'bg-gray-500'}`}>
-                                {isSales ? '영' : '관'}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5">
-                                  <span className={`text-[10px] font-semibold ${isSales ? 'text-violet-600' : 'text-gray-600'}`}>
-                                    {entry.user || entry.author || (isSales ? '영업팀' : '관리팀')}
-                                  </span>
-                                  <span className="text-[10px] text-gray-300">{kst.date} {kst.time}</span>
-                                </div>
-                                <p className="text-xs text-gray-700 mt-0.5">{entry.content || entry.text || ''}</p>
-                              </div>
-                              {!isSales && opsTlIdx >= 0 && (
-                                <button type="button" onClick={() => deleteIncallTimeline(opsTlIdx)}
-                                  className="text-[9px] text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">✕</button>
+                    <div className="divide-y divide-gray-50">
+                      {sec.fields.map((row, ri) => (
+                        <div key={ri} className={`grid gap-0 divide-x divide-gray-50 ${row.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                          {row.map(([label, k, val]: any) => (
+                            <div key={k} className="flex items-center px-3 py-2 hover:bg-gray-50 transition-colors">
+                              <span className="text-[10px] text-gray-400 font-medium w-[58px] shrink-0">{label}</span>
+                              {incallEditing ? (
+                                <input
+                                  type="text"
+                                  value={val}
+                                  onChange={e => incallField(k, e.target.value)}
+                                  placeholder="—"
+                                  className="flex-1 text-xs font-semibold text-[#1B2A45] bg-transparent border-b border-violet-300 focus:outline-none focus:border-violet-500 px-0.5 py-0"
+                                />
+                              ) : (
+                                <span className={`flex-1 text-xs font-semibold ${val ? 'text-[#1B2A45]' : 'text-gray-300'}`}>
+                                  {val || '—'}
+                                </span>
                               )}
                             </div>
-                          )
-                        })}
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+
+                {/* ── 인콜결과 + 재통화 (컴팩트) ── */}
+                <div className="bg-gray-50 border-t border-gray-100 px-3 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-gray-400 font-medium">결정전</span>
+                    {callResult ? (
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${INCALL_CALL_RESULTS.find(o => o.key === callResult)?.color || 'bg-gray-200 text-gray-600'}`}>
+                        {callResult}
+                      </span>
+                    ) : <span className="text-[10px] text-gray-300">—</span>}
+                    {incallEditing && (
+                      <div className="flex flex-wrap gap-1 ml-1">
+                        {INCALL_CALL_RESULTS.filter(o => o.key).map(opt => (
+                          <button key={opt.key} type="button"
+                            onClick={() => incallField('call_result', callResult === opt.key ? '' : opt.key)}
+                            className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold border transition-all ${
+                              callResult === opt.key ? opt.color + ' border-transparent' : 'bg-white text-gray-400 border-gray-200'
+                            }`}>{opt.key}</button>
+                        ))}
                       </div>
                     )}
                   </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-gray-400 font-medium">클로징</span>
+                    {closingResult ? (
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${INCALL_CLOSING_RESULTS.find(o => o.key === closingResult)?.color || 'bg-gray-200 text-gray-600'}`}>
+                        {closingResult}
+                      </span>
+                    ) : <span className="text-[10px] text-gray-300">—</span>}
+                    {incallEditing && (
+                      <div className="flex flex-wrap gap-1 ml-1">
+                        {INCALL_CLOSING_RESULTS.filter(o => o.key).map(opt => (
+                          <button key={opt.key} type="button"
+                            onClick={() => incallField('closing_result', closingResult === opt.key ? '' : opt.key)}
+                            className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold border transition-all ${
+                              closingResult === opt.key ? opt.color + ' border-transparent' : 'bg-white text-gray-400 border-gray-200'
+                            }`}>{opt.key}</button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-gray-400 font-medium">재통화</span>
+                    {incallEditing ? (
+                      <input type="date" value={subcallDate} onChange={e => incallField('subcall_date', e.target.value)}
+                        className="text-[10px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none" />
+                    ) : (
+                      <span className={`text-[10px] font-semibold ${subcallDate ? 'text-amber-700' : 'text-gray-300'}`}>
+                        {subcallDate ? `📅 ${subcallDate}` : '—'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── 타임라인 ── */}
+                <div className="px-3 pt-3 pb-2">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <span className="text-[10px] font-bold text-gray-500">🕐 타임라인</span>
+                    <div className="flex-1 h-px bg-gray-100" />
+                  </div>
+                  <div className="flex gap-1 mb-2">
+                    <input value={tlInput} onChange={e => setTlInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') addIncallTimeline() }}
+                      placeholder="기록 입력 후 Enter..."
+                      className="flex-1 border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400/50" />
+                    <button type="button" onClick={addIncallTimeline}
+                      className="px-3 py-1.5 bg-[#1B2A45] text-white text-xs font-bold rounded hover:bg-[#1B2A45]/80">추가</button>
+                  </div>
+                  {combinedTl.length === 0 ? (
+                    <p className="text-[10px] text-gray-300 text-center py-2">기록 없음</p>
+                  ) : (
+                    <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                      {[...combinedTl].reverse().map((entry: any, i: number) => {
+                        const isSales = entry._src === 'sales'
+                        const kst = formatKST(entry.created_at || entry.date || '')
+                        const opsTlIdx = isSales ? -1 : (ij.timeline || []).findIndex((e: any) =>
+                          e.created_at === entry.created_at && e.content === entry.content
+                        )
+                        return (
+                          <div key={i} className={`flex gap-2 items-start rounded-lg px-2 py-1.5 group ${isSales ? 'bg-violet-50' : 'bg-gray-50'}`}>
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white shrink-0 mt-0.5 ${isSales ? 'bg-violet-400' : 'bg-[#1B2A45]'}`}>
+                              {isSales ? '영' : '관'}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className={`text-[10px] font-semibold ${isSales ? 'text-violet-600' : 'text-[#1B2A45]'}`}>
+                                  {entry.user || entry.author || (isSales ? '영업팀' : '관리팀')}
+                                </span>
+                                <span className="text-[10px] text-gray-300">{kst.date} {kst.time}</span>
+                              </div>
+                              <p className="text-xs text-gray-700 mt-0.5">{entry.content || entry.text || ''}</p>
+                            </div>
+                            {!isSales && opsTlIdx >= 0 && (
+                              <button type="button" onClick={() => deleteIncallTimeline(opsTlIdx)}
+                                className="text-[9px] text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">✕</button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             )
