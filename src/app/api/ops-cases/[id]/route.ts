@@ -42,14 +42,19 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   // 권한 확인
   const { data: existing } = await supabaseAdmin
     .from('ops_cases')
-    .select('owner_id, stage, customer_name')
+    .select('owner_id, ops_user_name, stage, customer_name')
     .eq('id', id)
     .single()
 
   if (!existing) return NextResponse.json({ error: '케이스 없음' }, { status: 404 })
-  // ops 직원은 본인 케이스 또는 미배정(owner_id null) 케이스만 수정 가능
-  if (user.role === 'ops' && existing.owner_id !== null && existing.owner_id !== user.id) {
-    return NextResponse.json({ error: '권한 없음' }, { status: 403 })
+  // ops 직원은 본인 케이스(owner_id 또는 ops_user_name 매칭) 또는 미배정 케이스만 수정 가능
+  if (user.role === 'ops') {
+    const isOwnerById   = existing.owner_id === user.id
+    const isOwnerByName = existing.ops_user_name && existing.ops_user_name === user.name
+    const isUnassigned  = existing.owner_id === null && !existing.ops_user_name
+    if (!isOwnerById && !isOwnerByName && !isUnassigned) {
+      return NextResponse.json({ error: '권한 없음' }, { status: 403 })
+    }
   }
 
   const patch = toDbPatch(body)

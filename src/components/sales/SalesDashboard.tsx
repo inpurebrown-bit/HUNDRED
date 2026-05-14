@@ -303,6 +303,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         memo,
         revenue,
         owner_id: opsUserId || null,
+        ops_user_name: opsUserName || null,   // ← 관리팀 직원 이름 저장 (필수)
         timeline: salesTimeline.length > 0 ? salesTimeline : undefined,
         customer_id: customer.id,
         details: {

@@ -62,7 +62,14 @@ export async function GET(req: NextRequest) {
   }
 
   let query = supabaseAdmin.from('ops_cases').select('*')
-  if (user.role === 'ops') query = query.or(`owner_id.eq.${user.id},owner_id.is.null`) as any
+  if (user.role === 'ops') {
+    // owner_id 또는 ops_user_name 으로 매칭 (타입 불일치 방어용 이중 체크)
+    // owner_id.is.null: 미배정 케이스는 모든 ops 직원에게 표시
+    const safeUserName = (user.name || '').replace(/,/g, '')  // 쉼표 방어
+    query = query.or(
+      `owner_id.eq.${user.id},ops_user_name.eq.${safeUserName},owner_id.is.null`
+    ) as any
+  }
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
