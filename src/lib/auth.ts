@@ -53,6 +53,15 @@ export const authOptions: NextAuthOptions = {
         ;(session.user as any).role = token.role
         ;(session.user as any).teamId = token.teamId
         ;(session.user as any).username = token.username
+        // DB에서 최신 이름 조회 (대표가 이름 변경 시 즉시 반영)
+        try {
+          const { data: freshUser } = await supabaseAdmin
+            .from('users')
+            .select('name')
+            .eq('id', token.id as string)
+            .single()
+          if (freshUser?.name) session.user.name = freshUser.name
+        } catch {}
       }
       return session
     },
