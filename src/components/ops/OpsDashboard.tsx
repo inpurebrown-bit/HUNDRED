@@ -198,18 +198,24 @@ function TimelineSection({ initialTimeline, onSchedule }: {
       ) : (
         <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
           {[...tl].reverse().map((entry: any, i: number) => {
-            const isAuto = entry.user === '자동기록'
+            const isSales = entry.source === 'sales'
+            const isAuto  = entry.user === '자동기록'
             const kst = formatKST(entry.created_at || entry.date || '')
             const user = entry.user || entry.author || ''
             const content = entry.content || entry.text || ''
+            const bg      = isSales ? 'bg-violet-50'   : isAuto ? 'bg-violet-50/60' : 'bg-gray-50'
+            const avatarBg = isSales ? 'bg-violet-400'  : isAuto ? 'bg-violet-300'   : 'bg-[#1B2A45]'
+            const nameColor = isSales ? 'text-violet-600' : isAuto ? 'text-violet-400' : 'text-[#1B2A45]'
+            const avatarLabel = isSales ? '영' : (user ? user.slice(-2) : '관')
             return (
-              <div key={i} className={`flex gap-2 items-start rounded-lg px-2 py-1.5 ${isAuto ? 'bg-violet-50' : 'bg-gray-50'}`}>
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0 ${isAuto ? 'bg-violet-400' : 'bg-gray-400'}`}>
-                  {user ? user.slice(-2) : '기록'}
+              <div key={i} className={`flex gap-2 items-start rounded-lg px-2 py-1.5 ${bg}`}>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0 ${avatarBg}`}>
+                  {avatarLabel}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className={`text-[10px] font-semibold ${isAuto ? 'text-violet-600' : 'text-gray-600'}`}>{user || '—'}</span>
+                    <span className={`text-[10px] font-semibold ${nameColor}`}>{user || '—'}</span>
+                    {isSales && <span className="text-[9px] bg-violet-100 text-violet-600 px-1 py-0.5 rounded font-bold">영업팀</span>}
                     <span className="text-[10px] text-gray-300">{kst.date} {kst.time}</span>
                   </div>
                   <p className="text-xs text-gray-700 mt-0.5">{content}</p>
