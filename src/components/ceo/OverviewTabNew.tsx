@@ -16,6 +16,7 @@ import {
   getRemainingBusinessDays as _bizRemaining,
 } from '@/lib/businessDays'
 import { SUPPLY_RATE_TABLE, isActiveRow, contractWeight, calcRecommendedSupply } from '@/lib/supplyRules'
+import DailyRateWidget from './DailyRateWidget'
 
 // ─── Interfaces ───────────────────────────────────────────
 
@@ -610,7 +611,10 @@ export default function OverviewTabNew() {
         )}
       </div>
 
-      {/* ═══ 3. THIS MONTH SECTION ══════════════════════════ */}
+      {/* ═══ 3. 결제율 현황 (일일 수동 업데이트) ════════════ */}
+      <DailyRateWidget />
+
+      {/* ═══ 4. THIS MONTH SECTION ══════════════════════════ */}
       <div ref={thisMonthRef}>
         <MonthSection
           title={`${thisMonth}월 현황`}
