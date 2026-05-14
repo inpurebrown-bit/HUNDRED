@@ -9,23 +9,44 @@ import { supabaseAdmin } from '@/lib/supabase'
  *   institution, institution_type, solution, stage, memo,
  *   revenue, visit_date, script_delivered, next_plan,
  *   required_checks, fund_solution, tax_invoice_requested,
- *   is_refund, is_completed, approved_amount, commission_amount, created_at
+ *   is_refund, is_completed, approved_amount, commission_amount, created_at,
+ *   timeline, details, customer_id
  *
  * 프론트 호환용 alias (GET 응답에서 추가):
  *   progress_stage = stage
  *   progress_memo  = memo
- *   ops_user_name  = owner_id에서 조회 or stored
  */
-function normalize(c: any) {
+function normalize(c: any, customerMap: Record<string, any> = {}) {
+  // customers 테이블에서 전화번호로 매칭된 고객 데이터
+  const cust = customerMap[c.phone] || null
+  const custDetails = cust?.details || {}
+
+  // sales_customer_info: ops_case.details에 저장된 값 OR customers 테이블 실시간 데이터
+  const sci = c.details?.sales_customer_info || null
+
   return {
     ...c,
     progress_stage: c.stage ?? '',
     progress_memo:  c.memo  ?? '',
-    // customers 구조 맞추기 (customer_name/phone이 직접 컬럼)
     customers: {
-      name:    c.customer_name ?? '',
-      phone:   c.phone         ?? '',
-      details: { company: c.customer_name ?? '' },
+      name:    cust?.name ?? c.customer_name ?? '',
+      phone:   c.phone ?? '',
+      company: custDetails.company || c.customer_name || '',
+      details: {
+        company:         custDetails.company         || sci?.company         || c.customer_name || '',
+        representative:  cust?.name                  || sci?.representative  || '',
+        phone:           c.phone                     || '',
+        business_type:   custDetails.business_type   || sci?.business_type   || '',
+        region:          custDetails.region           || sci?.region          || '',
+        loan_history:    cust?.loan_history           || sci?.loan_history    || '',
+        call_result:     custDetails.call_result      || sci?.call_result     || '',
+        closing_result:  custDetails.closing_result   || sci?.closing_result  || '',
+        subcall_date:    custDetails.subcall_date      || sci?.subcall_date    || '',
+        sales_user_name: custDetails.sales_user_name  || sci?.sales_user_name || '',
+        created_at:      cust?.created_at             || sci?.created_at      || '',
+        memo:            cust?.memo                   || '',
+      },
+      call_timeline: cust?.call_timeline || [],
     },
   }
 }
@@ -41,13 +62,29 @@ export async function GET(req: NextRequest) {
   }
 
   let query = supabaseAdmin.from('ops_cases').select('*')
-  // ops 사용자는 본인 케이스 + 미배정(owner_id null) 케이스 모두 조회
   if (user.role === 'ops') query = query.or(`owner_id.eq.${user.id},owner_id.is.null`) as any
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ cases: (data || []).map(normalize) })
+  const cases = data || []
+
+  // 전화번호 목록으로 customers 테이블 일괄 조회
+  const phones = [...new Set(cases.map((c: any) => c.phone).filter(Boolean))]
+  let customerMap: Record<string, any> = {}
+  if (phones.length > 0) {
+    const { data: custData } = await supabaseAdmin
+      .from('customers')
+      .select('name, phone, loan_history, call_timeline, details, created_at, memo')
+      .in('phone', phones as string[])
+    if (custData) {
+      for (const c of custData) {
+        if (c.phone && !customerMap[c.phone]) customerMap[c.phone] = c
+      }
+    }
+  }
+
+  return NextResponse.json({ cases: cases.map((c: any) => normalize(c, customerMap)) })
 }
 
 // POST: 케이스 등록 (자금팀전송)

@@ -46,8 +46,9 @@ export interface OpsCase {
   customers: {
     name: string
     phone: string
-    company: string
+    company?: string
     loan_history?: string
+    call_timeline?: any[]
     details?: Record<string, any>
   }
 }
@@ -687,104 +688,130 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
       {activeDetailTab === '인콜일지' && (
         <div className="space-y-4">
 
-          {/* ── 영업팀 인콜일지 (고객카드 그대로) ── */}
+          {/* ── 영업팀 인콜일지 (customers 테이블 실시간 데이터 기반) ── */}
           {(() => {
-            const sci = d.sales_customer_info
-            const salesTimeline: any[] = (local.timeline || []).filter((e: any) => e.source === 'sales')
-            const hasSalesData = sci || salesTimeline.length > 0
-            if (!hasSalesData) {
-              return <p className="text-[10px] text-gray-300 text-center py-2">영업팀 전달 인콜일지 없음</p>
-            }
+            const cd = local.customers?.details || {}
+            // call_timeline: API에서 customers 테이블 조인으로 항상 포함됨
+            const callTimeline: any[] = (local.customers as any)?.call_timeline || []
+            // ops_case timeline에 source=sales로 저장된 것도 fallback으로 사용
+            const salesTimeline: any[] = callTimeline.length > 0
+              ? callTimeline
+              : (local.timeline || []).filter((e: any) => e.source === 'sales')
+
+            const company        = cd.company        || local.customers?.company || local.customers?.name || ''
+            const representative = cd.representative || local.customers?.name    || ''
+            const phone          = cd.phone          || local.customers?.phone   || ''
+            const businessType   = cd.business_type  || ''
+            const region         = cd.region         || ''
+            const loanHistory    = cd.loan_history   || local.customers?.loan_history || ''
+            const callResult     = cd.call_result    || ''
+            const closingResult  = cd.closing_result || ''
+            const subcallDate    = cd.subcall_date   || ''
+            const salesUserName  = cd.sales_user_name|| ''
+            const memo           = cd.memo           || (local.customers as any)?.memo || ''
+            const createdAt      = cd.created_at     || ''
+
             return (
               <div className="bg-violet-50 border border-violet-200 rounded-xl overflow-hidden">
                 {/* 헤더 */}
                 <div className="bg-violet-600 px-3 py-2 flex items-center gap-2">
                   <span className="text-white font-bold text-xs">📋 영업팀 인콜일지</span>
-                  {sci?.sales_user_name && (
-                    <span className="text-violet-200 text-[10px]">담당: {sci.sales_user_name}</span>
+                  {salesUserName && (
+                    <span className="text-violet-200 text-[10px]">담당: {salesUserName}</span>
                   )}
                 </div>
 
                 <div className="p-3 space-y-3">
                   {/* 고객 기본정보 */}
-                  {sci && (
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 bg-white rounded-lg p-2.5 border border-violet-100">
-                      {sci.company && (
-                        <div className="col-span-2">
-                          <span className="text-[9px] text-gray-400 block">업체명</span>
-                          <span className="text-xs font-bold text-gray-800">{sci.company}</span>
-                        </div>
-                      )}
-                      {sci.representative && sci.representative !== sci.company && (
-                        <div>
-                          <span className="text-[9px] text-gray-400 block">대표자</span>
-                          <span className="text-xs text-gray-700">{sci.representative}</span>
-                        </div>
-                      )}
-                      {sci.phone && (
-                        <div>
-                          <span className="text-[9px] text-gray-400 block">연락처</span>
-                          <span className="text-xs text-gray-700">{sci.phone}</span>
-                        </div>
-                      )}
-                      {sci.business_type && (
-                        <div>
-                          <span className="text-[9px] text-gray-400 block">업종</span>
-                          <span className="text-xs text-gray-700">{sci.business_type}</span>
-                        </div>
-                      )}
-                      {sci.region && (
-                        <div>
-                          <span className="text-[9px] text-gray-400 block">지역</span>
-                          <span className="text-xs text-gray-700">{sci.region}</span>
-                        </div>
-                      )}
-                      {sci.loan_history && (
-                        <div className="col-span-2">
-                          <span className="text-[9px] text-gray-400 block">기대출</span>
-                          <span className="text-xs text-gray-700">{sci.loan_history}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 bg-white rounded-lg p-2.5 border border-violet-100">
+                    {company && (
+                      <div className="col-span-2">
+                        <span className="text-[9px] text-gray-400 block">업체명</span>
+                        <span className="text-xs font-bold text-gray-800">{company}</span>
+                      </div>
+                    )}
+                    {representative && representative !== company && (
+                      <div>
+                        <span className="text-[9px] text-gray-400 block">대표자</span>
+                        <span className="text-xs text-gray-700">{representative}</span>
+                      </div>
+                    )}
+                    {phone && (
+                      <div>
+                        <span className="text-[9px] text-gray-400 block">연락처</span>
+                        <span className="text-xs text-gray-700">{phone}</span>
+                      </div>
+                    )}
+                    {businessType && (
+                      <div>
+                        <span className="text-[9px] text-gray-400 block">업종</span>
+                        <span className="text-xs text-gray-700">{businessType}</span>
+                      </div>
+                    )}
+                    {region && (
+                      <div>
+                        <span className="text-[9px] text-gray-400 block">지역</span>
+                        <span className="text-xs text-gray-700">{region}</span>
+                      </div>
+                    )}
+                    {createdAt && (
+                      <div>
+                        <span className="text-[9px] text-gray-400 block">접수일</span>
+                        <span className="text-xs text-gray-700">{formatKST(createdAt).date}</span>
+                      </div>
+                    )}
+                    {loanHistory && (
+                      <div className="col-span-2">
+                        <span className="text-[9px] text-gray-400 block">기대출</span>
+                        <span className="text-xs text-gray-700">{loanHistory}</span>
+                      </div>
+                    )}
+                    {memo && (
+                      <div className="col-span-2">
+                        <span className="text-[9px] text-gray-400 block">메모</span>
+                        <span className="text-xs text-gray-700 whitespace-pre-wrap">{memo}</span>
+                      </div>
+                    )}
+                  </div>
 
                   {/* 인콜결과 배지 */}
-                  {sci && (sci.call_result || sci.closing_result) && (
-                    <div className="flex items-center gap-2">
-                      {sci.call_result && (
+                  {(callResult || closingResult || subcallDate) && (
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {callResult && (
                         <div className="flex flex-col items-center">
                           <span className="text-[9px] text-gray-400 mb-0.5">결정전 결과</span>
-                          <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{sci.call_result}</span>
+                          <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{callResult}</span>
                         </div>
                       )}
-                      {sci.closing_result && (
+                      {closingResult && (
                         <div className="flex flex-col items-center">
                           <span className="text-[9px] text-gray-400 mb-0.5">클로징 결과</span>
-                          <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">{sci.closing_result}</span>
+                          <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">{closingResult}</span>
                         </div>
                       )}
-                      {sci.subcall_date && (
-                        <div className="flex flex-col items-center ml-2">
+                      {subcallDate && (
+                        <div className="flex flex-col items-center">
                           <span className="text-[9px] text-gray-400 mb-0.5">재통화 일정</span>
-                          <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">📅 {sci.subcall_date}</span>
+                          <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">📅 {subcallDate}</span>
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* 타임라인 (영업팀 기록) */}
-                  {salesTimeline.length > 0 && (
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <span className="text-[9px] font-bold text-violet-500 uppercase tracking-wide">인콜 타임라인</span>
-                        <div className="flex-1 h-px bg-violet-200" />
-                      </div>
+                  {/* 타임라인 (영업팀 인콜 기록) */}
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <span className="text-[9px] font-bold text-violet-500 uppercase tracking-wide">인콜 타임라인</span>
+                      <div className="flex-1 h-px bg-violet-200" />
+                    </div>
+                    {salesTimeline.length === 0 ? (
+                      <p className="text-[10px] text-gray-300 text-center py-2">인콜 기록 없음</p>
+                    ) : (
                       <div className="relative pl-4 border-l-2 border-violet-200 space-y-2">
                         {[...salesTimeline].reverse().map((log: any, i: number) => {
                           const origIdx = salesTimeline.length - 1 - i
                           const kst = formatKST(log.created_at || log.date || '')
                           const author = log.user || log.author || log.user_name || '영업팀'
-                          // 이 엔트리에 연결된 보충 기록 찾기
                           const supplements: any[] = (d.ops_incall_logs || []).filter(
                             (s: any) => s.ref_sales_idx === origIdx
                           )
@@ -805,7 +832,6 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
                                   </button>
                                 </div>
                                 {log.content && <p className="text-xs text-gray-700 whitespace-pre-wrap">{log.content}</p>}
-                                {/* 보충 입력 폼 */}
                                 {supplementIdx === origIdx && (
                                   <div className="mt-2 space-y-1.5 border-t border-violet-100 pt-2">
                                     <textarea
@@ -822,7 +848,6 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
                                     </button>
                                   </div>
                                 )}
-                                {/* 연결된 보충 기록 */}
                                 {supplements.length > 0 && (
                                   <div className="mt-2 space-y-1 border-t border-violet-100 pt-2">
                                     {supplements.map((sup: any, si: number) => {
@@ -865,8 +890,8 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
                           )
                         })}
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
             )
