@@ -714,9 +714,10 @@ export default function SalesCeoTab() {
         )
         .reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount), 0)
       const totalContracted = cfg.base + dbContracted
-      const rate = cfg.supplied > 0 ? parseFloat((totalContracted / cfg.supplied * 100).toFixed(2)) : 0
+      // floor(소수점 2자리 버림) — 반올림 시 12.999...→13.00이 되어 공급 오계산 방지
+      const rate = cfg.supplied > 0 ? Math.floor(totalContracted / cfg.supplied * 10000) / 100 : 0
       const recommended = calcRecommendedSupply(rate, bizElapsed)
-      const achievePct = cfg.goal > 0 ? parseFloat((totalContracted / cfg.goal * 100).toFixed(2)) : 0
+      const achievePct = cfg.goal > 0 ? Math.floor(totalContracted / cfg.goal * 10000) / 100 : 0
       return { name, cfg, dbContracted, totalContracted, rate, recommended, achievePct }
     })
   }, [salesPeople, supplyConfig, customers, thisMonthStr, bizElapsed])

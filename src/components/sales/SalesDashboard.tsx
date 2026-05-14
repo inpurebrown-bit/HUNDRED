@@ -379,8 +379,9 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
 
   // displayCfg: 공급설정 없으면 기본값 — 두 유저 동일 뷰 보장
   const displayCfg = mySupplyCfg ?? { supplied: todaySupply, goal: monthlyGoal, base: 0 }
+  // floor(소수점 2자리 버림) — 반올림 시 12.999...→13.00이 되어 공급 오계산 방지
   const contractRate = displayCfg.supplied > 0
-    ? parseFloat((myTotalContracted / displayCfg.supplied * 100).toFixed(2))
+    ? Math.floor(myTotalContracted / displayCfg.supplied * 10000) / 100
     : 0
   const tomorrowSupplyNeeded = calcRecommendedSupply(contractRate, bizElapsed)
 
