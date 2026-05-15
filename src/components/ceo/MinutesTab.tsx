@@ -183,89 +183,115 @@ export default function MinutesTab() {
                   {/* 마감보고 */}
                   <div>
                     <p className="text-xs font-bold text-blue-600 mb-3">📋 마감보고</p>
-                    {dr ? (
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-3 gap-2">
-                          {[
-                            { label: '당일계약', value: dr.data?.today_contracts || 0 },
-                            { label: '월누적', value: dr.data?.month_contracts || 0 },
-                            { label: '월목표', value: dr.data?.goal || 0 },
-                          ].map(s => (
-                            <div key={s.label} className="bg-blue-50 rounded-lg p-2 text-center">
-                              <p className="text-[9px] text-gray-400">{s.label}</p>
-                              <p className="text-lg font-black text-blue-700">{s.value}</p>
-                            </div>
-                          ))}
-                        </div>
-                        {(dr.data?.supply_db || []).filter((i: any) => i.is_decided).length > 0 && (
-                          <div>
-                            <p className="text-[10px] font-bold text-gray-500 mb-1">✅ 결정업체 (공급DB)</p>
-                            <div className="flex flex-wrap gap-1">
-                              {(dr.data.supply_db as any[]).filter(i => i.is_decided).map((i: any, idx: number) => (
-                                <span key={idx} className="text-[11px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{i.company}</span>
-                              ))}
-                            </div>
+                    {!dr && (
+                      <div className="bg-gray-50 rounded-lg px-3 py-2 text-xs text-gray-400 mb-2 text-center">마감보고 미제출</div>
+                    )}
+                    <div className="space-y-2">
+                      {/* 계약 수치 */}
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { label: '당일계약', value: dr?.data?.today_contracts ?? '—' },
+                          { label: '월누적', value: dr?.data?.month_contracts ?? '—' },
+                          { label: '월목표', value: dr?.data?.goal ?? '—' },
+                        ].map(s => (
+                          <div key={s.label} className="bg-blue-50 rounded-lg p-2 text-center">
+                            <p className="text-[9px] text-gray-400">{s.label}</p>
+                            <p className="text-lg font-black text-blue-700">{s.value}</p>
                           </div>
-                        )}
-                        {(dr.data?.outbound || []).filter((i: any) => i.is_decided).length > 0 && (
-                          <div>
-                            <p className="text-[10px] font-bold text-gray-500 mb-1">✅ 결정업체 (아웃바운딩)</p>
-                            <div className="flex flex-wrap gap-1">
-                              {(dr.data.outbound as any[]).filter(i => i.is_decided).map((i: any, idx: number) => (
-                                <span key={idx} className="text-[11px] bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">{i.company}</span>
-                              ))}
-                            </div>
+                        ))}
+                      </div>
+
+                      {/* 공급DB 상담결과 */}
+                      <div>
+                        <p className="text-[10px] font-bold text-green-700 mb-1">🟢 공급DB 상담결과</p>
+                        {(dr?.data?.supply_db || []).length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {(dr!.data.supply_db as any[]).map((i: any, idx: number) => (
+                              <span key={idx} className={`text-[11px] px-2 py-0.5 rounded-full ${i.is_decided ? 'bg-green-200 text-green-800 font-bold' : 'bg-green-50 text-green-600'}`}>
+                                {i.is_decided ? '✅ ' : ''}{i.company}
+                                {i.result && <span className="text-[9px] ml-1 opacity-70">({i.result})</span>}
+                              </span>
+                            ))}
                           </div>
-                        )}
-                        {(dr.data?.meetings || []).length > 0 && (
-                          <div>
-                            <p className="text-[10px] font-bold text-gray-500 mb-1">📅 미팅 일정</p>
-                            <div className="space-y-0.5">
-                              {(dr.data.meetings as any[]).map((m: any, idx: number) => (
-                                <p key={idx} className="text-[11px] text-gray-600">
-                                  {m.company} — {m.date} {m.time} {m.location && `(${m.location})`}
-                                </p>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {(dr.data?.payment_waiting || []).length > 0 && (
-                          <div>
-                            <p className="text-[10px] font-bold text-gray-500 mb-1">💰 입금대기 업체</p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {(dr.data.payment_waiting as any[]).map((p: any, idx: number) => (
-                                <span key={idx} className="text-[11px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg flex flex-col">
-                                  <span className="font-bold">{p.company}</span>
-                                  {(p.memo || p.notes) && (
-                                    <span className="text-[9px] text-amber-600 font-normal">{p.memo || p.notes}</span>
-                                  )}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {(dr.data?.worried || []).length > 0 && (
-                          <div>
-                            <p className="text-[10px] font-bold text-gray-500 mb-1">⚠️ 검토 필요 업체</p>
-                            <div className="space-y-0.5">
-                              {(dr.data.worried as any[]).map((w: any, idx: number) => (
-                                <p key={idx} className="text-[11px] text-gray-600">
-                                  {w.company}{' '}
-                                  <span className={`text-[9px] px-1 rounded ${
-                                    w.probability === '상' ? 'bg-green-100 text-green-600'
-                                    : w.probability === '중' ? 'bg-yellow-100 text-yellow-600'
-                                    : 'bg-red-100 text-red-600'
-                                  }`}>{w.probability}</span>
-                                  {w.reason && ` — ${w.reason}`}
-                                </p>
-                              ))}
-                            </div>
-                          </div>
+                        ) : (
+                          <p className="text-[11px] text-gray-300 pl-1">없음</p>
                         )}
                       </div>
-                    ) : (
-                      <div className="bg-gray-50 rounded-lg p-4 text-xs text-gray-400 text-center">마감보고 미제출</div>
-                    )}
+
+                      {/* 아웃바운딩 상담결과 */}
+                      <div>
+                        <p className="text-[10px] font-bold text-violet-700 mb-1">🟣 아웃바운딩 상담결과</p>
+                        {(dr?.data?.outbound || []).length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {(dr!.data.outbound as any[]).map((i: any, idx: number) => (
+                              <span key={idx} className={`text-[11px] px-2 py-0.5 rounded-full ${i.is_decided ? 'bg-violet-200 text-violet-800 font-bold' : 'bg-violet-50 text-violet-600'}`}>
+                                {i.is_decided ? '✅ ' : ''}{i.company}
+                                {i.result && <span className="text-[9px] ml-1 opacity-70">({i.result})</span>}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-gray-300 pl-1">없음</p>
+                        )}
+                      </div>
+
+                      {/* 미팅 일정 */}
+                      <div>
+                        <p className="text-[10px] font-bold text-sky-700 mb-1">📅 미팅 일정</p>
+                        {(dr?.data?.meetings || []).length > 0 ? (
+                          <div className="space-y-0.5">
+                            {(dr!.data.meetings as any[]).map((m: any, idx: number) => (
+                              <p key={idx} className="text-[11px] text-gray-600">
+                                {m.company} — {m.date} {m.time}{m.location && ` (${m.location})`}
+                              </p>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-gray-300 pl-1">없음</p>
+                        )}
+                      </div>
+
+                      {/* 입금대기 */}
+                      <div>
+                        <p className="text-[10px] font-bold text-amber-700 mb-1">💰 입금대기 업체</p>
+                        {(dr?.data?.payment_waiting || []).length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {(dr!.data.payment_waiting as any[]).map((p: any, idx: number) => (
+                              <span key={idx} className="text-[11px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg flex flex-col">
+                                <span className="font-bold">{p.company}</span>
+                                {(p.memo || p.notes) && (
+                                  <span className="text-[9px] text-amber-600 font-normal">{p.memo || p.notes}</span>
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-gray-300 pl-1">없음</p>
+                        )}
+                      </div>
+
+                      {/* 검토 필요 */}
+                      <div>
+                        <p className="text-[10px] font-bold text-red-600 mb-1">⚠️ 검토 필요 업체</p>
+                        {(dr?.data?.worried || []).length > 0 ? (
+                          <div className="space-y-0.5">
+                            {(dr!.data.worried as any[]).map((w: any, idx: number) => (
+                              <p key={idx} className="text-[11px] text-gray-600">
+                                {w.company}{' '}
+                                <span className={`text-[9px] px-1 rounded ${
+                                  w.probability === '상' ? 'bg-green-100 text-green-600'
+                                  : w.probability === '중' ? 'bg-yellow-100 text-yellow-600'
+                                  : 'bg-red-100 text-red-600'
+                                }`}>{w.probability}</span>
+                                {w.reason && ` — ${w.reason}`}
+                              </p>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-gray-300 pl-1">없음</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
