@@ -141,25 +141,42 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const { customer_name, phone, stage, progress_stage, memo, revenue, owner_id, ops_user_name, timeline, customer_id, details } = body
 
+  // 미배정 시 관리팀장(이름에 '팀장' 포함 ops 유저, 없으면 첫 번째 ops 유저)에게 자동 배정
+  let resolvedOwnerId: string | null = owner_id ?? null
+  let resolvedOpsName: string | null = ops_user_name ?? null
+
+  if (!resolvedOwnerId && !resolvedOpsName) {
+    const { data: opsUsers } = await supabaseAdmin
+      .from('users')
+      .select('id, name')
+      .eq('role', 'ops')
+      .order('name')
+    if (opsUsers && opsUsers.length > 0) {
+      const leader = opsUsers.find((u: any) => u.name?.includes('팀장')) || opsUsers[0]
+      resolvedOwnerId = String(leader.id)
+      resolvedOpsName = leader.name
+    }
+  }
+
   // ops_user_name, customer_id를 details 안에도 저장 (별도 컬럼 없어도 동작)
   const mergedDetails = {
     ...(details || {}),
-    ...(ops_user_name ? { ops_user_name } : {}),
-    ...(customer_id   ? { customer_id }   : {}),
+    ...(resolvedOpsName ? { ops_user_name: resolvedOpsName } : {}),
+    ...(customer_id     ? { customer_id }                    : {}),
   }
 
   const baseRow: Record<string, any> = {
-    customer_name:    customer_name ?? '',
-    phone:            phone         ?? '',
-    owner_id:         owner_id      ?? null,
+    customer_name:    customer_name     ?? '',
+    phone:            phone             ?? '',
+    owner_id:         resolvedOwnerId,
     stage:            stage ?? progress_stage ?? '서류받는중',
-    memo:             memo          ?? '',
-    revenue:          revenue       ?? 0,
+    memo:             memo              ?? '',
+    revenue:          revenue           ?? 0,
     institution_type: 'new',
     details:          mergedDetails,
-    ...(timeline      ? { timeline }      : {}),
-    ...(customer_id   ? { customer_id }   : {}),
-    ...(ops_user_name ? { ops_user_name } : {}),
+    ...(timeline         ? { timeline }                            : {}),
+    ...(customer_id      ? { customer_id }                        : {}),
+    ...(resolvedOpsName  ? { ops_user_name: resolvedOpsName }     : {}),
   }
 
   // 컬럼 없을 때 INSERT 실패 방지: 오류 시 옵셔널 컬럼 제거 후 재시도
