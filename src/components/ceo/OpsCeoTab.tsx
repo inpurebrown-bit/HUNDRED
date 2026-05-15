@@ -22,6 +22,10 @@ const PIPELINE_STAGES = [
   { key: '환불',       label: '환불',       color: 'bg-rose-500'    },
   { key: '종료',       label: '종료',       color: 'bg-neutral-400' },
 ]
+const OVERALL_STAGES = [
+  { key: '서류받는중', label: '서류받는중', color: 'bg-gray-500'  },
+  { key: '홀딩',       label: '홀딩',       color: 'bg-slate-400' },
+]
 const INST_DIRECT   = ['중진공','소진공(혁신)','소진공(신취)','소진공(재도전)','서민금융(미소)']
 const INST_INDIRECT = ['기보','신보','재단']
 const INDIRECT_SET  = new Set(INST_INDIRECT)
@@ -41,13 +45,15 @@ function formatKST(isoStr: string) {
 
 // ─── Case Card (8-col grid) ───────────────────────────────
 function CeoCaseCard({ c, isOpen, onToggle }: { c: OpsCase; isOpen: boolean; onToggle: (id: string) => void }) {
-  const companyName = c.customers?.details?.company || c.customers?.name || '—'
-  const stage = c.progress_stage || ''
-  const stageInfo = PIPELINE_STAGES.find(s => s.key === stage)
+  const allStages     = [...PIPELINE_STAGES, ...OVERALL_STAGES]
+  const companyName   = c.customers?.details?.company || c.customers?.name || '—'
+  const overallStage  = allStages.find(s => s.key === c.progress_stage)
+  const directStage   = c.details?.direct_stage  || ''
+  const indirectStage = c.details?.indirect_stage || ''
+  const directInfo    = allStages.find(s => s.key === directStage)
+  const indirectInfo  = allStages.find(s => s.key === indirectStage)
+  const scriptSent    = c.details?.script_sent || false
   const allInstitutions = (c.institution || '').split(',').map((s: string) => s.trim()).filter(Boolean)
-  const hasMultiple = allInstitutions.length > 1
-  const nextInst = c.details?.next_inst || ''
-  const nextDate = c.details?.visit_date || ''
 
   return (
     <div
@@ -60,22 +66,14 @@ function CeoCaseCard({ c, isOpen, onToggle }: { c: OpsCase; isOpen: boolean; onT
         style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
         {companyName}
       </p>
-      {/* 대표자 — 업체명과 다를 때만 표시 */}
       {c.customers?.name && c.customers.name !== companyName && (
         <p className="text-[10px] text-gray-400 mt-0.5">{c.customers.name}</p>
       )}
       <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{c.customers?.phone}</p>
       {c.ops_user_name && <p className="text-[9px] text-violet-500 mt-0.5">{c.ops_user_name}</p>}
 
-      <div className="mt-1.5">
-        {stageInfo ? (
-          <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold text-white ${stageInfo.color}`}>{stageInfo.label}</span>
-        ) : stage ? (
-          <span className="inline-block px-2 py-0.5 rounded-full text-[9px] font-bold text-white bg-gray-400">{stage}</span>
-        ) : null}
-      </div>
-
-      {hasMultiple && (
+      {/* 기관 항상 표시 */}
+      {allInstitutions.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-0.5 justify-center">
           {allInstitutions.map(inst => (
             <span key={inst} className={`text-[8px] px-1 py-0.5 rounded font-medium ${
@@ -85,21 +83,48 @@ function CeoCaseCard({ c, isOpen, onToggle }: { c: OpsCase; isOpen: boolean; onT
         </div>
       )}
 
-      {(nextInst || nextDate) && (
-        <div className="mt-1.5 flex items-center justify-center gap-1 flex-wrap">
-          {nextInst && <span className="text-[8px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">→ {nextInst}</span>}
-          {nextDate && <span className="text-[8px] text-sky-500 font-medium">📅 {nextDate.slice(5)}</span>}
+      {/* 전체 진행단계 */}
+      <div className="mt-1.5">
+        {overallStage ? (
+          <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold text-white ${overallStage.color}`}>{overallStage.label}</span>
+        ) : c.progress_stage ? (
+          <span className="inline-block px-2 py-0.5 rounded-full text-[9px] font-bold text-white bg-gray-400">{c.progress_stage}</span>
+        ) : null}
+      </div>
+
+      {/* 직접자금 진행단계 */}
+      {directStage && (
+        <div className="mt-0.5">
+          <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold text-white ${directInfo?.color || 'bg-blue-400'}`}>
+            직: {directStage}
+          </span>
+        </div>
+      )}
+
+      {/* 간접자금 진행단계 */}
+      {indirectStage && (
+        <div className="mt-0.5">
+          <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold text-white ${indirectInfo?.color || 'bg-violet-400'}`}>
+            간: {indirectStage}
+          </span>
         </div>
       )}
 
       {/* 핸들링 배지 */}
       {(c.details?.handling_no_contact || c.details?.handling_no_fit || c.details?.handling_mindless) && (
-        <div className="mt-1 flex flex-wrap gap-0.5 justify-center">
-          {c.details?.handling_no_contact && <span className="text-[8px] bg-red-100 text-red-600 px-1 py-0.5 rounded font-bold">📵 연락안됨</span>}
-          {c.details?.handling_no_fit     && <span className="text-[8px] bg-orange-100 text-orange-600 px-1 py-0.5 rounded font-bold">🚫 들어갈곳없음</span>}
-          {c.details?.handling_mindless   && <span className="text-[8px] bg-slate-100 text-slate-600 px-1 py-0.5 rounded font-bold">🔄 무지성</span>}
+        <div className="mt-0.5 flex flex-wrap gap-0.5 justify-center">
+          {c.details?.handling_no_contact && <span className="text-[8px] bg-red-100 text-red-600 px-1 py-0.5 rounded font-bold">📵연락안됨</span>}
+          {c.details?.handling_no_fit     && <span className="text-[8px] bg-orange-100 text-orange-600 px-1 py-0.5 rounded font-bold">🚫곳없음</span>}
+          {c.details?.handling_mindless   && <span className="text-[8px] bg-slate-100 text-slate-600 px-1 py-0.5 rounded font-bold">🔄무지성</span>}
         </div>
       )}
+
+      {/* 스크립트 발송 */}
+      <div className="mt-1.5 flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
+        <span className={`text-[9px] select-none ${scriptSent ? 'text-violet-600 font-semibold line-through' : 'text-gray-300'}`}>
+          {scriptSent ? '✓ 스크립트 발송' : '스크립트 미발송'}
+        </span>
+      </div>
     </div>
   )
 }

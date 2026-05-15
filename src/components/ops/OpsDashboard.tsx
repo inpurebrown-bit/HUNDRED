@@ -78,8 +78,14 @@ const PIPELINE_STAGES = [
   { key: '종료예정',   label: '종료예정',   color: 'bg-orange-400',  light: 'bg-orange-50 border-orange-200' },
 ]
 
+// 전체 진행단계 (간소화 — 상세 단계는 직접/간접자금 내부에서 관리)
+const OVERALL_STAGES = [
+  { key: '서류받는중', label: '서류받는중', color: 'bg-gray-500' },
+  { key: '홀딩',       label: '홀딩',       color: 'bg-slate-400' },
+]
+
 const STAGE_COLOR: Record<string, string> = Object.fromEntries(
-  PIPELINE_STAGES.map(s => [s.key, s.color])
+  [...PIPELINE_STAGES, ...OVERALL_STAGES].map(s => [s.key, s.color])
 )
 
 const ACTIVE_STAGE_KEYS = new Set([
@@ -487,7 +493,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                 <label className={lbl}>전체 진행 단계</label>
                 <select value={local.progress_stage} onChange={e => handleStageChange(e.target.value)} className={inp}>
                   {[
-                    ...PIPELINE_STAGES,
+                    ...OVERALL_STAGES,
                     ...(isCeo
                       ? [{ key: '환불', label: '환불' }, { key: '종료', label: '종료' }]
                       : [{ key: '환불예정', label: '환불예정 (승인요청)' }, { key: '종료예정', label: '종료예정 (승인요청)' }]
@@ -1137,13 +1143,15 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
   onToggle: (id: string) => void
   onScriptToggle: (id: string, val: boolean) => void
 }) {
-  const stage = PIPELINE_STAGES.find(s => s.key === c.progress_stage)
+  const allStages = [...PIPELINE_STAGES, ...OVERALL_STAGES]
+  const overallStage = allStages.find(s => s.key === c.progress_stage)
+  const directStage   = c.details?.direct_stage   || ''
+  const indirectStage = c.details?.indirect_stage  || ''
+  const directInfo    = allStages.find(s => s.key === directStage)
+  const indirectInfo  = allStages.find(s => s.key === indirectStage)
   const companyName = c.customers?.details?.company || c.customers?.name || '—'
-  const scriptSent = c.details?.script_sent || false
-  const nextInst = c.details?.next_inst || ''
-  const nextDate = c.details?.visit_date || ''
+  const scriptSent  = c.details?.script_sent || false
   const allInstitutions = (c.institution || '').split(',').map((s: string) => s.trim()).filter(Boolean)
-  const hasMultiple = allInstitutions.length > 1
 
   return (
     <div
@@ -1157,28 +1165,15 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
         style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
         {companyName}
       </p>
-      {/* 대표자 — 업체명과 다를 때만 표시 */}
+      {/* 대표자 */}
       {c.customers?.name && c.customers.name !== companyName && (
         <p className="text-[10px] text-gray-400 mt-0.5">{c.customers?.name}</p>
       )}
       {/* 전화번호 */}
       <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{c.customers?.phone}</p>
 
-      {/* 진행 단계 */}
-      <div className="mt-1.5">
-        {stage ? (
-          <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold text-white ${stage.color}`}>
-            {stage.label}
-          </span>
-        ) : c.progress_stage ? (
-          <span className="inline-block px-2 py-0.5 rounded-full text-[9px] font-bold text-white bg-gray-400">
-            {c.progress_stage}
-          </span>
-        ) : null}
-      </div>
-
-      {/* 동시진행 기관 표시 (복수일 때) */}
-      {hasMultiple && (
+      {/* 기관 (선택된 것 항상 표시) */}
+      {allInstitutions.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-0.5 justify-center">
           {allInstitutions.map(inst => (
             <span key={inst} className={`text-[8px] px-1 py-0.5 rounded font-medium ${
@@ -1188,55 +1183,54 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
         </div>
       )}
 
-      {/* 다음 기관 + 날짜 */}
-      {(nextInst || nextDate) && (
-        <div className="mt-1.5 flex items-center justify-center gap-1 flex-wrap">
-          {nextInst && (
-            <span className="text-[8px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">→ {nextInst}</span>
-          )}
-          {nextDate && (
-            <span className="text-[8px] text-sky-500 font-medium">📅 {nextDate.slice(5)}</span>
-          )}
+      {/* 전체 진행단계 */}
+      <div className="mt-1.5">
+        {overallStage ? (
+          <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold text-white ${overallStage.color}`}>
+            {overallStage.label}
+          </span>
+        ) : c.progress_stage ? (
+          <span className="inline-block px-2 py-0.5 rounded-full text-[9px] font-bold text-white bg-gray-400">
+            {c.progress_stage}
+          </span>
+        ) : null}
+      </div>
+
+      {/* 직접자금 진행단계 */}
+      {directStage && (
+        <div className="mt-0.5">
+          <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold text-white ${directInfo?.color || 'bg-blue-400'}`}>
+            직: {directStage}
+          </span>
+        </div>
+      )}
+
+      {/* 간접자금 진행단계 */}
+      {indirectStage && (
+        <div className="mt-0.5">
+          <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold text-white ${indirectInfo?.color || 'bg-violet-400'}`}>
+            간: {indirectStage}
+          </span>
         </div>
       )}
 
       {/* 승인대기 뱃지 */}
       {(c.progress_stage === '환불예정' || c.progress_stage === '종료예정') && (
-        <div className={`mt-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[8px] font-bold ${
+        <div className={`mt-1 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[8px] font-bold ${
           c.progress_stage === '환불예정' ? 'bg-rose-100 text-rose-700' : 'bg-orange-100 text-orange-700'
         }`}>
-          ⏳ 대표 승인 대기
+          ⏳ 승인대기
         </div>
       )}
 
       {/* 핸들링 뱃지 */}
       {(c.details?.handling_no_contact || c.details?.handling_no_fit || c.details?.handling_mindless) && (
-        <div className="mt-1 flex flex-wrap gap-0.5 justify-center">
-          {c.details?.handling_no_contact && <span className="text-[8px] bg-red-100 text-red-600 px-1 py-0.5 rounded font-bold">📵 연락안됨</span>}
-          {c.details?.handling_no_fit     && <span className="text-[8px] bg-orange-100 text-orange-600 px-1 py-0.5 rounded font-bold">🚫 들어갈곳없음</span>}
-          {c.details?.handling_mindless   && <span className="text-[8px] bg-slate-100 text-slate-600 px-1 py-0.5 rounded font-bold">🔄 무지성</span>}
+        <div className="mt-0.5 flex flex-wrap gap-0.5 justify-center">
+          {c.details?.handling_no_contact && <span className="text-[8px] bg-red-100 text-red-600 px-1 py-0.5 rounded font-bold">📵연락안됨</span>}
+          {c.details?.handling_no_fit     && <span className="text-[8px] bg-orange-100 text-orange-600 px-1 py-0.5 rounded font-bold">🚫곳없음</span>}
+          {c.details?.handling_mindless   && <span className="text-[8px] bg-slate-100 text-slate-600 px-1 py-0.5 rounded font-bold">🔄무지성</span>}
         </div>
       )}
-
-      {/* 빠른 일정 표시 */}
-      {(() => {
-        const today = new Date().toISOString().slice(0, 10)
-        const candidates = [
-          { label: '직방문', date: c.details?.direct_visit_date },
-          { label: '간방문', date: c.details?.indirect_visit_date },
-          { label: '직실사', date: c.details?.direct_inspection_date },
-          { label: '간실사', date: c.details?.indirect_inspection_date },
-        ].filter(d => d.date && d.date >= today).sort((a, b) => a.date!.localeCompare(b.date!))
-        const nearest = candidates[0]
-        if (!nearest) return null
-        return (
-          <div className="mt-1.5 flex items-center justify-center gap-0.5">
-            <span className="text-[8px] bg-sky-50 text-sky-600 font-semibold px-1.5 py-0.5 rounded-full border border-sky-200">
-              📅 {nearest.label} {nearest.date!.slice(5)}
-            </span>
-          </div>
-        )
-      })()}
 
       {/* 스크립트 발송 체크 */}
       <div className="mt-1.5 flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
