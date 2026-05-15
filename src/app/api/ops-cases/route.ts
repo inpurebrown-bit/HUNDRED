@@ -24,6 +24,50 @@ function normalize(c: any, customerMap: Record<string, any> = {}) {
   // sales_customer_info: ops_case.details에 저장된 값 OR customers 테이블 실시간 데이터
   const sci = c.details?.sales_customer_info || null
 
+  // sci → custDetails 순으로 머지 (DB의 최신 데이터가 우선)
+  // 명시적 필드는 아래에서 덮어씌움
+  const mergedDetails: Record<string, any> = {
+    ...(sci  || {}),       // sales_customer_info 기본값
+    ...custDetails,        // customers 테이블 최신값 우선
+    // 명시적 우선순위 필드
+    company:         custDetails.company         || sci?.company         || c.customer_name || '',
+    representative:  cust?.name                  || sci?.representative  || custDetails.representative || '',
+    phone:           c.phone                     || '',
+    business_type:   custDetails.business_type   || sci?.business_type   || '',
+    region:          custDetails.region           || sci?.region          || '',
+    loan_history:    cust?.loan_history           || sci?.loan_history    || custDetails.loan_history || '',
+    call_result:     custDetails.call_result      || sci?.call_result     || '',
+    closing_result:  custDetails.closing_result   || sci?.closing_result  || '',
+    subcall_date:    custDetails.subcall_date      || sci?.subcall_date    || '',
+    sales_user_name: custDetails.sales_user_name  || sci?.sales_user_name || '',
+    created_at:      cust?.created_at             || sci?.created_at      || '',
+    memo:            cust?.memo                   || '',
+    // 추가 인콜일지 필드 (영업팀 → 자금팀 전달)
+    real_work:        custDetails.real_work        || sci?.real_work        || '',
+    years_in_business:custDetails.years_in_business|| sci?.years_in_business|| custDetails.biz_size || '',
+    employee_count:   custDetails.employee_count   || sci?.employee_count   || '',
+    innovation:       custDetails.innovation        || sci?.innovation        || '',
+    reception_date:   custDetails.reception_date    || sci?.reception_date    || '',
+    // 대출 현황
+    loan_kibo:    custDetails.loan_kibo    || sci?.loan_kibo    || custDetails.loan_policy || '',
+    loan_shinbo:  custDetails.loan_shinbo  || sci?.loan_shinbo  || '',
+    loan_jaedan:  custDetails.loan_jaedan  || sci?.loan_jaedan  || '',
+    loan_jinjong: custDetails.loan_jinjong || sci?.loan_jinjong || '',
+    loan_sojin:   custDetails.loan_sojin   || sci?.loan_sojin   || '',
+    loan_other:   custDetails.loan_other   || sci?.loan_other   || custDetails.loan_credit || '',
+    loan_total:   custDetails.loan_total   || sci?.loan_total   || '',
+    // 신용 / 재무
+    credit_kcb:    custDetails.credit_kcb    || sci?.credit_kcb    || custDetails.credit_score || '',
+    credit_nice:   custDetails.credit_nice   || sci?.credit_nice   || '',
+    tax_status:    custDetails.tax_status    || sci?.tax_status    || custDetails.tax_delinquency || '',
+    assets:        custDetails.assets        || sci?.assets        || '',
+    revenue_2025:  custDetails.revenue_2025  || sci?.revenue_2025  || '',
+    revenue_2024:  custDetails.revenue_2024  || sci?.revenue_2024  || '',
+    revenue_2023:  custDetails.revenue_2023  || sci?.revenue_2023  || '',
+    required_funds:custDetails.required_funds|| sci?.required_funds|| '',
+    solution:      custDetails.solution      || sci?.solution      || '',
+  }
+
   return {
     ...c,
     progress_stage: c.stage ?? '',
@@ -31,21 +75,8 @@ function normalize(c: any, customerMap: Record<string, any> = {}) {
     customers: {
       name:    cust?.name ?? c.customer_name ?? '',
       phone:   c.phone ?? '',
-      company: custDetails.company || c.customer_name || '',
-      details: {
-        company:         custDetails.company         || sci?.company         || c.customer_name || '',
-        representative:  cust?.name                  || sci?.representative  || '',
-        phone:           c.phone                     || '',
-        business_type:   custDetails.business_type   || sci?.business_type   || '',
-        region:          custDetails.region           || sci?.region          || '',
-        loan_history:    cust?.loan_history           || sci?.loan_history    || '',
-        call_result:     custDetails.call_result      || sci?.call_result     || '',
-        closing_result:  custDetails.closing_result   || sci?.closing_result  || '',
-        subcall_date:    custDetails.subcall_date      || sci?.subcall_date    || '',
-        sales_user_name: custDetails.sales_user_name  || sci?.sales_user_name || '',
-        created_at:      cust?.created_at             || sci?.created_at      || '',
-        memo:            cust?.memo                   || '',
-      },
+      company: mergedDetails.company,
+      details: mergedDetails,
       call_timeline: cust?.call_timeline || [],
     },
   }
