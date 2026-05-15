@@ -1209,6 +1209,15 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
         </div>
       )}
 
+      {/* 핸들링 뱃지 */}
+      {(c.details?.handling_no_contact || c.details?.handling_no_fit || c.details?.handling_mindless) && (
+        <div className="mt-1 flex flex-wrap gap-0.5 justify-center">
+          {c.details?.handling_no_contact && <span className="text-[8px] bg-red-100 text-red-600 px-1 py-0.5 rounded font-bold">📵 연락안됨</span>}
+          {c.details?.handling_no_fit     && <span className="text-[8px] bg-orange-100 text-orange-600 px-1 py-0.5 rounded font-bold">🚫 들어갈곳없음</span>}
+          {c.details?.handling_mindless   && <span className="text-[8px] bg-slate-100 text-slate-600 px-1 py-0.5 rounded font-bold">🔄 무지성</span>}
+        </div>
+      )}
+
       {/* 빠른 일정 표시 */}
       {(() => {
         const today = new Date().toISOString().slice(0, 10)
@@ -1485,12 +1494,19 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
+  // 핸들링 플래그가 켜진 케이스 분리
+  const isHandling = (c: OpsCase) =>
+    !!(c.details?.handling_no_contact || c.details?.handling_no_fit || c.details?.handling_mindless)
+
   // 승인 대기 케이스 분리 (환불예정/종료예정) — 기관 그룹에서 제외
   const pendingCases = cases.filter(c =>
     PENDING_REFUND_KEYS.has(c.progress_stage) || PENDING_DONE_KEYS.has(c.progress_stage)
   )
+  const handlingCases = cases.filter(c =>
+    !PENDING_REFUND_KEYS.has(c.progress_stage) && !PENDING_DONE_KEYS.has(c.progress_stage) && isHandling(c)
+  )
   const regularCases = cases.filter(c =>
-    !PENDING_REFUND_KEYS.has(c.progress_stage) && !PENDING_DONE_KEYS.has(c.progress_stage)
+    !PENDING_REFUND_KEYS.has(c.progress_stage) && !PENDING_DONE_KEYS.has(c.progress_stage) && !isHandling(c)
   )
 
   // 기관별 그룹: 한 케이스가 여러 기관에 걸쳐 있으면 모두 등장
@@ -1504,6 +1520,8 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
   // 신규 유입 (institution이 비어있는 케이스) — 제일 상단에 배치
   const unassigned = regularCases.filter(c => !c.institution || c.institution.trim() === '')
   if (unassigned.length > 0) instGroups.unshift({ inst: '신규 유입', items: unassigned })
+  // 핸들링 그룹 — 신규유입 아래
+  if (handlingCases.length > 0) instGroups.push({ inst: '🔧 핸들링', items: handlingCases })
   // 승인 대기 — 최상단에 배치
   if (pendingCases.length > 0) instGroups.unshift({ inst: '⏳ 대표 승인 대기', items: pendingCases })
 
@@ -1532,7 +1550,9 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
                     ? 'bg-sky-500 hover:bg-sky-600'
                     : inst === '⏳ 대표 승인 대기'
                       ? 'bg-rose-500 hover:bg-rose-600'
-                      : 'bg-[#1B2A45] hover:bg-[#1B2A45]/90'
+                      : inst === '🔧 핸들링'
+                        ? 'bg-slate-500 hover:bg-slate-600'
+                        : 'bg-[#1B2A45] hover:bg-[#1B2A45]/90'
               }`}
             >
               <div className="flex items-center gap-2">
