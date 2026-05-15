@@ -722,6 +722,73 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
               </div>
             )
           })}
+
+          {/* 기타 아이디/비밀번호 */}
+          <div className="bg-gray-50 rounded-lg p-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[11px] font-bold text-gray-600">🔑 기타 아이디/비밀번호</p>
+              <button
+                type="button"
+                onClick={() => {
+                  const extras: any[] = d.extra_creds || []
+                  detailField('extra_creds', [...extras, { label: '', id: '', pw: '' }])
+                }}
+                className="text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 px-2 py-0.5 rounded font-medium transition-colors"
+              >+ 추가</button>
+            </div>
+            {(!d.extra_creds || (d.extra_creds as any[]).length === 0) ? (
+              <p className="text-[11px] text-gray-300 text-center py-1">+ 추가를 눌러 입력하세요 (네이버, 구글 등)</p>
+            ) : (
+              <div className="space-y-2">
+                {(d.extra_creds as any[]).map((item: any, idx: number) => (
+                  <div key={idx} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-1.5 items-end">
+                    <div>
+                      {idx === 0 && <label className={lbl}>서비스명</label>}
+                      <input type="text" autoComplete="off"
+                        value={item.label || ''}
+                        onChange={e => {
+                          const next = [...(d.extra_creds as any[])]
+                          next[idx] = { ...next[idx], label: e.target.value }
+                          detailField('extra_creds', next)
+                        }}
+                        className={inp} placeholder="네이버, 구글..." />
+                    </div>
+                    <div>
+                      {idx === 0 && <label className={lbl}>아이디</label>}
+                      <input type="text" autoComplete="off"
+                        value={item.id || ''}
+                        onChange={e => {
+                          const next = [...(d.extra_creds as any[])]
+                          next[idx] = { ...next[idx], id: e.target.value }
+                          detailField('extra_creds', next)
+                        }}
+                        className={inp} placeholder="아이디" />
+                    </div>
+                    <div>
+                      {idx === 0 && <label className={lbl}>비밀번호</label>}
+                      <input type="text" autoComplete="off"
+                        value={item.pw || ''}
+                        onChange={e => {
+                          const next = [...(d.extra_creds as any[])]
+                          next[idx] = { ...next[idx], pw: e.target.value }
+                          detailField('extra_creds', next)
+                        }}
+                        className={inp} placeholder="비밀번호" />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = (d.extra_creds as any[]).filter((_: any, i: number) => i !== idx)
+                        detailField('extra_creds', next)
+                      }}
+                      className={idx === 0 ? 'text-red-300 hover:text-red-500 text-xs pb-0.5' : 'text-red-300 hover:text-red-500 text-xs'}
+                    >✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
       )}
 
