@@ -283,6 +283,16 @@ export default function OpsCeoTab() {
     }, 1500)
   }, [])
 
+  // 패널 열리면 배경 스크롤 잠금
+  useEffect(() => {
+    if (openPanelIds.length > 0) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [openPanelIds])
+
   function closePanel(id: string) {
     setClosingPanelIds(prev => [...prev, id])
     setTimeout(() => {
