@@ -101,13 +101,24 @@ export async function GET(req: NextRequest) {
   if (user.role === 'ops') {
     const myId   = String(user.id).trim()
     const myName = (user.name || '').trim()
-    cases = cases.filter(c => {
-      const ownerMatch    = c.owner_id != null && String(c.owner_id).trim() === myId
-      const nameMatch     = c.ops_user_name && c.ops_user_name.trim() === myName
-      const detailsMatch  = c.details?.ops_user_name && String(c.details.ops_user_name).trim() === myName
-      const unassigned    = c.owner_id == null && !c.ops_user_name && !c.details?.ops_user_name
-      return ownerMatch || nameMatch || detailsMatch || unassigned
-    })
+    const isLeader = myName.includes('팀장')
+
+    if (isLeader) {
+      // 팀장은 전체 케이스 열람 (CEO와 동일) — 미배정·고아 케이스 포함
+      // cases 필터 없음
+    } else {
+      cases = cases.filter(c => {
+        const ownerId   = c.owner_id != null ? String(c.owner_id).trim() : ''
+        const ownerMatch   = ownerId !== '' && ownerId === myId
+        const nameMatch    = c.ops_user_name && c.ops_user_name.trim() === myName
+        const detailsMatch = c.details?.ops_user_name && String(c.details.ops_user_name).trim() === myName
+        // 미배정: owner_id가 null·빈값 이고 ops_user_name도 없는 케이스
+        const isUnassigned = (!c.owner_id || String(c.owner_id).trim() === '') &&
+                             (!c.ops_user_name || c.ops_user_name.trim() === '') &&
+                             (!c.details?.ops_user_name || String(c.details.ops_user_name).trim() === '')
+        return ownerMatch || nameMatch || detailsMatch || isUnassigned
+      })
+    }
   }
 
   // 전화번호 목록으로 customers 테이블 일괄 조회
