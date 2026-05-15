@@ -44,7 +44,7 @@ function formatKST(isoStr: string) {
 }
 
 // ─── Case Card (8-col grid) ───────────────────────────────
-function CeoCaseCard({ c, isOpen, onToggle }: { c: OpsCase; isOpen: boolean; onToggle: (id: string) => void }) {
+function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle }: { c: OpsCase; isOpen: boolean; onToggle: (id: string) => void; onScriptToggle: (id: string, val: boolean) => void }) {
   const allStages     = [...PIPELINE_STAGES, ...OVERALL_STAGES]
   const companyName   = c.customers?.details?.company || c.customers?.name || '—'
   const overallStage  = allStages.find(s => s.key === c.progress_stage)
@@ -119,11 +119,15 @@ function CeoCaseCard({ c, isOpen, onToggle }: { c: OpsCase; isOpen: boolean; onT
         </div>
       )}
 
-      {/* 스크립트 발송 */}
+      {/* 스크립트 발송 체크 */}
       <div className="mt-1.5 flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
-        <span className={`text-[9px] select-none ${scriptSent ? 'text-violet-600 font-semibold line-through' : 'text-gray-300'}`}>
-          {scriptSent ? '✓ 스크립트 발송' : '스크립트 미발송'}
-        </span>
+        <input type="checkbox" id={`ceo-script-${c.id}`} checked={scriptSent}
+          onChange={e => onScriptToggle(c.id, e.target.checked)}
+          className="w-3 h-3 accent-violet-500 cursor-pointer" />
+        <label htmlFor={`ceo-script-${c.id}`}
+          className={`text-[9px] cursor-pointer select-none ${scriptSent ? 'text-violet-600 font-semibold line-through' : 'text-gray-400'}`}>
+          스크립트 발송
+        </label>
       </div>
     </div>
   )
@@ -173,10 +177,11 @@ function CeoCaseListRow({ c, isOpen, onToggle }: { c: OpsCase; isOpen: boolean; 
 }
 
 // ─── Institution Grouped View (진행중) ────────────────────
-function InstitutionGroupedView({ cases, openPanelIds, onToggle }: {
+function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle }: {
   cases: OpsCase[]
   openPanelIds: string[]
   onToggle: (id: string) => void
+  onScriptToggle: (id: string, val: boolean) => void
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
@@ -225,7 +230,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle }: {
             {isOpen && (
               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
                 {items.map(c => (
-                  <CeoCaseCard key={`${inst}-${c.id}`} c={c} isOpen={openPanelIds.includes(c.id)} onToggle={onToggle} />
+                  <CeoCaseCard key={`${inst}-${c.id}`} c={c} isOpen={openPanelIds.includes(c.id)} onToggle={onToggle} onScriptToggle={onScriptToggle} />
                 ))}
               </div>
             )}
@@ -243,6 +248,7 @@ export default function OpsCeoTab() {
   const [view, setView] = useState<'active' | 'refund' | 'completed'>('active')
   const [search, setSearch] = useState('')
   const [openPanelIds, setOpenPanelIds] = useState<string[]>([])
+  const [closingPanelIds, setClosingPanelIds] = useState<string[]>([])
   const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
   async function load() {
@@ -276,12 +282,37 @@ export default function OpsCeoTab() {
     }, 1500)
   }, [])
 
+  function closePanel(id: string) {
+    setClosingPanelIds(prev => [...prev, id])
+    setTimeout(() => {
+      setOpenPanelIds(prev => prev.filter(x => x !== id))
+      setClosingPanelIds(prev => prev.filter(x => x !== id))
+    }, 300)
+  }
+
+  function closeAllPanels() {
+    setClosingPanelIds([...openPanelIds])
+    setTimeout(() => {
+      setOpenPanelIds([])
+      setClosingPanelIds([])
+    }, 300)
+  }
+
   function togglePanel(id: string) {
-    setOpenPanelIds(prev => {
-      if (prev.includes(id)) return prev.filter(x => x !== id)
-      const next = [...prev, id]
-      return next.length > 2 ? next.slice(1) : next
-    })
+    if (openPanelIds.includes(id)) {
+      closePanel(id)
+    } else {
+      setOpenPanelIds(prev => {
+        const next = [...prev, id]
+        return next.length > 2 ? next.slice(1) : next
+      })
+    }
+  }
+
+  function handleScriptToggle(id: string, val: boolean) {
+    const c = cases.find(x => x.id === id)
+    if (!c) return
+    handleSave(id, { details: { ...(c.details || {}), script_sent: val } })
   }
 
   // 필터
@@ -361,7 +392,7 @@ export default function OpsCeoTab() {
       {loading ? (
         <div className="text-center py-12 text-gray-400">불러오는 중...</div>
       ) : view === 'active' ? (
-        <InstitutionGroupedView cases={activeCases} openPanelIds={openPanelIds} onToggle={togglePanel} />
+        <InstitutionGroupedView cases={activeCases} openPanelIds={openPanelIds} onToggle={togglePanel} onScriptToggle={handleScriptToggle} />
       ) : (
         <div className="space-y-2">
           {viewCases.length === 0 ? (
@@ -376,14 +407,23 @@ export default function OpsCeoTab() {
         </div>
       )}
 
-      {/* ── 우측 슬라이딩 패널 (관리팀과 동일한 OpsDetailPanel) ── */}
+      {/* ── 배경 오버레이 ── */}
+      {openPanelIds.length > 0 && (
+        <div
+          className="fixed inset-0 bg-black/40 z-[99] transition-opacity duration-300"
+          onClick={closeAllPanels}
+        />
+      )}
+
+      {/* ── 우측 슬라이딩 패널 ── */}
       {openPanelIds.map((id, panelIndex) => {
         const c = cases.find(x => x.id === id)
         if (!c) return null
         const rightOffset = panelIndex === 0 ? 'right-0' : 'right-0 md:right-[530px]'
+        const isClosing = closingPanelIds.includes(id)
         return (
           <div key={id}
-            className={`fixed top-0 bottom-0 ${rightOffset} w-full md:w-[520px] bg-white shadow-2xl overflow-y-auto z-[100]`}
+            className={`fixed top-0 bottom-0 ${rightOffset} w-full md:w-[520px] bg-white shadow-2xl overflow-y-auto z-[100] transition-transform duration-300 ease-in-out ${isClosing ? 'translate-x-full' : 'translate-x-0'}`}
             onClick={e => e.stopPropagation()}
           >
             <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-3 flex items-center justify-between z-10">
@@ -391,7 +431,7 @@ export default function OpsCeoTab() {
                 <p className="font-bold text-[#1B2A45] text-sm">{c.customers?.details?.company || c.customers?.name}</p>
                 <p className="text-[10px] text-gray-400">{c.customers?.name} · {c.customers?.phone}</p>
               </div>
-              <button onClick={() => togglePanel(id)} className="text-gray-400 hover:text-gray-600 text-xl leading-none px-1">✕</button>
+              <button onClick={() => closePanel(id)} className="text-gray-400 hover:text-gray-600 text-xl leading-none px-1">✕</button>
             </div>
             <div className="p-4">
               <OpsDetailPanel c={c} onSave={handleSave} userRole="ceo" />

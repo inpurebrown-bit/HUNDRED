@@ -2403,6 +2403,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
   const [searchQuery, setSearchQuery] = useState('')
   const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const [openPanelIds, setOpenPanelIds] = useState<string[]>([])
+  const [closingPanelIds, setClosingPanelIds] = useState<string[]>([])
   const [installPrompt, setInstallPrompt] = useState<any>(null)
   const [installable, setInstallable] = useState(false)
   const [notices, setNotices] = useState<any[]>([])
@@ -2489,12 +2490,31 @@ export default function OpsDashboard({ userId, userName }: Props) {
       .catch(() => {})
   }, [])
 
+  function closePanel(id: string) {
+    setClosingPanelIds(prev => [...prev, id])
+    setTimeout(() => {
+      setOpenPanelIds(prev => prev.filter(x => x !== id))
+      setClosingPanelIds(prev => prev.filter(x => x !== id))
+    }, 300)
+  }
+
+  function closeAllPanels() {
+    setClosingPanelIds([...openPanelIds])
+    setTimeout(() => {
+      setOpenPanelIds([])
+      setClosingPanelIds([])
+    }, 300)
+  }
+
   function togglePanel(id: string) {
-    setOpenPanelIds(prev => {
-      if (prev.includes(id)) return prev.filter(x => x !== id)
-      const next = [...prev, id]
-      return next.length > 2 ? next.slice(1) : next
-    })
+    if (openPanelIds.includes(id)) {
+      closePanel(id)
+    } else {
+      setOpenPanelIds(prev => {
+        const next = [...prev, id]
+        return next.length > 2 ? next.slice(1) : next
+      })
+    }
   }
 
   const handleSave = useCallback((id: string, patch: Record<string, any>) => {
@@ -2870,8 +2890,8 @@ export default function OpsDashboard({ userId, userName }: Props) {
       {/* ── 배경 오버레이 (패널 열릴 때) ── */}
       {openPanelIds.length > 0 && (
         <div
-          className="fixed inset-0 bg-black/40 z-[99]"
-          onClick={() => setOpenPanelIds([])}
+          className="fixed inset-0 bg-black/40 z-[99] transition-opacity duration-300"
+          onClick={closeAllPanels}
         />
       )}
 
@@ -2880,9 +2900,10 @@ export default function OpsDashboard({ userId, userName }: Props) {
         const c = cases.find(x => x.id === id)
         if (!c) return null
         const rightOffset = panelIndex === 0 ? 'right-0' : 'right-0 md:right-[530px]'
+        const isClosing = closingPanelIds.includes(id)
         return (
           <div key={id}
-            className={`fixed top-0 bottom-0 ${rightOffset} w-full md:w-[520px] bg-white shadow-2xl overflow-y-auto z-[100]`}
+            className={`fixed top-0 bottom-0 ${rightOffset} w-full md:w-[520px] bg-white shadow-2xl overflow-y-auto z-[100] transition-transform duration-300 ease-in-out ${isClosing ? 'translate-x-full' : 'translate-x-0'}`}
             onClick={e => e.stopPropagation()}
           >
             <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-3 flex items-center justify-between z-10">
@@ -2890,7 +2911,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
                 <p className="font-bold text-[#1B2A45] text-sm">{c.customers?.details?.company || c.customers?.name}</p>
                 <p className="text-[10px] text-gray-400">{c.customers?.name} · {c.customers?.phone}</p>
               </div>
-              <button onClick={() => togglePanel(id)} className="text-gray-400 hover:text-gray-600 text-xl leading-none px-1">✕</button>
+              <button onClick={() => closePanel(id)} className="text-gray-400 hover:text-gray-600 text-xl leading-none px-1">✕</button>
             </div>
             <div className="p-4">
               <OpsDetailPanel c={c} onSave={handleSave} userRole={userRole} userName={userName} />
