@@ -1701,7 +1701,15 @@ function CustomerCard({
 
                   {/* A/S 요청 + 심사 요청 */}
                   <div className="flex flex-wrap items-center gap-2">
-                    {c.details?.as_requested ? (
+                    {c.details?.as_not_applicable ? (
+                      <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 border border-gray-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
+                        ⛔ A/S비해당 {c.details.as_not_applicable_date ? `(${c.details.as_not_applicable_date})` : ''}
+                      </span>
+                    ) : c.details?.as_approved ? (
+                      <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
+                        ✅ A/S완료 {c.details.as_approve_date ? `(${c.details.as_approve_date})` : ''}
+                      </span>
+                    ) : c.details?.as_requested ? (
                       <span className="inline-flex items-center gap-1 bg-orange-100 text-orange-700 border border-orange-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
                         🔧 A/S 요청됨 {c.details.as_request_date ? `(${c.details.as_request_date})` : ''}
                       </span>
@@ -1723,7 +1731,7 @@ function CustomerCard({
                         </span>
                       ) : inspectionStatus === 'approved' ? (
                         <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
-                          ✅ 심사 승인
+                          ✅ 심사완료
                         </span>
                       ) : inspectionStatus === 'rejected' ? (
                         <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 border border-red-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">

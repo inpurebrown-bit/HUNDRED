@@ -82,6 +82,14 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     })
   }
 
+  // 담당 영업직원 조회 헬퍼 (이름 → user_id)
+  const salesUserName = (updateBody.details ?? (existing.details as any))?.sales_user_name
+  async function getSalesUserId(): Promise<string | null> {
+    if (!salesUserName) return null
+    const { data: su } = await supabaseAdmin.from('users').select('id').eq('name', salesUserName).maybeSingle()
+    return su?.id ?? null
+  }
+
   // 심사 요청 시 대표에게 푸시 알림
   const prevInspectionStatus = (existing.details as any)?.inspection_status
   const newInspectionStatus = body.details?.inspection_status
@@ -92,6 +100,18 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       url: '/dashboard',
       tag: 'inspection',
       target: 'ceo',
+    })
+  }
+  // 심사 완료(승인/반려) 시 영업직원에게 알림
+  if ((newInspectionStatus === 'approved' || newInspectionStatus === 'rejected') && prevInspectionStatus !== newInspectionStatus) {
+    const salesUid = await getSalesUserId()
+    const resultLabel = newInspectionStatus === 'approved' ? '✅ 심사완료' : '❌ 심사반려'
+    await sendPushNotification({
+      title: resultLabel,
+      body: `${customerName} 심사가 ${newInspectionStatus === 'approved' ? '완료' : '반려'}되었습니다.`,
+      url: '/dashboard',
+      tag: 'inspection-result',
+      target: salesUid ?? 'sales',
     })
   }
 
@@ -105,6 +125,32 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       url: '/dashboard',
       tag: 'as-request',
       target: 'ceo',
+    })
+  }
+  // A/S 완료 → 영업직원에게 알림 (DB 쓰레기통 이동됨)
+  const prevAsApproved = (existing.details as any)?.as_approved
+  const newAsApproved = body.details?.as_approved
+  if (newAsApproved === true && !prevAsApproved) {
+    const salesUid = await getSalesUserId()
+    await sendPushNotification({
+      title: '♻️ A/S완료 처리',
+      body: `${customerName} A/S가 완료되어 DB쓰레기통으로 이동되었습니다.`,
+      url: '/dashboard',
+      tag: 'as-complete',
+      target: salesUid ?? 'sales',
+    })
+  }
+  // A/S 비해당 → 영업직원에게 알림
+  const prevAsNotApplicable = (existing.details as any)?.as_not_applicable
+  const newAsNotApplicable = body.details?.as_not_applicable
+  if (newAsNotApplicable === true && !prevAsNotApplicable) {
+    const salesUid = await getSalesUserId()
+    await sendPushNotification({
+      title: '⛔ A/S비해당',
+      body: `${customerName} A/S 비해당 처리되었습니다.`,
+      url: '/dashboard',
+      tag: 'as-not-applicable',
+      target: salesUid ?? 'sales',
     })
   }
 

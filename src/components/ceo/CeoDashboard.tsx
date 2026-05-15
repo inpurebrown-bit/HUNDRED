@@ -225,7 +225,7 @@ export default function CeoDashboard() {
     { key: 'minutesreports',label: '📒 회의록·보고함' },
     { key: 'calendar',      label: '📅 일정관리' },
     { key: 'ailogs',        label: '🔍 AI 질문 로그' },
-    { key: 'trash',         label: '🗑 거절 DB' },
+    { key: 'trash',         label: '🗑 DB 쓰레기통' },
   ]
 
   return (

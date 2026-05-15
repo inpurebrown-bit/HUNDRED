@@ -651,11 +651,41 @@ export default function SalesCeoTab() {
     customers.filter(c => (c as any).details?.as_approved === true),
   [customers])
 
-  async function approveAs(id: string) {
-    await updateCustomer(id, { details: { as_approved: true, as_resolved: true, as_approve_date: new Date().toISOString().slice(0, 10) } })
+  // 공급수 1 차감 헬퍼
+  async function decrementSupplyForUser(ownerName: string) {
+    if (!ownerName || !supplyConfig[ownerName]) return
+    const cfg = supplyConfig[ownerName]
+    const newSupplied = Math.max(0, (cfg.supplied || 0) - 1)
+    const updatedPeople: SupplyConfig = { ...supplyConfig, [ownerName]: { ...cfg, supplied: newSupplied } }
+    await fetch('/api/supply-config', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ month: new Date().toISOString().slice(0, 7), people: updatedPeople }),
+    })
+    setSupplyConfig(updatedPeople)
   }
-  async function rejectAs(id: string) {
-    await updateCustomer(id, { details: { as_rejected: true, as_resolved: true, as_reject_date: new Date().toISOString().slice(0, 10) } })
+
+  // A/S 완료 — DB쓰레기통 이동 + 공급수 -1
+  async function approveAs(id: string) {
+    const c = customers.find(x => x.id === id)
+    const ownerName = (c as any)?.details?.sales_user_name || (c as any)?.sales_user_name || ''
+    await updateCustomer(id, {
+      status: 'trash',
+      details: { as_approved: true, as_resolved: true, as_approve_date: new Date().toISOString().slice(0, 10) },
+    })
+    await decrementSupplyForUser(ownerName)
+  }
+
+  // A/S 비해당 — 결과 기록 (DB이동 없음)
+  async function notApplicableAs(id: string) {
+    const today = new Date().toISOString().slice(0, 10)
+    await updateCustomer(id, {
+      details: {
+        as_not_applicable: true,
+        as_resolved: true,
+        as_not_applicable_date: today,
+      },
+    })
   }
 
   const personStats = useMemo(() => salesPeople.map(name => {
@@ -965,10 +995,10 @@ export default function SalesCeoTab() {
                         <div className="border-t border-amber-100 bg-amber-50/30">
                           {/* 승인/반려 버튼 바 */}
                           <div className="flex items-center gap-3 px-5 py-3 bg-white border-b border-amber-100">
-                            <p className="text-xs text-gray-500 flex-1">타임라인에 메모 작성 후 승인 또는 반려하세요. 승인 시 담당자에게 DB가 반환됩니다.</p>
+                            <p className="text-xs text-gray-500 flex-1">타임라인에 메모 작성 후 완료 또는 반려하세요. 완료 시 담당자에게 알림이 전송됩니다.</p>
                             <button type="button" onClick={async () => { await handleInspection(c.id, 'approved'); setInspDetail(null) }}
                               className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg transition-colors">
-                              ✅ 승인
+                              ✅ 심사완료
                             </button>
                             <button type="button" onClick={async () => { await handleInspection(c.id, 'rejected'); setInspDetail(null) }}
                               className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-lg border border-red-200 transition-colors">
@@ -1041,11 +1071,11 @@ export default function SalesCeoTab() {
                       <div className="flex flex-col gap-2 shrink-0 pt-1">
                         <button type="button" onClick={() => approveAs(c.id)}
                           className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg transition-colors whitespace-nowrap">
-                          ✅ A/S 승인
+                          ✅ A/S완료
                         </button>
-                        <button type="button" onClick={() => rejectAs(c.id)}
-                          className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-lg border border-red-200 transition-colors whitespace-nowrap">
-                          🚫 A/S 불가
+                        <button type="button" onClick={() => notApplicableAs(c.id)}
+                          className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold rounded-lg border border-gray-200 transition-colors whitespace-nowrap">
+                          ⛔ A/S비해당
                         </button>
                       </div>
                     </div>
