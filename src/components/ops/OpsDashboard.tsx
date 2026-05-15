@@ -644,6 +644,57 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
       {/* ── 기관ID/PW ── */}
       {activeDetailTab === '기관ID/PW' && (
         <div className="space-y-3">
+
+          {/* 기본 식별 정보 */}
+          <div className="bg-[#1B2A45]/5 border border-[#1B2A45]/15 rounded-lg p-3">
+            <p className="text-[11px] font-bold text-[#1B2A45] mb-2">📋 기본 식별 정보</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className={lbl}>사업자등록번호</label>
+                <input type="text" autoComplete="off"
+                  value={d.biz_reg_number || ''}
+                  onChange={e => detailField('biz_reg_number', e.target.value)}
+                  className={inp} placeholder="000-00-00000" />
+              </div>
+              <div>
+                <label className={lbl}>법인등록번호</label>
+                <input type="text" autoComplete="off"
+                  value={d.corp_reg_number || ''}
+                  onChange={e => detailField('corp_reg_number', e.target.value)}
+                  className={inp} placeholder="000000-0000000" />
+              </div>
+              <div className="col-span-2">
+                <label className={lbl}>대표자 주민번호</label>
+                <input type="text" autoComplete="off"
+                  value={d.ceo_resident_number || ''}
+                  onChange={e => detailField('ceo_resident_number', e.target.value)}
+                  className={inp} placeholder="000000-0000000" />
+              </div>
+              <div>
+                <label className={lbl}>통신사</label>
+                <select
+                  value={d.carrier || ''}
+                  onChange={e => detailField('carrier', e.target.value)}
+                  className={inp}>
+                  <option value="">선택</option>
+                  <option value="SKT">SKT</option>
+                  <option value="KT">KT</option>
+                  <option value="LGU+">LGU+</option>
+                  <option value="SKT 알뜰폰">SKT 알뜰폰</option>
+                  <option value="KT 알뜰폰">KT 알뜰폰</option>
+                  <option value="LGU+ 알뜰폰">LGU+ 알뜰폰</option>
+                </select>
+              </div>
+              <div>
+                <label className={lbl}>휴대폰번호</label>
+                <input type="text" autoComplete="off"
+                  value={d.cert_phone || ''}
+                  onChange={e => detailField('cert_phone', e.target.value)}
+                  className={inp} placeholder="010-0000-0000" />
+              </div>
+            </div>
+          </div>
+
           {CRED_TYPES.map(cred => {
             const idKey  = `cred_${cred.key}_id`
             const pwKey  = `cred_${cred.key}_pw`
