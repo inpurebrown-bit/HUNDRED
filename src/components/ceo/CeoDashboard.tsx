@@ -52,7 +52,7 @@ function MinutesReportsTab() {
   const [sub, setSub] = useState<'minutes' | 'reports'>('reports')
   return (
     <div>
-      <div className="flex gap-2 mb-5">
+      <div className="flex gap-2 mb-5 print-hide">
         {([
           { key: 'reports', label: '📝 보고함' },
           { key: 'minutes', label: '📒 회의록' },

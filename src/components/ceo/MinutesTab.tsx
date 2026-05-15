@@ -130,7 +130,7 @@ export default function MinutesTab() {
             }
 
             return (
-              <div key={name} className="bg-white rounded-xl border border-gray-200 overflow-hidden print:overflow-visible print:break-inside-avoid">
+              <div key={name} className="bg-white rounded-xl border border-gray-200 overflow-hidden print:overflow-visible print:break-after-page">
                 {/* 직원 헤더 */}
                 <div className="bg-[#1B2A45] px-5 py-3 flex items-center justify-between">
                   <h3 className="text-white font-bold text-base">{name}</h3>
@@ -146,7 +146,7 @@ export default function MinutesTab() {
                   </div>
                 </div>
 
-                <div className="p-5 grid md:grid-cols-2 print:grid-cols-2 gap-5">
+                <div className="p-5 grid md:grid-cols-2 print:grid-cols-1 gap-4">
                   {/* 오전보고 */}
                   <div>
                     <p className="text-xs font-bold text-amber-600 mb-3">☀️ 오전보고</p>
@@ -419,7 +419,7 @@ export default function MinutesTab() {
       )}
 
       {/* 전체 메모 공간 */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="bg-white rounded-xl border border-gray-200 p-5 print:break-before-page">
         <p className="text-xs font-bold text-gray-500 mb-3">📝 전체 결정사항 / 메모</p>
         <div className="space-y-2">
           {[1, 2, 3, 4].map(i => (

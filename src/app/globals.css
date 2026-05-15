@@ -58,7 +58,7 @@ input:-webkit-autofill:active {
 @media print {
   @page {
     margin: 8mm 10mm;
-    size: A4 landscape;
+    size: A4 portrait;
   }
 
   /* 스크롤/overflow 클리핑 방지 — 인쇄 시 모든 내용 표시 */
@@ -69,6 +69,11 @@ input:-webkit-autofill:active {
 
   /* 화면 전용 UI 숨기기 */
   .print-hide {
+    display: none !important;
+  }
+
+  /* 헤더·내비 전체 숨기기 */
+  header, nav {
     display: none !important;
   }
 }
