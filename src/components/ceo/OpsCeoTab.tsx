@@ -91,6 +91,15 @@ function CeoCaseCard({ c, isOpen, onToggle }: { c: OpsCase; isOpen: boolean; onT
           {nextDate && <span className="text-[8px] text-sky-500 font-medium">📅 {nextDate.slice(5)}</span>}
         </div>
       )}
+
+      {/* 핸들링 배지 */}
+      {(c.details?.handling_no_contact || c.details?.handling_no_fit || c.details?.handling_mindless) && (
+        <div className="mt-1 flex flex-wrap gap-0.5 justify-center">
+          {c.details?.handling_no_contact && <span className="text-[8px] bg-red-100 text-red-600 px-1 py-0.5 rounded font-bold">📵 연락안됨</span>}
+          {c.details?.handling_no_fit     && <span className="text-[8px] bg-orange-100 text-orange-600 px-1 py-0.5 rounded font-bold">🚫 들어갈곳없음</span>}
+          {c.details?.handling_mindless   && <span className="text-[8px] bg-slate-100 text-slate-600 px-1 py-0.5 rounded font-bold">🔄 무지성</span>}
+        </div>
+      )}
     </div>
   )
 }
@@ -146,15 +155,22 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle }: {
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
+  const isHandling = (c: OpsCase) =>
+    !!(c.details?.handling_no_contact || c.details?.handling_no_fit || c.details?.handling_mindless)
+
+  const handlingCases = cases.filter(c => isHandling(c))
+  const regularCases  = cases.filter(c => !isHandling(c))
+
   const instGroups = ALL_INST_ORDER.map(inst => ({
     inst,
-    items: cases.filter(c =>
+    items: regularCases.filter(c =>
       (c.institution || '').split(',').map((s: string) => s.trim()).includes(inst)
     ),
   })).filter(g => g.items.length > 0)
 
-  const unassigned = cases.filter(c => !c.institution || c.institution.trim() === '')
+  const unassigned = regularCases.filter(c => !c.institution || c.institution.trim() === '')
   if (unassigned.length > 0) instGroups.unshift({ inst: '신규유입', items: unassigned })
+  if (handlingCases.length > 0) instGroups.push({ inst: '🔧 핸들링', items: handlingCases })
 
   if (instGroups.length === 0) {
     return <div className="bg-white rounded-xl border border-[#E8E2D4] p-12 text-center text-[#1B2A45]/40 text-sm">진행중인 업체가 없습니다</div>
@@ -171,6 +187,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle }: {
               className={`w-full flex items-center justify-between py-2.5 px-4 rounded-xl mb-2 transition-colors ${
                 isIndirect ? 'bg-violet-600 hover:bg-violet-700'
                   : inst === '신규유입' ? 'bg-emerald-500 hover:bg-emerald-600'
+                  : inst === '🔧 핸들링' ? 'bg-slate-500 hover:bg-slate-600'
                   : 'bg-[#1B2A45] hover:bg-[#1B2A45]/90'
               }`}>
               <div className="flex items-center gap-2">
