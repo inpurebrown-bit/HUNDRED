@@ -64,7 +64,7 @@ export default function MinutesTab() {
   return (
     <div className="space-y-4 pb-8">
       {/* 헤더 */}
-      <div className="bg-[#1B2A45] rounded-xl px-5 py-4 flex items-center justify-between flex-wrap gap-3">
+      <div className="bg-[#1B2A45] rounded-xl px-5 py-4 flex items-center justify-between flex-wrap gap-3 print-hide">
         <div>
           <h2 className="font-bold text-white text-base">📒 오늘 회의 자료</h2>
           <p className="text-xs text-white/50 mt-0.5">
@@ -94,6 +94,10 @@ export default function MinutesTab() {
             🖨️ 출력
           </button>
         </div>
+      </div>
+      {/* 인쇄 전용 타이틀 */}
+      <div className="hidden print:block text-center mb-3">
+        <h2 className="text-base font-bold text-gray-800">📒 회의 자료 — 마감보고: {prepDate} · 오전보고: {today}</h2>
       </div>
 
       {/* 직원별 보고 */}
@@ -126,7 +130,7 @@ export default function MinutesTab() {
             }
 
             return (
-              <div key={name} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div key={name} className="bg-white rounded-xl border border-gray-200 overflow-hidden print:overflow-visible print:break-inside-avoid">
                 {/* 직원 헤더 */}
                 <div className="bg-[#1B2A45] px-5 py-3 flex items-center justify-between">
                   <h3 className="text-white font-bold text-base">{name}</h3>
@@ -142,7 +146,7 @@ export default function MinutesTab() {
                   </div>
                 </div>
 
-                <div className="p-5 grid md:grid-cols-2 print:grid-cols-1 gap-5">
+                <div className="p-5 grid md:grid-cols-2 print:grid-cols-2 gap-5">
                   {/* 오전보고 */}
                   <div>
                     <p className="text-xs font-bold text-amber-600 mb-3">☀️ 오전보고</p>
@@ -274,7 +278,7 @@ export default function MinutesTab() {
                         ...prev,
                         [name]: [...(prev[name] || []), { id: uid(), company: '', note: '', done: false }]
                       }))}
-                      className="text-[10px] bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-0.5 rounded transition-colors"
+                      className="text-[10px] bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-0.5 rounded transition-colors print-hide"
                     >
                       + 추가
                     </button>
@@ -319,7 +323,7 @@ export default function MinutesTab() {
                               ...prev,
                               [name]: (prev[name] || []).filter((_, i) => i !== ci)
                             }))}
-                            className="text-red-300 hover:text-red-500 text-xs"
+                            className="text-red-300 hover:text-red-500 text-xs print-hide"
                           >✕</button>
                         </div>
                       ))}

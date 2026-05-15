@@ -57,8 +57,19 @@ input:-webkit-autofill:active {
 
 @media print {
   @page {
-    margin: 12mm;
-    size: A4;
+    margin: 8mm 10mm;
+    size: A4 landscape;
+  }
+
+  /* 스크롤/overflow 클리핑 방지 — 인쇄 시 모든 내용 표시 */
+  * {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  /* 화면 전용 UI 숨기기 */
+  .print-hide {
+    display: none !important;
   }
 }
 
