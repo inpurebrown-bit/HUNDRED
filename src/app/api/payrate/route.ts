@@ -6,11 +6,30 @@ import { supabaseAdmin } from '@/lib/supabase'
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
-  const user = session.user as { role?: string }
-  if (user.role !== 'ceo') return NextResponse.json({ error: '권한 없음' }, { status: 403 })
+  const user = session.user as { role?: string; name?: string }
+  if (user.role !== 'ceo' && user.role !== 'sales') return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
   const date = req.nextUrl.searchParams.get('date')
-  if (!date) return NextResponse.json({ error: 'date 파라미터 필요' }, { status: 400 })
+
+  // date 없으면 최신 레코드 반환 (오늘 or 가장 최근 저장 레코드)
+  if (!date) {
+    const today = new Date().toISOString().slice(0, 10)
+    const { data: todayData } = await supabaseAdmin
+      .from('payrate_records')
+      .select('*')
+      .eq('record_date', today)
+      .single()
+    if (todayData) return NextResponse.json({ record: todayData })
+
+    // 오늘 없으면 가장 최근 레코드
+    const { data: latestData } = await supabaseAdmin
+      .from('payrate_records')
+      .select('*')
+      .order('record_date', { ascending: false })
+      .limit(1)
+      .single()
+    return NextResponse.json({ record: latestData ?? null })
+  }
 
   const { data, error } = await supabaseAdmin
     .from('payrate_records')

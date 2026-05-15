@@ -7,7 +7,7 @@
  * - TESTER 제외
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { getElapsedBusinessDays } from '@/lib/businessDays'
 
 const TESTER = 'TESTER'
@@ -47,6 +47,8 @@ export default function DailyRateWidget() {
   const [employees,    setEmployees]    = useState<EmpRow[]>([])
   const [saving,       setSaving]       = useState(false)
   const [msg,          setMsg]          = useState('')
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const latestState   = useRef({ targetCount, employees, paymentCount, we, tw })
 
   useEffect(() => {
     async function load() {
@@ -87,29 +89,59 @@ export default function DailyRateWidget() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  function upd(i: number, f: keyof EmpRow, v: number | string) {
-    setEmployees(prev => { const n = [...prev]; n[i] = { ...n[i], [f]: f === 'name' ? v : Number(v) }; return n })
-  }
+  // latestState 항상 최신값으로 유지
+  useEffect(() => {
+    latestState.current = { targetCount, employees, paymentCount, we, tw }
+  }, [targetCount, employees, paymentCount, we, tw])
 
-  async function save() {
-    setSaving(true); setMsg('')
+  const doSave = useCallback(async (silent = false) => {
+    const s = latestState.current
+    if (!silent) { setSaving(true); setMsg('') }
     const res = await fetch('/api/payrate', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         date: today,
-        employee_count: employees.length,
-        target_count: targetCount,
-        payment_count: paymentCount,
-        working_days_elapsed: we,
-        total_working_days: tw,
-        employee_details: employees,
+        employee_count: s.employees.length,
+        target_count: s.targetCount,
+        payment_count: s.paymentCount,
+        working_days_elapsed: s.we,
+        total_working_days: s.tw,
+        employee_details: s.employees,
       }),
     })
     const json = await res.json()
-    setMsg(json.record ? '저장 완료' : '저장 실패')
-    setSaving(false)
-    setTimeout(() => setMsg(''), 3000)
+    if (!silent) {
+      setMsg(json.record ? '저장 완료' : '저장 실패')
+      setSaving(false)
+      setTimeout(() => setMsg(''), 3000)
+    } else {
+      if (json.record) setMsg('자동저장 ✓')
+      setTimeout(() => setMsg(''), 2000)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [today])
+
+  // 값 변경 시 2초 후 자동저장
+  function scheduleAutoSave() {
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = setTimeout(() => doSave(true), 2000)
   }
+
+  function upd(i: number, f: keyof EmpRow, v: number | string) {
+    setEmployees(prev => {
+      const n = [...prev]
+      n[i] = { ...n[i], [f]: f === 'name' ? v : Number(v) }
+      return n
+    })
+    scheduleAutoSave()
+  }
+
+  function setTargetCountAndSave(v: number) {
+    setTargetCount(v)
+    scheduleAutoSave()
+  }
+
+  async function save() { await doSave(false) }
 
   // 영업일 기준 계산
   const remaining = tw - we
@@ -147,7 +179,7 @@ export default function DailyRateWidget() {
           <div className="flex items-center gap-1 bg-gray-50 rounded-lg px-2.5 py-1.5">
             <span className="text-[10px] text-gray-400">목표</span>
             <input type="number" value={targetCount} min={0}
-              onChange={e => setTargetCount(Number(e.target.value))}
+              onChange={e => setTargetCountAndSave(Number(e.target.value))}
               className="w-10 text-center text-sm font-black text-gray-800 bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none
                 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />

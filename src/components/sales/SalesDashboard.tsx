@@ -118,6 +118,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
     saveTodos(todos.filter(t => t.id !== id))
   }
   const [supplyConfig, setSupplyConfig] = useState<Record<string, { supplied: number; goal: number; base: number }> | null>(null)
+  const [ceoPayRate, setCeoPayRate] = useState<number | null>(null)
   const [goalEditOpen, setGoalEditOpen] = useState(false)
   const [goalEditValue, setGoalEditValue] = useState('')
   const [goalSaving, setGoalSaving] = useState(false)
@@ -225,6 +226,27 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   }
 
   useEffect(() => { loadAll() }, [])
+
+  // ── 대표 결제율 불러오기 ──────────────────────────────────────────────
+  useEffect(() => {
+    async function loadPayRate() {
+      try {
+        const res = await fetch('/api/payrate')
+        if (!res.ok) return
+        const json = await res.json()
+        const record = json.record
+        if (!record?.employee_details) return
+        const row = record.employee_details.find((e: any) => e.name === userName)
+        if (!row) return
+        const supCnt = Number(row.supply_count) || 0
+        if (supCnt === 0) return
+        const rate = (Number(row.supply_payment) + Number(row.direct_payment)) / supCnt * 100
+        setCeoPayRate(Math.round(rate * 100) / 100)
+      } catch {}
+    }
+    loadPayRate()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userName])
 
   // ── Customer CRUD ─────────────────────────────────────────────────
   const patchCustomer = useCallback(async (id: string, patch: Record<string, any>) => {
@@ -891,18 +913,37 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   </p>
                   {todaySupply > 0 && <p className="text-[10px] text-blue-500 font-semibold mt-0.5">금일 {todaySupply}개 배정</p>}
                 </div>
-                {[
-                  { label: '결제수', value: `${myTotalContracted.toFixed(1)}개`, color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-100',
-                    sub: displayCfg.base > 0 ? `기존 ${displayCfg.base} + DB ${myDbContracted.toFixed(1)}` : undefined },
-                  { label: '공급 대비 계약율', value: `${contractRate.toFixed(2)}%`, color: contractRate >= 17 ? 'text-emerald-700' : contractRate >= 13 ? 'text-amber-700' : 'text-red-600', bg: contractRate >= 17 ? 'bg-emerald-50' : contractRate >= 13 ? 'bg-amber-50' : 'bg-red-50', border: contractRate >= 17 ? 'border-emerald-100' : contractRate >= 13 ? 'border-amber-100' : 'border-red-100' },
-                  { label: '결제율 대비 공급예정', value: tomorrowSupplyNeeded > 0 ? `${tomorrowSupplyNeeded}개` : '공급 중단', color: 'text-violet-700', bg: 'bg-violet-50', border: 'border-violet-100' },
-                ].map(s => (
-                  <div key={s.label} className={`${s.bg} border ${(s as any).border} rounded-xl p-3`}>
-                    <p className="text-[10px] text-gray-400 mb-1">{s.label}</p>
-                    <p className={`text-xl font-black ${s.color}`}>{s.value}</p>
-                    {(s as any).sub && <p className="text-[9px] text-gray-400 mt-0.5">{(s as any).sub}</p>}
-                  </div>
-                ))}
+                {/* 결제수 */}
+                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+                  <p className="text-[10px] text-gray-400 mb-1">결제수</p>
+                  <p className="text-xl font-black text-emerald-700">{myTotalContracted.toFixed(1)}개</p>
+                  {displayCfg.base > 0 && <p className="text-[9px] text-gray-400 mt-0.5">기존 {displayCfg.base} + DB {myDbContracted.toFixed(1)}</p>}
+                </div>
+                {/* 결제율 (대표 입력) */}
+                {(() => {
+                  const rate = ceoPayRate
+                  const rateColor = rate === null ? 'text-gray-400' : rate >= 17 ? 'text-emerald-700' : rate >= 13 ? 'text-amber-700' : 'text-red-600'
+                  const rateBg    = rate === null ? 'bg-gray-50'   : rate >= 17 ? 'bg-emerald-50'   : rate >= 13 ? 'bg-amber-50'   : 'bg-red-50'
+                  const rateBd    = rate === null ? 'border-gray-100' : rate >= 17 ? 'border-emerald-100' : rate >= 13 ? 'border-amber-100' : 'border-red-100'
+                  return (
+                    <div className={`${rateBg} border ${rateBd} rounded-xl p-3`}>
+                      <p className="text-[10px] text-gray-400 mb-1">결제율 <span className="text-[9px] bg-gray-200 text-gray-600 rounded-full px-1">대표입력</span></p>
+                      <p className={`text-xl font-black ${rateColor}`}>{rate !== null ? `${rate.toFixed(2)}%` : '미입력'}</p>
+                      <p className="text-[9px] text-gray-400 mt-0.5">공급 대비 계약율 {contractRate.toFixed(2)}%</p>
+                    </div>
+                  )
+                })()}
+                {/* 공급예정 */}
+                {(() => {
+                  const baseRate = ceoPayRate ?? contractRate
+                  const needed = calcRecommendedSupply(baseRate, bizElapsed)
+                  return (
+                    <div className="bg-violet-50 border border-violet-100 rounded-xl p-3">
+                      <p className="text-[10px] text-gray-400 mb-1">결제율 대비 공급예정</p>
+                      <p className="text-xl font-black text-violet-700">{needed > 0 ? `${needed}개` : '공급 중단'}</p>
+                    </div>
+                  )
+                })()}
               </div>
               {/* 목표 달성 바 */}
               <div>
