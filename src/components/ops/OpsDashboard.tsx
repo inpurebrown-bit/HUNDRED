@@ -604,123 +604,35 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
             </div>
           </div>
 
-          {/* 소진공 전용 섹션 */}
-          {selectedInstitutions.some(i => i.startsWith('소진공')) && (
-            <div className="bg-orange-50 border border-orange-300 rounded-xl p-3 space-y-3">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold text-orange-700">🏪 소진공 전용</span>
-                <div className="flex-1 h-px bg-orange-200" />
-              </div>
-
-              {/* ① 자금 프로그램 */}
-              <div>
-                <p className="text-[10px] font-bold text-orange-600 mb-1.5">① 자금 프로그램 (복수선택)</p>
-                <div className="flex flex-wrap gap-1">
-                  {[
-                    '일반경영안정','긴급경영안정','성장촉진','재도전특별','청년고용특별',
-                    '장애인기업','신취창업','혁신형소상공인','대환대출','명예퇴직재취업',
-                  ].map(prog => {
-                    const key = 'sojin_prog_' + prog
-                    const on = !!(d as any)[key]
-                    return (
-                      <button key={key} type="button" onClick={() => detailField(key, on ? '' : '1')}
-                        className={`px-2 py-0.5 rounded text-[11px] font-medium border transition-colors ${
-                          on ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-gray-500 border-gray-300 hover:bg-orange-50'
-                        }`}>{prog}</button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* ② 확인서 종류 */}
-              <div>
-                <p className="text-[10px] font-bold text-orange-600 mb-1.5">② 확인서 종류</p>
-                <div className="grid grid-cols-2 gap-1">
-                  {[
-                    { key: 'cert_general',   label: '일반경영안정 확인서' },
-                    { key: 'cert_youth',     label: '청년 확인서' },
-                    { key: 'cert_disabled',  label: '장애인 확인서' },
-                    { key: 'cert_emergency', label: '긴급경영안정 확인서' },
-                    { key: 'cert_refinance', label: '대환대출 확인서' },
-                    { key: 'cert_newbiz',    label: '신취창업 확인서' },
-                    { key: 'cert_comeback',  label: '재도전 확인서' },
-                    { key: 'cert_inno',      label: '혁신형 확인서' },
-                  ].map(({ key, label }) => {
-                    const on = !!(d as any)[key]
-                    return (
-                      <label key={key} className="flex items-center gap-1.5 cursor-pointer bg-white rounded px-2 py-1 border border-transparent hover:border-orange-200 transition-colors">
-                        <input type="checkbox" checked={on} onChange={() => toggleDetail(key)} className="w-3.5 h-3.5 accent-orange-500 shrink-0" />
-                        <span className={`text-[11px] font-medium ${on ? 'text-orange-800 font-semibold' : 'text-gray-600'}`}>{label}</span>
-                        {on && <span className="text-[9px] bg-orange-400 text-white px-1 py-0.5 rounded-full font-bold ml-auto shrink-0">✓</span>}
-                      </label>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* ③ 요건 충족 여부 */}
-              <div>
-                <p className="text-[10px] font-bold text-orange-600 mb-1.5">③ 요건 충족 여부</p>
-                <div className="grid grid-cols-2 gap-1">
-                  {[
-                    { key: 'req_biz_age',       label: '업력 요건' },
-                    { key: 'req_credit',         label: '신용점수 요건' },
-                    { key: 'req_revenue_limit',  label: '매출액 한도' },
-                    { key: 'req_inno_eval',      label: '혁신성 평가 통과' },
-                    { key: 'req_no_delinquent',  label: '연체 없음' },
-                    { key: 'req_no_tax',         label: '세금체납 없음' },
-                    { key: 'req_no_bounced',     label: '당좌부도 없음' },
-                    { key: 'req_employment',     label: '고용유지/증가' },
-                  ].map(({ key, label }) => {
-                    const val = (d as any)[key] || ''
-                    return (
-                      <div key={key} className="flex items-center gap-1 bg-white rounded px-2 py-1 border border-transparent">
-                        <span className="text-[10px] text-gray-500 flex-1">{label}</span>
-                        <div className="flex gap-0.5">
-                          {(['○', '△', '✕'] as const).map(v => (
-                            <button key={v} type="button" onClick={() => detailField(key, val === v ? '' : v)}
-                              className={`w-5 h-5 text-[10px] rounded font-bold transition-colors ${
-                                val === v
-                                  ? v === '○' ? 'bg-emerald-500 text-white' : v === '△' ? 'bg-amber-400 text-white' : 'bg-red-400 text-white'
-                                  : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                              }`}>{v}</button>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* ④ 신청금액 / 승인금액 */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className={lbl}>신청 금액</label>
-                  <input type="text" value={d.sojin_apply_amount || ''} onChange={e => detailField('sojin_apply_amount', e.target.value)} className={inp} placeholder="예: 5,000만원" />
-                </div>
-                <div>
-                  <label className={lbl}>승인 금액</label>
-                  <input type="text" value={d.sojin_approved_amount || ''} onChange={e => detailField('sojin_approved_amount', e.target.value)} className={inp} placeholder="예: 3,000만원" />
-                </div>
-                <div>
-                  <label className={lbl}>금리</label>
-                  <input type="text" value={d.sojin_rate || ''} onChange={e => detailField('sojin_rate', e.target.value)} className={inp} placeholder="예: 3.5%" />
-                </div>
-                <div>
-                  <label className={lbl}>대출 기간</label>
-                  <input type="text" value={d.sojin_period || ''} onChange={e => detailField('sojin_period', e.target.value)} className={inp} placeholder="예: 5년(거치2)" />
-                </div>
-              </div>
-
-              {/* ⑤ 메모 */}
-              <div>
-                <label className={lbl}>소진공 특이사항 메모</label>
-                <textarea value={d.sojin_memo || ''} onChange={e => detailField('sojin_memo', e.target.value)}
-                  rows={3} placeholder="진행 관련 특이사항, 담당자 이름, 센터 등 자유롭게..."
-                  className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-orange-400/50 resize-none" />
-              </div>
+          {/* ── 확인서 섹션 ── */}
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-bold text-amber-700">📄 확인서</span>
+              <div className="flex-1 h-px bg-amber-200" />
             </div>
-          )}
+            <p className="text-[10px] text-amber-600 font-semibold">소진공 확인서 보유 종류</p>
+            <div className="grid grid-cols-2 gap-1">
+              {[
+                { key: 'cert_general',   label: '일반경영안정' },
+                { key: 'cert_emergency', label: '긴급경영안정' },
+                { key: 'cert_youth',     label: '청년' },
+                { key: 'cert_disabled',  label: '장애인' },
+                { key: 'cert_refinance', label: '대환대출' },
+                { key: 'cert_newbiz',    label: '신취창업' },
+                { key: 'cert_comeback',  label: '재도전' },
+                { key: 'cert_inno',      label: '혁신형' },
+              ].map(({ key, label }) => {
+                const on = !!(d as any)[key]
+                return (
+                  <label key={key} className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={on} onChange={() => toggleDetail(key)} className="w-3.5 h-3.5 accent-amber-500 shrink-0" />
+                    <span className={`text-xs ${on ? 'text-amber-800 font-semibold' : 'text-gray-500'}`}>{label}</span>
+                    {on && <span className="text-[9px] bg-amber-500 text-white px-1.5 py-0.5 rounded-full font-bold ml-auto">보유</span>}
+                  </label>
+                )
+              })}
+            </div>
+          </div>
 
           {/* 타임라인 */}
           <div>
