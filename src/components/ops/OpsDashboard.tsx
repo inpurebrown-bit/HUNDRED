@@ -605,29 +605,22 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
           </div>
 
           {/* ── 확인서 섹션 ── */}
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-amber-700">📄 확인서</span>
-              <div className="flex-1 h-px bg-amber-200" />
-            </div>
-            <p className="text-[10px] text-amber-600 font-semibold">소진공 확인서 보유 종류</p>
-            <div className="grid grid-cols-2 gap-1">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-bold text-amber-700 shrink-0">📄 소진공 확인서</span>
+              <div className="h-px bg-amber-200 flex-1 min-w-[8px]" />
               {[
                 { key: 'cert_general',   label: '일반경영안정' },
                 { key: 'cert_emergency', label: '긴급경영안정' },
                 { key: 'cert_youth',     label: '청년' },
                 { key: 'cert_disabled',  label: '장애인' },
                 { key: 'cert_refinance', label: '대환대출' },
-                { key: 'cert_newbiz',    label: '신취창업' },
-                { key: 'cert_comeback',  label: '재도전' },
-                { key: 'cert_inno',      label: '혁신형' },
               ].map(({ key, label }) => {
                 const on = !!(d as any)[key]
                 return (
-                  <label key={key} className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={on} onChange={() => toggleDetail(key)} className="w-3.5 h-3.5 accent-amber-500 shrink-0" />
-                    <span className={`text-xs ${on ? 'text-amber-800 font-semibold' : 'text-gray-500'}`}>{label}</span>
-                    {on && <span className="text-[9px] bg-amber-500 text-white px-1.5 py-0.5 rounded-full font-bold ml-auto">보유</span>}
+                  <label key={key} className="flex items-center gap-1 cursor-pointer shrink-0">
+                    <input type="checkbox" checked={on} onChange={() => toggleDetail(key)} className="w-3 h-3 accent-amber-500" />
+                    <span className={`text-[10px] ${on ? 'text-amber-800 font-bold' : 'text-gray-400'}`}>{label}</span>
                   </label>
                 )
               })}
