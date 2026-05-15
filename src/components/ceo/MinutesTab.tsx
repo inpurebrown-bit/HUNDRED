@@ -205,13 +205,29 @@ export default function MinutesTab() {
                       <div>
                         <p className="text-[10px] font-bold text-green-700 mb-1">🟢 공급DB 상담결과</p>
                         {(dr?.data?.supply_db || []).length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {(dr!.data.supply_db as any[]).map((i: any, idx: number) => (
-                              <span key={idx} className={`text-[11px] px-2 py-0.5 rounded-full ${i.is_decided ? 'bg-green-200 text-green-800 font-bold' : 'bg-green-50 text-green-600'}`}>
-                                {i.is_decided ? '✅ ' : ''}{i.company}
-                                {i.result && <span className="text-[9px] ml-1 opacity-70">({i.result})</span>}
-                              </span>
-                            ))}
+                          <div className="space-y-1">
+                            {(dr!.data.supply_db as any[]).map((i: any, idx: number) => {
+                              const st = i.status || (i.is_decided ? '결정업체' : '')
+                              const stColor: Record<string, string> = {
+                                '결정업체': 'bg-emerald-100 text-emerald-700',
+                                '계약대기': 'bg-blue-100 text-blue-700',
+                                '계약서대기': 'bg-sky-100 text-sky-700',
+                                '입금대기': 'bg-violet-100 text-violet-700',
+                                '고민중': 'bg-amber-100 text-amber-700',
+                                '재통화예정': 'bg-orange-100 text-orange-700',
+                                '감성톡관리': 'bg-pink-100 text-pink-700',
+                              }
+                              return (
+                                <div key={idx} className="bg-green-50/60 rounded-lg px-2 py-1.5">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-[11px] font-bold text-gray-800">{i.company}</span>
+                                    {st && <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${stColor[st] || 'bg-gray-100 text-gray-600'}`}>{st}</span>}
+                                    {st === '재통화예정' && i.callback_date && <span className="text-[9px] text-orange-600">({i.callback_date})</span>}
+                                  </div>
+                                  {i.content && <p className="text-[10px] text-gray-500 mt-0.5 leading-relaxed">{i.content}</p>}
+                                </div>
+                              )
+                            })}
                           </div>
                         ) : (
                           <p className="text-[11px] text-gray-300 pl-1">없음</p>
@@ -222,12 +238,74 @@ export default function MinutesTab() {
                       <div>
                         <p className="text-[10px] font-bold text-violet-700 mb-1">🟣 아웃바운딩 상담결과</p>
                         {(dr?.data?.outbound || []).length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {(dr!.data.outbound as any[]).map((i: any, idx: number) => (
-                              <span key={idx} className={`text-[11px] px-2 py-0.5 rounded-full ${i.is_decided ? 'bg-violet-200 text-violet-800 font-bold' : 'bg-violet-50 text-violet-600'}`}>
-                                {i.is_decided ? '✅ ' : ''}{i.company}
-                                {i.result && <span className="text-[9px] ml-1 opacity-70">({i.result})</span>}
-                              </span>
+                          <div className="space-y-1">
+                            {(dr!.data.outbound as any[]).map((i: any, idx: number) => {
+                              const st = i.status || (i.is_decided ? '결정업체' : '')
+                              const stColor: Record<string, string> = {
+                                '결정업체': 'bg-emerald-100 text-emerald-700',
+                                '계약대기': 'bg-blue-100 text-blue-700',
+                                '계약서대기': 'bg-sky-100 text-sky-700',
+                                '입금대기': 'bg-violet-100 text-violet-700',
+                                '고민중': 'bg-amber-100 text-amber-700',
+                                '재통화예정': 'bg-orange-100 text-orange-700',
+                                '감성톡관리': 'bg-pink-100 text-pink-700',
+                              }
+                              return (
+                                <div key={idx} className="bg-violet-50/60 rounded-lg px-2 py-1.5">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-[11px] font-bold text-gray-800">{i.company}</span>
+                                    {st && <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${stColor[st] || 'bg-gray-100 text-gray-600'}`}>{st}</span>}
+                                    {st === '재통화예정' && i.callback_date && <span className="text-[9px] text-orange-600">({i.callback_date})</span>}
+                                  </div>
+                                  {i.content && <p className="text-[10px] text-gray-500 mt-0.5 leading-relaxed">{i.content}</p>}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-gray-300 pl-1">없음</p>
+                        )}
+                      </div>
+
+                      {/* 결정업체 */}
+                      <div>
+                        <p className="text-[10px] font-bold text-emerald-700 mb-1">✅ 결정업체</p>
+                        {(dr?.data?.decided || []).length > 0 ? (
+                          <div className="space-y-1">
+                            {(dr!.data.decided as any[]).map((d: any, idx: number) => (
+                              <div key={idx} className="bg-emerald-50/60 rounded-lg px-2 py-1.5">
+                                <span className="text-[11px] font-bold text-gray-800">{d.company}</span>
+                                {d.content && <p className="text-[10px] text-gray-500 mt-0.5">{d.content}</p>}
+                                {d.current_progress && <p className="text-[10px] text-emerald-700 mt-0.5">▶ 진행: {d.current_progress}</p>}
+                                {d.next_action && <p className="text-[10px] text-blue-600 mt-0.5">→ 다음: {d.next_action}</p>}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-gray-300 pl-1">없음</p>
+                        )}
+                      </div>
+
+                      {/* 고민관리업체 */}
+                      <div>
+                        <p className="text-[10px] font-bold text-amber-700 mb-1">🤔 고민관리업체</p>
+                        {(dr?.data?.worried || []).length > 0 ? (
+                          <div className="space-y-1">
+                            {(dr!.data.worried as any[]).map((w: any, idx: number) => (
+                              <div key={idx} className="bg-amber-50/60 rounded-lg px-2 py-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[11px] font-bold text-gray-800">{w.company}</span>
+                                  {w.probability && (
+                                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${
+                                      w.probability === '상' ? 'bg-green-100 text-green-700'
+                                      : w.probability === '중' ? 'bg-yellow-100 text-yellow-700'
+                                      : 'bg-red-100 text-red-600'
+                                    }`}>{w.probability}</span>
+                                  )}
+                                </div>
+                                {w.content && <p className="text-[10px] text-gray-500 mt-0.5 leading-relaxed">{w.content}</p>}
+                                {w.reason && <p className="text-[10px] text-amber-700 mt-0.5">고민사유: {w.reason}</p>}
+                              </div>
                             ))}
                           </div>
                         ) : (
@@ -253,38 +331,16 @@ export default function MinutesTab() {
 
                       {/* 입금대기 */}
                       <div>
-                        <p className="text-[10px] font-bold text-amber-700 mb-1">💰 입금대기 업체</p>
+                        <p className="text-[10px] font-bold text-indigo-700 mb-1">💰 입금대기 업체</p>
                         {(dr?.data?.payment_waiting || []).length > 0 ? (
-                          <div className="flex flex-wrap gap-1.5">
+                          <div className="space-y-1">
                             {(dr!.data.payment_waiting as any[]).map((p: any, idx: number) => (
-                              <span key={idx} className="text-[11px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg flex flex-col">
-                                <span className="font-bold">{p.company}</span>
-                                {(p.memo || p.notes) && (
-                                  <span className="text-[9px] text-amber-600 font-normal">{p.memo || p.notes}</span>
-                                )}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-[11px] text-gray-300 pl-1">없음</p>
-                        )}
-                      </div>
-
-                      {/* 검토 필요 */}
-                      <div>
-                        <p className="text-[10px] font-bold text-red-600 mb-1">⚠️ 검토 필요 업체</p>
-                        {(dr?.data?.worried || []).length > 0 ? (
-                          <div className="space-y-0.5">
-                            {(dr!.data.worried as any[]).map((w: any, idx: number) => (
-                              <p key={idx} className="text-[11px] text-gray-600">
-                                {w.company}{' '}
-                                <span className={`text-[9px] px-1 rounded ${
-                                  w.probability === '상' ? 'bg-green-100 text-green-600'
-                                  : w.probability === '중' ? 'bg-yellow-100 text-yellow-600'
-                                  : 'bg-red-100 text-red-600'
-                                }`}>{w.probability}</span>
-                                {w.reason && ` — ${w.reason}`}
-                              </p>
+                              <div key={idx} className="bg-indigo-50/60 rounded-lg px-2 py-1.5">
+                                <span className="text-[11px] font-bold text-gray-800">{p.company}</span>
+                                <p className="text-[10px] text-gray-500 mt-0.5">
+                                  {p.ceo_name && `${p.ceo_name}`}{p.phone && ` · ${p.phone}`}{p.first_call_date && ` · 첫콜 ${p.first_call_date}`}
+                                </p>
+                              </div>
                             ))}
                           </div>
                         ) : (
