@@ -508,6 +508,37 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
             </div>
           </div>
 
+          {/* ── 핸들링 섹션 ── */}
+          <div className="border border-gray-200 rounded-xl p-3">
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">핸들링</span>
+              <div className="flex-1 h-px bg-gray-100" />
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { key: 'handling_no_contact',  label: '📵 연락 안됨',      on: 'bg-red-500 text-white border-red-500',    off: 'bg-white text-gray-500 border-gray-300 hover:bg-red-50' },
+                { key: 'handling_no_fit',      label: '🚫 들어갈 곳 없음', on: 'bg-orange-500 text-white border-orange-500', off: 'bg-white text-gray-500 border-gray-300 hover:bg-orange-50' },
+                { key: 'handling_mindless',    label: '🔄 무지성 핸들링',  on: 'bg-slate-500 text-white border-slate-500',  off: 'bg-white text-gray-500 border-gray-300 hover:bg-slate-50' },
+              ].map(({ key, label, on, off }) => {
+                const active = !!(d as any)[key]
+                return (
+                  <button key={key} type="button"
+                    onClick={() => detailField(key, active ? '' : '1')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${active ? on : off}`}>
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+            {((d as any).handling_no_contact || (d as any).handling_no_fit || (d as any).handling_mindless) && (
+              <div className="mt-2">
+                <input type="text" value={d.handling_memo || ''} onChange={e => detailField('handling_memo', e.target.value)}
+                  placeholder="핸들링 메모 (선택)"
+                  className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-gray-300" />
+              </div>
+            )}
+          </div>
+
           {/* ── 직접자금 섹션 (항상 표시) ── */}
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-3">
             <div className="flex items-center gap-1.5">
