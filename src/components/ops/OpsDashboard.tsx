@@ -80,7 +80,8 @@ const PIPELINE_STAGES = [
 
 // 전체 진행단계 (간소화 — 상세 단계는 직접/간접자금 내부에서 관리)
 const OVERALL_STAGES = [
-  { key: '서류받는중', label: '서류받는중', color: 'bg-gray-500' },
+  { key: '서류받는중', label: '서류받는중', color: 'bg-gray-500'  },
+  { key: '진행중',     label: '진행중',     color: 'bg-blue-500'  },
   { key: '홀딩',       label: '홀딩',       color: 'bg-slate-400' },
 ]
 

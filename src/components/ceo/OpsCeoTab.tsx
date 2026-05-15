@@ -24,6 +24,7 @@ const PIPELINE_STAGES = [
 ]
 const OVERALL_STAGES = [
   { key: '서류받는중', label: '서류받는중', color: 'bg-gray-500'  },
+  { key: '진행중',     label: '진행중',     color: 'bg-blue-500'  },
   { key: '홀딩',       label: '홀딩',       color: 'bg-slate-400' },
 ]
 const INST_DIRECT   = ['중진공','소진공(혁신)','소진공(신취)','소진공(재도전)','서민금융(미소)']
