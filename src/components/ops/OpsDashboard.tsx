@@ -168,16 +168,17 @@ type DetailTab = typeof DETAIL_TABS[number]
 // ──────────────────────────────────────────────────────────────────────
 // TimelineSection
 // ──────────────────────────────────────────────────────────────────────
-function TimelineSection({ initialTimeline, onSchedule }: {
+function TimelineSection({ initialTimeline, onSchedule, userName }: {
   initialTimeline: any[]
   onSchedule: (patch: Record<string, any>) => void
+  userName?: string
 }) {
   const [tl, setTl] = useState<any[]>(initialTimeline || [])
   const [text, setText] = useState('')
 
   function add() {
     if (!text.trim()) return
-    const entry = { user: '수동입력', content: text.trim(), created_at: nowKST() }
+    const entry = { user: userName || '자금팀', content: text.trim(), created_at: nowKST() }
     const updated = [...tl, entry]
     setTl(updated)
     onSchedule({ timeline: updated })
@@ -232,7 +233,7 @@ function TimelineSection({ initialTimeline, onSchedule }: {
 // ──────────────────────────────────────────────────────────────────────
 // OpsDetailPanel (타임라인 기본, 고객정보 탭 제거)
 // ──────────────────────────────────────────────────────────────────────
-export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (id: string, patch: Record<string, any>) => void; userRole?: string }) {
+export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; onSave: (id: string, patch: Record<string, any>) => void; userRole?: string; userName?: string }) {
   const [local, setLocal] = useState<OpsCase>({ ...c })
   const [activeDetailTab, setActiveDetailTab] = useState<DetailTab>('진행현황')
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -636,7 +637,7 @@ export function OpsDetailPanel({ c, onSave, userRole }: { c: OpsCase; onSave: (i
               <div className="flex-1 h-px bg-gray-100" />
               <span className="text-[10px] text-gray-300">마지막 수정: {new Date(c.updated_at).toLocaleString('ko-KR')}</span>
             </div>
-            <TimelineSection initialTimeline={local.timeline || []} onSchedule={schedule} />
+            <TimelineSection initialTimeline={local.timeline || []} onSchedule={schedule} userName={userName} />
           </div>
         </div>
       )}
@@ -1727,7 +1728,7 @@ function OpsNewDbTab({ cases, userName, onSave }: {
                 <button onClick={() => setOpenId(null)} className="text-gray-400 hover:text-gray-600 text-sm">✕</button>
               </div>
             </div>
-            <OpsDetailPanel c={c} onSave={onSave} userRole="ops" />
+            <OpsDetailPanel c={c} onSave={onSave} userRole="ops" userName={userName} />
           </div>
         )
       })()}
@@ -2816,7 +2817,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
               <button onClick={() => togglePanel(id)} className="text-gray-400 hover:text-gray-600 text-xl leading-none px-1">✕</button>
             </div>
             <div className="p-4">
-              <OpsDetailPanel c={c} onSave={handleSave} userRole={userRole} />
+              <OpsDetailPanel c={c} onSave={handleSave} userRole={userRole} userName={userName} />
             </div>
           </div>
         )
