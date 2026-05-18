@@ -863,6 +863,7 @@ export default function SalesCeoTab() {
       const details: any = c.details || {}
       const isNewDb = destBucket === 'new_db'
       const revenue = parseInt(String(details.my_revenue || '0').replace(/[^0-9]/g, ''), 10) || 0
+      const salesTimeline = ((c as any).call_timeline || []).map((e: any) => ({ ...e, source: 'sales' }))
       await fetch('/api/ops-cases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -872,7 +873,51 @@ export default function SalesCeoTab() {
           stage: isNewDb ? 'new_db' : destBucket,
           memo: `대표 배정 → ${destPerson}`,
           revenue,
-          owner_id: destPerson,   // ops_cases에 담당자 이름 저장
+          owner_id: destPerson,
+          customer_id: c.id,
+          timeline: salesTimeline.length > 0 ? salesTimeline : undefined,
+          details: {
+            sales_customer_info: {
+              customer_id:       c.id,
+              company:           details.company || c.company || c.name || '',
+              representative:    c.name || '',
+              phone:             c.phone || '',
+              sales_user_name:   details.sales_user_name || '',
+              region:            details.region || '',
+              reception_date:    details.reception_date || '',
+              created_at:        (c as any).created_at || '',
+              business_type:     details.business_type || '',
+              real_work:         details.real_work || '',
+              years_in_business: details.years_in_business || details.biz_size || '',
+              employee_count:    details.employee_count || '',
+              innovation:        details.innovation || '',
+              loan_history:      (c as any).loan_history || details.loan_history || '',
+              loan_kibo:         details.loan_kibo   || details.loan_policy || '',
+              loan_shinbo:       details.loan_shinbo  || '',
+              loan_jaedan:       details.loan_jaedan  || '',
+              loan_jinjong:      details.loan_jinjong || '',
+              loan_sojin:        details.loan_sojin   || '',
+              loan_other:        details.loan_other   || details.loan_credit || '',
+              loan_total:        details.loan_total   || '',
+              credit_kcb:        details.credit_kcb   || details.credit_score || '',
+              credit_nice:       details.credit_nice  || '',
+              tax_status:        details.tax_status   || details.tax_delinquency || '',
+              assets:            details.assets        || '',
+              revenue_2025:      details.revenue_2025  || '',
+              revenue_2024:      details.revenue_2024  || '',
+              revenue_2023:      details.revenue_2023  || '',
+              required_funds:    details.required_funds || '',
+              solution:          details.solution       || '',
+              call_result:       details.call_result    || '',
+              closing_result:    details.closing_result || '',
+              subcall_date:      details.subcall_date   || '',
+              contract_fee:      details.contract_fee    || '',
+              commission_rate:   details.commission_rate || '',
+              payment_amount:    details.payment_amount  || '',
+              unpaid_amount:     details.unpaid_amount   || '',
+              tax_invoice:       details.tax_invoice     || '',
+            },
+          },
         }),
       })
       await updateCustomer(id, { details: { ops_transferred: true } })
