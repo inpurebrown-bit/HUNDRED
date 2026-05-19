@@ -393,8 +393,8 @@ function PayRateSubView() {
             if (!name || name === TESTER) return
             const contractMonth = (c.details?.contract_date || c.created_at || '').slice(0, 7)
             const createMonth   = (c.created_at || '').slice(0, 7)
-            const isLead   = c.lead_type === 'lead' || c.lead_type === 'consulting'
-            const isDirect = c.lead_type === 'db010'
+            const isLead   = c.status === 'lead' || c.status === 'consulting'
+            const isDirect = c.status === 'db010'
 
             // 전체 계약 집계 (기존)
             if (c.status === 'contracted' && contractMonth === month) {

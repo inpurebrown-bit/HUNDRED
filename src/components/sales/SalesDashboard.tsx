@@ -849,7 +849,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               const supPay    = Number(pr?.supply_payment ?? 0)
               // 직접수: 저장된 값 말고 customers DB에서 이번달 db010 실시간 카운트
               const dirCntAuto = customers.filter(c =>
-                (c as any).lead_type === 'db010' &&
+                c.status === 'db010' &&
                 ((c as any).created_at || '').slice(0, 7) === thisMonth
               ).length
               const dirCnt    = dirCntAuto > 0 ? dirCntAuto : Number(pr?.direct_count ?? 0)
