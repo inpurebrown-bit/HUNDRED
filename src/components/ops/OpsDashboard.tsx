@@ -60,6 +60,7 @@ export interface OpsCase {
   created_at: string
   customers: {
     name: string
+    representative?: string
     phone: string
     company?: string
     loan_history?: string
@@ -1277,9 +1278,12 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
         {companyName}
       </p>
       {/* 대표자 */}
-      {c.customers?.name && c.customers.name !== companyName && (
-        <p className="text-[10px] text-gray-400 mt-0.5">{c.customers?.name}</p>
-      )}
+      {(() => {
+        const rep = c.customers?.representative || c.customers?.details?.representative || ''
+        return rep && rep !== companyName ? (
+          <p className="text-[10px] text-gray-400 mt-0.5">{rep}</p>
+        ) : null
+      })()}
       {/* 전화번호 */}
       <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{formatPhone(c.customers?.phone || '')}</p>
 
@@ -1375,7 +1379,7 @@ function CaseListRow({ c, onToggle, isOpen }: { c: OpsCase; onToggle: (id: strin
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-semibold text-[#1B2A45] text-sm" style={{ wordBreak: 'break-all' }}>{companyName}</span>
-          <span className="text-xs text-gray-400">{c.customers?.name}</span>
+          {(() => { const rep = c.customers?.representative || c.customers?.details?.representative || ''; return rep && rep !== companyName ? <span className="text-xs text-gray-400">{rep}</span> : null })()}
           <span className="text-[10px] text-gray-400 font-mono">{formatPhone(c.customers?.phone || '')}</span>
         </div>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">

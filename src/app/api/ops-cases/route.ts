@@ -28,67 +28,80 @@ function normalize(c: any, customerMap: Record<string, any> = {}, customerIdMap:
   const cust = customerMap[c.phone] || customerMap[normPhone(c.phone)] || customerIdMap[c.customer_id] || null
   const custDetails = cust?.details || {}
 
-  // sales_customer_info: ops_case.details에 저장된 값 OR customers 테이블 실시간 데이터
+  // sales_customer_info: ops_case.details에 저장된 값
   const sci = c.details?.sales_customer_info || null
+  // 관리팀이 인콜일지 탭에서 직접 입력·수정한 값 (최고 우선순위)
+  const ij  = c.details?.incall_journal       || null
 
-  // sci → custDetails 순으로 머지 (DB의 최신 데이터가 우선)
-  // 명시적 필드는 아래에서 덮어씌움
-  const mergedDetails: Record<string, any> = {
-    ...(sci  || {}),       // sales_customer_info 기본값
-    ...custDetails,        // customers 테이블 최신값 우선
-    // 명시적 우선순위 필드
-    company:         custDetails.company         || sci?.company         || c.customer_name || '',
-    representative:  cust?.name                  || sci?.representative  || custDetails.representative || '',
-    phone:           c.phone                     || '',
-    business_type:   custDetails.business_type   || sci?.business_type   || '',
-    region:          custDetails.region           || sci?.region          || '',
-    loan_history:    cust?.loan_history           || sci?.loan_history    || custDetails.loan_history || '',
-    call_result:     custDetails.call_result      || sci?.call_result     || '',
-    closing_result:  custDetails.closing_result   || sci?.closing_result  || '',
-    subcall_date:    custDetails.subcall_date      || sci?.subcall_date    || '',
-    sales_user_name: custDetails.sales_user_name  || sci?.sales_user_name || '',
-    created_at:      cust?.created_at             || sci?.created_at      || '',
-    memo:            cust?.memo                   || '',
-    // 추가 인콜일지 필드 (영업팀 → 자금팀 전달)
-    real_work:        custDetails.real_work        || sci?.real_work        || '',
-    years_in_business:custDetails.years_in_business|| sci?.years_in_business|| custDetails.biz_size || '',
-    employee_count:   custDetails.employee_count   || sci?.employee_count   || '',
-    innovation:       custDetails.innovation        || sci?.innovation        || '',
-    reception_date:   custDetails.reception_date    || sci?.reception_date    || '',
-    // 대출 현황
-    loan_kibo:    custDetails.loan_kibo    || sci?.loan_kibo    || custDetails.loan_policy || '',
-    loan_shinbo:  custDetails.loan_shinbo  || sci?.loan_shinbo  || '',
-    loan_jaedan:  custDetails.loan_jaedan  || sci?.loan_jaedan  || '',
-    loan_jinjong: custDetails.loan_jinjong || sci?.loan_jinjong || '',
-    loan_sojin:   custDetails.loan_sojin   || sci?.loan_sojin   || '',
-    loan_other:   custDetails.loan_other   || sci?.loan_other   || custDetails.loan_credit || '',
-    loan_total:   custDetails.loan_total   || sci?.loan_total   || '',
-    // 신용 / 재무
-    credit_kcb:    custDetails.credit_kcb    || sci?.credit_kcb    || custDetails.credit_score || '',
-    credit_nice:   custDetails.credit_nice   || sci?.credit_nice   || '',
-    tax_status:    custDetails.tax_status    || sci?.tax_status    || custDetails.tax_delinquency || '',
-    assets:        custDetails.assets        || sci?.assets        || '',
-    revenue_2026:  custDetails.revenue_2026  || sci?.revenue_2026  || '',
-    revenue_2025:  custDetails.revenue_2025  || sci?.revenue_2025  || '',
-    revenue_2024:  custDetails.revenue_2024  || sci?.revenue_2024  || '',
-    revenue_2023:  custDetails.revenue_2023  || sci?.revenue_2023  || '',
-    required_funds:custDetails.required_funds|| sci?.required_funds|| '',
-    solution:      custDetails.solution      || sci?.solution      || '',
+  // 필드 우선순위: ij(관리팀 직접입력) > custDetails(customers 테이블) > sci(영업팀 전달값)
+  function pick(...srcs: (string | undefined | null)[]): string {
+    for (const s of srcs) { if (s && String(s).trim()) return String(s).trim() }
+    return ''
   }
+
+  const mergedDetails: Record<string, any> = {
+    ...(sci         || {}),
+    ...custDetails,
+    ...(ij          || {}),   // ij로 최종 덮어씌움 (관리팀 수정값 우선)
+    // 명시적 우선순위 필드
+    company:          pick(ij?.company,          custDetails.company,          sci?.company,          c.customer_name),
+    representative:   pick(ij?.representative,   cust?.name,                  custDetails.representative, sci?.representative),
+    phone:            pick(ij?.phone,            cust?.phone,                 c.phone,                sci?.phone),
+    business_type:    pick(ij?.business_type,    custDetails.business_type,   sci?.business_type),
+    region:           pick(ij?.region,           custDetails.region,          sci?.region),
+    loan_history:     pick(ij?.loan_history,     cust?.loan_history,          custDetails.loan_history, sci?.loan_history),
+    call_result:      pick(ij?.call_result,      custDetails.call_result,     sci?.call_result),
+    closing_result:   pick(ij?.closing_result,   custDetails.closing_result,  sci?.closing_result),
+    subcall_date:     pick(ij?.subcall_date,     custDetails.subcall_date,    sci?.subcall_date),
+    sales_user_name:  pick(ij?.sales_user_name,  custDetails.sales_user_name, sci?.sales_user_name),
+    created_at:       pick(ij?.created_at,       cust?.created_at,            sci?.created_at),
+    memo:             pick(cust?.memo),
+    real_work:        pick(ij?.real_work,        custDetails.real_work,       sci?.real_work),
+    years_in_business:pick(ij?.years_in_business,custDetails.years_in_business,sci?.years_in_business, custDetails.biz_size),
+    employee_count:   pick(ij?.employee_count,   custDetails.employee_count,  sci?.employee_count),
+    innovation:       pick(ij?.innovation,       custDetails.innovation,      sci?.innovation),
+    reception_date:   pick(ij?.reception_date,   custDetails.reception_date,  sci?.reception_date),
+    patent:           pick(ij?.patent,           custDetails.patent,          sci?.patent),
+    // 대출 현황
+    loan_kibo:    pick(ij?.loan_kibo,    custDetails.loan_kibo,    sci?.loan_kibo,    custDetails.loan_policy),
+    loan_shinbo:  pick(ij?.loan_shinbo,  custDetails.loan_shinbo,  sci?.loan_shinbo),
+    loan_jaedan:  pick(ij?.loan_jaedan,  custDetails.loan_jaedan,  sci?.loan_jaedan),
+    loan_jinjong: pick(ij?.loan_jinjong, custDetails.loan_jinjong, sci?.loan_jinjong),
+    loan_sojin:   pick(ij?.loan_sojin,   custDetails.loan_sojin,   sci?.loan_sojin),
+    loan_other:   pick(ij?.loan_other,   custDetails.loan_other,   sci?.loan_other,   custDetails.loan_credit),
+    loan_total:   pick(ij?.loan_total,   custDetails.loan_total,   sci?.loan_total),
+    // 신용 / 재무
+    credit_kcb:    pick(ij?.credit_kcb,    custDetails.credit_kcb,    sci?.credit_kcb,    custDetails.credit_score),
+    credit_nice:   pick(ij?.credit_nice,   custDetails.credit_nice,   sci?.credit_nice),
+    tax_status:    pick(ij?.tax_status,    custDetails.tax_status,    sci?.tax_status,    custDetails.tax_delinquency),
+    assets:        pick(ij?.assets,        custDetails.assets,        sci?.assets),
+    revenue_2026:  pick(ij?.revenue_2026,  custDetails.revenue_2026,  sci?.revenue_2026),
+    revenue_2025:  pick(ij?.revenue_2025,  custDetails.revenue_2025,  sci?.revenue_2025),
+    revenue_2024:  pick(ij?.revenue_2024,  custDetails.revenue_2024,  sci?.revenue_2024),
+    revenue_2023:  pick(ij?.revenue_2023,  custDetails.revenue_2023,  sci?.revenue_2023),
+    required_funds:pick(ij?.required_funds,custDetails.required_funds,sci?.required_funds),
+    solution:      pick(ij?.solution,      custDetails.solution,      sci?.solution),
+  }
+
+  // 대표자 이름: ij > customers 테이블 > sci > customer_name(업체명 가능성 있어 최후)
+  const representativeName = pick(ij?.representative, cust?.name, custDetails.representative, sci?.representative)
 
   return {
     ...c,
     progress_stage: c.stage ?? '',
     progress_memo:  c.memo  ?? '',
     customers: {
-      name:    cust?.name ?? c.customer_name ?? '',
-      phone:   cust?.phone
-        || (isKoreanPhone(c.phone) ? c.phone : '')
-        || (isKoreanPhone(c.details?.incall_journal?.phone) ? c.details.incall_journal.phone : '')
-        || (isKoreanPhone(c.details?.sales_customer_info?.phone) ? c.details.sales_customer_info.phone : ''),
-      company: mergedDetails.company,
-      details: mergedDetails,
-      call_timeline: cust?.call_timeline || [],
+      name:           representativeName || c.customer_name || '',
+      representative: representativeName,
+      phone: pick(
+        isKoreanPhone(ij?.phone)  ? ij?.phone  : '',
+        cust?.phone,
+        isKoreanPhone(c.phone)    ? c.phone    : '',
+        isKoreanPhone(sci?.phone) ? sci?.phone : '',
+      ),
+      company:        mergedDetails.company,
+      details:        mergedDetails,
+      call_timeline:  cust?.call_timeline || [],
     },
   }
 }
