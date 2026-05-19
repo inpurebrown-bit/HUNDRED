@@ -1742,25 +1742,29 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
               <span className="text-white/60 text-xs">{isOpen ? '▲' : '▼'}</span>
             </button>
             {isOpen && (
-              <div className="flex gap-3 items-start">
-                {/* 진행 중 카드 */}
-                {activeItems.length > 0 && (
-                  <div className={`min-w-0 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 ${upcomingItems.length > 0 ? 'w-1/2' : 'flex-1'}`}>
-                    {activeItems.map(c => (
-                      <OpsCard
-                        key={`${inst}-${c.id}`}
-                        c={c}
-                        isOpen={openPanelIds.includes(c.id)}
-                        onToggle={onToggle}
-                        onScriptToggle={onScriptToggle}
-                      />
-                    ))}
-                  </div>
-                )}
-                {/* 다음 자금 대기 */}
-                {upcomingItems.length > 0 && (
-                  <div className={`border-l-2 border-dashed border-gray-200 pl-3 ${activeItems.length > 0 ? 'w-1/2' : 'flex-1'}`}>
-                    <p className="text-[9px] font-bold text-gray-400 mb-1.5 uppercase tracking-wide">📋 다음 자금 대기</p>
+              <div className="flex gap-0 items-start">
+                {/* 진행 중 카드 — 항상 w-1/2 고정 */}
+                <div className="w-1/2 min-w-0 pr-3">
+                  {activeItems.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                      {activeItems.map(c => (
+                        <OpsCard
+                          key={`${inst}-${c.id}`}
+                          c={c}
+                          isOpen={openPanelIds.includes(c.id)}
+                          onToggle={onToggle}
+                          onScriptToggle={onScriptToggle}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="h-full min-h-[40px]" />
+                  )}
+                </div>
+                {/* 다음 자금 대기 — 항상 w-1/2 고정, 분리선 항상 표시 */}
+                <div className="w-1/2 min-w-0 border-l-2 border-dashed border-gray-200 pl-3">
+                  <p className="text-[9px] font-bold text-gray-400 mb-1.5 uppercase tracking-wide">📋 다음 자금 대기</p>
+                  {upcomingItems.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
                       {upcomingItems.map(c => (
                         <OpsCard
@@ -1772,8 +1776,10 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
                         />
                       ))}
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <p className="text-[10px] text-gray-300 italic">없음</p>
+                  )}
+                </div>
               </div>
             )}
           </div>
