@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { contractWeight } from '@/lib/supplyRules'
+import { contractWeight, calcRecommendedSupply } from '@/lib/supplyRules'
 
 // ── 타입 ──────────────────────────────────────────────────────────────────────
 interface EmployeeRow {
@@ -29,6 +29,11 @@ interface OtherCost {
 
 // ── 상수 ──────────────────────────────────────────────────────────────────────
 const TESTER = 'TESTER'
+
+// 직책 제거 이름 정규화 (예: "손제후 수석팀장" → "손제후")
+function cleanName(s: string): string {
+  return s.replace(/\s*(수석팀장|팀장|팀원|대리|과장|부장|차장|이사|수석|매니저|주임|사원).*/g, '').trim()
+}
 
 // ── 헬퍼 ──────────────────────────────────────────────────────────────────────
 function todayStr() { return new Date().toISOString().slice(0, 10) }
@@ -150,9 +155,9 @@ function EmpCard({
   const totalRate   = (supplyCount + directCount) > 0
     ? ((supplyPayment + directPayment) / (supplyCount + directCount) * 100) : null
   const needed      = Number(row.target) - total
-  const supplyNeeded = supplyRate && supplyRate > 0 && needed > 0
-    ? Math.round(needed / (supplyRate / 100) * 100) / 100
-    : null
+  // 공급예정: 공급기준표 기반 일일권장 × 잔여영업일
+  const dailyRec    = supplyRate !== null ? calcRecommendedSupply(supplyRate, we) : 0
+  const supplyNeeded = dailyRec > 0 ? dailyRec * (tw - we) : null
 
   const status     = we > 0 && tw > 0 ? (total / we >= Number(row.target) / tw ? 'GOOD' : 'BAD') : '-'
   const score      = calcScore(total, we, Number(row.target), tw)
@@ -280,11 +285,12 @@ function EmpCard({
           <p className="text-[9px] text-teal-600">총결제율</p>
           <p className="text-sm font-black text-teal-700">{fmtPct(totalRate)}</p>
         </div>
-        <div className="bg-amber-50 rounded-xl py-2 text-center">
-          <p className="text-[9px] text-amber-600">공급예정</p>
-          <p className="text-sm font-black text-amber-700">
-            {supplyNeeded !== null ? supplyNeeded.toFixed(2) + '개' : '—'}
+        <div className={`rounded-xl py-2 text-center ${dailyRec === 0 && supplyRate !== null ? 'bg-red-50' : 'bg-amber-50'}`}>
+          <p className={`text-[9px] ${dailyRec === 0 && supplyRate !== null ? 'text-red-500' : 'text-amber-600'}`}>공급예정</p>
+          <p className={`text-sm font-black ${dailyRec === 0 && supplyRate !== null ? 'text-red-600' : 'text-amber-700'}`}>
+            {supplyRate === null ? '—' : dailyRec === 0 ? '공급중단' : `${supplyNeeded}개`}
           </p>
+          {dailyRec > 0 && <p className="text-[8px] text-amber-400">{dailyRec}개/일×{tw-we}일</p>}
         </div>
         <div className={`rounded-xl py-2 text-center ${needed > 0 ? 'bg-rose-50' : 'bg-gray-100'}`}>
           <p className={`text-[9px] ${needed > 0 ? 'text-rose-400' : 'text-gray-400'}`}>목표까지</p>
@@ -407,7 +413,7 @@ function PayRateSubView() {
         setAutoStats(stats)
         setPaymentCount(stats.reduce((s, v) => s + v.contracted, 0))
 
-        // 인별 자동 집계
+        // 인별 자동 집계 (직책 포함/미포함 이름 모두 지원)
         const allNames = new Set([
           ...Object.keys(supplyPayMap),
           ...Object.keys(directPayMap),
@@ -415,10 +421,12 @@ function PayRateSubView() {
         ])
         const aMap: Record<string, AutoEmpData> = {}
         allNames.forEach(n => {
-          aMap[n] = {
-            supply_payment: supplyPayMap[n]  || 0,
-            direct_count:   directCntMap[n]  || 0,
-            direct_payment: directPayMap[n]  || 0,
+          const clean = cleanName(n)
+          const key   = clean // 정규화된 이름으로 저장
+          aMap[key] = {
+            supply_payment: (supplyPayMap[n]  || 0) + (aMap[key]?.supply_payment || 0),
+            direct_count:   (directCntMap[n]  || 0) + (aMap[key]?.direct_count   || 0),
+            direct_payment: (directPayMap[n]  || 0) + (aMap[key]?.direct_payment  || 0),
           }
         })
         setAutoByPerson(aMap)
@@ -428,7 +436,20 @@ function PayRateSubView() {
           const r = payJson.record
           setTargetCount(r.target_count ?? 0)
           const saved = (r.employee_details || []).filter((e: EmployeeRow) => e.name !== TESTER)
-          setEmployees(saved.length > 0 ? saved : people.map(mkRow))
+          const baseRows = saved.length > 0 ? saved : people.map(mkRow)
+          // ★ auto-sync: DB에 저장된 값과 자동집계값 비교 → 자동집계가 더 크면 덮어씀
+          const synced = baseRows.map((row: EmployeeRow) => {
+            const key  = cleanName(row.name)
+            const auto = aMap[key]
+            if (!auto) return row
+            return {
+              ...row,
+              supply_payment: Math.max(Number(row.supply_payment), auto.supply_payment),
+              direct_count:   Math.max(Number(row.direct_count),   auto.direct_count),
+              direct_payment: Math.max(Number(row.direct_payment), auto.direct_payment),
+            }
+          })
+          setEmployees(synced)
         } else {
           // DB 레코드 없으면 localStorage 폴백 시도
           try {
@@ -438,7 +459,19 @@ function PayRateSubView() {
               const d = JSON.parse(draft)
               if (d.target_count !== undefined) setTargetCount(d.target_count)
               const lsSaved = (d.employee_details || []).filter((e: EmployeeRow) => e.name !== TESTER)
-              setEmployees(lsSaved.length > 0 ? lsSaved : people.map(mkRow))
+              const baseRows = lsSaved.length > 0 ? lsSaved : people.map(mkRow)
+              const synced = baseRows.map((row: EmployeeRow) => {
+                const key  = cleanName(row.name)
+                const auto = aMap[key]
+                if (!auto) return row
+                return {
+                  ...row,
+                  supply_payment: Math.max(Number(row.supply_payment), auto.supply_payment),
+                  direct_count:   Math.max(Number(row.direct_count),   auto.direct_count),
+                  direct_payment: Math.max(Number(row.direct_payment), auto.direct_payment),
+                }
+              })
+              setEmployees(synced)
             } else {
               setEmployees(people.map(mkRow))
             }
@@ -620,7 +653,7 @@ function PayRateSubView() {
             <EmpCard
               key={i} row={row} idx={i} we={we} tw={tw}
               onChange={updateEmp} onRemove={removeEmp}
-              autoData={autoByPerson[row.name] || { supply_payment: 0, direct_count: 0, direct_payment: 0 }}
+              autoData={autoByPerson[cleanName(row.name)] || autoByPerson[row.name] || { supply_payment: 0, direct_count: 0, direct_payment: 0 }}
             />
           ))}
         </div>

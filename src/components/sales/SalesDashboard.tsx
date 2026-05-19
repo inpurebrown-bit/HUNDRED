@@ -926,9 +926,11 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               const supRate   = supCnt > 0    ? (supPay / supCnt * 100) : null
               const dirRate   = dirCnt > 0    ? (dirPay / dirCnt * 100) : null
               const totRate   = (supCnt + dirCnt) > 0 ? (total / (supCnt + dirCnt) * 100) : null
-              const needed    = target - total
-              const supNeeded = supRate && supRate > 0 && needed > 0
-                ? Math.round(needed / (supRate / 100) * 100) / 100 : null
+              const needed      = target - total
+              // 공급예정: 공급기준표 기반 일일권장 × 잔여영업일
+              const dailyRec    = supRate !== null ? calcRecommendedSupply(supRate, bizElapsed) : 0
+              const supNeeded   = dailyRec > 0 ? dailyRec * bizRemaining : null
+              const supStopped  = supRate !== null && dailyRec === 0
               const achievePct = target > 0 ? Math.round(total / target * 100) : 0
               const fmtV = (v: number) => v % 1 === 0 ? String(v) : v.toFixed(1)
               const fmtP = (v: number | null) => v !== null ? v.toFixed(1) + '%' : '—'
@@ -976,11 +978,12 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                       <p className="text-[9px] text-gray-400 mb-0.5">총결제율</p>
                       <p className="text-xl font-black text-teal-700">{fmtP(totRate)}</p>
                     </div>
-                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-2.5">
-                      <p className="text-[9px] text-gray-400 mb-0.5">공급예정</p>
-                      <p className="text-xl font-black text-amber-700">
-                        {supNeeded !== null ? supNeeded.toFixed(2) + '개' : '—'}
+                    <div className={`border rounded-xl p-2.5 ${supStopped ? 'bg-red-50 border-red-100' : 'bg-amber-50 border-amber-100'}`}>
+                      <p className={`text-[9px] mb-0.5 ${supStopped ? 'text-red-400' : 'text-gray-400'}`}>공급예정</p>
+                      <p className={`text-xl font-black ${supStopped ? 'text-red-600' : 'text-amber-700'}`}>
+                        {supRate === null ? '—' : supStopped ? '공급중단' : `${supNeeded}개`}
                       </p>
+                      {dailyRec > 0 && <p className="text-[8px] text-amber-400">{dailyRec}개/일×{bizRemaining}일</p>}
                     </div>
                   </div>
                   {/* 목표 달성 바 */}
