@@ -518,13 +518,14 @@ function UnknownOwnerCleanup({
   )
 }
 
-type StatusKey = 'lead' | 'db010' | 'contracted' | 'emotional' | 'trash'
+type StatusKey = 'all' | 'lead' | 'db010' | 'contracted' | 'emotional' | 'trash'
 
 const STATUS_TABS = [
-  { key: 'lead' as StatusKey,       label: '고객 DB',   color: 'text-sky-600',     bg: 'bg-sky-500' },
-  { key: 'db010' as StatusKey,      label: '010 DB',    color: 'text-violet-600',  bg: 'bg-violet-500' },
-  { key: 'contracted' as StatusKey, label: '계약 업체', color: 'text-emerald-600', bg: 'bg-emerald-500' },
-  { key: 'emotional' as StatusKey,  label: '감성톡(거절업체)',    color: 'text-pink-600',    bg: 'bg-pink-500' },
+  { key: 'all' as StatusKey,        label: '전체DB',    color: 'text-gray-600',    bg: 'bg-gray-500' },
+  { key: 'db010' as StatusKey,      label: '직가DB',    color: 'text-violet-600',  bg: 'bg-violet-500' },
+  { key: 'lead' as StatusKey,       label: '공급DB',    color: 'text-sky-600',     bg: 'bg-sky-500' },
+  { key: 'contracted' as StatusKey, label: '계약업체',  color: 'text-emerald-600', bg: 'bg-emerald-500' },
+  { key: 'emotional' as StatusKey,  label: '거절업체',  color: 'text-pink-600',    bg: 'bg-pink-500' },
   { key: 'trash' as StatusKey,      label: '자체거절',  color: 'text-gray-500',    bg: 'bg-gray-400' },
 ]
 
@@ -544,7 +545,7 @@ export default function SalesCeoTab() {
   const [ceoView, setCeoView] = useState<CeoView>('customers')
   const [supplyBannerDismissed, setSupplyBannerDismissed] = useState(false)
   const [personTab, setPersonTab] = useState<string>('all')
-  const [statusTab, setStatusTab] = useState<StatusKey>('lead')
+  const [statusTab, setStatusTab] = useState<StatusKey>('all')
   const [inspDetail, setInspDetail] = useState<Customer | null>(null)
   const [opsUsers, setOpsUsers] = useState<string[]>([])
   const [supplyConfig, setSupplyConfig] = useState<SupplyConfig>({})
@@ -634,8 +635,21 @@ export default function SalesCeoTab() {
   }, [customers, personTab])
 
   const statusCustomers = useMemo(() => {
-    if (statusTab === 'lead') return personCustomers.filter(c => ['lead', 'consulting'].includes(c.status))
-    return personCustomers.filter(c => c.status === statusTab)
+    let list: Customer[]
+    if (statusTab === 'all') {
+      list = personCustomers
+    } else if (statusTab === 'lead') {
+      list = personCustomers.filter(c => ['lead', 'consulting'].includes(c.status))
+    } else {
+      list = personCustomers.filter(c => c.status === statusTab)
+    }
+    // 전체DB 탭은 최신 등록순(created_at 내림차순) 정렬
+    if (statusTab === 'all') {
+      return [...list].sort((a, b) =>
+        ((b as any).created_at || '').localeCompare((a as any).created_at || '')
+      )
+    }
+    return list
   }, [personCustomers, statusTab])
 
   // 심사요청 대기 중인 업체
@@ -772,6 +786,7 @@ export default function SalesCeoTab() {
   }, [salesPeople, supplyConfig, customers, thisMonthStr, bizElapsed])
 
   const counts = useMemo(() => ({
+    all:        personCustomers.length,
     lead:       personCustomers.filter(c => ['lead', 'consulting'].includes(c.status)).length,
     db010:      personCustomers.filter(c => c.status === 'db010').length,
     contracted: personCustomers.filter(c => c.status === 'contracted').length,
@@ -1471,11 +1486,18 @@ export default function SalesCeoTab() {
                   personTab === p.name ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
                 )}>{p.total}</span>
               </div>
-              <div className={"flex gap-2 mt-1.5 text-[10px] " + (personTab === p.name ? 'text-white/70' : 'text-gray-400')}>
-                <span>매출 <b className={personTab === p.name ? 'text-[#C5A258]' : 'text-emerald-600'}>{fmtWon(p.revenue)}</b></span>
-                <span>·</span>
-                <span>계약 {p.contracted % 1 === 0 ? p.contracted : p.contracted.toFixed(1)}</span>
-              </div>
+              {(() => {
+                const tm = personThisMonth.find(m => m.name === p.name)
+                const tmRevenue = tm?.revenue || 0
+                const tmCount = tm?.count || 0
+                return (
+                  <div className={"flex gap-2 mt-1.5 text-[10px] " + (personTab === p.name ? 'text-white/70' : 'text-gray-400')}>
+                    <span>이번달 매출 <b className={personTab === p.name ? 'text-[#C5A258]' : 'text-emerald-600'}>{fmtWon(tmRevenue)}</b></span>
+                    <span>·</span>
+                    <span>계약 {tmCount % 1 === 0 ? tmCount : tmCount.toFixed(1)}</span>
+                  </div>
+                )
+              })()}
             </button>
           ))}
         </div>
@@ -1510,7 +1532,7 @@ export default function SalesCeoTab() {
         <InCallTableView
           customers={statusCustomers}
           allCustomers={customers}
-          tabType={statusTab}
+          tabType={statusTab === 'all' ? 'lead' : statusTab}
           salesUsers={salesPeople}
           opsUsers={opsUsers}
           userName="ceo"
