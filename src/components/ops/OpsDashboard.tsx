@@ -1683,11 +1683,20 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
     )
   }
 
+  // 다음 자금 대기 단계 (서류받는중 / 검토중)
+  const UPCOMING_KEYS = new Set(['서류받는중', '검토중'])
+
   return (
     <div className="space-y-4">
       {instGroups.map(({ inst, items }) => {
         const isIndirect = INDIRECT_SET.has(inst)
         const isOpen = !collapsed[inst]
+        const isSpecial = inst === '신규 유입' || inst === '⏳ 대표 승인 대기' || inst === '🔧 핸들링' || inst === '🔒 홀딩'
+
+        // 기관 그룹만 진행/대기 분리 (특수 그룹 제외)
+        const activeItems   = isSpecial ? items : items.filter(c => !UPCOMING_KEYS.has(c.progress_stage))
+        const upcomingItems = isSpecial ? []    : items.filter(c =>  UPCOMING_KEYS.has(c.progress_stage))
+
         return (
           <div key={inst}>
             {/* 기관 헤더 */}
@@ -1707,24 +1716,55 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
                           : 'bg-[#1B2A45] hover:bg-[#1B2A45]/90'
               }`}
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-white font-bold text-sm">{inst}</span>
-                <span className="bg-[#C5A258] text-white text-xs font-bold px-2 py-0.5 rounded-full">{items.length}</span>
+                {/* 진행 건수 */}
+                <span className="bg-[#C5A258] text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                  진행 {activeItems.length}
+                </span>
+                {/* 다음 자금 대기 건수 */}
+                {upcomingItems.length > 0 && (
+                  <span className="bg-gray-400 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                    대기 {upcomingItems.length}
+                  </span>
+                )}
                 {isIndirect && <span className="text-white/60 text-[10px]">간접자금</span>}
               </div>
               <span className="text-white/60 text-xs">{isOpen ? '▲' : '▼'}</span>
             </button>
             {isOpen && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
-                {items.map(c => (
-                  <OpsCard
-                    key={`${inst}-${c.id}`}
-                    c={c}
-                    isOpen={openPanelIds.includes(c.id)}
-                    onToggle={onToggle}
-                    onScriptToggle={onScriptToggle}
-                  />
-                ))}
+              <div className="flex gap-3 items-start">
+                {/* 진행 중 카드 */}
+                {activeItems.length > 0 && (
+                  <div className="flex-1 min-w-0 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-2">
+                    {activeItems.map(c => (
+                      <OpsCard
+                        key={`${inst}-${c.id}`}
+                        c={c}
+                        isOpen={openPanelIds.includes(c.id)}
+                        onToggle={onToggle}
+                        onScriptToggle={onScriptToggle}
+                      />
+                    ))}
+                  </div>
+                )}
+                {/* 다음 자금 대기 */}
+                {upcomingItems.length > 0 && (
+                  <div className="shrink-0 w-[120px] sm:w-[160px] border-l-2 border-dashed border-gray-200 pl-3">
+                    <p className="text-[9px] font-bold text-gray-400 mb-1.5 uppercase tracking-wide">📋 다음 자금 대기</p>
+                    <div className="flex flex-col gap-1.5">
+                      {upcomingItems.map(c => (
+                        <OpsCard
+                          key={`${inst}-upcoming-${c.id}`}
+                          c={c}
+                          isOpen={openPanelIds.includes(c.id)}
+                          onToggle={onToggle}
+                          onScriptToggle={onScriptToggle}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
