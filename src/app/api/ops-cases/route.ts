@@ -16,9 +16,11 @@ import { supabaseAdmin } from '@/lib/supabase'
  *   progress_stage = stage
  *   progress_memo  = memo
  */
+function normPhone(p: string): string { return (p || '').replace(/[^0-9]/g, '') }
+
 function normalize(c: any, customerMap: Record<string, any> = {}, customerIdMap: Record<string, any> = {}) {
-  // customers 테이블에서 전화번호 또는 customer_id로 매칭된 고객 데이터
-  const cust = customerMap[c.phone] || customerIdMap[c.customer_id] || null
+  // customers 테이블에서 전화번호(원본 or 하이픈제거) 또는 customer_id로 매칭된 고객 데이터
+  const cust = customerMap[c.phone] || customerMap[normPhone(c.phone)] || customerIdMap[c.customer_id] || null
   const custDetails = cust?.details || {}
 
   // sales_customer_info: ops_case.details에 저장된 값 OR customers 테이블 실시간 데이터
@@ -133,6 +135,8 @@ export async function GET(req: NextRequest) {
     if (custData) {
       for (const c of custData) {
         if (c.phone && !customerMap[c.phone]) customerMap[c.phone] = c
+        const norm = normPhone(c.phone)
+        if (norm && !customerMap[norm]) customerMap[norm] = c
       }
     }
   }

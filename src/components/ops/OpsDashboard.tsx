@@ -23,6 +23,21 @@ function fmt(n: number) {
   if (n >= 10_000) return Math.round(n / 10_000) + '만'
   return n.toLocaleString()
 }
+/** 전화번호 하이픈 포맷: 01012345678 → 010-1234-5678 */
+function formatPhone(v: string): string {
+  if (!v) return ''
+  const d = v.replace(/[^0-9]/g, '')
+  if (d.length === 11) return `${d.slice(0,3)}-${d.slice(3,7)}-${d.slice(7)}`
+  if (d.length === 10) return `${d.slice(0,3)}-${d.slice(3,6)}-${d.slice(6)}`
+  return v
+}
+/** 전화번호 입력 자동 하이픈: 타이핑 중에도 실시간 포맷 */
+function autoHyphenPhone(v: string): string {
+  const d = v.replace(/[^0-9]/g, '').slice(0, 11)
+  if (d.length <= 3) return d
+  if (d.length <= 7) return `${d.slice(0,3)}-${d.slice(3)}`
+  return `${d.slice(0,3)}-${d.slice(3,7)}-${d.slice(7)}`
+}
 
 // ── Types ──────────────────────────────────────────────────────────────
 export interface OpsCase {
@@ -900,7 +915,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                 title: '기업 기본정보', bg: 'bg-[#1B2A45]', textColor: 'text-white',
                 fields: [
                   [['업체명', 'company', gv('company', cd.company || local.customers?.company || local.customers?.name || '')], ['담당자', 'sales_user_name', gv('sales_user_name', cd.sales_user_name || '')]],
-                  [['대표자', 'representative', gv('representative', local.customers?.name || '')], ['연락처', 'phone', gv('phone', local.customers?.phone || '')]],
+                  [['대표자', 'representative', gv('representative', local.customers?.name || '')], ['연락처', 'phone', gv('phone', formatPhone(local.customers?.phone || ''))]],
                   [['지역', 'region', gv('region', cd.region || '')], ['접수일', 'reception_date', gv('reception_date', cd.reception_date || (cd.created_at ? formatKST(cd.created_at).date : ''))]],
                   [['업종', 'business_type', gv('business_type', cd.business_type || '')], ['실제업무', 'real_work', gv('real_work', cd.real_work || '')]],
                   [['업력', 'years_in_business', gv('years_in_business', cd.years_in_business || cd.biz_size || '')], ['직원수', 'employee_count', gv('employee_count', cd.employee_count || '')]],
@@ -958,14 +973,14 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                               {incallEditing ? (
                                 <input
                                   type="text"
-                                  value={val}
-                                  onChange={e => incallField(k, e.target.value)}
-                                  placeholder="—"
+                                  value={k === 'phone' ? autoHyphenPhone(val) : val}
+                                  onChange={e => incallField(k, k === 'phone' ? autoHyphenPhone(e.target.value) : e.target.value)}
+                                  placeholder={k === 'phone' ? '010-0000-0000' : '—'}
                                   className="flex-1 text-xs font-semibold text-[#1B2A45] bg-transparent border-b border-violet-300 focus:outline-none focus:border-violet-500 px-0.5 py-0"
                                 />
                               ) : (
                                 <span className={`flex-1 text-xs font-semibold ${val ? 'text-[#1B2A45]' : 'text-gray-300'}`}>
-                                  {val || '—'}
+                                  {k === 'phone' ? (val ? formatPhone(val) : '—') : (val || '—')}
                                 </span>
                               )}
                             </div>
@@ -1266,7 +1281,7 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
         <p className="text-[10px] text-gray-400 mt-0.5">{c.customers?.name}</p>
       )}
       {/* 전화번호 */}
-      <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{c.customers?.phone}</p>
+      <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{formatPhone(c.customers?.phone || '')}</p>
 
       {/* 기관 (선택된 것 항상 표시) */}
       {allInstitutions.length > 0 && (
@@ -1361,7 +1376,7 @@ function CaseListRow({ c, onToggle, isOpen }: { c: OpsCase; onToggle: (id: strin
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-semibold text-[#1B2A45] text-sm" style={{ wordBreak: 'break-all' }}>{companyName}</span>
           <span className="text-xs text-gray-400">{c.customers?.name}</span>
-          <span className="text-[10px] text-gray-400 font-mono">{c.customers?.phone}</span>
+          <span className="text-[10px] text-gray-400 font-mono">{formatPhone(c.customers?.phone || '')}</span>
         </div>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           {c.institution && <span className="text-[10px] text-gray-500">🏦 {c.institution}</span>}
@@ -2086,7 +2101,7 @@ function OpsContractTab({ userName }: { userName: string }) {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-[#1B2A45] text-sm" style={{ wordBreak: 'break-all' }}>{companyName}</span>
                     <span className="text-xs text-gray-400">{c.customers?.name}</span>
-                    <span className="text-[10px] text-gray-400">{c.customers?.phone}</span>
+                    <span className="text-[10px] text-gray-400">{formatPhone(c.customers?.phone || '')}</span>
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
                     {c.details?.contract_date && <span className="text-[10px] text-gray-400">계약일: {c.details.contract_date}</span>}
@@ -3015,7 +3030,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
             <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-3 flex items-center justify-between z-10">
               <div>
                 <p className="font-bold text-[#1B2A45] text-sm">{c.customers?.details?.company || c.customers?.name}</p>
-                <p className="text-[10px] text-gray-400">{c.customers?.name} · {c.customers?.phone}</p>
+                <p className="text-[10px] text-gray-400">{c.customers?.name} · {formatPhone(c.customers?.phone || '')}</p>
               </div>
               <button onClick={() => closePanel(id)} className="text-gray-400 hover:text-gray-600 text-xl leading-none px-1">✕</button>
             </div>
