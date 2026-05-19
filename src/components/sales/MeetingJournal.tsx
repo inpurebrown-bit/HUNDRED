@@ -137,10 +137,10 @@ export default function MeetingJournal({ customer, onClose }: MeetingJournalProp
               </button>
             </div>
           </div>
-          {/* 미리보기 본문: 9px 기준 */}
+          {/* 미리보기 본문 */}
           <div style={{ padding: '14px 18px', overflowX: 'auto' }}>
             <div style={{ fontSize: 9, lineHeight: 1.4 }}>
-              <JournalBody {...sharedProps} cellPad="3px 4px" />
+              <JournalBody {...sharedProps} cellPad="3px 4px" isPrint={false} />
             </div>
           </div>
         </div>
@@ -154,11 +154,11 @@ export default function MeetingJournal({ customer, onClose }: MeetingJournalProp
             fontFamily: '"Malgun Gothic","Apple SD Gothic Neo",sans-serif',
             background: '#fff',
             padding: '0 2px',
-            fontSize: 7,      /* 7px = ~5.25pt (compact for one page) */
-            lineHeight: 1.3,
+            fontSize: 9,
+            lineHeight: 1.35,
           }}
         >
-          <JournalBody {...sharedProps} cellPad="1.5px 2.5px" />
+          <JournalBody {...sharedProps} cellPad="2.5px 4px" isPrint={true} />
         </div>,
         document.body
       )}
@@ -191,15 +191,19 @@ interface BodyProps {
   corpType: string
   customer: { notes?: string }
   cellPad: string
+  isPrint?: boolean
 }
 
-function JournalBody({ d, company, name, phone, dateStr, corpType, customer, cellPad }: BodyProps) {
+function JournalBody({ d, company, name, phone, dateStr, corpType, customer, cellPad, isPrint = false }: BodyProps) {
   const cp = cellPad   // shorthand
   const th = (bg: string, bc: string, extra: CS = {}) => TH(bg, bc, { padding: cp, ...extra })
   const td = (bc: string, extra: CS = {}) => TD(bc, { padding: cp, ...extra })
 
   return (
-    <div style={{ fontFamily: 'inherit' }}>
+    <div style={{
+      fontFamily: 'inherit',
+      ...(isPrint ? { display: 'flex', flexDirection: 'column', minHeight: 'calc(297mm - 12mm)' } : {}),
+    }}>
       {/* ── 헤더 ── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
         <img src="/images/logo.png" alt="HUNDRED" style={{ height: 32, objectFit: 'contain' }} />
@@ -483,28 +487,39 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, customer, cel
             <td style={td(PB)} colSpan={4}><Blank w={50} /></td>
           </tr>
 
-          {/* ━━━━━━━━━━ 미팅 메모 (인콜 내용 반영) ━━━━━━━━━━ */}
-          {(d.innovation || d.result_memo || customer.notes) && (
-            <tr>
-              <td style={th(G, GB)} colSpan={2}>미팅 메모</td>
-              <td style={td(GB, { whiteSpace: 'pre-wrap', verticalAlign: 'top', minHeight: 28 })} colSpan={11}>
-                {d.innovation && <div><span style={{ fontWeight: 700, color: '#6d28d9' }}>혁신요건: </span>{d.innovation}</div>}
-                {(d.result_memo || customer.notes) && <div>{d.result_memo || customer.notes}</div>}
-              </td>
-            </tr>
-          )}
-
         </tbody>
       </table>
 
-      {/* 서명란 */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 28, marginTop: 8 }}>
-        {['작성자', '확인자'].map(label => (
-          <div key={label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-            <span style={{ fontSize: '0.9em', color: '#666', fontWeight: 700 }}>{label}</span>
-            <div style={{ border: '1px solid #aaa', width: 62, height: 40, borderRadius: 3 }} />
+      {/* ━━━━━━━━━━ 미팅 메모 (빈 필기란 — 페이지 하단 채움) ━━━━━━━━━━ */}
+      <div style={{
+        border: `1px solid ${GB}`,
+        marginTop: -1,       /* 테이블 하단 테두리와 연결 */
+        padding: '4px 6px',
+        ...(isPrint
+          ? { flex: 1, display: 'flex', flexDirection: 'column' }
+          : { minHeight: 80 }),
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <span style={{ fontWeight: 700, fontSize: '1em', color: '#1a2a40' }}>미팅 메모</span>
+          {/* 서명란을 메모 헤더 오른쪽에 배치 */}
+          <div style={{ display: 'flex', gap: 20 }}>
+            {['작성자', '확인자'].map(label => (
+              <div key={label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <span style={{ fontSize: '0.85em', color: '#666', fontWeight: 700 }}>{label}</span>
+                <div style={{ border: '1px solid #aaa', width: 55, height: 32, borderRadius: 3 }} />
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
+        {/* 필기용 줄 — isPrint면 flex:1 로 남은 공간 전부 사용 */}
+        <div style={{ ...(isPrint ? { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-around' } : {}) }}>
+          {Array.from({ length: isPrint ? 14 : 5 }).map((_, i) => (
+            <div key={i} style={{
+              borderBottom: '1px solid #ddd',
+              ...(isPrint ? { flex: 1, maxHeight: '8mm', minHeight: '5mm' } : { height: 16, marginBottom: 3 }),
+            }} />
+          ))}
+        </div>
       </div>
     </div>
   )
