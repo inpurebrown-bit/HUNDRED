@@ -1215,6 +1215,14 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
               <div className="flex-1 h-px bg-gray-100" />
             </div>
 
+            {/* 환불없이 계약 뱃지 (영업팀이 체크한 경우) */}
+            {(local.customers?.details?.no_refund || d.no_refund) && (
+              <div className="mb-2 inline-flex items-center gap-1.5 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">
+                <span className="text-red-500 text-sm">🚫</span>
+                <span className="text-xs font-bold text-red-700">환불없이 계약</span>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-x-2 gap-y-2">
               <div><label className={lbl}>계약금(VAT포함)</label><input type="text" value={d.contract_amount_vat || ''} onChange={e => detailField('contract_amount_vat', e.target.value)} className={inp} placeholder="0원" /></div>
               <div><label className={lbl}>입금액(VAT포함)</label><input type="text" value={d.deposit_amount_vat || ''} onChange={e => detailField('deposit_amount_vat', e.target.value)} className={inp} placeholder="0원" /></div>
@@ -1233,7 +1241,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
           <div>
             <label className={lbl}>결제방식</label>
             <div className="flex gap-2 mt-1">
-              {[{ key: 'has_invoice', label: '계산서' }, { key: 'has_cash', label: '현금' }, { key: 'has_card', label: '카드' }].map(opt => (
+              {[{ key: 'has_cash', label: '현금' }, { key: 'has_card', label: '카드' }].map(opt => (
                 <button key={opt.key} type="button" onClick={() => toggleDetail(opt.key)}
                   className={`px-3 py-1 rounded text-xs font-medium border transition-colors ${
                     d[opt.key] ? 'bg-violet-500 text-white border-violet-500' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'

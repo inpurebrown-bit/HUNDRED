@@ -372,6 +372,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             payment_amount:   anyDetails.payment_amount  || '',
             unpaid_amount:    anyDetails.unpaid_amount   || '',
             tax_invoice:      anyDetails.tax_invoice     || '',
+            no_refund:        anyDetails.no_refund       || false,
           }
         },
       }),
