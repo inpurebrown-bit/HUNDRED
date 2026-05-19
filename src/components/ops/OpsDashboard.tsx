@@ -265,6 +265,7 @@ function TimelineSection({ initialTimeline, onSchedule, userName }: {
       ) : (
         <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
           {[...tl].reverse().map((entry: any, i: number) => {
+            const realIdx = tl.length - 1 - i
             const isSales = entry.source === 'sales'
             const isAuto  = entry.user === '자동기록'
             const kst = formatKST(entry.created_at || entry.date || '')
@@ -275,7 +276,7 @@ function TimelineSection({ initialTimeline, onSchedule, userName }: {
             const nameColor = isSales ? 'text-violet-600' : isAuto ? 'text-violet-400' : 'text-[#1B2A45]'
             const avatarLabel = isSales ? '영' : (user ? user.slice(-2) : '관')
             return (
-              <div key={i} className={`flex gap-2 items-start rounded-lg px-2 py-1.5 ${bg}`}>
+              <div key={i} className={`flex gap-2 items-start rounded-lg px-2 py-1.5 ${bg} group`}>
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0 ${avatarBg}`}>
                   {avatarLabel}
                 </div>
@@ -287,6 +288,16 @@ function TimelineSection({ initialTimeline, onSchedule, userName }: {
                   </div>
                   <p className="text-xs text-gray-700 mt-0.5">{content}</p>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updated = tl.filter((_: any, idx: number) => idx !== realIdx)
+                    setTl(updated)
+                    onSchedule({ timeline: updated })
+                  }}
+                  className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-xs shrink-0 px-1 py-0.5 rounded hover:bg-red-50"
+                  title="삭제"
+                >✕</button>
               </div>
             )
           })}
