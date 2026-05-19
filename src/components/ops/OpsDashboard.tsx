@@ -1683,8 +1683,16 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
     )
   }
 
-  // 다음 자금 대기 단계 (서류받는중 / 검토중 / 접수전)
-  const UPCOMING_KEYS = new Set(['서류받는중', '검토중', '접수전'])
+  // 다음 자금 대기 판별: 해당 기관(직접/간접)의 자금 진행단계가 대기 상태인지 확인
+  // 대기 조건: 미선택 / 서류받는중 / 접수전
+  const UPCOMING_STAGES = new Set(['', '미선택', '서류받는중', '접수전'])
+
+  function isUpcoming(c: OpsCase, inst: string): boolean {
+    const stage = INDIRECT_SET.has(inst)
+      ? (c.details?.indirect_stage || '')   // 간접자금 → indirect_stage 기준
+      : (c.details?.direct_stage   || '')   // 직접자금 → direct_stage 기준
+    return UPCOMING_STAGES.has(stage)
+  }
 
   return (
     <div className="space-y-4">
@@ -1694,8 +1702,9 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
         const isSpecial = inst === '신규 유입' || inst === '⏳ 대표 승인 대기' || inst === '🔧 핸들링' || inst === '🔒 홀딩'
 
         // 기관 그룹만 진행/대기 분리 (특수 그룹 제외)
-        const activeItems   = isSpecial ? items : items.filter(c => !UPCOMING_KEYS.has(c.progress_stage))
-        const upcomingItems = isSpecial ? []    : items.filter(c =>  UPCOMING_KEYS.has(c.progress_stage))
+        // 직접자금 탭 → direct_stage 기준, 간접자금 탭 → indirect_stage 기준
+        const activeItems   = isSpecial ? items : items.filter(c => !isUpcoming(c, inst))
+        const upcomingItems = isSpecial ? []    : items.filter(c =>  isUpcoming(c, inst))
 
         return (
           <div key={inst}>
