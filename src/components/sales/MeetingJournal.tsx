@@ -202,7 +202,11 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, customer, cel
   return (
     <div style={{
       fontFamily: 'inherit',
-      ...(isPrint ? { display: 'flex', flexDirection: 'column', minHeight: 'calc(297mm - 12mm)' } : {}),
+      ...(isPrint ? {
+        display: 'flex', flexDirection: 'column',
+        height: 'calc(297mm - 12mm)',   /* 정확히 A4 1페이지 — overflow 잘림 */
+        overflow: 'hidden',
+      } : {}),
     }}>
       {/* ── 헤더 ── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -513,10 +517,10 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, customer, cel
         </div>
         {/* 필기용 줄 — isPrint면 flex:1 로 남은 공간 전부 사용 */}
         <div style={{ ...(isPrint ? { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-around' } : {}) }}>
-          {Array.from({ length: isPrint ? 14 : 5 }).map((_, i) => (
+          {Array.from({ length: isPrint ? 8 : 5 }).map((_, i) => (
             <div key={i} style={{
               borderBottom: '1px solid #ddd',
-              ...(isPrint ? { flex: 1, maxHeight: '8mm', minHeight: '5mm' } : { height: 16, marginBottom: 3 }),
+              ...(isPrint ? { flex: 1, maxHeight: '6mm', minHeight: '3mm' } : { height: 16, marginBottom: 3 }),
             }} />
           ))}
         </div>
