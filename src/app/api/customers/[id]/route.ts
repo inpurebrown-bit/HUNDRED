@@ -178,9 +178,14 @@ export async function DELETE(req: NextRequest, context: { params: Promise<{ id: 
 
   // 영업팀·관리팀은 soft-delete(trash 상태)만 허용 — 대표만 진짜 삭제 가능
   if (user.role !== 'ceo') {
+    // ⚡ sub_status도 반드시 'trash'로 업데이트해야 normalizeCustomer가 올바르게 'trash'로 인식
+    const existingDetails = existing ? (existing as any).details || {} : {}
     const { error: patchErr } = await supabaseAdmin
       .from('customers')
-      .update({ status: 'trash' })
+      .update({
+        status: 'active',
+        details: { ...existingDetails, sub_status: 'trash' },
+      })
       .eq('id', id)
     if (patchErr) return NextResponse.json({ error: patchErr.message }, { status: 500 })
     return NextResponse.json({ ok: true })
