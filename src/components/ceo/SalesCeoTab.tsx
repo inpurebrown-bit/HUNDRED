@@ -542,6 +542,7 @@ export default function SalesCeoTab() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [ceoView, setCeoView] = useState<CeoView>('customers')
+  const [supplyBannerDismissed, setSupplyBannerDismissed] = useState(false)
   const [personTab, setPersonTab] = useState<string>('all')
   const [statusTab, setStatusTab] = useState<StatusKey>('lead')
   const [inspDetail, setInspDetail] = useState<Customer | null>(null)
@@ -1404,7 +1405,7 @@ export default function SalesCeoTab() {
       </div>
 
       {/* ── A/S 승인 → 공급 DB 보충 알림 배너 ── */}
-      {asApprovedList.length > 0 && (
+      {asApprovedList.length > 0 && !supplyBannerDismissed && (
         <div className="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 flex items-center gap-3">
           <span className="text-xl">⚠️</span>
           <div className="flex-1">
@@ -1417,6 +1418,14 @@ export default function SalesCeoTab() {
             className="text-xs bg-amber-500 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-amber-600 transition-colors"
           >
             A/S 확인
+          </button>
+          <button
+            type="button"
+            onClick={() => setSupplyBannerDismissed(true)}
+            className="text-gray-400 hover:text-gray-600 text-lg leading-none px-1"
+            title="닫기"
+          >
+            ✕
           </button>
         </div>
       )}
@@ -1472,15 +1481,7 @@ export default function SalesCeoTab() {
         </div>
       </div>
 
-      {/* ── 이름 불일치 데이터 정리 배너 ── */}
-      {unknownOwners.length > 0 && (
-        <UnknownOwnerCleanup
-          unknownOwners={unknownOwners}
-          officialUsers={officialSalesUsers}
-          customers={customers}
-          onReassignDone={(updatedCustomers) => setCustomers(updatedCustomers)}
-        />
-      )}
+      {/* 등록되지 않은 담당자 배너 제거됨 */}
 
       {/* ── 상태 탭 ── */}
       <div className="flex gap-1.5 flex-wrap">

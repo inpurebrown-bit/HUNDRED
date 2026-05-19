@@ -15,6 +15,7 @@ export interface CustomerDetails {
   years_in_business?: string
   employee_count?: string
   loan_policy?: string
+  loan_kibo?: string
   loan_credit?: string
   revenue_2026?: string
   revenue_2025?: string
@@ -371,7 +372,7 @@ export default function CustomerCard({
               </div>
               <div>
                 <label className={lbl}>기대출(정책자금)</label>
-                <input type="text" value={details.loan_policy ?? ''} onChange={e => setDetailField('loan_policy', e.target.value)}
+                <input type="text" value={details.loan_kibo ?? details.loan_policy ?? ''} onChange={e => setDetailField('loan_kibo', e.target.value)}
                   className={inp} placeholder="소진공 5천" />
               </div>
               <div className="col-span-2">

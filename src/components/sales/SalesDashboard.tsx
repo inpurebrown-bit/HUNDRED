@@ -411,6 +411,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         business_type: rest.business_type,
         years_in_business: rest.years_in_business,
         employee_count: rest.employee_count,
+        loan_kibo: rest.loan_kibo || rest.loan_policy || '',
         loan_policy: rest.loan_policy,
         loan_credit: rest.loan_credit,
         revenue_2026: rest.revenue_2026,

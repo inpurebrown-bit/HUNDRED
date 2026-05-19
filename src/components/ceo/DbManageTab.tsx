@@ -162,7 +162,6 @@ export default function DbManageTab({ initialView = 'trash' }: { initialView?: '
         {[
           { key: 'trash' as const,     label: '🗑 거절 DB 쓰레기통' },
           { key: 'duplicate' as const, label: '♻️ 중복 DB 감지' },
-          { key: 'employees' as const, label: '👤 직원 관리' },
         ].map(v => (
           <button key={v.key} onClick={() => setView(v.key)}
             className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-colors ${

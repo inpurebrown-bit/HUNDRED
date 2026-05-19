@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { contractWeight } from '@/lib/supplyRules'
 
 // ── 타입 ──────────────────────────────────────────────────────────────────────
@@ -227,6 +227,8 @@ function PayRateSubView() {
 
   const mkRow = (name = ''): EmployeeRow => ({ name, target: 0, supply_count: 0, supply_payment: 0, direct_count: 0, direct_payment: 0 })
   const [employees, setEmployees] = useState<EmployeeRow[]>([])
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const latestState   = useRef({ targetCount, employees, paymentCount, we, tw })
 
   useEffect(() => {
     async function load() {
@@ -278,6 +280,43 @@ function PayRateSubView() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // latestState 항상 최신값 유지 (stale closure 방지)
+  useEffect(() => {
+    latestState.current = { targetCount, employees, paymentCount, we, tw }
+  }, [targetCount, employees, paymentCount, we, tw])
+
+  const doSave = useCallback(async (silent = false) => {
+    const s = latestState.current
+    if (!silent) { setSaving(true); setSaveMsg('') }
+    const res = await fetch('/api/payrate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date: today,
+        employee_count: s.employees.length,
+        target_count: s.targetCount,
+        payment_count: s.paymentCount,
+        working_days_elapsed: s.we,
+        total_working_days: s.tw,
+        employee_details: s.employees,
+      }),
+    })
+    const json = await res.json()
+    if (!silent) {
+      setSaveMsg(json.record ? '✅ 저장 완료' : '❌ 저장 실패')
+      setSaving(false)
+      setTimeout(() => setSaveMsg(''), 3000)
+    } else {
+      if (json.record) setSaveMsg('자동저장 ✓')
+      setTimeout(() => setSaveMsg(''), 2000)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [today])
+
+  function scheduleAutoSave() {
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = setTimeout(() => doSave(true), 2000)
+  }
+
   // 영업일 기준 계산
   const pc  = paymentCount, ec = employeeCount
   const remaining         = tw - we
@@ -290,25 +329,19 @@ function PayRateSubView() {
 
   function updateEmp(i: number, f: keyof EmployeeRow, v: number | string) {
     setEmployees(prev => { const n = [...prev]; n[i] = { ...n[i], [f]: f === 'name' ? v : Number(v) }; return n })
+    scheduleAutoSave()
   }
-  function removeEmp(i: number) { setEmployees(prev => prev.filter((_, idx) => idx !== i)) }
+  function removeEmp(i: number) {
+    setEmployees(prev => prev.filter((_, idx) => idx !== i))
+    scheduleAutoSave()
+  }
 
-  async function handleSave() {
-    setSaving(true); setSaveMsg('')
-    const res = await fetch('/api/payrate', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        date: today, employee_count: employeeCount,
-        target_count: targetCount, payment_count: paymentCount,
-        working_days_elapsed: we, total_working_days: tw,
-        employee_details: employees,
-      }),
-    })
-    const json = await res.json()
-    setSaveMsg(json.record ? '✅ 저장 완료' : '❌ 저장 실패')
-    setSaving(false)
-    setTimeout(() => setSaveMsg(''), 3000)
+  function setTargetCountAndSave(v: number) {
+    setTargetCount(v)
+    scheduleAutoSave()
   }
+
+  async function handleSave() { await doSave(false) }
 
   const totTarget  = employees.reduce((s, r) => s + Number(r.target), 0)
   const totSupply  = employees.reduce((s, r) => s + Number(r.supply_count), 0)
@@ -353,7 +386,7 @@ function PayRateSubView() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
           <NumInput label="인원수"   value={employeeCount} color="gray"     auto unit="명" />
-          <NumInput label="목표개수" value={targetCount}   color="editable" unit="개" onChange={v => setTargetCount(v)} />
+          <NumInput label="목표개수" value={targetCount}   color="editable" unit="개" onChange={v => setTargetCountAndSave(v)} />
           <NumInput label="결제개수" value={paymentCount % 1 === 0 ? paymentCount : Number(paymentCount.toFixed(1))}
             color="green" auto unit="개" />
           <div className="bg-slate-50 rounded-2xl px-3 py-2.5 flex flex-col items-center gap-0.5">

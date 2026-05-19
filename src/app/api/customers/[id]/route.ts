@@ -176,6 +176,16 @@ export async function DELETE(req: NextRequest, context: { params: Promise<{ id: 
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
 
+  // 영업팀·관리팀은 soft-delete(trash 상태)만 허용 — 대표만 진짜 삭제 가능
+  if (user.role !== 'ceo') {
+    const { error: patchErr } = await supabaseAdmin
+      .from('customers')
+      .update({ status: 'trash' })
+      .eq('id', id)
+    if (patchErr) return NextResponse.json({ error: patchErr.message }, { status: 500 })
+    return NextResponse.json({ ok: true })
+  }
+
   const { error } = await supabaseAdmin.from('customers').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })

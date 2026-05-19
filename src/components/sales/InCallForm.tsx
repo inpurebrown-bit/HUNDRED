@@ -16,6 +16,7 @@ export interface InCallData {
   years_in_business: string
   employee_count: string
   loan_policy: string
+  loan_kibo: string
   loan_credit: string
   revenue_2026: string
   revenue_2025: string
@@ -34,7 +35,7 @@ export function emptyInCallData(): InCallData {
     name: '', phone: '', company: '', corp_type: '', region: '',
     business_reg_no: '', assignee: '', reception_date: new Date().toISOString().slice(0, 10),
     business_type: '', years_in_business: '', employee_count: '',
-    loan_policy: '', loan_credit: '',
+    loan_policy: '', loan_kibo: '', loan_credit: '',
     revenue_2026: '', revenue_2025: '', revenue_2024: '', revenue_2023: '',
     credit_score: '', tax_delinquency: '', assets: '', required_funds: '',
     sensitivity: '', notes: '',
@@ -169,7 +170,7 @@ export default function InCallForm({ title, salesUsers, submitting, initialData,
           {/* 기대출 정책 · 기대출 신용/담보 */}
           <div className="col-span-2">
             <label className={lbl}>기대출 (정책자금)</label>
-            <input type="text" value={d.loan_policy} onChange={e => f('loan_policy', e.target.value)}
+            <input type="text" value={d.loan_kibo || d.loan_policy || ''} onChange={e => f('loan_kibo', e.target.value)}
               className={inp} placeholder="소진공 5천" />
           </div>
           <div className="col-span-2">
