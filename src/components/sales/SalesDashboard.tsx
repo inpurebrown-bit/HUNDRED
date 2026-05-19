@@ -847,7 +847,12 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               const ds = pr?.daily_supplies || {}
               const supCnt    = Object.values(ds).reduce((s: number, v: any) => s + Number(v || 0), 0)
               const supPay    = Number(pr?.supply_payment ?? 0)
-              const dirCnt    = Number(pr?.direct_count ?? 0)
+              // 직접수: 저장된 값 말고 customers DB에서 이번달 db010 실시간 카운트
+              const dirCntAuto = customers.filter(c =>
+                (c as any).lead_type === 'db010' &&
+                ((c as any).created_at || '').slice(0, 7) === thisMonth
+              ).length
+              const dirCnt    = dirCntAuto > 0 ? dirCntAuto : Number(pr?.direct_count ?? 0)
               const dirPay    = Number(pr?.direct_payment ?? 0)
               const target    = Number(pr?.target ?? monthlyGoal)
               const total     = supPay + dirPay
