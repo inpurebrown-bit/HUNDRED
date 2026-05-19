@@ -16,9 +16,9 @@ import { supabaseAdmin } from '@/lib/supabase'
  *   progress_stage = stage
  *   progress_memo  = memo
  */
-function normalize(c: any, customerMap: Record<string, any> = {}) {
-  // customers 테이블에서 전화번호로 매칭된 고객 데이터
-  const cust = customerMap[c.phone] || null
+function normalize(c: any, customerMap: Record<string, any> = {}, customerIdMap: Record<string, any> = {}) {
+  // customers 테이블에서 전화번호 또는 customer_id로 매칭된 고객 데이터
+  const cust = customerMap[c.phone] || customerIdMap[c.customer_id] || null
   const custDetails = cust?.details || {}
 
   // sales_customer_info: ops_case.details에 저장된 값 OR customers 테이블 실시간 데이터
@@ -61,6 +61,7 @@ function normalize(c: any, customerMap: Record<string, any> = {}) {
     credit_nice:   custDetails.credit_nice   || sci?.credit_nice   || '',
     tax_status:    custDetails.tax_status    || sci?.tax_status    || custDetails.tax_delinquency || '',
     assets:        custDetails.assets        || sci?.assets        || '',
+    revenue_2026:  custDetails.revenue_2026  || sci?.revenue_2026  || '',
     revenue_2025:  custDetails.revenue_2025  || sci?.revenue_2025  || '',
     revenue_2024:  custDetails.revenue_2024  || sci?.revenue_2024  || '',
     revenue_2023:  custDetails.revenue_2023  || sci?.revenue_2023  || '',
@@ -74,7 +75,7 @@ function normalize(c: any, customerMap: Record<string, any> = {}) {
     progress_memo:  c.memo  ?? '',
     customers: {
       name:    cust?.name ?? c.customer_name ?? '',
-      phone:   c.phone ?? '',
+      phone:   cust?.phone || c.phone || '',
       company: mergedDetails.company,
       details: mergedDetails,
       call_timeline: cust?.call_timeline || [],
@@ -127,7 +128,7 @@ export async function GET(req: NextRequest) {
   if (phones.length > 0) {
     const { data: custData } = await supabaseAdmin
       .from('customers')
-      .select('name, phone, loan_history, call_timeline, details, created_at, memo')
+      .select('id, name, phone, loan_history, call_timeline, details, created_at, memo')
       .in('phone', phones as string[])
     if (custData) {
       for (const c of custData) {
@@ -136,7 +137,22 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ cases: cases.map((c: any) => normalize(c, customerMap)) })
+  // customer_id로 보조 조회 (phone 불일치 케이스 대비)
+  const custIds = [...new Set(cases.map((c: any) => c.customer_id).filter(Boolean))]
+  let customerIdMap: Record<string, any> = {}
+  if (custIds.length > 0) {
+    const { data: custByIdData } = await supabaseAdmin
+      .from('customers')
+      .select('id, name, phone, loan_history, call_timeline, details, created_at, memo')
+      .in('id', custIds as string[])
+    if (custByIdData) {
+      for (const c of custByIdData) {
+        if (c.id) customerIdMap[c.id] = c
+      }
+    }
+  }
+
+  return NextResponse.json({ cases: cases.map((c: any) => normalize(c, customerMap, customerIdMap)) })
 }
 
 // POST: 케이스 등록 (자금팀전송)

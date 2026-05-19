@@ -356,6 +356,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             credit_nice:      anyDetails.credit_nice  || '',
             tax_status:       anyDetails.tax_status   || anyDetails.tax_delinquency || '',
             assets:           anyDetails.assets        || '',
+            revenue_2026:     anyDetails.revenue_2026  || '',
             revenue_2025:     anyDetails.revenue_2025  || '',
             revenue_2024:     anyDetails.revenue_2024  || '',
             revenue_2023:     anyDetails.revenue_2023  || '',

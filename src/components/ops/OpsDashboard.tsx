@@ -23,11 +23,6 @@ function fmt(n: number) {
   if (n >= 10_000) return Math.round(n / 10_000) + '만'
   return n.toLocaleString()
 }
-function commaFmt(v: string | number | undefined | null): string {
-  if (v === undefined || v === null || v === '') return ''
-  const n = String(v).replace(/[^0-9]/g, '')
-  return n ? Number(n).toLocaleString('ko-KR') : ''
-}
 
 // ── Types ──────────────────────────────────────────────────────────────
 export interface OpsCase {
@@ -900,7 +895,6 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
 
             // 섹션별 필드 정의
             const innovationVal = gv('innovation', cd.innovation || '')
-            const MONEY_FIELDS = new Set(['loan_kibo','loan_shinbo','loan_jaedan','loan_jinjong','loan_sojin','loan_other','loan_total','assets','revenue_2026','revenue_2025','revenue_2024','revenue_2023','required_funds'])
             const sections = [
               {
                 title: '기업 기본정보', bg: 'bg-[#1B2A45]', textColor: 'text-white',
@@ -964,14 +958,14 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                               {incallEditing ? (
                                 <input
                                   type="text"
-                                  value={MONEY_FIELDS.has(k) ? commaFmt(val) : val}
-                                  onChange={e => incallField(k, MONEY_FIELDS.has(k) ? e.target.value.replace(/[^0-9]/g, '') : e.target.value)}
+                                  value={val}
+                                  onChange={e => incallField(k, e.target.value)}
                                   placeholder="—"
                                   className="flex-1 text-xs font-semibold text-[#1B2A45] bg-transparent border-b border-violet-300 focus:outline-none focus:border-violet-500 px-0.5 py-0"
                                 />
                               ) : (
                                 <span className={`flex-1 text-xs font-semibold ${val ? 'text-[#1B2A45]' : 'text-gray-300'}`}>
-                                  {MONEY_FIELDS.has(k) ? (val ? commaFmt(val) : '—') : (val || '—')}
+                                  {val || '—'}
                                 </span>
                               )}
                             </div>
@@ -1151,9 +1145,9 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                     <label className={lbl}>입금 날짜</label>
                     <input type="date" value={d.deposit_date || ''} onChange={e => detailField('deposit_date', e.target.value)} className={inp} />
                   </div>
-                  <div><label className={lbl}>승인금액</label><input type="text" value={commaFmt(d.approval_amount)} onChange={e => detailField('approval_amount', e.target.value.replace(/[^0-9]/g, ''))} className={inp} placeholder="0원" /></div>
+                  <div><label className={lbl}>승인금액</label><input type="text" value={d.approval_amount || ''} onChange={e => detailField('approval_amount', e.target.value)} className={inp} placeholder="0원" /></div>
                   <div><label className={lbl}>수수료%</label><input type="text" value={d.fee_rate || ''} onChange={e => detailField('fee_rate', e.target.value)} className={inp} placeholder="%" /></div>
-                  <div className="col-span-2"><label className={lbl}>수수료</label><input type="text" value={commaFmt(d.fee_amount)} onChange={e => detailField('fee_amount', e.target.value.replace(/[^0-9]/g, ''))} className={inp} placeholder="0원" /></div>
+                  <div className="col-span-2"><label className={lbl}>수수료</label><input type="text" value={d.fee_amount || ''} onChange={e => detailField('fee_amount', e.target.value)} className={inp} placeholder="0원" /></div>
                 </div>
               </div>
               {/* 추가 입금 블록들 */}
@@ -1177,9 +1171,9 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                         detailField('payment_entries', entries)
                       }} className={inp} />
                     </div>
-                    <div><label className={lbl}>승인금액</label><input type="text" value={commaFmt(entry.approval_amount)} onChange={e => {
+                    <div><label className={lbl}>승인금액</label><input type="text" value={entry.approval_amount || ''} onChange={e => {
                       const entries: any[] = [...(d.payment_entries || [])]
-                      entries[idx] = { ...entries[idx], approval_amount: e.target.value.replace(/[^0-9]/g, '') }
+                      entries[idx] = { ...entries[idx], approval_amount: e.target.value }
                       detailField('payment_entries', entries)
                     }} className={inp} placeholder="0원" /></div>
                     <div><label className={lbl}>수수료%</label><input type="text" value={entry.fee_rate || ''} onChange={e => {
@@ -1187,9 +1181,9 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                       entries[idx] = { ...entries[idx], fee_rate: e.target.value }
                       detailField('payment_entries', entries)
                     }} className={inp} placeholder="%" /></div>
-                    <div className="col-span-2"><label className={lbl}>수수료</label><input type="text" value={commaFmt(entry.fee_amount)} onChange={e => {
+                    <div className="col-span-2"><label className={lbl}>수수료</label><input type="text" value={entry.fee_amount || ''} onChange={e => {
                       const entries: any[] = [...(d.payment_entries || [])]
-                      entries[idx] = { ...entries[idx], fee_amount: e.target.value.replace(/[^0-9]/g, '') }
+                      entries[idx] = { ...entries[idx], fee_amount: e.target.value }
                       detailField('payment_entries', entries)
                     }} className={inp} placeholder="0원" /></div>
                   </div>
@@ -1206,9 +1200,9 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
             </div>
 
             <div className="grid grid-cols-2 gap-x-2 gap-y-2">
-              <div><label className={lbl}>계약금(VAT포함)</label><input type="text" value={commaFmt(d.contract_amount_vat)} onChange={e => detailField('contract_amount_vat', e.target.value.replace(/[^0-9]/g, ''))} className={inp} placeholder="0원" /></div>
-              <div><label className={lbl}>입금액(VAT포함)</label><input type="text" value={commaFmt(d.deposit_amount_vat)} onChange={e => detailField('deposit_amount_vat', e.target.value.replace(/[^0-9]/g, ''))} className={inp} placeholder="0원" /></div>
-              <div><label className={lbl}>미입금액</label><input type="text" value={commaFmt(d.unpaid_amount)} onChange={e => detailField('unpaid_amount', e.target.value.replace(/[^0-9]/g, ''))} className={inp} placeholder="0원" /></div>
+              <div><label className={lbl}>계약금(VAT포함)</label><input type="text" value={d.contract_amount_vat || ''} onChange={e => detailField('contract_amount_vat', e.target.value)} className={inp} placeholder="0원" /></div>
+              <div><label className={lbl}>입금액(VAT포함)</label><input type="text" value={d.deposit_amount_vat || ''} onChange={e => detailField('deposit_amount_vat', e.target.value)} className={inp} placeholder="0원" /></div>
+              <div><label className={lbl}>미입금액</label><input type="text" value={d.unpaid_amount || ''} onChange={e => detailField('unpaid_amount', e.target.value)} className={inp} placeholder="0원" /></div>
               <div><label className={lbl}>세금계산서</label><input type="text" value={d.tax_invoice || ''} onChange={e => detailField('tax_invoice', e.target.value)} className={inp} placeholder="발급/미발급" /></div>
               <div><label className={lbl}>수수료율</label>
                 <div className="relative">
