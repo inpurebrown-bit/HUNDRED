@@ -17,6 +17,11 @@ import { supabaseAdmin } from '@/lib/supabase'
  *   progress_memo  = memo
  */
 function normPhone(p: string): string { return (p || '').replace(/[^0-9]/g, '') }
+// 한국 전화번호 유효성: 0으로 시작, 9~11자리
+function isKoreanPhone(p: string): boolean {
+  const d = normPhone(p)
+  return d.startsWith('0') && d.length >= 9 && d.length <= 11
+}
 
 function normalize(c: any, customerMap: Record<string, any> = {}, customerIdMap: Record<string, any> = {}) {
   // customers 테이블에서 전화번호(원본 or 하이픈제거) 또는 customer_id로 매칭된 고객 데이터
@@ -77,7 +82,7 @@ function normalize(c: any, customerMap: Record<string, any> = {}, customerIdMap:
     progress_memo:  c.memo  ?? '',
     customers: {
       name:    cust?.name ?? c.customer_name ?? '',
-      phone:   cust?.phone || c.phone || '',
+      phone:   cust?.phone || (isKoreanPhone(c.phone) ? c.phone : ''),
       company: mergedDetails.company,
       details: mergedDetails,
       call_timeline: cust?.call_timeline || [],
