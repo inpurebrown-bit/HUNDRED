@@ -294,16 +294,27 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
 
   useEffect(() => {
     const next = { ...c }
-    // 영업팀 인계 정보가 있고, 기타재무 필드가 비어있으면 자동 주입
+    // 영업팀 인계 정보 자동 주입
+    // sci: ops_cases.details.sales_customer_info
+    // cd : customers 테이블 live 데이터 (normalize() 에서 병합된 mergedDetails)
     const sci = (c.details as any)?.sales_customer_info
-    if (sci) {
-      const d = { ...(c.details || {}) } as Record<string, any>
-      if (!d.contract_amount_vat && sci.contract_fee)   d.contract_amount_vat = sci.contract_fee
-      if (!d.unpaid_amount       && sci.unpaid_amount)  d.unpaid_amount       = sci.unpaid_amount
-      if (!d.deposit_amount_vat  && sci.payment_amount) d.deposit_amount_vat  = sci.payment_amount
-      if (!d.commission_rate     && sci.commission_rate) d.commission_rate     = sci.commission_rate
-      next.details = d
+    const cd  = (c as any).customers?.details || {}
+    const d   = { ...(c.details || {}) } as Record<string, any>
+
+    function fill(key: string, ...srcs: string[]) {
+      if (d[key]) return   // 이미 ops가 입력한 값이 있으면 덮어쓰지 않음
+      for (const src of srcs) {
+        if (src) { d[key] = src; return }
+      }
     }
+
+    fill('contract_amount_vat', sci?.contract_fee,    cd.contract_fee)
+    fill('deposit_amount_vat',  sci?.payment_amount,  cd.payment_amount)
+    fill('unpaid_amount',       sci?.unpaid_amount,   cd.unpaid_amount)
+    fill('commission_rate',     sci?.commission_rate, cd.commission_rate)
+    fill('tax_invoice',         sci?.tax_invoice,     cd.tax_invoice)
+
+    next.details = d
     setLocal(next)
   }, [c.id])
 
