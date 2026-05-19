@@ -1683,8 +1683,8 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
     )
   }
 
-  // 다음 자금 대기 단계 (서류받는중 / 검토중)
-  const UPCOMING_KEYS = new Set(['서류받는중', '검토중'])
+  // 다음 자금 대기 단계 (서류받는중 / 검토중 / 접수전)
+  const UPCOMING_KEYS = new Set(['서류받는중', '검토중', '접수전'])
 
   return (
     <div className="space-y-4">
@@ -1736,7 +1736,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
               <div className="flex gap-3 items-start">
                 {/* 진행 중 카드 */}
                 {activeItems.length > 0 && (
-                  <div className="flex-1 min-w-0 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-2">
+                  <div className={`min-w-0 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 ${upcomingItems.length > 0 ? 'w-1/2' : 'flex-1'}`}>
                     {activeItems.map(c => (
                       <OpsCard
                         key={`${inst}-${c.id}`}
@@ -1750,9 +1750,9 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
                 )}
                 {/* 다음 자금 대기 */}
                 {upcomingItems.length > 0 && (
-                  <div className="shrink-0 w-[120px] sm:w-[160px] border-l-2 border-dashed border-gray-200 pl-3">
+                  <div className={`border-l-2 border-dashed border-gray-200 pl-3 ${activeItems.length > 0 ? 'w-1/2' : 'flex-1'}`}>
                     <p className="text-[9px] font-bold text-gray-400 mb-1.5 uppercase tracking-wide">📋 다음 자금 대기</p>
-                    <div className="flex flex-col gap-1.5">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
                       {upcomingItems.map(c => (
                         <OpsCard
                           key={`${inst}-upcoming-${c.id}`}
