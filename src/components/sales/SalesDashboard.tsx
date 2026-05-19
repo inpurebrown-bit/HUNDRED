@@ -878,6 +878,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                     <div className="text-right">
                       <p className="text-[10px] text-white/40">{thisMonth} · 영업일 {bizElapsed}/{bizTotal}일</p>
                       <p className="text-xs font-bold text-white/70 mt-0.5">잔여 {bizRemaining}일 · 목표까지 {fmtV(needed)}개</p>
+                      <p className="text-[11px] text-[#C5A258] font-black mt-1">
+                        💰 {thisMonthTotalPaid > 0
+                          ? (thisMonthTotalPaid >= 100000000
+                            ? (thisMonthTotalPaid / 100000000).toFixed(1) + '억'
+                            : (thisMonthTotalPaid / 10000).toFixed(0) + '만원')
+                          : '매출 없음'}
+                      </p>
                     </div>
                   </div>
 
@@ -938,8 +945,8 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                       </div>
                     </div>
 
-                    {/* 통합 요약 바 */}
-                    <div className="bg-gray-50 rounded-xl p-3 grid grid-cols-3 divide-x divide-gray-200 text-center">
+                    {/* 통합 요약 */}
+                    <div className="border border-[#C5A258]/30 bg-gradient-to-r from-[#1B2A45]/5 to-[#C5A258]/5 rounded-xl p-3 grid grid-cols-3 divide-x divide-[#C5A258]/20 text-center">
                       <div className="pr-3">
                         <p className="text-[9px] text-gray-400 font-semibold mb-0.5">총결제</p>
                         <p className="text-lg font-black text-gray-800">{fmtV(total)}</p>
@@ -955,40 +962,6 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                         <p className={`text-lg font-black ${supStopped ? 'text-red-600' : 'text-amber-700'}`}>
                           {supRate === null ? '—' : supStopped ? '중단' : `${dailyRec}개`}
                         </p>
-                      </div>
-                    </div>
-
-                    {/* 이달 매출 */}
-                    <div className="border border-[#C5A258]/30 bg-gradient-to-r from-[#1B2A45]/5 to-[#C5A258]/5 rounded-xl p-3">
-                      <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-2.5">💰 이달 매출</p>
-                      <div className="grid grid-cols-3 gap-3 text-center">
-                        <div>
-                          <p className="text-[9px] text-gray-400 mb-0.5">계약금액 합계</p>
-                          <p className="text-base font-black text-[#1B2A45] leading-tight">
-                            {thisMonthTotalPaid > 0
-                              ? (thisMonthTotalPaid >= 100000000
-                                ? (thisMonthTotalPaid / 100000000).toFixed(1) + '억'
-                                : (thisMonthTotalPaid / 10000).toFixed(0) + '만')
-                              : '—'}
-                          </p>
-                          <p className="text-[8px] text-gray-400">{thisMonthTotalPaid > 0 ? thisMonthTotalPaid.toLocaleString() + '원' : ''}</p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] text-gray-400 mb-0.5">계약건수</p>
-                          <p className="text-base font-black text-[#C5A258] leading-tight">
-                            {thisMonthContractCount % 1 === 0 ? thisMonthContractCount : thisMonthContractCount.toFixed(1)}건
-                          </p>
-                          <p className="text-[8px] text-gray-400">contractWeight 기준</p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] text-gray-400 mb-0.5">건당 평균</p>
-                          <p className="text-base font-black text-gray-700 leading-tight">
-                            {thisMonthContractCount > 0 && thisMonthTotalPaid > 0
-                              ? ((thisMonthTotalPaid / thisMonthContractCount) / 10000).toFixed(0) + '만'
-                              : '—'}
-                          </p>
-                          <p className="text-[8px] text-gray-400">계약당 평균금액</p>
-                        </div>
                       </div>
                     </div>
                   </div>
