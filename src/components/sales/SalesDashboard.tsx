@@ -119,6 +119,11 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   }
   const [supplyConfig, setSupplyConfig] = useState<Record<string, { supplied: number; goal: number; base: number }> | null>(null)
   const [ceoPayRate, setCeoPayRate] = useState<number | null>(null)
+  // 대표 결제율 현황 - 내 직원 행 전체
+  const [myPayrateRow, setMyPayrateRow] = useState<{
+    target: number; supply_count: number; supply_payment: number
+    direct_count: number; direct_payment: number; daily_supplies?: Record<string, number>
+  } | null>(null)
   const [goalEditOpen, setGoalEditOpen] = useState(false)
   const [goalEditValue, setGoalEditValue] = useState('')
   const [goalSaving, setGoalSaving] = useState(false)
@@ -227,7 +232,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
 
   useEffect(() => { loadAll() }, [])
 
-  // ── 대표 결제율 불러오기 ──────────────────────────────────────────────
+  // ── 대표 결제율 현황 불러오기 ──────────────────────────────────────────────
   useEffect(() => {
     async function loadPayRate() {
       try {
@@ -236,12 +241,20 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         const json = await res.json()
         const record = json.record
         if (!record?.employee_details) return
-        const row = record.employee_details.find((e: any) => e.name === userName)
+        // 이름 매칭 (수석팀장 등 타이틀 제거 후 비교)
+        const cleanName = (s: string) => s.replace(/\s*(수석팀장|팀장|팀원|대리|과장|부장).*/, '').trim()
+        const row = record.employee_details.find((e: any) =>
+          cleanName(e.name || '') === cleanName(userName)
+        )
         if (!row) return
-        const supCnt = Number(row.supply_count) || 0
-        if (supCnt === 0) return
-        const rate = (Number(row.supply_payment) + Number(row.direct_payment)) / supCnt * 100
-        setCeoPayRate(Math.round(rate * 100) / 100)
+        setMyPayrateRow(row)
+        // 기존 결제율 계산 (공급수 기반)
+        const ds = row.daily_supplies || {}
+        const supCnt = Object.values(ds).reduce((s: number, v: any) => s + Number(v || 0), 0)
+        if (supCnt > 0) {
+          const rate = (Number(row.supply_payment) + Number(row.direct_payment)) / supCnt * 100
+          setCeoPayRate(Math.round(rate * 100) / 100)
+        }
       } catch {}
     }
     loadPayRate()
@@ -900,68 +913,93 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               </p>
             </div>
 
-            {/* 공급 현황 + 계약율 — 항상 상세뷰 (설정 없으면 displayCfg 기본값 사용) */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-bold text-gray-700">📊 내 이번달 공급 현황</p>
-                <span className="text-[10px] text-gray-400">{thisMonth}</span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {/* 공급 현황 카드 */}
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-400 mb-1">공급 현황</p>
-                  <p className="text-xl font-black text-blue-700">
-                    {displayCfg.supplied > 0 ? `${displayCfg.supplied}개` : '미배정'}
-                    {displayCfg.supplied > 0 && <span className="text-[11px] font-normal text-gray-400"> 이달</span>}
-                  </p>
-                  {todaySupply > 0 && <p className="text-[10px] text-blue-500 font-semibold mt-0.5">금일 {todaySupply}개 배정</p>}
-                </div>
-                {/* 결제수 */}
-                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-400 mb-1">결제수</p>
-                  <p className="text-xl font-black text-emerald-700">{myTotalContracted.toFixed(1)}개</p>
-                  {displayCfg.base > 0 && <p className="text-[9px] text-gray-400 mt-0.5">기존 {displayCfg.base} + DB {myDbContracted.toFixed(1)}</p>}
-                </div>
-                {/* 결제율 (대표 입력) */}
-                {(() => {
-                  const rate = ceoPayRate
-                  const rateColor = rate === null ? 'text-gray-400' : rate >= 17 ? 'text-emerald-700' : rate >= 13 ? 'text-amber-700' : 'text-red-600'
-                  const rateBg    = rate === null ? 'bg-gray-50'   : rate >= 17 ? 'bg-emerald-50'   : rate >= 13 ? 'bg-amber-50'   : 'bg-red-50'
-                  const rateBd    = rate === null ? 'border-gray-100' : rate >= 17 ? 'border-emerald-100' : rate >= 13 ? 'border-amber-100' : 'border-red-100'
-                  return (
-                    <div className={`${rateBg} border ${rateBd} rounded-xl p-3`}>
-                      <p className="text-[10px] text-gray-400 mb-1">결제율 <span className="text-[9px] bg-gray-200 text-gray-600 rounded-full px-1">대표입력</span></p>
-                      <p className={`text-xl font-black ${rateColor}`}>{rate !== null ? `${rate.toFixed(2)}%` : '미입력'}</p>
-                      <p className="text-[9px] text-gray-400 mt-0.5">공급 대비 계약율 {contractRate.toFixed(2)}%</p>
+            {/* 공급 현황 — 대표 결제율 현황 기반 */}
+            {(() => {
+              const pr = myPayrateRow
+              const ds = pr?.daily_supplies || {}
+              const supCnt    = Object.values(ds).reduce((s: number, v: any) => s + Number(v || 0), 0)
+              const supPay    = Number(pr?.supply_payment ?? 0)
+              const dirCnt    = Number(pr?.direct_count ?? 0)
+              const dirPay    = Number(pr?.direct_payment ?? 0)
+              const target    = Number(pr?.target ?? monthlyGoal)
+              const total     = supPay + dirPay
+              const supRate   = supCnt > 0    ? (supPay / supCnt * 100) : null
+              const dirRate   = dirCnt > 0    ? (dirPay / dirCnt * 100) : null
+              const totRate   = (supCnt + dirCnt) > 0 ? (total / (supCnt + dirCnt) * 100) : null
+              const needed    = target - total
+              const supNeeded = supRate && supRate > 0 && needed > 0
+                ? Math.round(needed / (supRate / 100) * 100) / 100 : null
+              const achievePct = target > 0 ? Math.round(total / target * 100) : 0
+              const fmtV = (v: number) => v % 1 === 0 ? String(v) : v.toFixed(1)
+              const fmtP = (v: number | null) => v !== null ? v.toFixed(1) + '%' : '—'
+
+              return (
+                <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-gray-700">📊 내 이번달 공급 현황</p>
+                    <span className="text-[10px] text-gray-400">{thisMonth}</span>
+                  </div>
+                  {/* 상단 수치 */}
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-sky-50 border border-sky-100 rounded-xl p-2.5">
+                      <p className="text-[9px] text-gray-400 mb-0.5">공급수</p>
+                      <p className="text-xl font-black text-sky-700">{supCnt}</p>
                     </div>
-                  )
-                })()}
-                {/* 공급예정 */}
-                {(() => {
-                  const baseRate = ceoPayRate ?? contractRate
-                  const needed = calcRecommendedSupply(baseRate, bizElapsed)
-                  return (
-                    <div className="bg-violet-50 border border-violet-100 rounded-xl p-3">
-                      <p className="text-[10px] text-gray-400 mb-1">결제율 대비 공급예정</p>
-                      <p className="text-xl font-black text-violet-700">{needed > 0 ? `${needed}개` : '공급 중단'}</p>
+                    <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2.5">
+                      <p className="text-[9px] text-gray-400 mb-0.5">공급결제</p>
+                      <p className="text-xl font-black text-emerald-700">{fmtV(supPay)}</p>
                     </div>
-                  )
-                })()}
-              </div>
-              {/* 목표 달성 바 */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] text-gray-500">목표 달성 ({myTotalContracted.toFixed(1)} / {displayCfg.goal}개)</span>
-                  <span className="text-[10px] font-bold text-gray-700">
-                    {displayCfg.goal > 0 ? Math.round(myTotalContracted / displayCfg.goal * 100) : 0}%
-                  </span>
+                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-2.5">
+                      <p className="text-[9px] text-gray-400 mb-0.5">공급결제율</p>
+                      <p className="text-xl font-black text-blue-700">{fmtP(supRate)}</p>
+                    </div>
+                    <div className="bg-violet-50 border border-violet-100 rounded-xl p-2.5">
+                      <p className="text-[9px] text-gray-400 mb-0.5">직접수</p>
+                      <p className="text-xl font-black text-violet-700">{dirCnt}</p>
+                    </div>
+                    <div className="bg-purple-50 border border-purple-100 rounded-xl p-2.5">
+                      <p className="text-[9px] text-gray-400 mb-0.5">직접결제</p>
+                      <p className="text-xl font-black text-purple-700">{fmtV(dirPay)}</p>
+                    </div>
+                    <div className="bg-pink-50 border border-pink-100 rounded-xl p-2.5">
+                      <p className="text-[9px] text-gray-400 mb-0.5">직접결제율</p>
+                      <p className="text-xl font-black text-pink-700">{fmtP(dirRate)}</p>
+                    </div>
+                  </div>
+                  {/* 하단 요약 */}
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-gray-800 rounded-xl p-2.5">
+                      <p className="text-[9px] text-white/60 mb-0.5">총결제</p>
+                      <p className="text-xl font-black text-white">{fmtV(total)}</p>
+                    </div>
+                    <div className="bg-teal-50 border border-teal-100 rounded-xl p-2.5">
+                      <p className="text-[9px] text-gray-400 mb-0.5">총결제율</p>
+                      <p className="text-xl font-black text-teal-700">{fmtP(totRate)}</p>
+                    </div>
+                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-2.5">
+                      <p className="text-[9px] text-gray-400 mb-0.5">공급예정</p>
+                      <p className="text-xl font-black text-amber-700">
+                        {supNeeded !== null ? supNeeded.toFixed(2) + '개' : '—'}
+                      </p>
+                    </div>
+                  </div>
+                  {/* 목표 달성 바 */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] text-gray-500">목표 달성 ({fmtV(total)} / {target}개)</span>
+                      <span className="text-[10px] font-bold text-gray-700">{achievePct}%</span>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full transition-all ${achievePct >= 100 ? 'bg-emerald-500' : achievePct >= 60 ? 'bg-blue-500' : 'bg-amber-400'}`}
+                        style={{ width: `${Math.min(100, achievePct)}%` }} />
+                    </div>
+                    {needed > 0 && (
+                      <p className="text-[10px] text-rose-500 font-semibold mt-1">목표까지 {fmtV(needed)}개 남음</p>
+                    )}
+                  </div>
                 </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-500 rounded-full transition-all"
-                    style={{ width: `${displayCfg.goal > 0 ? Math.min(100, Math.round(myTotalContracted / displayCfg.goal * 100)) : 0}%` }} />
-                </div>
-              </div>
-            </div>
+              )
+            })()}
 
             {/* 공급기준표 */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

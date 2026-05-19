@@ -133,18 +133,23 @@ function EmpCard({
   onRemove: (i: number) => void
   autoData: AutoEmpData
 }) {
-  // 일별 공급 합산 → 공급수
+  const [showDaily, setShowDaily] = useState(false)
+
+  // 일별 공급 합산 → 공급수 (자동)
   const dailySupplies = row.daily_supplies || {}
   const supplyCount   = Object.values(dailySupplies).reduce((s, v) => s + Number(v || 0), 0)
 
-  // 자동 집계
-  const supplyPayment = autoData.supply_payment
-  const directCount   = autoData.direct_count
-  const directPayment = autoData.direct_payment
+  // 수동 입력값 (저장된 값 사용, DB자동값은 참고용)
+  const supplyPayment = Number(row.supply_payment)
+  const directCount   = Number(row.direct_count)
+  const directPayment = Number(row.direct_payment)
 
-  const total      = supplyPayment + directPayment
-  const supplyRate = supplyCount > 0 ? (supplyPayment / supplyCount * 100) : null
-  const needed     = Number(row.target) - total
+  const total       = supplyPayment + directPayment
+  const supplyRate  = supplyCount > 0 ? (supplyPayment / supplyCount * 100) : null
+  const directRate  = directCount > 0 ? (directPayment / directCount * 100) : null
+  const totalRate   = (supplyCount + directCount) > 0
+    ? ((supplyPayment + directPayment) / (supplyCount + directCount) * 100) : null
+  const needed      = Number(row.target) - total
   const supplyNeeded = supplyRate && supplyRate > 0 && needed > 0
     ? Math.round(needed / (supplyRate / 100) * 100) / 100
     : null
@@ -153,12 +158,44 @@ function EmpCard({
   const score      = calcScore(total, we, Number(row.target), tw)
   const achievePct = Number(row.target) > 0 ? Math.round(total / Number(row.target) * 100) : 0
 
-  // 이번달 일수
   const now = new Date()
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
   const todayDay    = now.getDate()
 
   const fmtVal = (v: number) => v % 1 === 0 ? String(v) : v.toFixed(1)
+  const fmtPct = (v: number | null) => v !== null ? v.toFixed(1) + '%' : '—'
+
+  // 수동편집 필드 (DB자동값 동기화 버튼 포함)
+  function EditableAutoField({
+    label, field, value, autoVal, color,
+  }: { label: string; field: string; value: number; autoVal: number; color: string }) {
+    return (
+      <div className="flex flex-col items-center gap-0.5">
+        <div className="flex items-center gap-0.5">
+          <p className={`text-[9px] font-medium ${color}`}>{label}</p>
+          {autoVal !== value && (
+            <button
+              title={`DB자동값(${fmtVal(autoVal)})으로 동기화`}
+              onClick={() => onChange(idx, field, autoVal)}
+              className="text-[8px] text-gray-400 hover:text-blue-500 transition-colors"
+            >🔄</button>
+          )}
+        </div>
+        <div className="relative w-full">
+          <input
+            type="number" min={0} step={0.5} value={value}
+            onChange={e => onChange(idx, field, Number(e.target.value))}
+            className="w-full text-center text-sm font-bold text-gray-800 bg-white rounded-xl
+              border border-gray-200 px-1 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300
+              [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          />
+          {autoVal > 0 && autoVal !== value && (
+            <span className="absolute -bottom-3 left-0 right-0 text-center text-[7px] text-gray-400">DB:{fmtVal(autoVal)}</span>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
@@ -182,9 +219,9 @@ function EmpCard({
         </div>
       </div>
 
-      {/* ── 5개 수치 (목표만 수동) ── */}
-      <div className="grid grid-cols-5 gap-1.5">
-        {/* 목표 - 수동 입력 */}
+      {/* ── 5개 수치 ── */}
+      <div className="grid grid-cols-5 gap-1.5 pb-3">
+        {/* 목표 */}
         <div className="flex flex-col items-center gap-0.5">
           <p className="text-[9px] text-gray-400 font-medium">목표</p>
           <input
@@ -195,38 +232,22 @@ function EmpCard({
               [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           />
         </div>
-        {/* 공급수 - 자동 (일별 합산) */}
+        {/* 공급수 - 일별 합산 자동 */}
         <div className="flex flex-col items-center gap-0.5">
           <p className="text-[9px] text-sky-500 font-medium">공급수</p>
-          <div className="w-full text-center text-sm font-bold text-sky-700 bg-sky-50 rounded-xl border border-sky-100 px-1 py-2 leading-none">
+          <div className="w-full text-center text-sm font-bold text-sky-700 bg-sky-50 rounded-xl border border-sky-100 px-1 py-2">
             {supplyCount}
-            <span className="block text-[7px] font-normal text-sky-400 mt-0.5">자동</span>
           </div>
         </div>
-        {/* 공급결제 - 자동 */}
-        <div className="flex flex-col items-center gap-0.5">
-          <p className="text-[9px] text-emerald-500 font-medium">공급결제</p>
-          <div className="w-full text-center text-sm font-bold text-emerald-700 bg-emerald-50 rounded-xl border border-emerald-100 px-1 py-2 leading-none">
-            {fmtVal(supplyPayment)}
-            <span className="block text-[7px] font-normal text-emerald-400 mt-0.5">자동</span>
-          </div>
-        </div>
-        {/* 직접수 - 자동 */}
-        <div className="flex flex-col items-center gap-0.5">
-          <p className="text-[9px] text-violet-500 font-medium">직접수</p>
-          <div className="w-full text-center text-sm font-bold text-violet-700 bg-violet-50 rounded-xl border border-violet-100 px-1 py-2 leading-none">
-            {directCount}
-            <span className="block text-[7px] font-normal text-violet-400 mt-0.5">자동</span>
-          </div>
-        </div>
-        {/* 직접결제 - 자동 */}
-        <div className="flex flex-col items-center gap-0.5">
-          <p className="text-[9px] text-purple-500 font-medium">직접결제</p>
-          <div className="w-full text-center text-sm font-bold text-purple-700 bg-purple-50 rounded-xl border border-purple-100 px-1 py-2 leading-none">
-            {fmtVal(directPayment)}
-            <span className="block text-[7px] font-normal text-purple-400 mt-0.5">자동</span>
-          </div>
-        </div>
+        {/* 공급결제 - 수동 (DB자동값 참고) */}
+        <EditableAutoField label="공급결제" field="supply_payment"
+          value={supplyPayment} autoVal={autoData.supply_payment} color="text-emerald-600" />
+        {/* 직접수 - 수동 */}
+        <EditableAutoField label="직접수" field="direct_count"
+          value={directCount} autoVal={autoData.direct_count} color="text-violet-600" />
+        {/* 직접결제 - 수동 */}
+        <EditableAutoField label="직접결제" field="direct_payment"
+          value={directPayment} autoVal={autoData.direct_payment} color="text-purple-600" />
       </div>
 
       {/* ── 목표 달성률 ── */}
@@ -241,17 +262,23 @@ function EmpCard({
         </div>
       </div>
 
-      {/* ── 4박스: 총결제 / 공급결제율 / 공급예정 / 목표까지 ── */}
-      <div className="grid grid-cols-4 gap-1.5">
+      {/* ── 6박스: 총결제 / 공급결제율 / 직접결제율 / 총결제율 / 공급예정 / 목표까지 ── */}
+      <div className="grid grid-cols-3 gap-1.5">
         <div className="bg-emerald-50 rounded-xl py-2 text-center">
           <p className="text-[9px] text-emerald-500">총결제</p>
           <p className="text-base font-black text-emerald-700">{fmtVal(total)}</p>
         </div>
         <div className="bg-blue-50 rounded-xl py-2 text-center">
           <p className="text-[9px] text-blue-500">공급결제율</p>
-          <p className="text-sm font-black text-blue-700">
-            {supplyRate !== null ? supplyRate.toFixed(1) + '%' : '—'}
-          </p>
+          <p className="text-sm font-black text-blue-700">{fmtPct(supplyRate)}</p>
+        </div>
+        <div className="bg-violet-50 rounded-xl py-2 text-center">
+          <p className="text-[9px] text-violet-500">직접결제율</p>
+          <p className="text-sm font-black text-violet-700">{fmtPct(directRate)}</p>
+        </div>
+        <div className="bg-teal-50 rounded-xl py-2 text-center">
+          <p className="text-[9px] text-teal-600">총결제율</p>
+          <p className="text-sm font-black text-teal-700">{fmtPct(totalRate)}</p>
         </div>
         <div className="bg-amber-50 rounded-xl py-2 text-center">
           <p className="text-[9px] text-amber-600">공급예정</p>
@@ -267,31 +294,39 @@ function EmpCard({
         </div>
       </div>
 
-      {/* ── 일별 공급 입력 (1~31) ── */}
+      {/* ── 일별 공급 입력 (접기/펼치기) ── */}
       <div>
-        <p className="text-[9px] text-gray-400 font-semibold mb-1.5">
-          📅 일별 공급 입력
-          <span className="ml-1 text-sky-600 font-black">합계 {supplyCount}개</span>
-        </p>
-        <div className="grid grid-cols-7 gap-1">
-          {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => (
-            <div key={day} className={`text-center ${day === todayDay ? 'ring-2 ring-blue-400 rounded-lg' : ''}`}>
-              <p className={`text-[8px] font-medium mb-0.5 ${day === todayDay ? 'text-blue-600 font-black' : 'text-gray-400'}`}>{day}</p>
-              <input
-                type="number" min={0}
-                value={dailySupplies[String(day)] || ''}
-                placeholder="0"
-                onChange={e => {
-                  const v = Number(e.target.value) || 0
-                  onChange(idx, 'daily_supplies', { ...dailySupplies, [String(day)]: v })
-                }}
-                className="w-full text-center text-[10px] font-bold text-gray-700 bg-white rounded border border-gray-200 py-1
-                  focus:outline-none focus:ring-1 focus:ring-blue-300
-                  [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              />
-            </div>
-          ))}
-        </div>
+        <button
+          onClick={() => setShowDaily(v => !v)}
+          className="w-full flex items-center justify-between py-1.5 px-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
+        >
+          <span className="text-[9px] text-gray-500 font-semibold">
+            📅 일별 공급 입력
+            <span className="ml-1.5 text-sky-600 font-black">합계 {supplyCount}개</span>
+          </span>
+          <span className="text-[9px] text-gray-400">{showDaily ? '▲ 접기' : '▼ 펼치기'}</span>
+        </button>
+        {showDaily && (
+          <div className="mt-2 grid grid-cols-7 gap-1">
+            {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => (
+              <div key={day} className={`text-center ${day === todayDay ? 'ring-2 ring-blue-400 rounded-lg' : ''}`}>
+                <p className={`text-[8px] font-medium mb-0.5 ${day === todayDay ? 'text-blue-600 font-black' : 'text-gray-400'}`}>{day}</p>
+                <input
+                  type="number" min={0}
+                  value={dailySupplies[String(day)] || ''}
+                  placeholder="0"
+                  onChange={e => {
+                    const v = Number(e.target.value) || 0
+                    onChange(idx, 'daily_supplies', { ...dailySupplies, [String(day)]: v })
+                  }}
+                  className="w-full text-center text-[10px] font-bold text-gray-700 bg-white rounded border border-gray-200 py-1
+                    focus:outline-none focus:ring-1 focus:ring-blue-300
+                    [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
