@@ -329,7 +329,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
     const cd  = (c as any).customers?.details || {}
     const d   = { ...(c.details || {}) } as Record<string, any>
 
-    function fill(key: string, ...srcs: string[]) {
+    function fill(key: string, ...srcs: (string | undefined)[]) {
       if (d[key]) return   // 이미 ops가 입력한 값이 있으면 덮어쓰지 않음
       for (const src of srcs) {
         if (src) { d[key] = src; return }
@@ -340,7 +340,10 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
     fill('deposit_amount_vat',  sci?.payment_amount,  cd.payment_amount)
     fill('unpaid_amount',       sci?.unpaid_amount,   cd.unpaid_amount)
     fill('commission_rate',     sci?.commission_rate, cd.commission_rate)
-    fill('tax_invoice',         sci?.tax_invoice,     cd.tax_invoice)
+    // 세금계산서: 영업팀 계약 시 vat_included 여부로 자동 설정 (발급/미발급)
+    const vatIncluded = sci?.vat_included ?? cd.vat_included
+    const taxInvoiceFallback = vatIncluded === true ? '발급' : vatIncluded === false ? '미발급' : undefined
+    fill('tax_invoice', sci?.tax_invoice, cd.tax_invoice, taxInvoiceFallback)
 
     next.details = d
     setLocal(next)
