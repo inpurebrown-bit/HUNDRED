@@ -394,17 +394,23 @@ export default function OverviewTabNew() {
   }))
 
   // This month revenue for mini card
-  const thisMonthRevRaw =
-    revenueData?.monthly?.find(m => {
-      // API returns month like "05월"
-      const mmStr = String(thisMonth).padStart(2, '0') + '월'
-      return m.month === mmStr || m.month === thisMonthStr
-    })?.합계 ?? 0
+  const thisMonthRevEntry = revenueData?.monthly?.find(m => {
+    const mmStr = String(thisMonth).padStart(2, '0') + '월'
+    return m.month === mmStr || m.month === thisMonthStr
+  })
+  const thisMonthRevRaw = thisMonthRevEntry?.합계 ?? 0
+  const thisMonthOpsRaw = thisMonthRevEntry?.관리팀 ?? 0
   const thisMonthRevDisplay =
     thisMonthRevRaw >= 10000
       ? (thisMonthRevRaw / 10000).toFixed(0) + '만원'
       : thisMonthRevRaw > 0
       ? thisMonthRevRaw.toLocaleString() + '원'
+      : '-'
+  const thisMonthOpsDisplay =
+    thisMonthOpsRaw >= 10000
+      ? (thisMonthOpsRaw / 10000).toFixed(0) + '만원'
+      : thisMonthOpsRaw > 0
+      ? thisMonthOpsRaw.toLocaleString() + '원'
       : '-'
 
   // Contracts: contracts 테이블 + customers 테이블에서 contracted 상태 업체 모두 포함
@@ -541,7 +547,7 @@ export default function OverviewTabNew() {
     <div className="space-y-6 pb-10">
 
       {/* ═══ 1. TOP MINI-CARDS ROW ══════════════════════════ */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <MiniCard
           icon="📋"
           label="배정 대기"
@@ -568,10 +574,18 @@ export default function OverviewTabNew() {
         />
         <MiniCard
           icon="💰"
-          label="이달 매출"
+          label="이달 총매출"
           value={loading ? null : thisMonthRevDisplay}
           loading={loading}
           color="text-[#C5A258]"
+          onClick={() => scrollTo(chartRef)}
+        />
+        <MiniCard
+          icon="🏦"
+          label="관리팀 매출"
+          value={loading ? null : thisMonthOpsDisplay}
+          loading={loading}
+          color="text-emerald-600"
           onClick={() => scrollTo(chartRef)}
         />
       </div>

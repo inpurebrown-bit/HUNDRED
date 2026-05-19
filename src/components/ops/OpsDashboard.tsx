@@ -214,7 +214,7 @@ const INCALL_CLOSING_RESULTS = [
 ]
 
 // ── Tab types ──────────────────────────────────────────────────────────
-type OpsTab = 'dashboard' | 'active' | 'refund' | 'completed' | 'newdb' | 'ops_contract' | 'report' | 'profile'
+type OpsTab = 'dashboard' | 'active' | 'refund' | 'completed' | 'newdb' | 'ops_contract' | 'report' | 'revenue' | 'profile'
 
 const opsTabs: { key: OpsTab; label: string }[] = [
   { key: 'dashboard',    label: '📊 대시보드' },
@@ -224,6 +224,7 @@ const opsTabs: { key: OpsTab; label: string }[] = [
   { key: 'newdb',        label: '🆕 신규DB' },
   { key: 'ops_contract', label: '📝 관리팀계약' },
   { key: 'report',       label: '📋 관리팀보고' },
+  { key: 'revenue',      label: '💰 매출 현황' },
   { key: 'profile',      label: '👤 사원정보' },
 ]
 
@@ -1182,9 +1183,21 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                     <label className={lbl}>입금 날짜</label>
                     <input type="date" value={d.deposit_date || ''} onChange={e => detailField('deposit_date', e.target.value)} className={inp} />
                   </div>
-                  <div><label className={lbl}>승인금액</label><input type="text" value={d.approval_amount || ''} onChange={e => detailField('approval_amount', e.target.value)} className={inp} placeholder="0원" /></div>
-                  <div><label className={lbl}>수수료%</label><input type="text" value={d.fee_rate || ''} onChange={e => detailField('fee_rate', e.target.value)} className={inp} placeholder="%" /></div>
-                  <div className="col-span-2"><label className={lbl}>수수료</label><input type="text" value={d.fee_amount || ''} onChange={e => detailField('fee_amount', e.target.value)} className={inp} placeholder="0원" /></div>
+                  <div><label className={lbl}>기관명</label><input type="text" value={d.deposit_institution || ''} onChange={e => detailField('deposit_institution', e.target.value)} className={inp} placeholder="기관명" /></div>
+                  <div><label className={lbl}>상품명</label><input type="text" value={d.deposit_product || ''} onChange={e => detailField('deposit_product', e.target.value)} className={inp} placeholder="상품명" /></div>
+                  <div><label className={lbl}>승인금액</label><input type="text" value={d.approval_amount || ''} onChange={e => {
+                    detailField('approval_amount', e.target.value)
+                    const amt = parseInt(e.target.value.replace(/[^0-9]/g, ''), 10) || 0
+                    const rate = parseFloat(String(d.fee_rate || '0')) || 0
+                    if (amt > 0 && rate > 0) detailField('fee_amount', String(Math.round(amt * rate / 100)))
+                  }} className={inp} placeholder="0원" /></div>
+                  <div><label className={lbl}>수수료%</label><input type="text" value={d.fee_rate || ''} onChange={e => {
+                    detailField('fee_rate', e.target.value)
+                    const rate = parseFloat(e.target.value) || 0
+                    const amt = parseInt(String(d.approval_amount || '0').replace(/[^0-9]/g, ''), 10) || 0
+                    if (amt > 0 && rate > 0) detailField('fee_amount', String(Math.round(amt * rate / 100)))
+                  }} className={inp} placeholder="%" /></div>
+                  <div className="col-span-2"><label className={lbl}>수수료 <span className="text-emerald-600 font-bold">(관리팀 매출)</span></label><input type="text" value={d.fee_amount || ''} onChange={e => detailField('fee_amount', e.target.value)} className={inp + ' font-semibold'} placeholder="0원" /></div>
                 </div>
               </div>
               {/* 추가 입금 블록들 */}
@@ -1208,17 +1221,31 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                         detailField('payment_entries', entries)
                       }} className={inp} />
                     </div>
+                    <div><label className={lbl}>기관명</label><input type="text" value={entry.institution || ''} onChange={e => {
+                      const entries: any[] = [...(d.payment_entries || [])]
+                      entries[idx] = { ...entries[idx], institution: e.target.value }
+                      detailField('payment_entries', entries)
+                    }} className={inp} placeholder="기관명" /></div>
+                    <div><label className={lbl}>상품명</label><input type="text" value={entry.product || ''} onChange={e => {
+                      const entries: any[] = [...(d.payment_entries || [])]
+                      entries[idx] = { ...entries[idx], product: e.target.value }
+                      detailField('payment_entries', entries)
+                    }} className={inp} placeholder="상품명" /></div>
                     <div><label className={lbl}>승인금액</label><input type="text" value={entry.approval_amount || ''} onChange={e => {
                       const entries: any[] = [...(d.payment_entries || [])]
-                      entries[idx] = { ...entries[idx], approval_amount: e.target.value }
+                      const amt = parseInt(e.target.value.replace(/[^0-9]/g, ''), 10) || 0
+                      const rate = parseFloat(String(entries[idx].fee_rate || '0')) || 0
+                      entries[idx] = { ...entries[idx], approval_amount: e.target.value, ...(amt > 0 && rate > 0 ? { fee_amount: String(Math.round(amt * rate / 100)) } : {}) }
                       detailField('payment_entries', entries)
                     }} className={inp} placeholder="0원" /></div>
                     <div><label className={lbl}>수수료%</label><input type="text" value={entry.fee_rate || ''} onChange={e => {
                       const entries: any[] = [...(d.payment_entries || [])]
-                      entries[idx] = { ...entries[idx], fee_rate: e.target.value }
+                      const rate = parseFloat(e.target.value) || 0
+                      const amt = parseInt(String(entries[idx].approval_amount || '0').replace(/[^0-9]/g, ''), 10) || 0
+                      entries[idx] = { ...entries[idx], fee_rate: e.target.value, ...(amt > 0 && rate > 0 ? { fee_amount: String(Math.round(amt * rate / 100)) } : {}) }
                       detailField('payment_entries', entries)
                     }} className={inp} placeholder="%" /></div>
-                    <div className="col-span-2"><label className={lbl}>수수료</label><input type="text" value={entry.fee_amount || ''} onChange={e => {
+                    <div className="col-span-2"><label className={lbl}>수수료 <span className="text-blue-600 font-bold">(관리팀 매출)</span></label><input type="text" value={entry.fee_amount || ''} onChange={e => {
                       const entries: any[] = [...(d.payment_entries || [])]
                       entries[idx] = { ...entries[idx], fee_amount: e.target.value }
                       detailField('payment_entries', entries)
@@ -1245,10 +1272,16 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
             )}
 
             <div className="grid grid-cols-2 gap-x-2 gap-y-2">
-              <div><label className={lbl}>계약금(VAT포함)</label><input type="text" value={d.contract_amount_vat || ''} onChange={e => detailField('contract_amount_vat', e.target.value)} className={inp} placeholder="0원" /></div>
+              <div><label className={lbl}>계약금(VAT미포함)</label><input type="text" value={d.contract_amount_vat || ''} onChange={e => detailField('contract_amount_vat', e.target.value)} className={inp} placeholder="0원" /></div>
               <div><label className={lbl}>입금액(VAT포함)</label><input type="text" value={d.deposit_amount_vat || ''} onChange={e => detailField('deposit_amount_vat', e.target.value)} className={inp} placeholder="0원" /></div>
-              <div><label className={lbl}>미입금액</label><input type="text" value={d.unpaid_amount || ''} onChange={e => detailField('unpaid_amount', e.target.value)} className={inp} placeholder="0원" /></div>
-              <div><label className={lbl}>세금계산서</label><input type="text" value={d.tax_invoice || ''} onChange={e => detailField('tax_invoice', e.target.value)} className={inp} placeholder="발급/미발급" /></div>
+              <div><label className={lbl}>미입금액(VAT미포함)</label><input type="text" value={d.unpaid_amount || ''} onChange={e => detailField('unpaid_amount', e.target.value)} className={inp} placeholder="0원" /></div>
+              <div><label className={lbl}>세금계산서</label>
+                <select value={d.tax_invoice || ''} onChange={e => detailField('tax_invoice', e.target.value)} className={inp}>
+                  <option value="">— 선택 —</option>
+                  <option value="발급">발급</option>
+                  <option value="미발급">미발급</option>
+                </select>
+              </div>
               <div><label className={lbl}>수수료율</label>
                 <div className="relative">
                   <input type="text" value={d.commission_rate || ''} onChange={e => detailField('commission_rate', e.target.value)} className={inp + ' pr-5'} placeholder="%" />
@@ -2261,6 +2294,129 @@ interface OpsDailyReport {
   new_contracts_count: string
 }
 
+// ──────────────────────────────────────────────────────────────────────
+// OpsRevenueTab (관리팀 매출 현황)
+// ──────────────────────────────────────────────────────────────────────
+function OpsRevenueTab({ userName }: { userName: string }) {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/revenue')
+      .then(r => r.json())
+      .then(d => { setData(d); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [])
+
+  function parseMoney(v: any) {
+    if (!v) return 0
+    return parseInt(String(v).replace(/[^0-9]/g, ''), 10) || 0
+  }
+  function fmtMoney(n: number) {
+    if (n >= 100_000_000) return (n / 100_000_000).toFixed(1) + '억'
+    if (n >= 10_000) return Math.round(n / 10_000) + '만원'
+    return n.toLocaleString() + '원'
+  }
+
+  const now = new Date()
+  const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
+  // 이달 내 수수료 건 목록 (본인 것만)
+  const myEntries: { company: string; amount: number; date: string }[] = []
+  if (data?.thisMonthOps) {
+    for (const e of data.thisMonthOps) {
+      if (!e.ops_user_name || e.ops_user_name === userName || !userName) {
+        myEntries.push({ company: e.company || '—', amount: e.amount, date: e.date || '' })
+      }
+    }
+  }
+  const myTotal = myEntries.reduce((s, e) => s + e.amount, 0)
+
+  // 월별 내 매출 (최근 6개월)
+  const monthly: { month: string; amount: number }[] = (data?.monthly || []).map((m: any) => ({
+    month: m.month,
+    amount: m.관리팀 || 0,
+  }))
+
+  if (loading) return (
+    <div className="text-center py-16 text-[#1B2A45]/40 text-sm">불러오는 중...</div>
+  )
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="font-bold text-[#1B2A45] text-base">💰 관리팀 매출 현황</h2>
+        <button onClick={() => {
+          setLoading(true)
+          fetch('/api/revenue').then(r => r.json()).then(d => { setData(d); setLoading(false) }).catch(() => setLoading(false))
+        }} className="text-xs bg-white border border-[#E8E2D4] text-[#1B2A45]/60 px-3 py-1.5 rounded-lg hover:border-[#1B2A45]/30 transition-colors">
+          🔄 새로고침
+        </button>
+      </div>
+
+      {/* 이달 총 매출 강조 블록 */}
+      <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-5 text-white">
+        <p className="text-emerald-100 text-xs font-semibold mb-1">{now.getMonth() + 1}월 관리팀 수수료 수입</p>
+        <p className="text-3xl font-black tracking-tight">{fmtMoney(myTotal)}</p>
+        <p className="text-emerald-200 text-xs mt-1">{myEntries.length}건</p>
+      </div>
+
+      {/* 이달 건별 내역 */}
+      {myEntries.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <p className="text-xs font-bold text-gray-500">이달 수수료 내역</p>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {myEntries.map((e, i) => (
+              <div key={i} className="flex items-center justify-between px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-[#1B2A45]">{e.company}</p>
+                  {e.date && <p className="text-[10px] text-gray-400 mt-0.5">{e.date}</p>}
+                </div>
+                <span className="text-base font-black text-emerald-600">{fmtMoney(e.amount)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {myEntries.length === 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-gray-400 text-sm">
+          이달 수수료 내역이 없습니다
+        </div>
+      )}
+
+      {/* 월별 매출 추이 */}
+      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100">
+          <p className="text-xs font-bold text-gray-500">월별 관리팀 수수료 수입</p>
+        </div>
+        <div className="p-4 space-y-2">
+          {monthly.map((m, i) => {
+            const max = Math.max(...monthly.map(x => x.amount), 1)
+            const pct = Math.round((m.amount / max) * 100)
+            const isCurrent = m.month === String(now.getMonth() + 1).padStart(2, '0') + '월'
+            return (
+              <div key={i} className="flex items-center gap-3">
+                <span className={`text-[11px] w-10 shrink-0 font-medium ${isCurrent ? 'text-emerald-600' : 'text-gray-400'}`}>{m.month}</span>
+                <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${isCurrent ? 'bg-emerald-500' : 'bg-teal-300'}`}
+                    style={{ width: pct + '%' }}
+                  />
+                </div>
+                <span className={`text-xs font-bold w-16 text-right ${isCurrent ? 'text-emerald-700' : 'text-gray-600'}`}>
+                  {m.amount > 0 ? fmtMoney(m.amount) : '—'}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function OpsReportTab({ userId, userName }: { userId: string; userName: string }) {
   const todayStr = new Date().toISOString().slice(0, 10)
   const [submitting, setSubmitting] = useState(false)
@@ -2785,6 +2941,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
     newdb:        newdbCases.length,
     ops_contract: null,
     report:       null,
+    revenue:      null,
     profile:      null,
   }
 
@@ -2914,6 +3071,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
                   { tab: 'completed' as OpsTab, icon: '✅', label: '종료업체', count: completedCases.length, color: 'border-emerald-200 hover:border-emerald-400' },
                   { tab: 'ops_contract' as OpsTab, icon: '📝', label: '관리팀계약', count: null, color: 'border-violet-200 hover:border-violet-400' },
                   { tab: 'report' as OpsTab, icon: '📋', label: '관리팀보고', count: null, color: 'border-blue-200 hover:border-blue-400' },
+                  { tab: 'revenue' as OpsTab, icon: '💰', label: '매출 현황', count: null, color: 'border-emerald-200 hover:border-emerald-400' },
                   { tab: 'profile' as OpsTab, icon: '👤', label: '사원정보', count: null, color: 'border-gray-200 hover:border-gray-400' },
                 ].map(item => (
                   <button key={item.tab} onClick={() => setActiveTab(item.tab)}
@@ -3017,6 +3175,11 @@ export default function OpsDashboard({ userId, userName }: Props) {
         {/* ── 관리팀보고 ── */}
         {activeTab === 'report' && (
           <OpsReportTab userId={userId} userName={userName} />
+        )}
+
+        {/* ── 매출 현황 ── */}
+        {activeTab === 'revenue' && (
+          <OpsRevenueTab userName={userName} />
         )}
 
         {/* ── 사원정보 ── */}
