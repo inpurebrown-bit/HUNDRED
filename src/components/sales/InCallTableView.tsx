@@ -4,6 +4,21 @@ import { useState, useRef, useEffect } from 'react'
 import NumberInput, { parseNumber, formatNumber } from '@/components/ui/NumberInput'
 import MeetingJournal from '@/components/sales/MeetingJournal'
 
+// ── 전화번호 유틸 ──────────────────────────────────────────
+function formatPhone(v: string): string {
+  if (!v) return ''
+  const d = v.replace(/[^0-9]/g, '')
+  if (d.length === 11) return `${d.slice(0,3)}-${d.slice(3,7)}-${d.slice(7)}`
+  if (d.length === 10) return `${d.slice(0,3)}-${d.slice(3,6)}-${d.slice(6)}`
+  return v
+}
+function autoHyphenPhone(v: string): string {
+  const d = v.replace(/[^0-9]/g, '').slice(0, 11)
+  if (d.length <= 3) return d
+  if (d.length <= 7) return `${d.slice(0,3)}-${d.slice(3)}`
+  return `${d.slice(0,3)}-${d.slice(3,7)}-${d.slice(7)}`
+}
+
 // ── KST 시간 유틸 ──────────────────────────────────────────
 function nowKST(): string {
   return new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(' ', 'T') + '+09:00'
@@ -350,7 +365,7 @@ function buildLogFields(c: Customer) {
   return [
     { label: '업체명',    value: c.details?.company || c.company },
     { label: '대표자',    value: c.name },
-    { label: '연락처',    value: c.phone },
+    { label: '연락처',    value: formatPhone(c.phone || '') },
     { label: '지역',      value: c.details?.region },
     { label: '접수일',    value: c.details?.reception_date },
     { label: '업종',      value: c.details?.business_type },
@@ -1187,7 +1202,7 @@ function CustomerCard({
         {/* 대표자 */}
         <p className="text-[10px] text-gray-400 mt-0.5 truncate px-1">{c.name}</p>
         {/* 전화번호 */}
-        <p className="text-[9px] text-gray-400 mt-0.5 font-mono truncate px-1">{c.phone}</p>
+        <p className="text-[9px] text-gray-400 mt-0.5 font-mono truncate px-1">{formatPhone(c.phone || '')}</p>
 
         {/* 감도 */}
         {c.details?.sensitivity && (
@@ -1491,10 +1506,10 @@ function CustomerCard({
                       <span className={`w-20 shrink-0 text-[10px] font-bold ${isKey ? 'text-blue-800' : 'text-blue-600'}`}>{label}</span>
                       <input
                         type="text"
-                        value={logDraft[key] || ''}
-                        onChange={e => setLogDraft(prev => ({ ...prev, [key]: e.target.value }))}
+                        value={key === 'phone' ? autoHyphenPhone(logDraft[key] || '') : (logDraft[key] || '')}
+                        onChange={e => setLogDraft(prev => ({ ...prev, [key]: key === 'phone' ? autoHyphenPhone(e.target.value) : e.target.value }))}
                         className="flex-1 text-xs bg-transparent border-0 border-b border-gray-300 focus:border-blue-400 focus:outline-none py-0.5 text-gray-800 placeholder:text-gray-300"
-                        placeholder="—"
+                        placeholder={key === 'phone' ? '010-0000-0000' : '—'}
                       />
                     </div>
                   ))}
@@ -1522,7 +1537,7 @@ function CustomerCard({
                       }`}>
                         <span className={`w-20 shrink-0 text-[10px] font-bold pt-0.5 ${isKey ? 'text-blue-800' : 'text-blue-600'}`}>{label}</span>
                         <span className={`text-xs flex-1 break-words ${isEmpty ? 'text-gray-300 italic' : isKey ? 'text-gray-900 font-semibold' : 'text-gray-700 font-medium'}`}>
-                          {isEmpty ? '—' : String(value)}
+                          {isEmpty ? '—' : label === '연락처' ? formatPhone(String(value)) : String(value)}
                         </span>
                       </div>
                     )
