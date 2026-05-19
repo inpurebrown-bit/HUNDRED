@@ -841,79 +841,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         {/* ══════════ 메인보드 ══════════ */}
         {activeTab === 'board' && (
           <div className="space-y-4">
-            {/* 월 목표 달성 배너 */}
-            <div className={`rounded-2xl p-5 border ${isAhead ? 'bg-emerald-50 border-emerald-200' : achievementRate >= 70 ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200'}`}>
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <p className="text-xs font-semibold text-gray-500">{thisMonth} 월간 목표</p>
-                    {/* 목표 인라인 편집 */}
-                    {!goalEditOpen ? (
-                      <button
-                        onClick={() => { setGoalEditValue(String(monthlyGoal)); setGoalEditOpen(true) }}
-                        className="text-[10px] text-gray-400 hover:text-blue-500 px-1.5 py-0.5 rounded hover:bg-blue-50 transition-colors font-medium"
-                      >✏️ 목표 설정</button>
-                    ) : (
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="number"
-                          value={goalEditValue}
-                          onChange={e => setGoalEditValue(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter') saveGoal(); if (e.key === 'Escape') setGoalEditOpen(false) }}
-                          className="w-14 text-xs border border-blue-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-400 text-gray-800"
-                          autoFocus
-                        />
-                        <button onClick={saveGoal} disabled={goalSaving}
-                          className="text-[10px] bg-blue-500 text-white px-2 py-0.5 rounded font-semibold hover:bg-blue-600 disabled:opacity-50">
-                          {goalSaving ? '…' : '저장'}
-                        </button>
-                        <button onClick={() => setGoalEditOpen(false)}
-                          className="text-[10px] text-gray-400 hover:text-gray-600 px-1">✕</button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className={`text-4xl font-black ${isAhead ? 'text-emerald-600' : achievementRate >= 70 ? 'text-amber-600' : 'text-red-600'}`}>
-                      {Number.isInteger(monthContractCount) ? monthContractCount : monthContractCount.toFixed(1)}
-                    </span>
-                    <span className="text-lg text-gray-400 font-medium">/ {monthlyGoal}개</span>
-                    <span className={`text-sm font-bold px-2 py-0.5 rounded-full ${isAhead ? 'bg-emerald-100 text-emerald-700' : achievementRate >= 70 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'}`}>
-                      {achievementRate}%
-                    </span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-gray-400">영업일 {bizElapsed}일째 / {bizTotal}일</p>
-                  <p className={`text-sm font-bold mt-0.5 ${isAhead ? 'text-emerald-600' : 'text-red-500'}`}>
-                    {isAhead ? '🔥 목표 페이스 초과' : `⚡ 하루 ${dailyPaceNeeded}건 필요`}
-                  </p>
-                </div>
-              </div>
-              <div className="bg-white/60 rounded-full h-3 overflow-hidden mb-3">
-                <div
-                  className={`h-full rounded-full transition-all duration-700 ${isAhead ? 'bg-emerald-500' : achievementRate >= 70 ? 'bg-amber-500' : 'bg-red-400'}`}
-                  style={{ width: `${Math.min(100, achievementRate)}%` }}
-                />
-              </div>
-              <div className="flex items-center justify-between text-xs text-gray-500">
-                <span>남은 목표 <strong className="text-gray-800">{remaining % 1 === 0 ? remaining : remaining.toFixed(1)}개</strong></span>
-                <span>페이스 기준 <strong className={isAhead ? 'text-emerald-600' : 'text-red-500'}>{onPaceCount}개</strong> 위치</span>
-                <span>남은 영업일 <strong className="text-gray-800">{bizRemaining}일</strong></span>
-              </div>
-              <p className={`text-xs font-semibold mt-2 text-center ${isAhead ? 'text-emerald-600' : achievementRate >= 50 ? 'text-amber-600' : 'text-red-500'}`}>
-                {achievementRate >= 100
-                  ? '🎉 목표 달성! 초과 달성 중입니다!'
-                  : isAhead
-                  ? '💪 잘 하고 있습니다! 이 페이스 유지하면 목표 달성!'
-                  : achievementRate >= 70
-                  ? `👊 조금만 더! 하루 ${dailyPaceNeeded}건씩 하면 됩니다`
-                  : achievementRate >= 40
-                  ? `⚡ 분발이 필요합니다. 하루 ${dailyPaceNeeded}건 목표!`
-                  : `🚨 목표 대비 부진 — 하루 ${dailyPaceNeeded}건 이상 필수!`}
-              </p>
-            </div>
-
-            {/* 공급 현황 — 대표 결제율 현황 기반 */}
+            {/* ── 이번달 공급 현황 (분석 대시보드) ── */}
             {(() => {
               const pr = myPayrateRow
               const ds = pr?.daily_supplies || {}
@@ -923,82 +851,112 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               const dirPay    = Number(pr?.direct_payment ?? 0)
               const target    = Number(pr?.target ?? monthlyGoal)
               const total     = supPay + dirPay
-              const supRate   = supCnt > 0    ? (supPay / supCnt * 100) : null
-              const dirRate   = dirCnt > 0    ? (dirPay / dirCnt * 100) : null
+              const supRate   = supCnt > 0 ? (supPay / supCnt * 100) : null
+              const dirRate   = dirCnt > 0 ? (dirPay / dirCnt * 100) : null
               const totRate   = (supCnt + dirCnt) > 0 ? (total / (supCnt + dirCnt) * 100) : null
-              const needed      = target - total
-              // 공급예정: 내일 공급 권장 수 (기준표 기반 일일권장)
-              const dailyRec    = supRate !== null ? calcRecommendedSupply(supRate, bizElapsed) : 0
-              const supNeeded   = dailyRec > 0 ? dailyRec : null
-              const supStopped  = supRate !== null && dailyRec === 0
-              const achievePct = target > 0 ? Math.round(total / target * 100) : 0
+              const needed    = Math.max(0, target - total)
+              const dailyRec  = supRate !== null ? calcRecommendedSupply(supRate, bizElapsed) : 0
+              const supStopped = supRate !== null && dailyRec === 0
+              const achievePct = target > 0 ? Math.min(100, Math.round(total / target * 100)) : 0
               const fmtV = (v: number) => v % 1 === 0 ? String(v) : v.toFixed(1)
               const fmtP = (v: number | null) => v !== null ? v.toFixed(1) + '%' : '—'
 
               return (
-                <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold text-gray-700">📊 내 이번달 공급 현황</p>
-                    <span className="text-[10px] text-gray-400">{thisMonth}</span>
-                  </div>
-                  {/* 상단 수치 */}
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="bg-sky-50 border border-sky-100 rounded-xl p-2.5">
-                      <p className="text-[9px] text-gray-400 mb-0.5">공급수</p>
-                      <p className="text-xl font-black text-sky-700">{supCnt}</p>
+                <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+                  {/* 헤더 */}
+                  <div className="bg-[#1B2A45] px-5 py-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-[11px] text-white/50 font-medium uppercase tracking-widest mb-0.5">이번달 공급 현황</p>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-black text-white">{fmtV(total)}</span>
+                        <span className="text-sm text-white/50">/ {target}개 목표</span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${achievePct >= 100 ? 'bg-emerald-400/20 text-emerald-300' : achievePct >= 60 ? 'bg-blue-400/20 text-blue-300' : 'bg-amber-400/20 text-amber-300'}`}>
+                          {achievePct}%
+                        </span>
+                      </div>
                     </div>
-                    <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2.5">
-                      <p className="text-[9px] text-gray-400 mb-0.5">공급결제</p>
-                      <p className="text-xl font-black text-emerald-700">{fmtV(supPay)}</p>
-                    </div>
-                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-2.5">
-                      <p className="text-[9px] text-gray-400 mb-0.5">공급결제율</p>
-                      <p className="text-xl font-black text-blue-700">{fmtP(supRate)}</p>
-                    </div>
-                    <div className="bg-violet-50 border border-violet-100 rounded-xl p-2.5">
-                      <p className="text-[9px] text-gray-400 mb-0.5">직접수</p>
-                      <p className="text-xl font-black text-violet-700">{dirCnt}</p>
-                    </div>
-                    <div className="bg-purple-50 border border-purple-100 rounded-xl p-2.5">
-                      <p className="text-[9px] text-gray-400 mb-0.5">직접결제</p>
-                      <p className="text-xl font-black text-purple-700">{fmtV(dirPay)}</p>
-                    </div>
-                    <div className="bg-pink-50 border border-pink-100 rounded-xl p-2.5">
-                      <p className="text-[9px] text-gray-400 mb-0.5">직접결제율</p>
-                      <p className="text-xl font-black text-pink-700">{fmtP(dirRate)}</p>
+                    <div className="text-right">
+                      <p className="text-[10px] text-white/40">{thisMonth} · 영업일 {bizElapsed}/{bizTotal}일</p>
+                      <p className="text-xs font-bold text-white/70 mt-0.5">잔여 {bizRemaining}일 · 목표까지 {fmtV(needed)}개</p>
                     </div>
                   </div>
-                  {/* 하단 요약 */}
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="bg-gray-800 rounded-xl p-2.5">
-                      <p className="text-[9px] text-white/60 mb-0.5">총결제</p>
-                      <p className="text-xl font-black text-white">{fmtV(total)}</p>
-                    </div>
-                    <div className="bg-teal-50 border border-teal-100 rounded-xl p-2.5">
-                      <p className="text-[9px] text-gray-400 mb-0.5">총결제율</p>
-                      <p className="text-xl font-black text-teal-700">{fmtP(totRate)}</p>
-                    </div>
-                    <div className={`border rounded-xl p-2.5 ${supStopped ? 'bg-red-50 border-red-100' : 'bg-amber-50 border-amber-100'}`}>
-                      <p className={`text-[9px] mb-0.5 ${supStopped ? 'text-red-400' : 'text-gray-400'}`}>공급예정</p>
-                      <p className={`text-xl font-black ${supStopped ? 'text-red-600' : 'text-amber-700'}`}>
-                        {supRate === null ? '—' : supStopped ? '공급중단' : `${supNeeded}개`}
-                      </p>
-                      {dailyRec > 0 && <p className="text-[8px] text-amber-400">내일 권장</p>}
-                    </div>
-                  </div>
+
                   {/* 목표 달성 바 */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] text-gray-500">목표 달성 ({fmtV(total)} / {target}개)</span>
-                      <span className="text-[10px] font-bold text-gray-700">{achievePct}%</span>
+                  <div className="h-1.5 bg-gray-100">
+                    <div
+                      className={`h-full transition-all duration-700 ${achievePct >= 100 ? 'bg-emerald-500' : achievePct >= 60 ? 'bg-blue-500' : 'bg-amber-400'}`}
+                      style={{ width: `${achievePct}%` }}
+                    />
+                  </div>
+
+                  <div className="p-4 space-y-3">
+                    {/* 공급 섹션 */}
+                    <div>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-2">공급 채널</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="rounded-xl bg-sky-50 p-3 text-center">
+                          <p className="text-[9px] text-sky-400 font-semibold mb-1">공급수</p>
+                          <p className="text-2xl font-black text-sky-700 leading-none">{supCnt}</p>
+                          <p className="text-[8px] text-sky-400 mt-1">이번달 투입</p>
+                        </div>
+                        <div className="rounded-xl bg-emerald-50 p-3 text-center">
+                          <p className="text-[9px] text-emerald-500 font-semibold mb-1">공급결제</p>
+                          <p className="text-2xl font-black text-emerald-700 leading-none">{fmtV(supPay)}</p>
+                          <p className="text-[8px] text-emerald-400 mt-1">공가 계약</p>
+                        </div>
+                        <div className="rounded-xl bg-blue-50 p-3 text-center relative">
+                          <p className="text-[9px] text-blue-400 font-semibold mb-1">공급결제율</p>
+                          <p className={`text-xl font-black leading-none ${supRate !== null && supRate >= 15 ? 'text-blue-700' : supRate !== null && supRate >= 13 ? 'text-amber-600' : 'text-red-500'}`}>
+                            {fmtP(supRate)}
+                          </p>
+                          <p className="text-[8px] text-blue-400 mt-1">
+                            {supRate === null ? '—' : supRate >= 20 ? '🔥 최상' : supRate >= 15 ? '✅ 양호' : supRate >= 13 ? '⚡ 주의' : '🚨 위험'}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full transition-all ${achievePct >= 100 ? 'bg-emerald-500' : achievePct >= 60 ? 'bg-blue-500' : 'bg-amber-400'}`}
-                        style={{ width: `${Math.min(100, achievePct)}%` }} />
+
+                    {/* 직접 섹션 */}
+                    <div>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-2">직접 채널</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="rounded-xl bg-violet-50 p-3 text-center">
+                          <p className="text-[9px] text-violet-400 font-semibold mb-1">직접수</p>
+                          <p className="text-2xl font-black text-violet-700 leading-none">{dirCnt}</p>
+                          <p className="text-[8px] text-violet-400 mt-1">직가 DB 등록</p>
+                        </div>
+                        <div className="rounded-xl bg-purple-50 p-3 text-center">
+                          <p className="text-[9px] text-purple-400 font-semibold mb-1">직접결제</p>
+                          <p className="text-2xl font-black text-purple-700 leading-none">{fmtV(dirPay)}</p>
+                          <p className="text-[8px] text-purple-400 mt-1">직가 계약</p>
+                        </div>
+                        <div className="rounded-xl bg-pink-50 p-3 text-center">
+                          <p className="text-[9px] text-pink-400 font-semibold mb-1">직접결제율</p>
+                          <p className="text-xl font-black text-pink-700 leading-none">{fmtP(dirRate)}</p>
+                          <p className="text-[8px] text-pink-400 mt-1">&nbsp;</p>
+                        </div>
+                      </div>
                     </div>
-                    {needed > 0 && (
-                      <p className="text-[10px] text-rose-500 font-semibold mt-1">목표까지 {fmtV(needed)}개 남음</p>
-                    )}
+
+                    {/* 통합 요약 바 */}
+                    <div className="bg-gray-50 rounded-xl p-3 grid grid-cols-3 divide-x divide-gray-200 text-center">
+                      <div className="pr-3">
+                        <p className="text-[9px] text-gray-400 font-semibold mb-0.5">총결제</p>
+                        <p className="text-lg font-black text-gray-800">{fmtV(total)}</p>
+                      </div>
+                      <div className="px-3">
+                        <p className="text-[9px] text-teal-500 font-semibold mb-0.5">총결제율</p>
+                        <p className="text-lg font-black text-teal-700">{fmtP(totRate)}</p>
+                      </div>
+                      <div className="pl-3">
+                        <p className={`text-[9px] font-semibold mb-0.5 ${supStopped ? 'text-red-400' : 'text-amber-500'}`}>
+                          내일 공급예정
+                        </p>
+                        <p className={`text-lg font-black ${supStopped ? 'text-red-600' : 'text-amber-700'}`}>
+                          {supRate === null ? '—' : supStopped ? '중단' : `${dailyRec}개`}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )
