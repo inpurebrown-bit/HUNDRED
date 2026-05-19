@@ -986,11 +986,16 @@ function RevenueTab() {
   const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
   const lastMonthStr = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`
 
-  const thisMonthRevenue = data?.monthly?.find((m: any) => m.month === thisMonthStr)?.합계 ?? 0
-  const lastMonthRevenue = data?.monthly?.find((m: any) => m.month === lastMonthStr)?.합계 ?? 0
+  const thisMonthRevenue = data?.monthly?.find((m: any) => m.fullMonth === thisMonthStr)?.합계 ?? 0
+  const lastMonthRevenue = data?.monthly?.find((m: any) => m.fullMonth === lastMonthStr)?.합계 ?? 0
   const revenueChange = lastMonthRevenue > 0
     ? (((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100).toFixed(1)
     : null
+
+  const thisMonthSales: any[] = data?.thisMonthSales || []
+  const thisMonthOps:   any[] = data?.thisMonthOps   || []
+  const thisMonthSalesTotal = thisMonthSales.reduce((s: number, e: any) => s + (e.amount || 0), 0)
+  const thisMonthOpsTotal   = thisMonthOps.reduce((s: number, e: any) => s + (e.amount || 0), 0)
 
   const totalCustomers = customers.length
   const contractedCustomers = customers.filter((c: any) => c.status === 'contracted').length
@@ -1038,6 +1043,81 @@ function RevenueTab() {
 
   return (
     <div className="space-y-6 pb-8">
+
+      {/* ── 이달 매출 상단 요약 ── */}
+      <div className="bg-gradient-to-r from-[#1B2A45] to-[#263d66] rounded-2xl p-5 text-white">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-[11px] text-white/60 font-medium">{thisMonthStr.replace('-', '년 ')}월 매출</p>
+            <p className="text-3xl font-black mt-0.5">{fmt(thisMonthSalesTotal + thisMonthOpsTotal)}원</p>
+          </div>
+          {revenueChange !== null && (
+            <div className={`text-center px-3 py-1.5 rounded-xl ${Number(revenueChange) >= 0 ? 'bg-emerald-500/30' : 'bg-red-400/30'}`}>
+              <p className="text-lg font-black">{Number(revenueChange) >= 0 ? '▲' : '▼'}{Math.abs(Number(revenueChange))}%</p>
+              <p className="text-[10px] text-white/70">전월 대비</p>
+            </div>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-white/10 rounded-xl p-3">
+            <p className="text-[10px] text-white/60 mb-1">영업팀 ({thisMonthSales.length}건)</p>
+            <p className="text-xl font-black">{fmt(thisMonthSalesTotal)}원</p>
+          </div>
+          <div className="bg-white/10 rounded-xl p-3">
+            <p className="text-[10px] text-white/60 mb-1">관리팀 ({thisMonthOps.length}건)</p>
+            <p className="text-xl font-black">{fmt(thisMonthOpsTotal)}원</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 이달 매출 내역 상세 ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* 영업팀 이달 계약 */}
+        <div className="bg-white rounded-xl border border-blue-100 overflow-hidden">
+          <div className="px-4 py-3 bg-blue-50 border-b border-blue-100 flex items-center justify-between">
+            <p className="text-xs font-bold text-blue-800">📋 영업팀 이달 계약 매출</p>
+            <span className="text-[10px] text-blue-600">{thisMonthSales.length}건 · {fmt(thisMonthSalesTotal)}원</span>
+          </div>
+          {thisMonthSales.length === 0 ? (
+            <p className="text-xs text-gray-400 text-center py-6">이달 계약 없음</p>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {thisMonthSales.map((e: any) => (
+                <div key={e.id} className="px-4 py-2.5 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-800">{e.company}</p>
+                    <p className="text-[10px] text-gray-400">{e.sales_user_name} · {e.date?.slice(0, 10)}</p>
+                  </div>
+                  <span className="text-sm font-black text-blue-600">{fmt(e.amount)}원</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {/* 관리팀 이달 수수료 */}
+        <div className="bg-white rounded-xl border border-violet-100 overflow-hidden">
+          <div className="px-4 py-3 bg-violet-50 border-b border-violet-100 flex items-center justify-between">
+            <p className="text-xs font-bold text-violet-800">💰 관리팀 이달 수수료 매출</p>
+            <span className="text-[10px] text-violet-600">{thisMonthOps.length}건 · {fmt(thisMonthOpsTotal)}원</span>
+          </div>
+          {thisMonthOps.length === 0 ? (
+            <p className="text-xs text-gray-400 text-center py-6">이달 수수료 없음</p>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {thisMonthOps.map((e: any) => (
+                <div key={e.id} className="px-4 py-2.5 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-800">{e.company}</p>
+                    <p className="text-[10px] text-gray-400">{e.ops_user_name} · {e.date?.slice(0, 10)}</p>
+                  </div>
+                  <span className="text-sm font-black text-violet-600">{fmt(e.amount)}원</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* 이번 달 성과 */}
       <div>
         <h3 className="text-sm font-semibold text-gray-700 mb-3">이번 달 성과</h3>

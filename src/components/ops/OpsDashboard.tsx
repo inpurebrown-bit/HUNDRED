@@ -132,6 +132,49 @@ const CRED_TYPES = [
 const inp = 'w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400/50 bg-white'
 const lbl = 'text-[10px] text-gray-400 mb-0.5 block font-medium'
 
+// ── 혁신성장촉진자금 드롭다운 ──────────────────────────────────────────
+const INNOVATION_GROUPS = [
+  { group: '혁신형', color: 'bg-violet-100 text-violet-800 border-violet-300', options: ['매출신장', '수출', '직접대출 성실상환'] },
+  { group: '일반형', color: 'bg-sky-100 text-sky-800 border-sky-300', options: ['3D', 'AI', '키오스크', '디지털오더', '무인판매기', '로봇', '디지털메뉴', '전자칠판', '고객관리S/W', '매출관리S/W', '재고관리S/W', '통합관리시스템', '온라인예약관리', '육가공공정시스템'] },
+]
+function InnovationSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const selected = value ? value.split(',').map(v => v.trim()).filter(Boolean) : []
+  useEffect(() => {
+    if (!open) return
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h)
+  }, [open])
+  function toggle(opt: string) { const next = selected.includes(opt) ? selected.filter(s => s !== opt) : [...selected, opt]; onChange(next.join(', ')) }
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" onClick={() => setOpen(v => !v)}
+        className="w-full text-left bg-white border border-gray-200 rounded-lg px-2 py-1 text-xs min-h-[28px] flex flex-wrap gap-1 items-center">
+        {selected.length > 0 ? selected.map(s => <span key={s} className="bg-violet-100 text-violet-800 px-1.5 py-0.5 rounded text-[10px] font-semibold">{s}</span>)
+          : <span className="text-gray-300 text-[10px]">클릭하여 선택</span>}
+        <span className="ml-auto text-gray-300 text-[10px]">▾</span>
+      </button>
+      {open && (
+        <div className="absolute z-50 top-full left-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 p-3 w-72">
+          {INNOVATION_GROUPS.map(({ group, color, options }) => (
+            <div key={group} className="mb-3 last:mb-0">
+              <p className="text-[10px] font-bold text-gray-500 mb-1.5">{group}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {options.map(opt => (
+                  <button key={opt} type="button" onClick={() => toggle(opt)}
+                    className={`px-2 py-1 rounded-full text-[10px] font-semibold border transition-colors ${selected.includes(opt) ? color : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'}`}>{opt}</button>
+                ))}
+              </div>
+            </div>
+          ))}
+          {selected.length > 0 && <button type="button" onClick={() => onChange('')} className="mt-2 text-[10px] text-red-400 hover:text-red-600 w-full text-right">전체 해제</button>}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // 인콜일지 결과 배지 옵션 (영업팀과 동일)
 const INCALL_CALL_RESULTS = [
   { key: '원콜클로징', color: 'bg-emerald-500 text-white' },
@@ -840,6 +883,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
             const subcallDate   = gv('subcall_date',   cd.subcall_date   ?? '')
 
             // 섹션별 필드 정의
+            const innovationVal = gv('innovation', cd.innovation || '')
             const sections = [
               {
                 title: '기업 기본정보', bg: 'bg-[#1B2A45]', textColor: 'text-white',
@@ -849,7 +893,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                   [['지역', 'region', gv('region', cd.region || '')], ['접수일', 'reception_date', gv('reception_date', cd.reception_date || (cd.created_at ? formatKST(cd.created_at).date : ''))]],
                   [['업종', 'business_type', gv('business_type', cd.business_type || '')], ['실제업무', 'real_work', gv('real_work', cd.real_work || '')]],
                   [['업력', 'years_in_business', gv('years_in_business', cd.years_in_business || cd.biz_size || '')], ['직원수', 'employee_count', gv('employee_count', cd.employee_count || '')]],
-                  [['혁신요건', 'innovation', gv('innovation', cd.innovation || '')]],
+                  [['특허', 'patent', gv('patent', cd.patent || '')]],
                 ],
               },
               {
@@ -866,9 +910,9 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                 fields: [
                   [['KCB점수', 'credit_kcb', gv('credit_kcb', cd.credit_kcb || cd.credit_score || '')], ['NICE점수', 'credit_nice', gv('credit_nice', cd.credit_nice || '')]],
                   [['세금체납', 'tax_status', gv('tax_status', cd.tax_status || cd.tax_delinquency || '')], ['자산', 'assets', gv('assets', cd.assets || '')]],
-                  [['25년매출', 'revenue_2025', gv('revenue_2025', cd.revenue_2025 || '')], ['24년매출', 'revenue_2024', gv('revenue_2024', cd.revenue_2024 || '')]],
-                  [['23년매출', 'revenue_2023', gv('revenue_2023', cd.revenue_2023 || '')], ['필요자금', 'required_funds', gv('required_funds', cd.required_funds || '')]],
-                  [['솔루션', 'solution', gv('solution', cd.solution || '')]],
+                  [['26년매출', 'revenue_2026', gv('revenue_2026', cd.revenue_2026 || '')], ['25년매출', 'revenue_2025', gv('revenue_2025', cd.revenue_2025 || '')]],
+                  [['24년매출', 'revenue_2024', gv('revenue_2024', cd.revenue_2024 || '')], ['23년매출', 'revenue_2023', gv('revenue_2023', cd.revenue_2023 || '')]],
+                  [['필요자금', 'required_funds', gv('required_funds', cd.required_funds || '')], ['솔루션', 'solution', gv('solution', cd.solution || '')]],
                 ],
               },
             ]
@@ -920,6 +964,47 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                     </div>
                   </div>
                 ))}
+
+                {/* ── 혁신성장촉진자금 ── */}
+                <div className="mb-0">
+                  <div className="bg-emerald-700 px-3 py-1.5">
+                    <span className="text-[10px] font-bold text-white tracking-wide">혁신성장촉진자금</span>
+                  </div>
+                  <div className="px-3 py-2 hover:bg-gray-50 transition-colors">
+                    <span className="text-[10px] text-gray-400 font-medium block mb-1">혁신요건</span>
+                    {incallEditing ? (
+                      <InnovationSelect value={innovationVal} onChange={v => incallField('innovation', v)} />
+                    ) : (
+                      innovationVal
+                        ? <div className="flex flex-wrap gap-1">{innovationVal.split(',').map((s: string) => s.trim()).filter((s: string) => Boolean(s)).map((s: string) => (
+                            <span key={s} className="bg-violet-100 text-violet-800 px-1.5 py-0.5 rounded text-[10px] font-semibold">{s}</span>
+                          ))}</div>
+                        : <span className="text-xs font-semibold text-gray-300">—</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── 통화 메모 ── */}
+                <div className="mb-0">
+                  <div className="bg-gray-700 px-3 py-1.5">
+                    <span className="text-[10px] font-bold text-white tracking-wide">통화 메모</span>
+                  </div>
+                  <div className="px-3 py-2">
+                    {incallEditing ? (
+                      <textarea
+                        value={gv('notes', cd.notes || '')}
+                        onChange={e => incallField('notes', e.target.value)}
+                        placeholder="통화 내용 / 메모를 입력하세요…"
+                        rows={3}
+                        className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-blue-300 resize-y"
+                      />
+                    ) : (
+                      <p className={`text-xs whitespace-pre-wrap ${gv('notes', cd.notes || '') ? 'text-gray-700' : 'text-gray-300'}`}>
+                        {gv('notes', cd.notes || '') || '—'}
+                      </p>
+                    )}
+                  </div>
+                </div>
 
                 {/* ── 영업팀 통화메모 (읽기전용) ── */}
                 {(() => {
@@ -1105,10 +1190,9 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
 
             <div className="grid grid-cols-2 gap-x-2 gap-y-2">
               <div><label className={lbl}>계약금(VAT포함)</label><input type="text" value={d.contract_amount_vat || ''} onChange={e => detailField('contract_amount_vat', e.target.value)} className={inp} placeholder="0원" /></div>
-              <div><label className={lbl}>계약금(VAT제외)</label><input type="text" value={d.contract_amount || ''} onChange={e => detailField('contract_amount', e.target.value)} className={inp} placeholder="0원" /></div>
               <div><label className={lbl}>입금액(VAT포함)</label><input type="text" value={d.deposit_amount_vat || ''} onChange={e => detailField('deposit_amount_vat', e.target.value)} className={inp} placeholder="0원" /></div>
-              <div><label className={lbl}>입금액(VAT제외)</label><input type="text" value={d.deposit_amount || ''} onChange={e => detailField('deposit_amount', e.target.value)} className={inp} placeholder="0원" /></div>
               <div><label className={lbl}>미입금액</label><input type="text" value={d.unpaid_amount || ''} onChange={e => detailField('unpaid_amount', e.target.value)} className={inp} placeholder="0원" /></div>
+              <div><label className={lbl}>세금계산서</label><input type="text" value={d.tax_invoice || ''} onChange={e => detailField('tax_invoice', e.target.value)} className={inp} placeholder="발급/미발급" /></div>
               <div><label className={lbl}>수수료율</label>
                 <div className="relative">
                   <input type="text" value={d.commission_rate || ''} onChange={e => detailField('commission_rate', e.target.value)} className={inp + ' pr-5'} placeholder="%" />
