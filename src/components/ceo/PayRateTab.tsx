@@ -418,8 +418,8 @@ function PayRateSubView() {
             const contractMonth  = (c.details?.contract_date || c.created_at || '').slice(0, 7)
             // 직가 등록월: db010_month 우선, 없으면 접수일, 없으면 created_at
             const receptionMonth = (c.details?.db010_month || c.details?.reception_date || c.created_at || '').slice(0, 7)
-            const isLead   = c.status === 'lead' || c.status === 'consulting'
-            const isDirect = c.status === 'db010'
+            const isLead   = (c.status === 'lead' || c.status === 'consulting') && !c.details?.db010_month
+            const isDirect = c.status === 'db010' || !!c.details?.db010_month
 
             // 전체 계약 집계 (기존)
             if (c.status === 'contracted' && contractMonth === month) {

@@ -855,11 +855,22 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 const regMonth = (c as any).details?.db010_month
                   || ((c as any).details?.reception_date || (c as any).created_at || '').slice(0, 7)
                 const isDirectType = c.status === 'db010'
-                  || (c as any).details?.db010_month  // 기존에 db010으로 등록된 적 있는 경우
+                  || !!(c as any).details?.db010_month  // 기존에 db010으로 등록된 적 있는 경우 (계약 후에도 유지)
                 return isDirectType && regMonth === thisMonth && !(c as any).details?.direct_count_voided
               }).length
+              // 직접결제: customers DB에서 db010 출신 계약 완료 건 실시간 집계
+              const dirPayAuto = customers
+                .filter(c => {
+                  const isDirectType = c.status === 'db010' || !!(c as any).details?.db010_month
+                  const contractMonth = ((c as any).details?.contract_date || (c as any).created_at || '').slice(0, 7)
+                  return isDirectType && c.status === 'contracted' && contractMonth === thisMonth
+                })
+                .reduce((sum, c) => {
+                  const amt = Number((c as any).details?.payment_amount || 0)
+                  return sum + (amt <= 330000 ? 0.5 : 1)
+                }, 0)
               const dirCnt    = dirCntAuto > 0 ? dirCntAuto : Number(pr?.direct_count ?? 0)
-              const dirPay    = Number(pr?.direct_payment ?? 0)
+              const dirPay    = dirPayAuto > 0 ? dirPayAuto : Number(pr?.direct_payment ?? 0)
               const target    = Number(pr?.target ?? monthlyGoal)
               const total     = supPay + dirPay
               const supRate   = supCnt > 0 ? (supPay / supCnt * 100) : null
