@@ -391,8 +391,8 @@ function PayRateSubView() {
           .forEach((c: any) => {
             const name  = (c.details?.sales_user_name || c.sales_user_name || '').trim()
             if (!name || name === TESTER) return
-            const contractMonth = (c.details?.contract_date || c.created_at || '').slice(0, 7)
-            const createMonth   = (c.created_at || '').slice(0, 7)
+            const contractMonth  = (c.details?.contract_date || c.created_at || '').slice(0, 7)
+            const receptionMonth = (c.details?.reception_date || c.created_at || '').slice(0, 7)
             const isLead   = c.status === 'lead' || c.status === 'consulting'
             const isDirect = c.status === 'db010'
 
@@ -403,8 +403,8 @@ function PayRateSubView() {
               if (isLead)   supplyPayMap[name]  = (supplyPayMap[name]  || 0) + w
               if (isDirect) directPayMap[name]  = (directPayMap[name]  || 0) + w
             }
-            // 직접수: 직가 DB 이번달 추가
-            if (isDirect && createMonth === month) {
+            // 직접수: 직가 DB 접수일 기준 이번달
+            if (isDirect && receptionMonth === month) {
               directCntMap[name] = (directCntMap[name] || 0) + 1
             }
           })
