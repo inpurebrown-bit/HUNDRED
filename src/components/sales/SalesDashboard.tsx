@@ -438,6 +438,8 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         assets: rest.assets,
         required_funds: rest.required_funds,
         sensitivity: rest.sensitivity,
+        // 직가DB 등록 시 등록월 영구 기록 (거절/삭제 후에도 카운트 유지용)
+        ...(status === 'db010' ? { db010_month: new Date().toISOString().slice(0, 7) } : {}),
       },
     }
   }
@@ -848,10 +850,14 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               const supCnt    = Object.values(ds).reduce((s: number, v: any) => s + Number(v || 0), 0)
               const supPay    = Number(pr?.supply_payment ?? 0)
               // 직접수: 저장된 값 말고 customers DB에서 이번달 db010 실시간 카운트
-              const dirCntAuto = customers.filter(c =>
-                c.status === 'db010' &&
-                ((c as any).details?.reception_date || (c as any).created_at || '').slice(0, 7) === thisMonth
-              ).length
+              // 직접수: db010_month(신규) 또는 접수일/등록일 기준 — 거절/삭제 이동 후에도 카운트 유지
+              const dirCntAuto = customers.filter(c => {
+                const regMonth = (c as any).details?.db010_month
+                  || ((c as any).details?.reception_date || (c as any).created_at || '').slice(0, 7)
+                const isDirectType = c.status === 'db010'
+                  || (c as any).details?.db010_month  // 기존에 db010으로 등록된 적 있는 경우
+                return isDirectType && regMonth === thisMonth && !(c as any).details?.direct_count_voided
+              }).length
               const dirCnt    = dirCntAuto > 0 ? dirCntAuto : Number(pr?.direct_count ?? 0)
               const dirPay    = Number(pr?.direct_payment ?? 0)
               const target    = Number(pr?.target ?? monthlyGoal)

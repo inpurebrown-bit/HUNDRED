@@ -11,6 +11,7 @@ interface EmployeeRow {
   supply_payment: number // 하위호환 보존 (실제값은 자동집계)
   direct_count: number   // 하위호환 보존 (실제값은 자동집계)
   direct_payment: number // 하위호환 보존 (실제값은 자동집계)
+  direct_adjustment?: number // 대표가 수동 차감한 카운트 (음수, 기본 0)
   daily_supplies?: Record<string, number> // 일별 공급 입력 (key: 일자 "1"~"31")
 }
 
@@ -145,9 +146,11 @@ function EmpCard({
   const supplyCount   = Object.values(dailySupplies).reduce((s, v) => s + Number(v || 0), 0)
 
   // 수동 입력값 (저장된 값 사용, DB자동값은 참고용)
-  const supplyPayment = Number(row.supply_payment)
-  const directCount   = Number(row.direct_count)
-  const directPayment = Number(row.direct_payment)
+  const supplyPayment    = Number(row.supply_payment)
+  const directCountRaw   = Number(row.direct_count)
+  const directAdjustment = Number(row.direct_adjustment ?? 0)  // 대표 수동 차감 (음수)
+  const directCount      = Math.max(0, directCountRaw + directAdjustment)
+  const directPayment    = Number(row.direct_payment)
 
   const total       = supplyPayment + directPayment
   const supplyRate  = supplyCount > 0 ? (supplyPayment / supplyCount * 100) : null
@@ -247,9 +250,30 @@ function EmpCard({
         {/* 공급결제 - 수동 (DB자동값 참고) */}
         <EditableAutoField label="공급결제" field="supply_payment"
           value={supplyPayment} autoVal={autoData.supply_payment} color="text-emerald-600" />
-        {/* 직접수 - 수동 */}
-        <EditableAutoField label="직접수" field="direct_count"
-          value={directCount} autoVal={autoData.direct_count} color="text-violet-600" />
+        {/* 직접수 - 자동집계 + 대표 차감 버튼 */}
+        <div className="flex flex-col items-center gap-0.5">
+          <div className="flex items-center gap-0.5">
+            <p className="text-[9px] font-medium text-violet-600">직접수</p>
+            {directAdjustment < 0 && (
+              <span className="text-[8px] text-red-400 font-bold">{directAdjustment}</span>
+            )}
+          </div>
+          <div className="w-full text-center text-sm font-bold text-violet-700 bg-violet-50 rounded-xl border border-violet-100 px-1 py-2">
+            {directCount}
+          </div>
+          <button
+            title="직접수 1개 취소 (실수 등록 시 대표만 사용)"
+            onClick={() => onChange(idx, 'direct_adjustment', directAdjustment - 1)}
+            className="text-[8px] text-red-300 hover:text-red-500 hover:bg-red-50 rounded px-1 py-0.5 transition-colors font-semibold"
+          >−1 취소</button>
+          {directAdjustment < 0 && (
+            <button
+              title="차감 취소 (복원)"
+              onClick={() => onChange(idx, 'direct_adjustment', directAdjustment + 1)}
+              className="text-[8px] text-gray-300 hover:text-gray-500 hover:bg-gray-50 rounded px-1 py-0.5 transition-colors"
+            >+1 복원</button>
+          )}
+        </div>
         {/* 직접결제 - 수동 */}
         <EditableAutoField label="직접결제" field="direct_payment"
           value={directPayment} autoVal={autoData.direct_payment} color="text-purple-600" />
@@ -392,7 +416,8 @@ function PayRateSubView() {
             const name  = (c.details?.sales_user_name || c.sales_user_name || '').trim()
             if (!name || name === TESTER) return
             const contractMonth  = (c.details?.contract_date || c.created_at || '').slice(0, 7)
-            const receptionMonth = (c.details?.reception_date || c.created_at || '').slice(0, 7)
+            // 직가 등록월: db010_month 우선, 없으면 접수일, 없으면 created_at
+            const receptionMonth = (c.details?.db010_month || c.details?.reception_date || c.created_at || '').slice(0, 7)
             const isLead   = c.status === 'lead' || c.status === 'consulting'
             const isDirect = c.status === 'db010'
 
@@ -403,8 +428,10 @@ function PayRateSubView() {
               if (isLead)   supplyPayMap[name]  = (supplyPayMap[name]  || 0) + w
               if (isDirect) directPayMap[name]  = (directPayMap[name]  || 0) + w
             }
-            // 직접수: 직가 DB 접수일 기준 이번달
-            if (isDirect && receptionMonth === month) {
+            // 직접수: 거절/삭제 이동해도 카운트 유지 (direct_count_voided=true일 때만 제외)
+            const isDirectMonth = isDirect && receptionMonth === month
+            const isVoided = c.details?.direct_count_voided === true
+            if (isDirectMonth && !isVoided) {
               directCntMap[name] = (directCntMap[name] || 0) + 1
             }
           })
