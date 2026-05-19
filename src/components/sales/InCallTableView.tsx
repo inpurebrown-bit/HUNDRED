@@ -1185,14 +1185,36 @@ function CustomerCard({
           </div>
         )}
 
-        {/* 직가/공가 뱃지 */}
-        {leadType && (
-          <div className="mb-1 flex justify-center">
-            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${leadType === '직가' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
-              {leadType}
-            </span>
-          </div>
-        )}
+        {/* 현재 탭 위치 뱃지 */}
+        {(() => {
+          const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
+            db010:      { label: '직가DB',   cls: 'bg-violet-100 text-violet-700' },
+            lead:       { label: '공가DB',   cls: 'bg-sky-100 text-sky-700' },
+            consulting: { label: '공가DB',   cls: 'bg-sky-100 text-sky-700' },
+            contracted: { label: '계약업체', cls: 'bg-emerald-100 text-emerald-700' },
+            emotional:  { label: '거절업체', cls: 'bg-pink-100 text-pink-700' },
+            trash:      { label: '자체거절', cls: 'bg-gray-100 text-gray-500' },
+          }
+          const badge = STATUS_BADGE[c.status]
+          return badge ? (
+            <div className="mb-1 flex justify-center gap-1">
+              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${badge.cls}`}>
+                {badge.label}
+              </span>
+              {leadType && (
+                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${leadType === '직가' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {leadType}
+                </span>
+              )}
+            </div>
+          ) : leadType ? (
+            <div className="mb-1 flex justify-center">
+              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${leadType === '직가' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                {leadType}
+              </span>
+            </div>
+          ) : null
+        })()}
 
         {/* 업체명 — 긴 이름 줄바꿈 */}
         <p className="font-bold text-[#1B2A45] text-[11px] leading-snug px-1 break-all"
