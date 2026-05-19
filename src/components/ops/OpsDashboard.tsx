@@ -214,12 +214,11 @@ const INCALL_CLOSING_RESULTS = [
 ]
 
 // ── Tab types ──────────────────────────────────────────────────────────
-type OpsTab = 'dashboard' | 'active' | 'holding' | 'refund' | 'completed' | 'newdb' | 'ops_contract' | 'report' | 'profile'
+type OpsTab = 'dashboard' | 'active' | 'refund' | 'completed' | 'newdb' | 'ops_contract' | 'report' | 'profile'
 
 const opsTabs: { key: OpsTab; label: string }[] = [
   { key: 'dashboard',    label: '📊 대시보드' },
   { key: 'active',       label: '🔄 진행중업체' },
-  { key: 'holding',      label: '🔒 홀딩' },
   { key: 'refund',       label: '💸 환불업체' },
   { key: 'completed',    label: '✅ 종료업체' },
   { key: 'newdb',        label: '🆕 신규DB' },
@@ -1639,7 +1638,8 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
-  // 핸들링 플래그가 켜진 케이스 분리
+  // 플래그 분류 헬퍼
+  const isHolding  = (c: OpsCase) => !!(c.details?.is_holding)
   const isHandling = (c: OpsCase) =>
     !!(c.details?.handling_no_contact || c.details?.handling_no_fit || c.details?.handling_mindless)
 
@@ -1647,11 +1647,14 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
   const pendingCases = cases.filter(c =>
     PENDING_REFUND_KEYS.has(c.progress_stage) || PENDING_DONE_KEYS.has(c.progress_stage)
   )
+  const holdingCases = cases.filter(c =>
+    !PENDING_REFUND_KEYS.has(c.progress_stage) && !PENDING_DONE_KEYS.has(c.progress_stage) && isHolding(c)
+  )
   const handlingCases = cases.filter(c =>
-    !PENDING_REFUND_KEYS.has(c.progress_stage) && !PENDING_DONE_KEYS.has(c.progress_stage) && isHandling(c)
+    !PENDING_REFUND_KEYS.has(c.progress_stage) && !PENDING_DONE_KEYS.has(c.progress_stage) && !isHolding(c) && isHandling(c)
   )
   const regularCases = cases.filter(c =>
-    !PENDING_REFUND_KEYS.has(c.progress_stage) && !PENDING_DONE_KEYS.has(c.progress_stage) && !isHandling(c)
+    !PENDING_REFUND_KEYS.has(c.progress_stage) && !PENDING_DONE_KEYS.has(c.progress_stage) && !isHolding(c) && !isHandling(c)
   )
 
   // 기관별 그룹: 한 케이스가 여러 기관에 걸쳐 있으면 모두 등장
@@ -1665,8 +1668,10 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
   // 신규 유입 (institution이 비어있는 케이스) — 제일 상단에 배치
   const unassigned = regularCases.filter(c => !c.institution || c.institution.trim() === '')
   if (unassigned.length > 0) instGroups.unshift({ inst: '신규 유입', items: unassigned })
-  // 핸들링 그룹 — 신규유입 아래
+  // 핸들링 그룹
   if (handlingCases.length > 0) instGroups.push({ inst: '🔧 핸들링', items: handlingCases })
+  // 홀딩 그룹 — 핸들링 아래
+  if (holdingCases.length > 0) instGroups.push({ inst: '🔒 홀딩', items: holdingCases })
   // 승인 대기 — 최상단에 배치
   if (pendingCases.length > 0) instGroups.unshift({ inst: '⏳ 대표 승인 대기', items: pendingCases })
 
@@ -1697,7 +1702,9 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
                       ? 'bg-rose-500 hover:bg-rose-600'
                       : inst === '🔧 핸들링'
                         ? 'bg-slate-500 hover:bg-slate-600'
-                        : 'bg-[#1B2A45] hover:bg-[#1B2A45]/90'
+                        : inst === '🔒 홀딩'
+                          ? 'bg-indigo-600 hover:bg-indigo-700'
+                          : 'bg-[#1B2A45] hover:bg-[#1B2A45]/90'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -2706,17 +2713,8 @@ export default function OpsDashboard({ userId, userName }: Props) {
     : cases
 
   const newdbCases     = filteredCases.filter(c => NEWDB_STAGE_KEYS.has(c.progress_stage))
-  const holdingCases   = filteredCases.filter(c =>
-    !NEWDB_STAGE_KEYS.has(c.progress_stage) &&
-    !REFUND_STAGE_KEYS.has(c.progress_stage) &&
-    !COMPLETED_STAGE_KEYS.has(c.progress_stage) &&
-    !c.is_refund && !c.is_completed &&
-    !!(c.details?.is_holding)
-  )
-  const holdingIds = new Set(holdingCases.map(c => c.id))
   const activeCases    = filteredCases.filter(c =>
-    !NEWDB_STAGE_KEYS.has(c.progress_stage) &&
-    !holdingIds.has(c.id) && (
+    !NEWDB_STAGE_KEYS.has(c.progress_stage) && (
       ACTIVE_STAGE_KEYS.has(c.progress_stage) ||
       (!REFUND_STAGE_KEYS.has(c.progress_stage) && !COMPLETED_STAGE_KEYS.has(c.progress_stage) && !c.is_refund && !c.is_completed)
     )
@@ -2727,7 +2725,6 @@ export default function OpsDashboard({ userId, userName }: Props) {
   const tabCounts: Record<OpsTab, number | null> = {
     dashboard:    null,
     active:       activeCases.length,
-    holding:      holdingCases.length,
     refund:       refundCases.length,
     completed:    completedCases.length,
     newdb:        newdbCases.length,
@@ -2898,33 +2895,6 @@ export default function OpsDashboard({ userId, userName }: Props) {
             ) : (
               <InstitutionGroupedView
                 cases={activeCases}
-                openPanelIds={openPanelIds}
-                onToggle={togglePanel}
-                onScriptToggle={(id, val) =>
-                  handleSave(id, { details: { ...(cases.find(x => x.id === id)?.details || {}), script_sent: val } })
-                }
-              />
-            )}
-          </div>
-        )}
-
-        {/* ── 홀딩 ── */}
-        {activeTab === 'holding' && (
-          <div className="max-w-6xl space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="font-bold text-[#1B2A45] text-base">🔒 홀딩</h2>
-                <p className="text-xs text-gray-400 mt-0.5">홀딩 처리된 업체 — 상세에서 🔒 홀딩(해제) 버튼으로 복귀</p>
-              </div>
-              <span className="text-xs text-gray-400">{holdingCases.length}건</span>
-            </div>
-            {loading ? (
-              <div className="text-center py-16 text-[#1B2A45]/40 text-sm">불러오는 중...</div>
-            ) : holdingCases.length === 0 ? (
-              <div className="bg-white rounded-xl border border-[#E8E2D4] p-14 text-center text-[#1B2A45]/40 text-sm">홀딩 업체가 없습니다</div>
-            ) : (
-              <InstitutionGroupedView
-                cases={holdingCases}
                 openPanelIds={openPanelIds}
                 onToggle={togglePanel}
                 onScriptToggle={(id, val) =>
