@@ -82,7 +82,10 @@ function normalize(c: any, customerMap: Record<string, any> = {}, customerIdMap:
     progress_memo:  c.memo  ?? '',
     customers: {
       name:    cust?.name ?? c.customer_name ?? '',
-      phone:   cust?.phone || (isKoreanPhone(c.phone) ? c.phone : ''),
+      phone:   cust?.phone
+        || (isKoreanPhone(c.phone) ? c.phone : '')
+        || (isKoreanPhone(c.details?.incall_journal?.phone) ? c.details.incall_journal.phone : '')
+        || (isKoreanPhone(c.details?.sales_customer_info?.phone) ? c.details.sales_customer_info.phone : ''),
       company: mergedDetails.company,
       details: mergedDetails,
       call_timeline: cust?.call_timeline || [],
