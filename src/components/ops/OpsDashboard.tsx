@@ -214,11 +214,12 @@ const INCALL_CLOSING_RESULTS = [
 ]
 
 // ── Tab types ──────────────────────────────────────────────────────────
-type OpsTab = 'dashboard' | 'active' | 'refund' | 'completed' | 'newdb' | 'ops_contract' | 'report' | 'profile'
+type OpsTab = 'dashboard' | 'active' | 'holding' | 'refund' | 'completed' | 'newdb' | 'ops_contract' | 'report' | 'profile'
 
 const opsTabs: { key: OpsTab; label: string }[] = [
   { key: 'dashboard',    label: '📊 대시보드' },
   { key: 'active',       label: '🔄 진행중업체' },
+  { key: 'holding',      label: '🔒 홀딩' },
   { key: 'refund',       label: '💸 환불업체' },
   { key: 'completed',    label: '✅ 종료업체' },
   { key: 'newdb',        label: '🆕 신규DB' },
@@ -617,6 +618,16 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                   </button>
                 )
               })}
+              {/* 홀딩 버튼 */}
+              <button type="button"
+                onClick={() => detailField('is_holding', !(d as any).is_holding)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                  (d as any).is_holding
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'bg-white text-indigo-600 border-indigo-300 hover:bg-indigo-50'
+                }`}>
+                🔒 홀딩{(d as any).is_holding ? ' (해제)' : ''}
+              </button>
             </div>
             {((d as any).handling_no_contact || (d as any).handling_no_fit || (d as any).handling_mindless) && (
               <div className="mt-2">
@@ -1357,6 +1368,12 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
         </div>
       )}
 
+      {/* 홀딩 뱃지 */}
+      {c.details?.is_holding && (
+        <div className="mt-0.5">
+          <span className="text-[8px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold">🔒홀딩</span>
+        </div>
+      )}
       {/* 핸들링 뱃지 */}
       {(c.details?.handling_no_contact || c.details?.handling_no_fit || c.details?.handling_mindless) && (
         <div className="mt-0.5 flex flex-wrap gap-0.5 justify-center">
@@ -2689,8 +2706,17 @@ export default function OpsDashboard({ userId, userName }: Props) {
     : cases
 
   const newdbCases     = filteredCases.filter(c => NEWDB_STAGE_KEYS.has(c.progress_stage))
+  const holdingCases   = filteredCases.filter(c =>
+    !NEWDB_STAGE_KEYS.has(c.progress_stage) &&
+    !REFUND_STAGE_KEYS.has(c.progress_stage) &&
+    !COMPLETED_STAGE_KEYS.has(c.progress_stage) &&
+    !c.is_refund && !c.is_completed &&
+    !!(c.details?.is_holding)
+  )
+  const holdingIds = new Set(holdingCases.map(c => c.id))
   const activeCases    = filteredCases.filter(c =>
-    !NEWDB_STAGE_KEYS.has(c.progress_stage) && (
+    !NEWDB_STAGE_KEYS.has(c.progress_stage) &&
+    !holdingIds.has(c.id) && (
       ACTIVE_STAGE_KEYS.has(c.progress_stage) ||
       (!REFUND_STAGE_KEYS.has(c.progress_stage) && !COMPLETED_STAGE_KEYS.has(c.progress_stage) && !c.is_refund && !c.is_completed)
     )
@@ -2701,6 +2727,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
   const tabCounts: Record<OpsTab, number | null> = {
     dashboard:    null,
     active:       activeCases.length,
+    holding:      holdingCases.length,
     refund:       refundCases.length,
     completed:    completedCases.length,
     newdb:        newdbCases.length,
@@ -2871,6 +2898,33 @@ export default function OpsDashboard({ userId, userName }: Props) {
             ) : (
               <InstitutionGroupedView
                 cases={activeCases}
+                openPanelIds={openPanelIds}
+                onToggle={togglePanel}
+                onScriptToggle={(id, val) =>
+                  handleSave(id, { details: { ...(cases.find(x => x.id === id)?.details || {}), script_sent: val } })
+                }
+              />
+            )}
+          </div>
+        )}
+
+        {/* ── 홀딩 ── */}
+        {activeTab === 'holding' && (
+          <div className="max-w-6xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-bold text-[#1B2A45] text-base">🔒 홀딩</h2>
+                <p className="text-xs text-gray-400 mt-0.5">홀딩 처리된 업체 — 상세에서 🔒 홀딩(해제) 버튼으로 복귀</p>
+              </div>
+              <span className="text-xs text-gray-400">{holdingCases.length}건</span>
+            </div>
+            {loading ? (
+              <div className="text-center py-16 text-[#1B2A45]/40 text-sm">불러오는 중...</div>
+            ) : holdingCases.length === 0 ? (
+              <div className="bg-white rounded-xl border border-[#E8E2D4] p-14 text-center text-[#1B2A45]/40 text-sm">홀딩 업체가 없습니다</div>
+            ) : (
+              <InstitutionGroupedView
+                cases={holdingCases}
                 openPanelIds={openPanelIds}
                 onToggle={togglePanel}
                 onScriptToggle={(id, val) =>
