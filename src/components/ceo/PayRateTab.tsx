@@ -265,14 +265,28 @@ function PayRateSubView() {
         setAutoStats(stats)
         setPaymentCount(stats.reduce((s, v) => s + v.contracted, 0))
 
-        // 결제율 레코드
+        // 결제율 레코드 (DB → localStorage 순으로 폴백)
         if (payJson.record) {
           const r = payJson.record
           setTargetCount(r.target_count ?? 0)
           const saved = (r.employee_details || []).filter((e: EmployeeRow) => e.name !== TESTER)
           setEmployees(saved.length > 0 ? saved : people.map(mkRow))
         } else {
-          setEmployees(people.map(mkRow))
+          // DB 레코드 없으면 localStorage 폴백 시도
+          try {
+            const lsKey = `payrate-draft-${today}`
+            const draft = localStorage.getItem(lsKey)
+            if (draft) {
+              const d = JSON.parse(draft)
+              if (d.target_count !== undefined) setTargetCount(d.target_count)
+              const lsSaved = (d.employee_details || []).filter((e: EmployeeRow) => e.name !== TESTER)
+              setEmployees(lsSaved.length > 0 ? lsSaved : people.map(mkRow))
+            } else {
+              setEmployees(people.map(mkRow))
+            }
+          } catch {
+            setEmployees(people.map(mkRow))
+          }
         }
       } catch {}
     }
@@ -285,29 +299,46 @@ function PayRateSubView() {
     latestState.current = { targetCount, employees, paymentCount, we, tw }
   }, [targetCount, employees, paymentCount, we, tw])
 
+  const LS_KEY = `payrate-draft-${today}`
+
   const doSave = useCallback(async (silent = false) => {
     const s = latestState.current
     if (!silent) { setSaving(true); setSaveMsg('') }
-    const res = await fetch('/api/payrate', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        date: today,
-        employee_count: s.employees.length,
-        target_count: s.targetCount,
-        payment_count: s.paymentCount,
-        working_days_elapsed: s.we,
-        total_working_days: s.tw,
-        employee_details: s.employees,
-      }),
-    })
-    const json = await res.json()
-    if (!silent) {
-      setSaveMsg(json.record ? '✅ 저장 완료' : '❌ 저장 실패')
-      setSaving(false)
-      setTimeout(() => setSaveMsg(''), 3000)
-    } else {
-      if (json.record) setSaveMsg('자동저장 ✓')
-      setTimeout(() => setSaveMsg(''), 2000)
+    const payload = {
+      date: today,
+      employee_count: s.employees.length,
+      target_count: s.targetCount,
+      payment_count: s.paymentCount,
+      working_days_elapsed: s.we,
+      total_working_days: s.tw,
+      employee_details: s.employees,
+    }
+    // localStorage에 항상 백업 (새로고침 방어)
+    try { localStorage.setItem(LS_KEY, JSON.stringify(payload)) } catch {}
+    try {
+      const res = await fetch('/api/payrate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const json = await res.json()
+      if (!silent) {
+        if (!res.ok) {
+          setSaveMsg(`❌ 저장 실패: ${json.error || res.status}`)
+        } else {
+          setSaveMsg(json.record ? '✅ 저장 완료' : '❌ 저장 실패')
+        }
+        setSaving(false)
+        setTimeout(() => setSaveMsg(''), 4000)
+      } else {
+        if (json.record) setSaveMsg('자동저장 ✓')
+        setTimeout(() => setSaveMsg(''), 2000)
+      }
+    } catch (e: any) {
+      if (!silent) {
+        setSaveMsg(`❌ 네트워크 오류`)
+        setSaving(false)
+        setTimeout(() => setSaveMsg(''), 4000)
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [today])
@@ -416,12 +447,6 @@ function PayRateSubView() {
           {employees.filter(r => r.name !== TESTER).map((row, i) => (
             <EmpCard key={i} row={row} idx={i} we={we} tw={tw} onChange={updateEmp} onRemove={removeEmp} />
           ))}
-          <button onClick={() => setEmployees(prev => [...prev, mkRow()])}
-            className="min-h-[160px] border-2 border-dashed border-gray-200 rounded-2xl text-gray-300
-              hover:border-blue-300 hover:text-blue-400 transition-colors flex flex-col items-center justify-center gap-2">
-            <span className="text-2xl">＋</span>
-            <span className="text-sm font-medium">직원 추가</span>
-          </button>
         </div>
         {employees.length >= 2 && (
           <div className="mt-4 bg-[#1B2A45] rounded-2xl p-4 grid grid-cols-3 gap-3 text-white text-center">
@@ -506,28 +531,66 @@ export function PnlSubView() {
   const iCls = 'w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300'
   const rCls = 'bg-gray-50 text-gray-600 text-sm px-2 py-1.5 rounded-lg text-right whitespace-nowrap'
 
+  const PNL_LS_KEY = `pnl-draft-${today}`
+
   useEffect(() => {
     fetch(`/api/pnl?date=${today}`).then(r => r.json()).then(json => {
-      if (!json.record) return
+      if (!json.record) {
+        // DB 없으면 localStorage 폴백
+        try {
+          const draft = localStorage.getItem(PNL_LS_KEY)
+          if (draft) {
+            const d = JSON.parse(draft)
+            if (Array.isArray(d.sales_employees)) setSalesEmps(d.sales_employees)
+            if (Array.isArray(d.ops_employees))   setOpsEmps(d.ops_employees)
+            if (d.other_costs)                    setOtherCosts(d.other_costs)
+            if (d.ceo_salary !== undefined)       setCeoSalary(d.ceo_salary)
+          }
+        } catch {}
+        return
+      }
       const r = json.record
       if (Array.isArray(r.sales_employees)) setSalesEmps(r.sales_employees)
       if (Array.isArray(r.ops_employees))   setOpsEmps(r.ops_employees)
       if (r.other_costs)                    setOtherCosts(r.other_costs)
       if (r.ceo_salary !== undefined)       setCeoSalary(r.ceo_salary)
-    }).catch(() => {})
+    }).catch(() => {
+      // 네트워크 오류 시 localStorage 폴백
+      try {
+        const draft = localStorage.getItem(PNL_LS_KEY)
+        if (draft) {
+          const d = JSON.parse(draft)
+          if (Array.isArray(d.sales_employees)) setSalesEmps(d.sales_employees)
+          if (Array.isArray(d.ops_employees))   setOpsEmps(d.ops_employees)
+          if (d.other_costs)                    setOtherCosts(d.other_costs)
+          if (d.ceo_salary !== undefined)       setCeoSalary(d.ceo_salary)
+        }
+      } catch {}
+    })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function handleSave() {
     setSaving(true); setMsg('')
-    const res  = await fetch('/api/pnl', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date: today, sales_employees: salesEmps, ops_employees: opsEmps, other_costs: otherCosts, ceo_salary: ceoSalary }),
-    })
-    const json = await res.json()
-    setMsg(json.record ? '✅ 저장 완료' : '❌ 저장 실패')
+    const payload = { date: today, sales_employees: salesEmps, ops_employees: opsEmps, other_costs: otherCosts, ceo_salary: ceoSalary }
+    // localStorage 항상 백업
+    try { localStorage.setItem(PNL_LS_KEY, JSON.stringify(payload)) } catch {}
+    try {
+      const res  = await fetch('/api/pnl', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setMsg(`❌ 저장 실패: ${json.error || res.status}`)
+      } else {
+        setMsg(json.record ? '✅ 저장 완료' : '❌ 저장 실패')
+      }
+    } catch {
+      setMsg('❌ 네트워크 오류 (로컬 백업됨)')
+    }
     setSaving(false)
-    setTimeout(() => setMsg(''), 3000)
+    setTimeout(() => setMsg(''), 4000)
   }
 
   function updSales(i: number, f: keyof SalesEmp, v: string) {
