@@ -574,15 +574,15 @@ function PayRateSubView() {
   async function handleSave() { await doSave(false) }
 
   const totTarget   = employees.reduce((s, r) => s + Number(r.target), 0)
-  // 자동집계 합산
-  const totSupply   = employees.filter(r => r.name !== TESTER)
+  // 직원 카드 표시값 기준 합산 (auto-sync 이미 반영된 row 값 직접 사용)
+  const totSupply    = employees.filter(r => r.name !== TESTER)
     .reduce((s, r) => s + Object.values(r.daily_supplies || {}).reduce((a, v) => a + Number(v || 0), 0), 0)
   const totSupplyPay = employees.filter(r => r.name !== TESTER)
-    .reduce((s, r) => s + (autoByPerson[r.name]?.supply_payment || 0), 0)
+    .reduce((s, r) => s + Number(r.supply_payment), 0)
   const totDirectPay = employees.filter(r => r.name !== TESTER)
-    .reduce((s, r) => s + (autoByPerson[r.name]?.direct_payment || 0), 0)
-  const totPayment  = totSupplyPay + totDirectPay
-  const totSupRate  = totSupply > 0 ? (totSupplyPay / totSupply * 100) : null
+    .reduce((s, r) => s + Number(r.direct_payment), 0)
+  const totPayment   = totSupplyPay + totDirectPay
+  const totSupRate   = totSupply > 0 ? (totSupplyPay / totSupply * 100) : null
 
   return (
     <div className="space-y-5 pb-8">
