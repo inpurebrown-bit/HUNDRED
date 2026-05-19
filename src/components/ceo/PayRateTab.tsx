@@ -65,16 +65,16 @@ function PaceBadge({ status, score }: { status: string; score?: number }) {
   if (status === '-' || !status) return <span className="text-gray-300 text-xs">—</span>
   const isGood = status === 'GOOD'
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex flex-col items-center gap-0.5">
       <span className={`px-2.5 py-0.5 rounded-full text-xs font-black tracking-wide ${
         isGood ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'
       }`}>{status}</span>
       {score !== undefined && score > 0 && (
-        <span className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center ${
-          score >= 9 ? 'bg-emerald-100 text-emerald-700' :
-          score >= 7 ? 'bg-blue-100 text-blue-700' :
-          score >= 4 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
-        }`}>{score}</span>
+        <span className={`text-[10px] font-bold tabular-nums ${
+          score >= 9 ? 'text-emerald-600' :
+          score >= 7 ? 'text-blue-500' :
+          score >= 4 ? 'text-amber-500' : 'text-red-400'
+        }`}>{score}<span className="opacity-50">/10</span></span>
       )}
     </div>
   )
