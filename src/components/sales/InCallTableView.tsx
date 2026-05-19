@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import NumberInput, { parseNumber, formatNumber } from '@/components/ui/NumberInput'
+import MeetingJournal from '@/components/sales/MeetingJournal'
 
 // ── KST 시간 유틸 ──────────────────────────────────────────
 function nowKST(): string {
@@ -747,6 +748,7 @@ function CustomerCard({
   const [logSaving, setLogSaving] = useState(false)
   const [emotionalOpen, setEmotionalOpen] = useState(false)
   const [emotionalMood, setEmotionalMood] = useState<'상'|'중'|'하'|''>('')
+  const [meetingJournalOpen, setMeetingJournalOpen] = useState(false)
   const [trashOpen, setTrashOpen] = useState(false)
   const [trashReason, setTrashReason] = useState('')
   const menuRef    = useRef<HTMLDivElement>(null)
@@ -1054,6 +1056,14 @@ function CustomerCard({
             </div>
           </div>
         </div>
+      )}
+
+      {/* 미팅일지 모달 */}
+      {meetingJournalOpen && (
+        <MeetingJournal
+          customer={c}
+          onClose={() => setMeetingJournalOpen(false)}
+        />
       )}
 
       {/* 계약완료 모달 */}
@@ -1390,8 +1400,16 @@ function CustomerCard({
                 {getOpsStageStyle(opsStatus.stage).label}
               </span>
             )}
+            {/* 미팅일지 출력 버튼 */}
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); setMeetingJournalOpen(true) }}
+              className="ml-auto px-2.5 py-1 rounded text-[11px] font-semibold bg-[#C5A258] hover:bg-[#b8923f] text-white flex items-center gap-1"
+            >
+              🖨️ 미팅일지
+            </button>
             <button type="button" onClick={() => onExpand(null)}
-              className="text-gray-400 hover:text-gray-600 text-sm font-bold px-1 ml-auto">✕</button>
+              className="text-gray-400 hover:text-gray-600 text-sm font-bold px-1">✕</button>
           </div>
 
           {/* 좌/우 2단 패널 */}
