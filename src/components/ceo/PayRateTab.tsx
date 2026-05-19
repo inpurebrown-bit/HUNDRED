@@ -7,10 +7,17 @@ import { contractWeight } from '@/lib/supplyRules'
 interface EmployeeRow {
   name: string
   target: number
-  supply_count: number
-  supply_payment: number
-  direct_count: number
-  direct_payment: number
+  supply_count: number   // 하위호환 보존 (실제값은 daily_supplies 합산)
+  supply_payment: number // 하위호환 보존 (실제값은 자동집계)
+  direct_count: number   // 하위호환 보존 (실제값은 자동집계)
+  direct_payment: number // 하위호환 보존 (실제값은 자동집계)
+  daily_supplies?: Record<string, number> // 일별 공급 입력 (key: 일자 "1"~"31")
+}
+
+interface AutoEmpData {
+  supply_payment: number  // 공급결제 (공가 계약)
+  direct_count: number    // 직접수 (직가 DB 추가)
+  direct_payment: number  // 직접결제 (직가 계약)
 }
 
 interface SalesEmp { name: string; sales_vat_incl: number; contracts: number }
@@ -119,30 +126,43 @@ function NumInput({
 }
 
 function EmpCard({
-  row, idx, we, tw, onChange, onRemove,
+  row, idx, we, tw, onChange, onRemove, autoData,
 }: {
   row: EmployeeRow; idx: number; we: number; tw: number
-  onChange: (i: number, f: keyof EmployeeRow, v: number | string) => void
+  onChange: (i: number, f: string, v: number | string | Record<string, number>) => void
   onRemove: (i: number) => void
+  autoData: AutoEmpData
 }) {
-  const total      = Number(row.supply_payment) + Number(row.direct_payment)
-  const supplyRate = Number(row.supply_count) > 0
-    ? (total / Number(row.supply_count) * 100) : null
+  // 일별 공급 합산 → 공급수
+  const dailySupplies = row.daily_supplies || {}
+  const supplyCount   = Object.values(dailySupplies).reduce((s, v) => s + Number(v || 0), 0)
+
+  // 자동 집계
+  const supplyPayment = autoData.supply_payment
+  const directCount   = autoData.direct_count
+  const directPayment = autoData.direct_payment
+
+  const total      = supplyPayment + directPayment
+  const supplyRate = supplyCount > 0 ? (supplyPayment / supplyCount * 100) : null
   const needed     = Number(row.target) - total
+  const supplyNeeded = supplyRate && supplyRate > 0 && needed > 0
+    ? Math.round(needed / (supplyRate / 100) * 100) / 100
+    : null
+
   const status     = we > 0 && tw > 0 ? (total / we >= Number(row.target) / tw ? 'GOOD' : 'BAD') : '-'
   const score      = calcScore(total, we, Number(row.target), tw)
   const achievePct = Number(row.target) > 0 ? Math.round(total / Number(row.target) * 100) : 0
 
-  const FIELDS: { key: keyof EmployeeRow; label: string }[] = [
-    { key: 'target',         label: '목표' },
-    { key: 'supply_count',   label: '공급수' },
-    { key: 'supply_payment', label: '공급결제' },
-    { key: 'direct_count',   label: '직접수' },
-    { key: 'direct_payment', label: '직접결제' },
-  ]
+  // 이번달 일수
+  const now = new Date()
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  const todayDay    = now.getDate()
+
+  const fmtVal = (v: number) => v % 1 === 0 ? String(v) : v.toFixed(1)
 
   return (
     <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
+      {/* ── 헤더 ── */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-full bg-[#1B2A45] text-white flex items-center justify-center text-sm font-bold shrink-0">
@@ -162,25 +182,58 @@ function EmpCard({
         </div>
       </div>
 
+      {/* ── 5개 수치 (목표만 수동) ── */}
       <div className="grid grid-cols-5 gap-1.5">
-        {FIELDS.map(({ key, label }) => (
-          <div key={key} className="flex flex-col items-center gap-0.5">
-            <p className="text-[9px] text-gray-400 font-medium">{label}</p>
-            <input
-              type="number" min={0} value={row[key] as number}
-              onChange={e => onChange(idx, key, Number(e.target.value))}
-              className="w-full text-center text-sm font-bold text-gray-800 bg-white rounded-xl
-                border border-gray-200 px-1 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300
-                [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-            />
+        {/* 목표 - 수동 입력 */}
+        <div className="flex flex-col items-center gap-0.5">
+          <p className="text-[9px] text-gray-400 font-medium">목표</p>
+          <input
+            type="number" min={0} value={row.target}
+            onChange={e => onChange(idx, 'target', Number(e.target.value))}
+            className="w-full text-center text-sm font-bold text-gray-800 bg-white rounded-xl
+              border border-gray-200 px-1 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300
+              [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          />
+        </div>
+        {/* 공급수 - 자동 (일별 합산) */}
+        <div className="flex flex-col items-center gap-0.5">
+          <p className="text-[9px] text-sky-500 font-medium">공급수</p>
+          <div className="w-full text-center text-sm font-bold text-sky-700 bg-sky-50 rounded-xl border border-sky-100 px-1 py-2 leading-none">
+            {supplyCount}
+            <span className="block text-[7px] font-normal text-sky-400 mt-0.5">자동</span>
           </div>
-        ))}
+        </div>
+        {/* 공급결제 - 자동 */}
+        <div className="flex flex-col items-center gap-0.5">
+          <p className="text-[9px] text-emerald-500 font-medium">공급결제</p>
+          <div className="w-full text-center text-sm font-bold text-emerald-700 bg-emerald-50 rounded-xl border border-emerald-100 px-1 py-2 leading-none">
+            {fmtVal(supplyPayment)}
+            <span className="block text-[7px] font-normal text-emerald-400 mt-0.5">자동</span>
+          </div>
+        </div>
+        {/* 직접수 - 자동 */}
+        <div className="flex flex-col items-center gap-0.5">
+          <p className="text-[9px] text-violet-500 font-medium">직접수</p>
+          <div className="w-full text-center text-sm font-bold text-violet-700 bg-violet-50 rounded-xl border border-violet-100 px-1 py-2 leading-none">
+            {directCount}
+            <span className="block text-[7px] font-normal text-violet-400 mt-0.5">자동</span>
+          </div>
+        </div>
+        {/* 직접결제 - 자동 */}
+        <div className="flex flex-col items-center gap-0.5">
+          <p className="text-[9px] text-purple-500 font-medium">직접결제</p>
+          <div className="w-full text-center text-sm font-bold text-purple-700 bg-purple-50 rounded-xl border border-purple-100 px-1 py-2 leading-none">
+            {fmtVal(directPayment)}
+            <span className="block text-[7px] font-normal text-purple-400 mt-0.5">자동</span>
+          </div>
+        </div>
       </div>
 
+      {/* ── 목표 달성률 ── */}
       <div>
         <div className="flex justify-between mb-1">
           <span className="text-[10px] text-gray-400">목표 달성률</span>
-          <span className="text-[10px] font-bold text-gray-600">{total} / {Number(row.target)}개 · {achievePct}%</span>
+          <span className="text-[10px] font-bold text-gray-600">{fmtVal(total)} / {Number(row.target)}개 · {achievePct}%</span>
         </div>
         <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
           <div className={`h-full rounded-full transition-all ${achievePct >= 100 ? 'bg-emerald-500' : achievePct >= 60 ? 'bg-blue-500' : 'bg-amber-400'}`}
@@ -188,22 +241,56 @@ function EmpCard({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      {/* ── 4박스: 총결제 / 공급결제율 / 공급예정 / 목표까지 ── */}
+      <div className="grid grid-cols-4 gap-1.5">
         <div className="bg-emerald-50 rounded-xl py-2 text-center">
           <p className="text-[9px] text-emerald-500">총결제</p>
-          <p className="text-base font-black text-emerald-700">{total}</p>
+          <p className="text-base font-black text-emerald-700">{fmtVal(total)}</p>
         </div>
         <div className="bg-blue-50 rounded-xl py-2 text-center">
-          <p className="text-[9px] text-blue-500">공급대비율</p>
-          <p className="text-base font-black text-blue-700">
+          <p className="text-[9px] text-blue-500">공급결제율</p>
+          <p className="text-sm font-black text-blue-700">
             {supplyRate !== null ? supplyRate.toFixed(1) + '%' : '—'}
+          </p>
+        </div>
+        <div className="bg-amber-50 rounded-xl py-2 text-center">
+          <p className="text-[9px] text-amber-600">공급예정</p>
+          <p className="text-sm font-black text-amber-700">
+            {supplyNeeded !== null ? supplyNeeded.toFixed(2) + '개' : '—'}
           </p>
         </div>
         <div className={`rounded-xl py-2 text-center ${needed > 0 ? 'bg-rose-50' : 'bg-gray-100'}`}>
           <p className={`text-[9px] ${needed > 0 ? 'text-rose-400' : 'text-gray-400'}`}>목표까지</p>
-          <p className={`text-base font-black ${needed > 0 ? 'text-rose-600' : 'text-gray-500'}`}>
-            {needed > 0 ? `${needed}개` : '완료'}
+          <p className={`text-sm font-black ${needed > 0 ? 'text-rose-600' : 'text-gray-500'}`}>
+            {needed > 0 ? `${fmtVal(needed)}개` : '완료'}
           </p>
+        </div>
+      </div>
+
+      {/* ── 일별 공급 입력 (1~31) ── */}
+      <div>
+        <p className="text-[9px] text-gray-400 font-semibold mb-1.5">
+          📅 일별 공급 입력
+          <span className="ml-1 text-sky-600 font-black">합계 {supplyCount}개</span>
+        </p>
+        <div className="grid grid-cols-7 gap-1">
+          {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => (
+            <div key={day} className={`text-center ${day === todayDay ? 'ring-2 ring-blue-400 rounded-lg' : ''}`}>
+              <p className={`text-[8px] font-medium mb-0.5 ${day === todayDay ? 'text-blue-600 font-black' : 'text-gray-400'}`}>{day}</p>
+              <input
+                type="number" min={0}
+                value={dailySupplies[String(day)] || ''}
+                placeholder="0"
+                onChange={e => {
+                  const v = Number(e.target.value) || 0
+                  onChange(idx, 'daily_supplies', { ...dailySupplies, [String(day)]: v })
+                }}
+                className="w-full text-center text-[10px] font-bold text-gray-700 bg-white rounded border border-gray-200 py-1
+                  focus:outline-none focus:ring-1 focus:ring-blue-300
+                  [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -224,6 +311,8 @@ function PayRateSubView() {
   const [targetCount,   setTargetCount]  = useState(0)
   const [paymentCount,  setPaymentCount] = useState(0)  // contractWeight 기준 자동
   const [employeeCount, setEmployeeCount] = useState(0)
+  // 인별 자동집계: 공급결제(공가) / 직접수(직가DB) / 직접결제(직가계약)
+  const [autoByPerson,  setAutoByPerson] = useState<Record<string, AutoEmpData>>({})
 
   const mkRow = (name = ''): EmployeeRow => ({ name, target: 0, supply_count: 0, supply_payment: 0, direct_count: 0, direct_payment: 0 })
   const [employees, setEmployees] = useState<EmployeeRow[]>([])
@@ -249,21 +338,55 @@ function PayRateSubView() {
         setEmployeeCount(people.length)
 
         // ★ contractWeight 기준 이번달 계약 집계 (TESTER 제외)
+        // 공가(lead/consulting) 계약 → supply_payment
+        // 직가(db010) 계약 → direct_payment
+        // 직가 DB 추가 → direct_count
         const byPerson: Record<string, number> = {}
+        const supplyPayMap:  Record<string, number> = {}
+        const directPayMap:  Record<string, number> = {}
+        const directCntMap:  Record<string, number> = {}
+
         ;(custJson.customers || [])
-          .filter((c: any) =>
-            c.status === 'contracted' &&
-            (c.details?.contract_date || c.created_at || '').startsWith(month) &&
-            (c.details?.sales_user_name || '').trim() !== TESTER
-          )
           .forEach((c: any) => {
-            const name   = (c.details?.sales_user_name || c.sales_user_name || '').trim()
-            const weight = contractWeight(c.details?.payment_amount)
-            if (name && name !== TESTER) byPerson[name] = (byPerson[name] || 0) + weight
+            const name  = (c.details?.sales_user_name || c.sales_user_name || '').trim()
+            if (!name || name === TESTER) return
+            const contractMonth = (c.details?.contract_date || c.created_at || '').slice(0, 7)
+            const createMonth   = (c.created_at || '').slice(0, 7)
+            const isLead   = c.lead_type === 'lead' || c.lead_type === 'consulting'
+            const isDirect = c.lead_type === 'db010'
+
+            // 전체 계약 집계 (기존)
+            if (c.status === 'contracted' && contractMonth === month) {
+              const w = contractWeight(c.details?.payment_amount)
+              byPerson[name] = (byPerson[name] || 0) + w
+              if (isLead)   supplyPayMap[name]  = (supplyPayMap[name]  || 0) + w
+              if (isDirect) directPayMap[name]  = (directPayMap[name]  || 0) + w
+            }
+            // 직접수: 직가 DB 이번달 추가
+            if (isDirect && createMonth === month) {
+              directCntMap[name] = (directCntMap[name] || 0) + 1
+            }
           })
+
         const stats = Object.entries(byPerson).map(([name, contracted]) => ({ name, contracted }))
         setAutoStats(stats)
         setPaymentCount(stats.reduce((s, v) => s + v.contracted, 0))
+
+        // 인별 자동 집계
+        const allNames = new Set([
+          ...Object.keys(supplyPayMap),
+          ...Object.keys(directPayMap),
+          ...Object.keys(directCntMap),
+        ])
+        const aMap: Record<string, AutoEmpData> = {}
+        allNames.forEach(n => {
+          aMap[n] = {
+            supply_payment: supplyPayMap[n]  || 0,
+            direct_count:   directCntMap[n]  || 0,
+            direct_payment: directPayMap[n]  || 0,
+          }
+        })
+        setAutoByPerson(aMap)
 
         // 결제율 레코드 (DB → localStorage 순으로 폴백)
         if (payJson.record) {
@@ -358,8 +481,16 @@ function PayRateSubView() {
   const paceStatus        = we > 0 && tw > 0 ? (pc / we >= targetCount / tw ? 'GOOD' : 'BAD') : '-'
   const paceScore         = calcScore(pc, we, targetCount, tw)
 
-  function updateEmp(i: number, f: keyof EmployeeRow, v: number | string) {
-    setEmployees(prev => { const n = [...prev]; n[i] = { ...n[i], [f]: f === 'name' ? v : Number(v) }; return n })
+  function updateEmp(i: number, f: string, v: number | string | Record<string, number>) {
+    setEmployees(prev => {
+      const n = [...prev]
+      if (f === 'daily_supplies') {
+        n[i] = { ...n[i], daily_supplies: v as Record<string, number> }
+      } else {
+        n[i] = { ...n[i], [f]: f === 'name' ? v : Number(v) }
+      }
+      return n
+    })
     scheduleAutoSave()
   }
   function removeEmp(i: number) {
@@ -374,10 +505,16 @@ function PayRateSubView() {
 
   async function handleSave() { await doSave(false) }
 
-  const totTarget  = employees.reduce((s, r) => s + Number(r.target), 0)
-  const totSupply  = employees.reduce((s, r) => s + Number(r.supply_count), 0)
-  const totPayment = employees.reduce((s, r) => s + Number(r.supply_payment) + Number(r.direct_payment), 0)
-  const totSupRate = totSupply > 0 ? (totPayment / totSupply * 100) : null
+  const totTarget   = employees.reduce((s, r) => s + Number(r.target), 0)
+  // 자동집계 합산
+  const totSupply   = employees.filter(r => r.name !== TESTER)
+    .reduce((s, r) => s + Object.values(r.daily_supplies || {}).reduce((a, v) => a + Number(v || 0), 0), 0)
+  const totSupplyPay = employees.filter(r => r.name !== TESTER)
+    .reduce((s, r) => s + (autoByPerson[r.name]?.supply_payment || 0), 0)
+  const totDirectPay = employees.filter(r => r.name !== TESTER)
+    .reduce((s, r) => s + (autoByPerson[r.name]?.direct_payment || 0), 0)
+  const totPayment  = totSupplyPay + totDirectPay
+  const totSupRate  = totSupply > 0 ? (totSupplyPay / totSupply * 100) : null
 
   return (
     <div className="space-y-5 pb-8">
@@ -445,7 +582,11 @@ function PayRateSubView() {
         <h3 className="text-sm font-bold text-gray-800 mb-4">👥 직원별 현황</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {employees.filter(r => r.name !== TESTER).map((row, i) => (
-            <EmpCard key={i} row={row} idx={i} we={we} tw={tw} onChange={updateEmp} onRemove={removeEmp} />
+            <EmpCard
+              key={i} row={row} idx={i} we={we} tw={tw}
+              onChange={updateEmp} onRemove={removeEmp}
+              autoData={autoByPerson[row.name] || { supply_payment: 0, direct_count: 0, direct_payment: 0 }}
+            />
           ))}
         </div>
         {employees.length >= 2 && (
@@ -459,7 +600,7 @@ function PayRateSubView() {
               <p className="text-lg font-black text-emerald-400">{totPayment}</p>
             </div>
             <div>
-              <p className="text-[10px] text-white/50 mb-0.5">공급대비율</p>
+              <p className="text-[10px] text-white/50 mb-0.5">공급결제율</p>
               <p className="text-lg font-black text-blue-400">
                 {totSupRate !== null ? totSupRate.toFixed(1) + '%' : '—'}
               </p>

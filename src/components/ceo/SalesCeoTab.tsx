@@ -529,7 +529,7 @@ const STATUS_TABS = [
   { key: 'trash' as StatusKey,      label: '자체거절',  color: 'text-gray-500',    bg: 'bg-gray-400' },
 ]
 
-type CeoView = 'customers' | 'inspection' | 'as' | 'transfer' | 'supply'
+type CeoView = 'customers' | 'inspection' | 'as' | 'transfer' | 'diary'
 
 // ── 공급 설정 타입 ──────────────────────────────────────
 interface PersonSupply {
@@ -538,6 +538,135 @@ interface PersonSupply {
   base:     number   // 기존 결제 오프셋 (시스템 전 계약수 수동 입력)
 }
 type SupplyConfig = Record<string, PersonSupply>
+
+// ════════════════════════════════════════════════════════════════════════════════
+//  영업일지: 월별 아카이브 뷰
+// ════════════════════════════════════════════════════════════════════════════════
+function SalesDiaryView() {
+  const [records, setRecords] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [expandedMonth, setExpandedMonth] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/payrate?list=true')
+      .then(r => r.json())
+      .then(json => {
+        setRecords(json.records || [])
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [])
+
+  const thisMonth = new Date().toISOString().slice(0, 7)
+
+  if (loading) return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center text-gray-400 text-sm">
+      불러오는 중…
+    </div>
+  )
+  if (records.length === 0) return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
+      아직 저장된 영업일지가 없습니다
+    </div>
+  )
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-bold text-gray-800">📒 영업일지</h2>
+        <p className="text-[11px] text-gray-400">월별 결제율 현황 · 자동 저장</p>
+      </div>
+      {records.map((rec: any) => {
+        const ym = rec.year_month || (rec.record_date as string).slice(0, 7)
+        const isCurrent = ym === thisMonth
+        const isOpen = expandedMonth === ym
+        const emps: any[] = rec.employee_details || []
+
+        return (
+          <div key={ym} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <button
+              className="w-full px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
+              onClick={() => setExpandedMonth(isOpen ? null : ym)}
+            >
+              <div className="flex items-center gap-3">
+                <span className="font-bold text-gray-800 text-sm">{ym.replace('-', '년 ')}월</span>
+                {isCurrent && <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">이번달</span>}
+                <span className="text-[11px] text-gray-400">직원 {emps.filter((e: any) => e.name).length}명</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] text-emerald-600 font-bold">
+                  결제 {(rec.payment_count ?? 0) % 1 === 0 ? rec.payment_count ?? 0 : Number(rec.payment_count ?? 0).toFixed(1)}건
+                </span>
+                <span className="text-gray-400 text-xs">{isOpen ? '▲' : '▼'}</span>
+              </div>
+            </button>
+
+            {isOpen && emps.length > 0 && (
+              <div className="border-t border-gray-100 px-5 py-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {emps.filter((e: any) => e.name).map((e: any, ei: number) => {
+                    const ds = e.daily_supplies || {}
+                    const supplyCount = Object.values(ds).reduce((s: number, v: any) => s + Number(v || 0), 0)
+                    const total = Number(e.supply_payment || 0) + Number(e.direct_payment || 0)
+                    const supplyRate = supplyCount > 0 ? (Number(e.supply_payment || 0) / supplyCount * 100) : null
+                    const achievePct = Number(e.target) > 0 ? Math.round(total / Number(e.target) * 100) : 0
+                    const daysArr = Object.entries(ds).filter(([, v]) => Number(v) > 0)
+
+                    return (
+                      <div key={ei} className="bg-gray-50 rounded-xl p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full bg-[#1B2A45] text-white flex items-center justify-center text-xs font-bold">
+                              {(e.name || '?').charAt(0)}
+                            </div>
+                            <span className="font-bold text-gray-800 text-sm">{e.name}</span>
+                          </div>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            achievePct >= 100 ? 'bg-emerald-100 text-emerald-700' :
+                            achievePct >= 60  ? 'bg-blue-100 text-blue-700' :
+                            'bg-amber-100 text-amber-700'
+                          }`}>달성 {achievePct}%</span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-1.5 text-center">
+                          <div className="bg-white rounded-lg py-1.5">
+                            <p className="text-[8px] text-gray-400">공급수</p>
+                            <p className="text-sm font-black text-sky-700">{supplyCount}</p>
+                          </div>
+                          <div className="bg-white rounded-lg py-1.5">
+                            <p className="text-[8px] text-gray-400">총결제</p>
+                            <p className="text-sm font-black text-emerald-700">{total % 1 === 0 ? total : total.toFixed(1)}</p>
+                          </div>
+                          <div className="bg-white rounded-lg py-1.5">
+                            <p className="text-[8px] text-gray-400">공급결제율</p>
+                            <p className="text-sm font-black text-blue-700">{supplyRate !== null ? supplyRate.toFixed(1) + '%' : '—'}</p>
+                          </div>
+                          <div className="bg-white rounded-lg py-1.5">
+                            <p className="text-[8px] text-gray-400">목표</p>
+                            <p className="text-sm font-black text-gray-700">{e.target || 0}</p>
+                          </div>
+                        </div>
+                        {/* 일별 공급 기록 */}
+                        {daysArr.length > 0 && (
+                          <div className="flex flex-wrap gap-1 pt-1">
+                            {daysArr.map(([day, val]) => (
+                              <span key={day} className="text-[9px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">
+                                {day}일: {String(val)}개
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 export default function SalesCeoTab() {
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -1002,11 +1131,11 @@ export default function SalesCeoTab() {
           )}>
           🔀 DB 이동
         </button>
-        <button type="button" onClick={() => setCeoView('supply')}
+        <button type="button" onClick={() => setCeoView('diary')}
           className={"flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border transition-colors " + (
-            ceoView === 'supply' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-700 border-emerald-200 hover:border-emerald-400'
+            ceoView === 'diary' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-700 border-emerald-200 hover:border-emerald-400'
           )}>
-          📊 공급현황
+          📒 영업일지
         </button>
       </div>
 
@@ -1181,181 +1310,8 @@ export default function SalesCeoTab() {
         </div>
       )}
 
-      {/* ── 공급 현황 뷰 ── */}
-      {ceoView === 'supply' && (
-        <div className="space-y-5">
-          {/* 헤더 */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-bold text-gray-800">📊 이번달 공급 현황</h2>
-              <p className="text-[11px] text-gray-400 mt-0.5">{thisMonthStr} · 공급 대비 결제율 기반 내일 공급 권장량 산출</p>
-            </div>
-            {!supplyEditMode ? (
-              <button type="button" onClick={openSupplyEdit}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 transition-colors">
-                ✏️ 공급수/목표 수정
-              </button>
-            ) : (
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setSupplyEditMode(false)}
-                  className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-500 text-xs font-semibold hover:bg-gray-200 transition-colors">취소</button>
-                <button type="button" onClick={saveSupplyConfig} disabled={supplySaving}
-                  className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-60">
-                  {supplySaving ? '저장중…' : '💾 저장'}
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* 인당 공급 카드 */}
-          {salesPeople.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center text-gray-400 text-sm">
-              등록된 영업사원이 없습니다
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {supplyStats.map(s => (
-                <div key={s.name} className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
-                  {/* 이름 + 달성률 */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-[#1B2A45] text-white flex items-center justify-center text-sm font-bold">
-                        {s.name.charAt(0)}
-                      </div>
-                      <span className="font-bold text-gray-800 text-sm">{s.name}</span>
-                    </div>
-                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                      s.achievePct >= 100 ? 'bg-emerald-100 text-emerald-700' :
-                      s.achievePct >= 70  ? 'bg-blue-100 text-blue-700' :
-                      s.achievePct >= 40  ? 'bg-amber-100 text-amber-700' :
-                      'bg-red-50 text-red-600'
-                    }`}>달성 {s.achievePct}%</span>
-                  </div>
-
-                  {/* 수치 그리드 */}
-                  <div className="grid grid-cols-3 gap-3 text-center">
-                    <div className="bg-sky-50 rounded-xl py-2.5">
-                      <p className="text-[10px] text-gray-400 mb-0.5">이번달 공급</p>
-                      {supplyEditMode ? (
-                        <input type="number" min="0"
-                          value={supplyDraft[s.name]?.supplied ?? s.cfg.supplied}
-                          onChange={e => setSupplyDraft(prev => ({
-                            ...prev, [s.name]: { ...(prev[s.name] || { supplied: '0', goal: '0', base: '0' }), supplied: e.target.value }
-                          }))}
-                          className="w-full text-center text-base font-black text-sky-700 bg-transparent border-b-2 border-sky-400 focus:outline-none"
-                        />
-                      ) : (
-                        <p className="text-base font-black text-sky-700">{s.cfg.supplied}개</p>
-                      )}
-                    </div>
-                    <div className="bg-emerald-50 rounded-xl py-2.5">
-                      <p className="text-[10px] text-gray-400 mb-0.5">결제수</p>
-                      <p className="text-base font-black text-emerald-700">{s.totalContracted}개</p>
-                      {s.cfg.base > 0 && (
-                        <p className="text-[9px] text-gray-400">기존 {s.cfg.base} + DB {s.dbContracted.toFixed(1)}</p>
-                      )}
-                    </div>
-                    <div className={`rounded-xl py-2.5 ${
-                      s.rate >= 17 ? 'bg-emerald-50' : s.rate >= 13 ? 'bg-amber-50' : 'bg-red-50'
-                    }`}>
-                      <p className="text-[10px] text-gray-400 mb-0.5">계약율</p>
-                      <p className={`text-base font-black ${
-                        s.rate >= 17 ? 'text-emerald-700' : s.rate >= 13 ? 'text-amber-700' : 'text-red-600'
-                      }`}>{s.rate.toFixed(2)}%</p>
-                    </div>
-                  </div>
-
-                  {/* 목표 + 달성 바 */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[10px] text-gray-500 font-semibold">목표 달성</span>
-                      <div className="flex items-center gap-1">
-                        <span className="text-[10px] text-gray-400">{s.totalContracted.toFixed(1)} /</span>
-                        {supplyEditMode ? (
-                          <input type="number" min="0"
-                            value={supplyDraft[s.name]?.goal ?? s.cfg.goal}
-                            onChange={e => setSupplyDraft(prev => ({
-                              ...prev, [s.name]: { ...(prev[s.name] || { supplied: '0', goal: '0', base: '0' }), goal: e.target.value }
-                            }))}
-                            className="w-12 text-center text-[10px] font-bold text-gray-800 bg-transparent border-b border-gray-400 focus:outline-none"
-                          />
-                        ) : (
-                          <span className="text-[10px] font-bold text-gray-800">{s.cfg.goal}개</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all bg-emerald-500"
-                        style={{ width: `${Math.min(100, s.achievePct)}%` }} />
-                    </div>
-                  </div>
-
-                  {/* 기존 결제 오프셋 (수정모드에서 보임) */}
-                  {supplyEditMode && (
-                    <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
-                      <span className="text-[10px] text-gray-500 flex-1">시스템 전 기존 결제수 (오프셋)</span>
-                      <input type="number" min="0" step="0.5"
-                        value={supplyDraft[s.name]?.base ?? s.cfg.base}
-                        onChange={e => setSupplyDraft(prev => ({
-                          ...prev, [s.name]: { ...(prev[s.name] || { supplied: '0', goal: '0', base: '0' }), base: e.target.value }
-                        }))}
-                        className="w-16 text-center text-xs font-bold text-gray-800 bg-white border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                      />
-                    </div>
-                  )}
-
-                  {/* 권장 내일 공급 */}
-                  <div className={`rounded-xl px-4 py-3 flex items-center justify-between ${
-                    s.recommended >= 5 ? 'bg-emerald-50 border border-emerald-200' :
-                    s.recommended >= 3 ? 'bg-blue-50 border border-blue-200' :
-                    s.recommended >= 1 ? 'bg-amber-50 border border-amber-200' :
-                    'bg-red-50 border border-red-200'
-                  }`}>
-                    <div>
-                      <p className="text-[10px] text-gray-500 font-semibold">권장 내일 공급</p>
-                      <p className="text-[10px] text-gray-400">계약율 {s.rate.toFixed(2)}% 기준</p>
-                    </div>
-                    <p className={`text-2xl font-black ${
-                      s.recommended >= 5 ? 'text-emerald-700' :
-                      s.recommended >= 3 ? 'text-blue-700' :
-                      s.recommended >= 1 ? 'text-amber-700' : 'text-red-600'
-                    }`}>{s.recommended}개</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* 기준표 */}
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-            <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-gray-700">📋 공급기준표</h3>
-              <span className="text-[10px] text-gray-400">계약율 기준 권장 공급 (일일)</span>
-            </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">기준</th>
-                  <th className="px-4 py-2.5 text-xs font-semibold text-[#C5A258] text-center">권장 공급</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {SUPPLY_RATE_TABLE.map(row => (
-                  <tr key={row.condition}>
-                    <td className="px-4 py-2.5 text-xs text-gray-600">{row.condition}</td>
-                    <td className={`px-4 py-2.5 text-center font-bold text-sm ${row.supply === 0 ? 'text-red-500' : 'text-gray-700'}`}>
-                      {row.supply}개
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="px-5 py-3 bg-amber-50 border-t border-amber-100">
-              <p className="text-[11px] text-amber-700 font-semibold">💡 계약 가중치: 입금액 33만원 이하(부가세 포함 기준) = 0.5개, 그 외 = 1개</p>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── 영업일지 뷰 ── */}
+      {ceoView === 'diary' && <SalesDiaryView />}
 
       {/* ── DB 이동 뷰 ── */}
       {ceoView === 'transfer' && (

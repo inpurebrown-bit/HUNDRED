@@ -576,43 +576,10 @@ export default function OverviewTabNew() {
         />
       </div>
 
-      {/* ═══ 2. 오늘 인별 공급 배정 ═════════════════════════ */}
-      <div ref={chartRef} className="bg-white rounded-xl border border-[#E8E2D4] overflow-hidden">
-        <div className="px-5 py-3 border-b border-[#E8E2D4] flex items-center justify-between">
-          <h2 className="font-semibold text-[#1B2A45] text-base">📦 오늘 공급 배정</h2>
-          <span className="text-[10px] text-[#1B2A45]/40">결제율 기준 · 인별 오늘 공급 권장 수</span>
-        </div>
-        {loading ? (
-          <div className="p-5"><Skeleton className="h-20 w-full" /></div>
-        ) : supplyStats.length === 0 ? (
-          <div className="p-8 text-center text-sm text-[#1B2A45]/40">영업사원 데이터 없음</div>
-        ) : (
-          <div className="divide-y divide-[#E8E2D4]/60">
-            {supplyStats.map(s => (
-              <div key={s.name} className="px-5 py-3.5 flex items-center gap-4">
-                <div className="w-8 h-8 rounded-full bg-[#1B2A45]/10 flex items-center justify-center text-xs font-bold text-[#1B2A45] shrink-0">
-                  {s.name.charAt(0)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-[#1B2A45]">{s.name.replace(' 수석팀장', '')}</p>
-                  <p className="text-[10px] text-[#1B2A45]/50">
-                    결제율 {s.rate.toFixed(2)}% · 이달 계약 {s.totalContracted % 1 === 0 ? s.totalContracted : s.totalContracted.toFixed(1)}건
-                  </p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className={`text-2xl font-black ${s.recommended === 0 ? 'text-red-500' : s.recommended >= 5 ? 'text-[#C5A258]' : 'text-[#1B2A45]'}`}>
-                    {s.recommended}개
-                  </p>
-                  <p className="text-[10px] text-[#1B2A45]/40">오늘 권장</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+      {/* ═══ 2. 결제율 대시보드 ═══════════════════════════════ */}
+      <div ref={chartRef}>
+        <PayRateTab />
       </div>
-
-      {/* ═══ 3. 결제율 대시보드 ════════════════════════════════ */}
-      <PayRateTab />
 
       {/* ═══ 4. THIS MONTH SECTION ══════════════════════════ */}
       <div ref={thisMonthRef}>

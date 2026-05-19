@@ -10,6 +10,26 @@ export async function GET(req: NextRequest) {
   if (user.role !== 'ceo' && user.role !== 'sales') return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
   const date = req.nextUrl.searchParams.get('date')
+  const list = req.nextUrl.searchParams.get('list')
+
+  // list=true → 월별 아카이브 (각 월의 마지막 레코드)
+  if (list === 'true') {
+    const { data } = await supabaseAdmin
+      .from('payrate_records')
+      .select('*')
+      .order('record_date', { ascending: false })
+      .limit(60)
+    // 월별 그룹핑 (month당 최신 레코드 1개)
+    const byMonth: Record<string, any> = {}
+    for (const row of (data || [])) {
+      const ym = (row.year_month || (row.record_date as string).slice(0, 7)) as string
+      if (!byMonth[ym]) byMonth[ym] = row
+    }
+    const records = Object.values(byMonth).sort((a: any, b: any) =>
+      b.record_date.localeCompare(a.record_date)
+    )
+    return NextResponse.json({ records })
+  }
 
   // date 없으면 최신 레코드 반환 (오늘 or 가장 최근 저장 레코드)
   if (!date) {
