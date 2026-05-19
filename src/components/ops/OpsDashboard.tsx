@@ -1316,17 +1316,6 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
       {/* 전화번호 */}
       <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{formatPhone(c.customers?.phone || '')}</p>
 
-      {/* 기관 (선택된 것 항상 표시) */}
-      {allInstitutions.length > 0 && (
-        <div className="mt-1 flex flex-wrap gap-0.5 justify-center">
-          {allInstitutions.map(inst => (
-            <span key={inst} className={`text-[8px] px-1 py-0.5 rounded font-medium ${
-              INDIRECT_SET.has(inst) ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'
-            }`}>{inst}</span>
-          ))}
-        </div>
-      )}
-
       {/* 전체 진행단계 */}
       <div className="mt-1.5">
         {overallStage ? (
@@ -1339,6 +1328,17 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
           </span>
         ) : null}
       </div>
+
+      {/* 기관 (선택된 것 항상 표시) */}
+      {allInstitutions.length > 0 && (
+        <div className="mt-1 flex flex-wrap gap-0.5 justify-center">
+          {allInstitutions.map(inst => (
+            <span key={inst} className={`text-[8px] px-1 py-0.5 rounded font-medium ${
+              INDIRECT_SET.has(inst) ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'
+            }`}>{inst}</span>
+          ))}
+        </div>
+      )}
 
       {/* 직접자금 진행단계 */}
       {directStage && (
