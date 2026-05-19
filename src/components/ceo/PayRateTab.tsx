@@ -155,9 +155,9 @@ function EmpCard({
   const totalRate   = (supplyCount + directCount) > 0
     ? ((supplyPayment + directPayment) / (supplyCount + directCount) * 100) : null
   const needed      = Number(row.target) - total
-  // 공급예정: 공급기준표 기반 일일권장 × 잔여영업일
+  // 공급예정: 내일 공급 권장 수 (기준표 기반 일일권장, 잔여일 곱하지 않음)
   const dailyRec    = supplyRate !== null ? calcRecommendedSupply(supplyRate, we) : 0
-  const supplyNeeded = dailyRec > 0 ? dailyRec * (tw - we) : null
+  const supplyNeeded = dailyRec > 0 ? dailyRec : null
 
   const status     = we > 0 && tw > 0 ? (total / we >= Number(row.target) / tw ? 'GOOD' : 'BAD') : '-'
   const score      = calcScore(total, we, Number(row.target), tw)
@@ -290,7 +290,7 @@ function EmpCard({
           <p className={`text-sm font-black ${dailyRec === 0 && supplyRate !== null ? 'text-red-600' : 'text-amber-700'}`}>
             {supplyRate === null ? '—' : dailyRec === 0 ? '공급중단' : `${supplyNeeded}개`}
           </p>
-          {dailyRec > 0 && <p className="text-[8px] text-amber-400">{dailyRec}개/일×{tw-we}일</p>}
+          {dailyRec > 0 && <p className="text-[8px] text-amber-400">내일 권장</p>}
         </div>
         <div className={`rounded-xl py-2 text-center ${needed > 0 ? 'bg-rose-50' : 'bg-gray-100'}`}>
           <p className={`text-[9px] ${needed > 0 ? 'text-rose-400' : 'text-gray-400'}`}>목표까지</p>

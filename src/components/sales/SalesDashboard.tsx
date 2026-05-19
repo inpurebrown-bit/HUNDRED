@@ -927,9 +927,9 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               const dirRate   = dirCnt > 0    ? (dirPay / dirCnt * 100) : null
               const totRate   = (supCnt + dirCnt) > 0 ? (total / (supCnt + dirCnt) * 100) : null
               const needed      = target - total
-              // 공급예정: 공급기준표 기반 일일권장 × 잔여영업일
+              // 공급예정: 내일 공급 권장 수 (기준표 기반 일일권장)
               const dailyRec    = supRate !== null ? calcRecommendedSupply(supRate, bizElapsed) : 0
-              const supNeeded   = dailyRec > 0 ? dailyRec * bizRemaining : null
+              const supNeeded   = dailyRec > 0 ? dailyRec : null
               const supStopped  = supRate !== null && dailyRec === 0
               const achievePct = target > 0 ? Math.round(total / target * 100) : 0
               const fmtV = (v: number) => v % 1 === 0 ? String(v) : v.toFixed(1)
@@ -983,7 +983,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                       <p className={`text-xl font-black ${supStopped ? 'text-red-600' : 'text-amber-700'}`}>
                         {supRate === null ? '—' : supStopped ? '공급중단' : `${supNeeded}개`}
                       </p>
-                      {dailyRec > 0 && <p className="text-[8px] text-amber-400">{dailyRec}개/일×{bizRemaining}일</p>}
+                      {dailyRec > 0 && <p className="text-[8px] text-amber-400">내일 권장</p>}
                     </div>
                   </div>
                   {/* 목표 달성 바 */}
