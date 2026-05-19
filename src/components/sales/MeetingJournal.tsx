@@ -14,57 +14,76 @@ interface MeetingJournalProps {
   onClose: () => void
 }
 
-/* ── 색상 상수 ── */
-const G  = '#c6d9b0'  // 녹색 (기본)
-const GB = '#4a7a30'
-const O  = '#fde4b8'  // 주황 (제조)
-const OB = '#b86a10'
-const B  = '#c2dbf5'  // 파랑 (정보통신)
-const BB = '#2a5faa'
-const P  = '#ddd0f7'  // 보라 (법인)
-const PB = '#6030b8'
+/* ── 섹션 색상 ── */
+const G  = '#d4e8b8'; const GB = '#4a7a30'  // 녹색
+const O  = '#fde4b8'; const OB = '#b86a10'  // 주황 (제조)
+const B  = '#c8dff7'; const BB = '#2a5faa'  // 파랑 (정보통신)
+const P  = '#e2d4f8'; const PB = '#6030b8'  // 보라 (법인)
 
-/* ── 스타일 헬퍼 ── */
 type CS = React.CSSProperties
 
-function TH(bg: string, bc: string, extra: CS = {}): CS {
+/* 체크 옵션 버튼 */
+function Opt({ label, checked }: { label: string; checked?: boolean }) {
+  return (
+    <span style={{
+      display: 'inline-block',
+      border: `1px solid ${checked ? '#1a2a40' : '#bbb'}`,
+      background: checked ? '#1a2a40' : '#fff',
+      color: checked ? '#fff' : '#444',
+      borderRadius: 3, padding: '0 5px', fontSize: '0.88em',
+      fontWeight: checked ? 700 : 400, marginRight: 3,
+    }}>{label}</span>
+  )
+}
+
+/* 빈 밑줄 */
+function Blank({ w = 50 }: { w?: number }) {
+  return <span style={{ display: 'inline-block', borderBottom: '1.5px solid #bbb', minWidth: w, height: 12, marginBottom: -2 }} />
+}
+
+/* 작은 레이블 */
+function L({ children }: { children: React.ReactNode }) {
+  return <span style={{ fontSize: '0.8em', color: '#555', fontWeight: 700, whiteSpace: 'nowrap' }}>{children}</span>
+}
+
+/* 인콜에서 채워진 값 */
+function Val({ v }: { v?: string | null }) {
+  return v && String(v).trim()
+    ? <span style={{ color: '#1a2a40', fontWeight: 700 }}>{v}</span>
+    : <span style={{ color: '#ccc', fontSize: '0.8em' }}>—</span>
+}
+
+/* 헤더 TH */
+function TH(bg: string, bc: string, p: string, extra: CS = {}): CS {
   return {
-    background: bg, border: `1px solid ${bc}`,
+    background: bg, border: `1px solid ${bc}`, padding: p,
     fontSize: 'inherit', fontWeight: 700, color: '#1a2a40',
-    textAlign: 'center', verticalAlign: 'middle',
-    padding: 'inherit', whiteSpace: 'nowrap',
+    textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap',
     WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' as any,
     ...extra,
   }
 }
-function TD(bc: string, extra: CS = {}): CS {
+/* 데이터 TD */
+function TD(bc: string, p: string, extra: CS = {}): CS {
   return {
-    border: `1px solid ${bc}`,
-    fontSize: 'inherit', color: '#333',
-    padding: 'inherit', verticalAlign: 'middle',
+    border: `1px solid ${bc}`, padding: p,
+    fontSize: 'inherit', color: '#222', verticalAlign: 'middle',
     ...extra,
   }
 }
-function Opt({ label, checked }: { label: string; checked?: boolean }) {
+
+/* 섹션 구분 배너 */
+function SectBanner({ bg, bc, color, children }: { bg: string; bc: string; color: string; children: React.ReactNode }) {
   return (
-    <span style={{
-      display: 'inline-block', border: `1px solid ${checked ? '#1a2a40' : '#bbb'}`,
-      background: checked ? '#1a2a40' : 'transparent',
-      color: checked ? '#fff' : '#555',
-      borderRadius: 2, padding: '0 4px', fontSize: '0.85em', marginRight: 2,
-    }}>{label}</span>
+    <tr>
+      <td colSpan={13} style={{
+        background: bg, border: `1px solid ${bc}`, color,
+        fontWeight: 700, fontSize: '0.9em', padding: '3px 7px',
+        letterSpacing: '0.3px',
+        WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' as any,
+      }}>{children}</td>
+    </tr>
   )
-}
-function Blank({ w = 50 }: { w?: number }) {
-  return <span style={{ display: 'inline-block', borderBottom: '1px solid #bbb', minWidth: w, height: 10 }} />
-}
-function L({ children }: { children: React.ReactNode }) {
-  return <span style={{ fontSize: '0.82em', color: '#666', fontWeight: 700, whiteSpace: 'nowrap' }}>{children}</span>
-}
-function Val({ v }: { v?: string | null }) {
-  return v && String(v).trim()
-    ? <span style={{ color: '#1a2a40', fontWeight: 700 }}>{v}</span>
-    : <span style={{ color: '#ccc', fontSize: '0.82em' }}>—</span>
 }
 
 /* ── 메인 컴포넌트 ── */
@@ -76,7 +95,7 @@ export default function MeetingJournal({ customer, onClose }: MeetingJournalProp
   const phone    = customer.phone || ''
   const corpType = d.corp_type || ''
   const today    = new Date()
-  const dateStr  = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, '0')}.${String(today.getDate()).padStart(2, '0')}`
+  const dateStr  = `${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일`
 
   useEffect(() => {
     setMounted(true)
@@ -84,22 +103,16 @@ export default function MeetingJournal({ customer, onClose }: MeetingJournalProp
     return () => { document.body.style.overflow = '' }
   }, [])
 
-  const sharedProps = { d, company, name, phone, dateStr, corpType, customer }
+  const props = { d, company, name, phone, dateStr, corpType }
 
   return (
     <>
-      {/*
-        프린트 CSS 핵심:
-        - body > * { display:none !important }  →  모든 직속 자식 숨김
-        - #mj-print-body { display:block !important }  →  ID 셀렉터(1,0,0) > 형제 규칙(0,0,1)
-          !important 충돌 시 specificity 비교 → ID 승리
-      */}
       <style dangerouslySetInnerHTML={{ __html: `
         #mj-print-body { display: none; }
         @media print {
           body > * { display: none !important; }
           #mj-print-body { display: block !important; }
-          @page { size: A4 portrait; margin: 6mm 7mm; }
+          @page { size: A4 portrait; margin: 8mm 9mm; }
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
       `}} />
@@ -107,58 +120,42 @@ export default function MeetingJournal({ customer, onClose }: MeetingJournalProp
       {/* ── 미리보기 모달 ── */}
       <div
         onClick={e => { if (e.target === e.currentTarget) onClose() }}
-        style={{
-          position: 'fixed', inset: 0, zIndex: 600,
-          background: 'rgba(0,0,0,0.72)', overflowY: 'auto', padding: '12px 8px',
-        }}
+        style={{ position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(0,0,0,0.72)', overflowY: 'auto', padding: '12px 8px' }}
       >
-        <div style={{ maxWidth: 900, margin: '0 auto', background: '#fff', borderRadius: 12, boxShadow: '0 8px 40px rgba(0,0,0,0.35)' }}>
-          {/* 컨트롤 */}
+        <div style={{ maxWidth: 860, margin: '0 auto', background: '#fff', borderRadius: 12, boxShadow: '0 8px 40px rgba(0,0,0,0.35)' }}>
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '10px 18px', borderBottom: '1px solid #e5e7eb',
             background: '#f9fafb', borderRadius: '12px 12px 0 0',
           }}>
-            <span style={{ fontWeight: 700, fontSize: 13, color: '#1a2a40' }}>
-              📋 미팅일지 미리보기 — {company}
-            </span>
+            <span style={{ fontWeight: 700, fontSize: 13, color: '#1a2a40' }}>📋 미팅일지 미리보기 — {company}</span>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={() => window.print()}
-                style={{ padding: '6px 16px', borderRadius: 8, background: '#1a2a40', color: '#fff', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer' }}
-              >
+              <button onClick={() => window.print()}
+                style={{ padding: '6px 16px', borderRadius: 8, background: '#1a2a40', color: '#fff', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
                 🖨️ 출력 / PDF 저장
               </button>
-              <button
-                onClick={onClose}
-                style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280', fontSize: 12, cursor: 'pointer' }}
-              >
+              <button onClick={onClose}
+                style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280', fontSize: 12, cursor: 'pointer' }}>
                 ✕ 닫기
               </button>
             </div>
           </div>
-          {/* 미리보기 본문 */}
-          <div style={{ padding: '14px 18px', overflowX: 'auto' }}>
-            <div style={{ fontSize: 9, lineHeight: 1.4 }}>
-              <JournalBody {...sharedProps} cellPad="3px 4px" isPrint={false} />
+          <div style={{ padding: '16px 20px', overflowX: 'auto' }}>
+            <div style={{ fontSize: 10, lineHeight: 1.5, fontFamily: '"Malgun Gothic","Apple SD Gothic Neo",sans-serif' }}>
+              <JournalBody {...props} isPrint={false} />
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── 프린트 전용 Portal (body 직속) ── */}
+      {/* ── 프린트 Portal (body 직속) ── */}
       {mounted && createPortal(
-        <div
-          id="mj-print-body"
-          style={{
-            fontFamily: '"Malgun Gothic","Apple SD Gothic Neo",sans-serif',
-            background: '#fff',
-            padding: '0 2px',
-            fontSize: 9,
-            lineHeight: 1.35,
-          }}
-        >
-          <JournalBody {...sharedProps} cellPad="2.5px 4px" isPrint={true} />
+        <div id="mj-print-body" style={{
+          fontFamily: '"Malgun Gothic","Apple SD Gothic Neo",sans-serif',
+          background: '#fff', padding: '0',
+          fontSize: 8.5, lineHeight: 1.4,
+        }}>
+          <JournalBody {...props} isPrint={true} />
         </div>,
         document.body
       )}
@@ -166,22 +163,9 @@ export default function MeetingJournal({ customer, onClose }: MeetingJournalProp
   )
 }
 
-/* ── 섹션 구분 배너 컴포넌트 ── */
-function SectBanner({ bg, bc, color, children }: { bg: string; bc: string; color: string; children: React.ReactNode }) {
-  return (
-    <tr>
-      <td colSpan={13} style={{
-        background: bg, border: `1px solid ${bc}`, color, fontWeight: 700,
-        fontSize: '0.92em', padding: '1.5px 5px',
-        WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' as any,
-      }}>{children}</td>
-    </tr>
-  )
-}
-
-/* ══════════════════════════════════════════════════════════════════════
-   JournalBody: 실제 미팅일지 테이블 (미리보기 + 프린트 공용)
-══════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════
+   JournalBody
+══════════════════════════════════════════════════════════════════ */
 interface BodyProps {
   d: Record<string, any>
   company: string
@@ -189,90 +173,104 @@ interface BodyProps {
   phone: string
   dateStr: string
   corpType: string
-  customer: { notes?: string }
-  cellPad: string
-  isPrint?: boolean
+  isPrint: boolean
 }
 
-function JournalBody({ d, company, name, phone, dateStr, corpType, customer, cellPad, isPrint = false }: BodyProps) {
-  const cp = cellPad   // shorthand
-  const th = (bg: string, bc: string, extra: CS = {}) => TH(bg, bc, { padding: cp, ...extra })
-  const td = (bc: string, extra: CS = {}) => TD(bc, { padding: cp, ...extra })
+function JournalBody({ d, company, name, phone, dateStr, corpType, isPrint }: BodyProps) {
+  const p  = isPrint ? '3px 5px'  : '4px 6px'    // 셀 패딩
+  const th = (bg: string, bc: string, extra: CS = {}) => TH(bg, bc, p, extra)
+  const td = (bc: string, extra: CS = {}) => TD(bc, p, extra)
 
   return (
     <div style={{
       fontFamily: 'inherit',
       ...(isPrint ? {
         display: 'flex', flexDirection: 'column',
-        height: 'calc(297mm - 12mm)',   /* 정확히 A4 1페이지 — overflow 잘림 */
+        height: 'calc(297mm - 16mm)',
         overflow: 'hidden',
       } : {}),
     }}>
-      {/* ── 헤더 ── */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
-        <img src="/images/logo.png" alt="HUNDRED" style={{ height: 32, objectFit: 'contain' }} />
-        <div style={{ textAlign: 'center', flex: 1, padding: '0 8px' }}>
-          <div style={{ fontSize: '2.2em', fontWeight: 900, color: '#1a2a40', letterSpacing: 1 }}>
-            {company || <span style={{ color: '#ccc' }}>업체명</span>}
+
+      {/* ══ 헤더 ══ */}
+      <div style={{
+        background: '#1a2a40',
+        borderRadius: isPrint ? 0 : 8,
+        padding: isPrint ? '8px 12px 10px' : '12px 16px 14px',
+        marginBottom: 8,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' as any,
+      }}>
+        {/* 로고 */}
+        <img src="/images/logo.png" alt="HUNDRED"
+          style={{ height: isPrint ? 28 : 36, objectFit: 'contain', filter: 'brightness(0) invert(1)', opacity: 0.9 }} />
+
+        {/* 업체명 */}
+        <div style={{ flex: 1, textAlign: 'center', padding: '0 12px' }}>
+          <div style={{ fontSize: isPrint ? '1.85em' : '2em', fontWeight: 900, color: '#ffffff', letterSpacing: 2, textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
+            {company || <span style={{ opacity: 0.4 }}>업체명</span>}
           </div>
+          <div style={{ fontSize: '0.8em', color: 'rgba(255,255,255,0.55)', marginTop: 2, letterSpacing: 1 }}>MEETING JOURNAL</div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-end', fontSize: '1.1em' }}>
-          {[['일시', dateStr], ['대표자', name], ['전화번호', phone]].map(([lb, val]) => (
-            <div key={lb} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-              <span style={{ color: '#555', fontWeight: 700, whiteSpace: 'nowrap' }}>{lb} :</span>
-              <span style={{ borderBottom: '1px solid #888', minWidth: 110, paddingLeft: 3, color: '#1a2a40', fontWeight: 600 }}>{val}</span>
+
+        {/* 일시 / 대표자 / 연락처 */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: isPrint ? 3 : 4, minWidth: 160 }}>
+          {[['일시', dateStr], ['대표자', name], ['연락처', phone]].map(([lb, val]) => (
+            <div key={lb} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.8em', fontWeight: 700, width: 38, flexShrink: 0 }}>{lb}</span>
+              <span style={{
+                flex: 1, borderBottom: '1px solid rgba(255,255,255,0.35)',
+                color: '#fff', fontSize: '0.85em', fontWeight: 600,
+                paddingLeft: 3, paddingBottom: 1,
+              }}>{val || ' '}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* ── 메인 테이블 ── */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+      {/* ══ 메인 테이블 ══ */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 'inherit' }}>
         <colgroup>
-          <col style={{ width: '4.5%' }} />
+          <col style={{ width: '5%' }} />
           <col style={{ width: '9%' }} />
           <col style={{ width: '10%' }} />
           <col style={{ width: '6%' }} />
-          <col style={{ width: '7.5%' }} />
+          <col style={{ width: '7%' }} />
           <col style={{ width: '7.5%' }} />
           <col style={{ width: '7.5%' }} />
           <col style={{ width: '7.5%' }} />
           <col style={{ width: '8%' }} />
           <col style={{ width: '8%' }} />
           <col style={{ width: '9%' }} />
-          <col style={{ width: '9.5%' }} />
+          <col style={{ width: '9%' }} />
           <col style={{ width: '6.5%' }} />
         </colgroup>
         <tbody>
 
-          {/* ━━━━━━━━━━ 사업자 ━━━━━━━━━━ */}
+          {/* ━━ 사업자 ━━ */}
           <tr>
-            <td rowSpan={6} style={th(G, GB)}>사업자</td>
+            <td rowSpan={6} style={th(G, GB, { fontSize: '0.9em' })}>사업자</td>
             <td style={th(G, GB)}>종류</td>
-            <td style={td(GB)}>
-              <Opt label="개인" checked={corpType === '개인'} />
-              <Opt label="법인" checked={corpType === '법인'} />
-            </td>
+            <td style={td(GB)}><Opt label="개인" checked={corpType === '개인'} /><Opt label="법인" checked={corpType === '법인'} /></td>
             <td style={th(G, GB)} colSpan={2}>매출</td>
             <td style={td(GB)}><L>26년(월)</L><br /><Val v={d.revenue_2026} /></td>
             <td style={td(GB)}><L>25년</L><br /><Val v={d.revenue_2025} /></td>
             <td style={td(GB)}><L>24년</L><br /><Val v={d.revenue_2024} /></td>
             <td style={td(GB)}><L>23년</L><br /><Val v={d.revenue_2023} /></td>
-            <td style={td(GB)}><L>22년</L><br /><Blank w={45} /></td>
-            <td style={td(GB)} colSpan={3}></td>
+            <td style={td(GB)}><L>22년</L><br /><Blank w={40} /></td>
+            <td style={td(GB, { padding: p })} colSpan={3}></td>
           </tr>
           <tr>
-            <td style={th(G, GB)}>업태/업종</td>
+            <td style={th(G, GB)}>업태 / 업종</td>
             <td style={td(GB)}><Val v={d.business_type} /></td>
             <td style={th(G, GB)} rowSpan={3}>체납<br />사신</td>
-            <td style={td(GB, { fontSize: '0.82em' })} colSpan={8}>
-              <L>국세&nbsp;&nbsp;지방세&nbsp;&nbsp;카드&nbsp;&nbsp;중소세&nbsp;&nbsp;원산세&nbsp;&nbsp;무가세&nbsp;&nbsp;4대보험&nbsp;&nbsp;그외기타</L>
+            <td style={td(GB)} colSpan={8}>
+              <L>국세&nbsp; 지방세&nbsp; 카드&nbsp; 중소세&nbsp; 원산세&nbsp; 무가세&nbsp; 4대보험&nbsp; 그외기타</L>
               <br /><Val v={d.tax_status || d.tax_delinquency} />
             </td>
             <td style={td(GB)}><L>KCB</L><br /><Val v={d.credit_kcb || d.credit_score} /></td>
           </tr>
           <tr>
-            <td style={th(G, GB)}>업력(개업일)</td>
+            <td style={th(G, GB)}>업력 (개업일)</td>
             <td style={td(GB)}><Val v={d.years_in_business || d.biz_size} /></td>
             <td style={td(GB)} colSpan={8}></td>
             <td style={td(GB)}><L>NICE</L><br /><Val v={d.credit_nice} /></td>
@@ -281,9 +279,9 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, customer, cel
             <td style={th(G, GB)}>직원 수<br /><span style={{ fontWeight: 400, fontSize: '0.8em' }}>(4대보험)</span></td>
             <td style={td(GB)}><Val v={d.employee_count} /></td>
             <td style={td(GB)} colSpan={3}></td>
-            <td style={td(GB)}><L>부채비율</L><br /><Blank w={45} /></td>
-            <td style={td(GB)}><L>이자보상배수</L><br /><Blank w={45} /></td>
-            <td style={td(GB)}><L>공정과정</L><br /><Blank w={45} /></td>
+            <td style={td(GB)}><L>부채비율</L><br /><Blank w={44} /></td>
+            <td style={td(GB)}><L>이자보상배수</L><br /><Blank w={44} /></td>
+            <td style={td(GB)}><L>공정과정</L><br /><Blank w={44} /></td>
             <td style={td(GB)} colSpan={2}></td>
           </tr>
           <tr>
@@ -292,12 +290,12 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, customer, cel
           </tr>
           <tr>
             <td style={th(G, GB)}>사업내용</td>
-            <td style={td(GB, { minHeight: 18 })} colSpan={11}><Val v={d.real_work || d.business_description} /></td>
+            <td style={td(GB, { minHeight: 20 })} colSpan={11}><Val v={d.real_work || d.business_description} /></td>
           </tr>
 
-          {/* ━━━━━━━━━━ 기대출 ━━━━━━━━━━ */}
+          {/* ━━ 기대출 ━━ */}
           <tr>
-            <td rowSpan={3} style={th(G, GB)}>기대출</td>
+            <td rowSpan={3} style={th(G, GB, { fontSize: '0.9em' })}>기대출</td>
             <td style={th(G, GB)}>정책자금</td>
             <td style={td(GB)} colSpan={8}><Val v={d.loan_kibo || d.loan_policy} /></td>
             <td style={td(GB)}><L>부채비율</L><br /><Blank w={40} /></td>
@@ -305,16 +303,16 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, customer, cel
           </tr>
           <tr>
             <td style={th(G, GB)}>신용 대출</td>
-            <td style={td(GB)} colSpan={5}>
+            <td style={td(GB)} colSpan={6}>
               {[['신보', d.loan_shinbo], ['재단', d.loan_jaedan], ['중진공', d.loan_jinjong], ['소진공', d.loan_sojin], ['기타', d.loan_other || d.loan_credit]].map(([lb, v]) =>
-                v ? <span key={lb as string} style={{ marginRight: 5 }}><b>{lb}</b>: <Val v={v as string} /></span> : null
+                v ? <span key={lb as string} style={{ marginRight: 6 }}><b>{lb}</b>: <Val v={v as string} /></span> : null
               )}
               {!d.loan_shinbo && !d.loan_jaedan && !d.loan_jinjong && !d.loan_sojin && !d.loan_other && !d.loan_credit && <Val v="" />}
             </td>
             <td style={td(GB)}><L>합계</L><br /><Val v={d.loan_total} /></td>
             <td style={td(GB)}></td>
             <td style={td(GB)}><L>이자보상배수</L><br /><Blank w={40} /></td>
-            <td style={td(GB)} colSpan={3}></td>
+            <td style={td(GB)} colSpan={2}></td>
           </tr>
           <tr>
             <td style={th(G, GB)}>담보 대출</td>
@@ -325,13 +323,13 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, customer, cel
             <td style={td(GB)} colSpan={4}></td>
           </tr>
 
-          {/* ━━━━━━━━━━ 대표자 ━━━━━━━━━━ */}
+          {/* ━━ 대표자 ━━ */}
           <tr>
-            <td rowSpan={6} style={th(G, GB)}>대표자</td>
+            <td rowSpan={6} style={th(G, GB, { fontSize: '0.9em' })}>대표자</td>
             <td style={th(G, GB)}>성별</td>
             <td style={td(GB)}><Opt label="남" /><Opt label="여" /></td>
             <td style={th(G, GB)}>수출</td>
-            <td style={td(GB)} colSpan={2}><L>직원채용예정(공고)</L><br /><Blank w={65} /></td>
+            <td style={td(GB)} colSpan={2}><L>직원채용예정</L><br /><Blank w={65} /></td>
             <td style={td(GB)} colSpan={2}><L>수출실적증명</L><br /><Blank w={65} /></td>
             <td style={td(GB)}><L>회생여부</L><br /><Blank w={40} /></td>
             <td style={td(GB)}><L>별도사업자</L><br /><Blank w={40} /></td>
@@ -351,13 +349,13 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, customer, cel
             <td style={th(G, GB)}>혼인여부</td>
             <td style={td(GB)}>
               <Opt label="有" /><Opt label="無" />
-              <br /><L>자녀: </L><Blank w={22} />
+              <br /><L>자녀: </L><Blank w={24} />
             </td>
           </tr>
           <tr>
             <td style={th(G, GB)}>동종업 경력</td>
-            <td style={td(GB)} colSpan={2}><Blank w={75} /></td>
-            <td style={th(G, GB)}>특허/인증</td>
+            <td style={td(GB)} colSpan={2}><Blank w={80} /></td>
+            <td style={th(G, GB)}>특허 / 인증</td>
             <td style={td(GB)} colSpan={8}><Val v={d.patent} /></td>
           </tr>
           <tr>
@@ -375,31 +373,31 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, customer, cel
             <td style={td(GB)} colSpan={10}><Blank w={180} /></td>
           </tr>
 
-          {/* ━━━━━━━━━━ 특허 ━━━━━━━━━━ */}
+          {/* ━━ 특허 ━━ */}
           <tr>
-            <td style={th(G, GB)}>특허<br /><span style={{ fontWeight: 400, fontSize: '0.8em' }}>(상표권,실용<br />신안,디자인권)</span></td>
+            <td style={th(G, GB, { fontSize: '0.82em' })}>특허<br />(상표권·실용<br />신안·디자인권)</td>
             <td style={th(G, GB)}>내용</td>
             <td style={td(GB)}><Val v={d.patent} /></td>
             <td style={th(G, GB)}>등록원</td>
-            <td style={td(GB)}><Blank w={45} /></td>
+            <td style={td(GB)}><Blank w={44} /></td>
             <td style={th(G, GB)}>매출 영향</td>
-            <td style={td(GB)}><Blank w={45} /></td>
+            <td style={td(GB)}><Blank w={44} /></td>
             <td style={th(G, GB)} colSpan={2}>특허권자</td>
             <td style={th(G, GB)}>등급</td>
             <td style={td(GB)} colSpan={3}><L>가치평가&nbsp;</L><Opt label="有" /><Opt label="無" /></td>
           </tr>
 
-          {/* ━━━━━━━━━━ 제조 (주황) ━━━━━━━━━━ */}
-          <SectBanner bg={O} bc={OB} color="#6a2800">▶ 제조업 해당 시 작성</SectBanner>
+          {/* ━━ 제조 (주황) ━━ */}
+          <SectBanner bg="#fff3e0" bc={OB} color="#7a3000">▶ 제조업 해당 시 작성</SectBanner>
           <tr>
-            <td rowSpan={4} style={th(O, OB)}>제조</td>
+            <td rowSpan={3} style={th(O, OB, { fontSize: '0.9em' })}>제조</td>
             <td style={th(O, OB)}>제작 방식</td>
             <td style={td(OB)}><Opt label="시장" /><Opt label="주문" /></td>
             <td style={th(O, OB)} rowSpan={2}>기계</td>
             <td style={th(O, OB)}>설비</td>
             <td style={th(O, OB)}>종류</td>
             <td style={th(O, OB)}>가격</td>
-            <td style={td(OB)} colSpan={5}>거래 내역</td>
+            <td style={td(OB)} colSpan={5}>거래 내역 <Blank w={100} /></td>
             <td style={td(OB)}></td>
           </tr>
           <tr>
@@ -412,29 +410,24 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, customer, cel
             <td style={td(OB)} colSpan={2}></td>
           </tr>
           <tr>
-            <td style={th(O, OB)}>제품매출 비중</td>
-            <td style={td(OB)} colSpan={3}><L>OEM </L><Blank w={24} />%&nbsp;<L>ODM </L><Blank w={24} />%&nbsp;<L>기타 </L><Blank w={24} />%</td>
-            <td style={td(OB)} colSpan={9}></td>
-          </tr>
-          <tr>
             <td style={th(O, OB)}>판매처</td>
-            <td style={td(OB)} colSpan={3}><Opt label="B2B" /><Opt label="B2C" />&nbsp;<Blank w={75} /></td>
-            <td style={th(O, OB)}>공장</td>
-            <td style={td(OB)} colSpan={8}><Opt label="자가" /><Opt label="임차" />&nbsp;<Blank w={100} /></td>
+            <td style={td(OB)} colSpan={3}><Opt label="B2B" /><Opt label="B2C" />&nbsp;<Blank w={80} /></td>
+            <td style={th(O, OB)} colSpan={2}>제품매출 비중</td>
+            <td style={td(OB)} colSpan={6}><L>OEM </L><Blank w={24} />%&nbsp;<L>ODM </L><Blank w={24} />%&nbsp;<L>기타 </L><Blank w={24} />%</td>
           </tr>
 
-          {/* ━━━━━━━━━━ 정보통신 (파랑) ━━━━━━━━━━ */}
-          <SectBanner bg={B} bc={BB} color="#0a2a5a">▶ 정보통신업 해당 시 작성</SectBanner>
+          {/* ━━ 정보통신 (파랑) ━━ */}
+          <SectBanner bg="#e8f2ff" bc={BB} color="#0a2a5a">▶ 정보통신업 해당 시 작성</SectBanner>
           <tr>
-            <td rowSpan={2} style={th(B, BB)}>정보<br />통신</td>
+            <td rowSpan={2} style={th(B, BB, { fontSize: '0.9em' })}>정보<br />통신</td>
             <td style={th(B, BB)}>개발 단계</td>
             <td style={td(BB)}><Opt label="전" /><Opt label="중" /><Opt label="후" /></td>
             <td style={th(B, BB)}>사업화 계획</td>
-            <td style={td(BB)}><Blank w={45} /></td>
+            <td style={td(BB)}><Blank w={44} /></td>
             <td style={th(B, BB)}>제작팀</td>
             <td style={td(BB)}><Opt label="자체" /><Opt label="외주" /></td>
             <td style={th(B, BB)}>인력/경력</td>
-            <td style={td(BB)}><Blank w={38} /></td>
+            <td style={td(BB)}><Blank w={36} /></td>
             <td style={th(B, BB)}>발생매출</td>
             <td style={td(BB)} colSpan={3}><Opt label="자점" /><Opt label="대여" /></td>
           </tr>
@@ -446,10 +439,10 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, customer, cel
             <td style={td(BB)} colSpan={2}><L>실물확인&nbsp;</L><Opt label="有" /><Opt label="無" /></td>
           </tr>
 
-          {/* ━━━━━━━━━━ 법인 (보라) ━━━━━━━━━━ */}
-          <SectBanner bg={P} bc={PB} color="#2e0870">▶ 법인 해당 시 작성</SectBanner>
+          {/* ━━ 법인 (보라) ━━ */}
+          <SectBanner bg="#f3eeff" bc={PB} color="#2e0870">▶ 법인 해당 시 작성</SectBanner>
           <tr>
-            <td rowSpan={5} style={th(P, PB)}>법인</td>
+            <td rowSpan={5} style={th(P, PB, { fontSize: '0.9em' })}>법인</td>
             <td style={th(P, PB)}>실제경영자</td>
             <td style={td(PB)}><Opt label="有" /><Opt label="無" /></td>
             <td style={th(P, PB)} colSpan={2}>관계회사 유/무</td>
@@ -463,7 +456,7 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, customer, cel
             <td style={td(PB)}><Blank w={55} /></td>
             <td style={th(P, PB)} colSpan={2}>관계회사 대표자</td>
             <td style={td(PB)} colSpan={2}><Blank w={55} /></td>
-            <td style={th(P, PB)} colSpan={2}>자본금(5천이상)</td>
+            <td style={th(P, PB)} colSpan={2}>자본금 (5천이상)</td>
             <td style={td(PB)} colSpan={4}><Blank w={50} /></td>
           </tr>
           <tr>
@@ -475,11 +468,11 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, customer, cel
             <td style={td(PB)} colSpan={4}><Blank w={50} /></td>
           </tr>
           <tr>
-            <td style={th(P, PB)}>최근1년 대표자<br />변경</td>
+            <td style={th(P, PB)}>최근1년<br />대표자변경</td>
             <td style={td(PB)}><Opt label="有" /><Opt label="無" /></td>
             <td style={th(P, PB)} colSpan={2}>관계회사 서로 매입출</td>
             <td style={td(PB)} colSpan={2}><Opt label="有" /><Opt label="無" /></td>
-            <td style={th(P, PB)} colSpan={2}>가수금/가지급금</td>
+            <td style={th(P, PB)} colSpan={2}>가수금 / 가지급금</td>
             <td style={td(PB)} colSpan={4}><Blank w={50} /></td>
           </tr>
           <tr>
@@ -494,38 +487,34 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, customer, cel
         </tbody>
       </table>
 
-      {/* ━━━━━━━━━━ 미팅 메모 (빈 필기란 — 페이지 하단 채움) ━━━━━━━━━━ */}
+      {/* ━━ 미팅 메모 (빈 필기란) ━━ */}
       <div style={{
-        border: `1px solid ${GB}`,
-        marginTop: -1,       /* 테이블 하단 테두리와 연결 */
-        padding: '4px 6px',
-        ...(isPrint
-          ? { flex: 1, display: 'flex', flexDirection: 'column' }
-          : { minHeight: 80 }),
+        ...(isPrint ? { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' } : { minHeight: 80 }),
+        border: `1px solid ${GB}`, marginTop: -1, padding: '5px 8px',
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-          <span style={{ fontWeight: 700, fontSize: '1em', color: '#1a2a40' }}>미팅 메모</span>
-          {/* 서명란을 메모 헤더 오른쪽에 배치 */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+          <span style={{ fontWeight: 700, fontSize: '1.05em', color: '#1a2a40', letterSpacing: 0.5 }}>미팅 메모</span>
           <div style={{ display: 'flex', gap: 20 }}>
             {['작성자', '확인자'].map(label => (
               <div key={label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                 <span style={{ fontSize: '0.85em', color: '#666', fontWeight: 700 }}>{label}</span>
-                <div style={{ border: '1px solid #aaa', width: 55, height: 32, borderRadius: 3 }} />
+                <div style={{ border: '1px solid #aaa', width: 58, height: 30, borderRadius: 3 }} />
               </div>
             ))}
           </div>
         </div>
-        {/* 필기용 줄 — isPrint면 flex:1 로 남은 공간 전부 사용 */}
         <div style={{ ...(isPrint ? { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-around' } : {}) }}>
-          {Array.from({ length: isPrint ? 8 : 5 }).map((_, i) => (
+          {Array.from({ length: isPrint ? 9 : 5 }).map((_, i) => (
             <div key={i} style={{
               borderBottom: '1px solid #ddd',
-              ...(isPrint ? { flex: 1, maxHeight: '6mm', minHeight: '3mm' } : { height: 16, marginBottom: 3 }),
+              ...(isPrint
+                ? { flex: 1, maxHeight: '7mm', minHeight: '4mm' }
+                : { height: 18, marginBottom: 4 }),
             }} />
           ))}
         </div>
       </div>
+
     </div>
   )
-
 }
