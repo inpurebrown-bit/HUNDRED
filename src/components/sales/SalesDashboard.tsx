@@ -909,10 +909,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   const cMonth = ((c as any).details?.contract_date || '').slice(0, 7)
                   return !isDirectType && c.status === 'contracted' && cMonth === thisMonth
                 })
-                .reduce((sum, c) => {
-                  const amt = Number((c as any).details?.payment_amount || 0)
-                  return sum + (amt > 0 && amt <= 330000 ? 0.5 : 1)
-                }, 0)
+                .reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0)
               const supPay = supPayAuto > 0 ? supPayAuto : Number(pr?.supply_payment ?? 0)
               // 직접수: 저장된 값 말고 customers DB에서 이번달 db010 실시간 카운트
               // 직접수: db010_month(신규) 또는 접수일/등록일 기준 — 거절/삭제 이동 후에도 카운트 유지
