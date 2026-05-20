@@ -720,7 +720,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
       )}
 
       {/* Header */}
-      <header className="bg-[#1B2A45] px-4 md:px-6 py-3 flex items-center justify-between sticky top-0 z-30">
+      <header className="bg-gradient-to-r from-[#1B2A45] to-sky-700 px-4 md:px-6 py-3 flex items-center justify-between sticky top-0 z-30">
         <Link href="/" className="relative h-8 w-24 shrink-0 block">
           <Image src="/images/logo.png" alt="HUNDRED" fill className="object-contain object-left brightness-0 invert" unoptimized />
         </Link>
@@ -886,7 +886,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               return (
                 <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
                   {/* 헤더 */}
-                  <div className="bg-[#1B2A45] px-5 py-4 flex items-center justify-between">
+                  <div className="bg-gradient-to-r from-[#1B2A45] to-sky-700 px-5 py-4 flex items-center justify-between">
                     <div>
                       <p className="text-[11px] text-white/50 font-medium uppercase tracking-widest mb-0.5">이번달 공급 현황</p>
                       <div className="flex items-baseline gap-2">
@@ -1045,12 +1045,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         {/* ══════════ 직가 DB ══════════ */}
         {activeTab === 'db010' && (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-sm font-bold text-gray-700 mr-auto">
-                직가 DB <span className="text-gray-400 font-normal">({db010List.length}건)</span>
-              </h2>
+            <div className="bg-gradient-to-r from-[#1B2A45] to-blue-600 rounded-xl px-5 py-3.5 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-white">📂 직가 DB</h2>
+                <p className="text-white/50 text-[11px] mt-0.5">총 {db010List.length}건</p>
+              </div>
               <button onClick={() => setShow010Form(v => !v)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                className="bg-white/15 hover:bg-white/25 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-colors border border-white/20">
                 {show010Form ? '✕ 취소' : '+ 직가DB 등록'}
               </button>
             </div>
@@ -1089,12 +1090,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         {/* ══════════ 공가 DB ══════════ */}
         {activeTab === 'customers' && (
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold text-gray-700">
-                공가 DB <span className="text-gray-400 font-normal">({activeCustomers.length}건)</span>
-              </h2>
+            <div className="bg-gradient-to-r from-[#1B2A45] to-indigo-600 rounded-xl px-5 py-3.5 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-white">📂 공가 DB</h2>
+                <p className="text-white/50 text-[11px] mt-0.5">총 {activeCustomers.length}건</p>
+              </div>
               <button onClick={() => setShowNewForm(v => !v)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                className="bg-white/15 hover:bg-white/25 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-colors border border-white/20">
                 {showNewForm ? '✕ 취소' : '+ 공가DB 등록'}
               </button>
             </div>
@@ -1134,9 +1136,10 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         {/* ══════════ 계약 업체 ══════════ */}
         {activeTab === 'contracted' && (
           <div className="space-y-3">
-            <h2 className="text-sm font-bold text-gray-700">
-              계약 업체 <span className="text-gray-400 font-normal">({contractedCustomers.length}건)</span>
-            </h2>
+            <div className="bg-gradient-to-r from-[#1B2A45] to-emerald-600 rounded-xl px-5 py-3.5">
+              <h2 className="text-sm font-bold text-white">✅ 계약 업체</h2>
+              <p className="text-white/50 text-[11px] mt-0.5">총 {contractedCustomers.length}건</p>
+            </div>
 
             {loading ? (
               <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
@@ -1176,9 +1179,10 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         {/* ══════════ 감성톡 관리 ══════════ */}
         {activeTab === 'emotional' && (
           <div className="space-y-3">
-            <h2 className="text-sm font-bold text-gray-700">
-              💬 감성톡 관리 업체 <span className="text-gray-400 font-normal">({emotionalCustomers.length}건)</span>
-            </h2>
+            <div className="bg-gradient-to-r from-[#1B2A45] to-violet-600 rounded-xl px-5 py-3.5">
+              <h2 className="text-sm font-bold text-white">💬 감성톡 관리 업체</h2>
+              <p className="text-white/50 text-[11px] mt-0.5">총 {emotionalCustomers.length}건 · 장기 육성 대상</p>
+            </div>
 
             {/* 오늘 재통화 업체 미니맵 */}
             {(() => {
@@ -1229,12 +1233,10 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         {/* ══════════ 자체거절 ══════════ */}
         {activeTab === 'trash' && (
           <div className="space-y-3">
-            <h2 className="text-sm font-bold text-gray-700">
-              🗑 자체거절 업체 <span className="text-gray-400 font-normal">({trashCustomers.length}건)</span>
-            </h2>
-            <p className="text-xs text-gray-400 bg-gray-50 border border-gray-100 rounded-lg px-4 py-2">
-              스스로 판단하여 진행 불가로 분류한 업체 · 복구 가능
-            </p>
+            <div className="bg-gradient-to-r from-[#1B2A45] to-slate-600 rounded-xl px-5 py-3.5">
+              <h2 className="text-sm font-bold text-white">🗑 자체거절 업체</h2>
+              <p className="text-white/50 text-[11px] mt-0.5">총 {trashCustomers.length}건 · 복구 가능</p>
+            </div>
 
             {loading ? (
               <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
@@ -1260,7 +1262,10 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         {/* ══════════ 매출 ══════════ */}
         {activeTab === 'revenue' && (
           <div className="space-y-4">
-            <h2 className="text-sm font-bold text-gray-700">💰 매출 현황</h2>
+            <div className="bg-gradient-to-r from-[#1B2A45] to-amber-600 rounded-xl px-5 py-3.5">
+              <h2 className="text-sm font-bold text-white">💰 매출 현황</h2>
+              <p className="text-white/50 text-[11px] mt-0.5">나의 계약 · 입금 현황</p>
+            </div>
 
             {/* ── 이번달 요약 카드 ── */}
             <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">

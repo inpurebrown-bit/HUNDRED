@@ -1477,7 +1477,7 @@ function CustomerCard({
               <div className="flex-1 overflow-y-auto min-h-0">
 
               {/* ① 직가/공가 — 최상단 (항상 표시) */}
-              <div className="flex items-center gap-2 bg-[#1B2A45] border border-[#1B2A45] rounded-lg px-2.5 py-2 mb-2 shadow-sm">
+              <div className="flex items-center gap-2 bg-gradient-to-r from-[#1B2A45] to-sky-800 border border-transparent rounded-lg px-2.5 py-2 mb-2 shadow-sm">
                 <span className="w-20 shrink-0 text-[10px] text-white font-bold">직가/공가</span>
                 <div className="flex gap-1.5">
                   {['직가', '공가'].map(opt => (

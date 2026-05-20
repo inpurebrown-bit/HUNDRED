@@ -82,7 +82,7 @@ export default function InCallForm({ title, salesUsers, submitting, initialData,
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       {/* 헤더 */}
-      <div className="bg-[#1B2A45] px-4 py-2.5 flex items-center justify-between">
+      <div className="bg-gradient-to-r from-[#1B2A45] to-sky-700 px-4 py-2.5 flex items-center justify-between">
         <h3 className="text-white font-semibold text-sm">📋 {title}</h3>
         <button type="button" onClick={onCancel} className="text-white/50 hover:text-white text-base leading-none">✕</button>
       </div>
