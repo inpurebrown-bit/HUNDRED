@@ -1261,23 +1261,28 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                     <div><label className={lbl}>기관명</label><input type="text" value={d.deposit_institution || ''} onChange={e => detailField('deposit_institution', e.target.value)} className={inp} placeholder="기관명" /></div>
                     <div><label className={lbl}>상품명</label><input type="text" value={d.deposit_product || ''} onChange={e => detailField('deposit_product', e.target.value)} className={inp} placeholder="상품명" /></div>
                     <div><label className={lbl}>승인금액</label><input type="text"
+                      inputMode="numeric"
                       value={d.approval_amount ? formatComma(d.approval_amount) : ''}
                       onChange={e => {
                         const raw = parseComma(e.target.value)
                         const stored = raw > 0 ? String(raw) : ''
-                        detailField('approval_amount', stored)
                         const rate = parseFloat(String(d.fee_rate || '0')) || 0
-                        if (raw > 0 && rate > 0) detailField('fee_amount', String(Math.round(raw * rate / 100)))
+                        const newFee = raw > 0 && rate > 0 ? String(Math.round(raw * rate / 100)) : (d.fee_amount || '')
+                        const next = { ...local, details: { ...(local.details || {}), approval_amount: stored, fee_amount: newFee } }
+                        setLocal(next)
+                        schedule({ details: { ...(local.details || {}), approval_amount: stored, fee_amount: newFee } })
                       }} className={inp} placeholder="0원" /></div>
                     <div><label className={lbl}>수수료%</label><input type="text"
                       inputMode="decimal"
                       value={d.fee_rate || ''}
                       onChange={e => {
                         const val = e.target.value.replace(/[^0-9.]/g, '')
-                        detailField('fee_rate', val)
                         const rate = parseFloat(val) || 0
                         const amt = parseComma(String(d.approval_amount || '0'))
-                        if (amt > 0 && rate > 0) detailField('fee_amount', String(Math.round(amt * rate / 100)))
+                        const newFee = amt > 0 && rate > 0 ? String(Math.round(amt * rate / 100)) : (d.fee_amount || '')
+                        const next = { ...local, details: { ...(local.details || {}), fee_rate: val, fee_amount: newFee } }
+                        setLocal(next)
+                        schedule({ details: { ...(local.details || {}), fee_rate: val, fee_amount: newFee } })
                       }} className={inp} placeholder="%" /></div>
                     <div className="col-span-2">
                       <label className={lbl}>수수료 <span className="text-emerald-600 font-bold">(관리팀 매출 · 자동산정)</span></label>
