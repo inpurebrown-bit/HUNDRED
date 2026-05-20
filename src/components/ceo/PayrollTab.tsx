@@ -6,29 +6,23 @@ import { useState, useEffect, useCallback } from 'react'
 
 interface OpsEmployee {
   name: string
-  base_salary: number       // 기본급
-  fee_revenue: number       // 수수료매출 (VAT제외)
-  puto_revenue: number      // 뿌토매출 (VAT제외)
-  performance_bonus: number // 성과급
+  base_salary: number
+  fee_revenue: number
+  puto_revenue: number
+  performance_bonus: number
 }
 
-interface AwardItem {
-  reason: string
-  amount: number
-}
+interface AwardItem { reason: string; amount: number }
 
 interface SalesEmployee {
   name: string
-  contract_revenue: number  // 계약금매출 (VAT제외)
-  contract_count: number    // 계약수 (프로모션 계산용)
-  performance_bonus: number // 성과급 (수동)
-  awards: AwardItem[]       // 시상금 목록
+  contract_revenue: number
+  contract_count: number   // 내부 보관 (자동 반영, 표시 안 함)
+  performance_bonus: number
+  awards: AwardItem[]
 }
 
-interface OtherCostItem {
-  label: string
-  amount: number
-}
+interface OtherCostItem { label: string; amount: number }
 
 interface OtherCosts {
   db_count: number
@@ -39,58 +33,50 @@ interface OtherCosts {
   sales_other_items: OtherCostItem[]
 }
 
-// ─── 계산 함수 ────────────────────────────────────────────
+// ─── 계산 ─────────────────────────────────────────────────
 
-function calcOps(emp: OpsEmployee) {
-  const feeIncentive   = Math.round(Number(emp.fee_revenue)  * 0.10)
-  const putoIncentive  = Math.round(Number(emp.puto_revenue) * 0.35)
-  const beforeDeduction = Number(emp.base_salary) + feeIncentive + putoIncentive + Number(emp.performance_bonus)
-  const afterDeduction  = Math.round(beforeDeduction * (1 - 0.033))
-  return { feeIncentive, putoIncentive, beforeDeduction, afterDeduction }
+function calcOps(e: OpsEmployee) {
+  const feeInc  = Math.round(Number(e.fee_revenue)  * 0.10)
+  const putoInc = Math.round(Number(e.puto_revenue) * 0.35)
+  const before  = Number(e.base_salary) + feeInc + putoInc + Number(e.performance_bonus)
+  const after   = Math.round(before * 0.967)
+  return { feeInc, putoInc, before, after }
 }
 
-function getPromotion(count: number): number {
-  if (count >= 40) return 1_500_000
-  if (count >= 30) return 1_000_000
-  if (count >= 25) return   700_000
-  if (count >= 20) return   500_000
+function getPromo(n: number) {
+  if (n >= 40) return 1_500_000
+  if (n >= 30) return 1_000_000
+  if (n >= 25) return   700_000
+  if (n >= 20) return   500_000
   return 0
 }
 
-function promotionLabel(count: number): string {
-  if (count >= 40) return '150만 (40개↑)'
-  if (count >= 30) return '100만 (30개↑)'
-  if (count >= 25) return '70만 (25개↑)'
-  if (count >= 20) return '50만 (20개↑)'
-  return '-'
-}
-
-function calcSales(emp: SalesEmployee) {
-  const rate             = 0.25 + (emp.contract_count >= 12 ? 0.05 : 0)
-  const contractIncentive = Math.round(Number(emp.contract_revenue) * rate)
-  const extraRate        = emp.contract_count >= 12 ? 0.05 : 0
-  const promotion        = getPromotion(emp.contract_count)
-  const awardsTotal      = (emp.awards || []).reduce((s, a) => s + Number(a.amount || 0), 0)
-  const beforeDeduction  = contractIncentive + promotion + Number(emp.performance_bonus) + awardsTotal
-  const afterDeduction   = Math.round(beforeDeduction * (1 - 0.033))
-  return { contractIncentive, extraRate, promotion, awardsTotal, beforeDeduction, afterDeduction }
+function calcSales(e: SalesEmployee) {
+  const contractInc  = Math.round(Number(e.contract_revenue) * 0.25)
+  const perfBonus    = Number(e.performance_bonus)
+  const promo        = getPromo(e.contract_count)
+  const awardsSum    = (e.awards || []).reduce((s, a) => s + Number(a.amount || 0), 0)
+  const before       = contractInc + perfBonus + promo + awardsSum
+  const after        = Math.round(before * 0.967)
+  return { contractInc, perfBonus, promo, awardsSum, before, after }
 }
 
 // ─── 유틸 ─────────────────────────────────────────────────
 
-const INPUT_CLS = 'border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 w-full'
-const CALC_CLS  = 'bg-gray-50 text-gray-600 text-sm px-2 py-1 text-right whitespace-nowrap'
-
-function thisMonth(): string {
+function thisMonth() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
-
-function fmtW(n: number) {
-  if (!n || n === 0) return '-'
-  if (n >= 100_000_000) return (n / 100_000_000).toFixed(1) + '억'
-  if (n >= 10_000) return Math.round(n / 10_000) + '만원'
-  return n.toLocaleString() + '원'
+function won(n: number) {
+  if (!n) return '-'
+  return n.toLocaleString('ko-KR') + '원'
+}
+function fmtInput(n: number) {
+  if (!n) return ''
+  return n.toLocaleString('ko-KR')
+}
+function parseInput(s: string) {
+  return parseInt(s.replace(/[^0-9]/g, ''), 10) || 0
 }
 
 function defaultOps(): OpsEmployee {
@@ -99,63 +85,206 @@ function defaultOps(): OpsEmployee {
 function defaultSales(): SalesEmployee {
   return { name: '', contract_revenue: 0, contract_count: 0, performance_bonus: 0, awards: [] }
 }
-function defaultOtherCosts(): OtherCosts {
-  return {
-    db_count: 0,
-    db_unit_price: 40000,
-    rent: 650000,
-    mgmt: 400000,
-    sales_fixed: 820000,
-    sales_other_items: [],
-  }
+function defaultCosts(): OtherCosts {
+  return { db_count: 0, db_unit_price: 40000, rent: 650000, mgmt: 400000, sales_fixed: 820000, sales_other_items: [] }
 }
 
-// ─── 컴포넌트 ─────────────────────────────────────────────
+// ─── PayRow 헬퍼 ─────────────────────────────────────────
+
+function PayRow({
+  label, value, editable, onEdit, autoTag, bold, colorClass, sub,
+}: {
+  label: string; value: number
+  editable?: boolean; onEdit?: (v: string) => void
+  autoTag?: boolean; bold?: boolean
+  colorClass?: string; sub?: string
+}) {
+  const valColor = colorClass || (bold ? 'text-gray-800' : 'text-gray-700')
+  return (
+    <div className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
+      <div className="flex items-center gap-1 min-w-0">
+        <span className={`text-xs leading-tight ${bold ? 'font-semibold text-gray-700' : 'text-gray-400'} truncate`}>
+          {label}
+        </span>
+        {autoTag && <span className="shrink-0 text-[9px] bg-blue-50 text-blue-400 border border-blue-100 px-1 rounded">자동</span>}
+      </div>
+      <div className="flex items-center gap-1 shrink-0 ml-2">
+        {sub && <span className="text-[9px] text-gray-300">{sub}</span>}
+        {editable && onEdit ? (
+          <input
+            type="text"
+            inputMode="numeric"
+            value={fmtInput(value)}
+            onChange={e => onEdit(e.target.value)}
+            placeholder="0"
+            className="w-28 text-right text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400 text-gray-700"
+          />
+        ) : (
+          <span className={`text-xs font-semibold ${valColor}`}>{won(value)}</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── 관리팀 직원 카드 ─────────────────────────────────────
+
+function OpsCard({
+  emp, idx, onChange, onRemove,
+}: {
+  emp: OpsEmployee; idx: number
+  onChange: (i: number, f: keyof OpsEmployee, v: string) => void
+  onRemove: (i: number) => void
+}) {
+  const c = calcOps(emp)
+  return (
+    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+      {/* 헤더 */}
+      <div className="bg-gradient-to-r from-[#1B2A45] to-[#2d4a7a] px-4 py-3 flex items-center justify-between">
+        <input
+          type="text" value={emp.name}
+          onChange={e => onChange(idx, 'name', e.target.value)}
+          placeholder="직원명"
+          className="bg-transparent text-white font-bold text-sm placeholder-white/40 border-none outline-none w-full"
+        />
+        <button onClick={() => onRemove(idx)} className="text-white/30 hover:text-white/70 text-sm ml-2 shrink-0">✕</button>
+      </div>
+      {/* 항목 */}
+      <div className="px-4 py-3 space-y-0">
+        <PayRow label="기본급" value={emp.base_salary} editable onEdit={v => onChange(idx, 'base_salary', v)} />
+        <PayRow label="수수료매출(VAT제외)" value={emp.fee_revenue} editable autoTag onEdit={v => onChange(idx, 'fee_revenue', v)} />
+        <PayRow label="수수료인센(10%)" value={c.feeInc} />
+        <PayRow label="뿌토매출(VAT제외)" value={emp.puto_revenue} editable autoTag onEdit={v => onChange(idx, 'puto_revenue', v)} />
+        <PayRow label="뿌토인센(35%)" value={c.putoInc} />
+        <PayRow label="성과급" value={emp.performance_bonus} editable onEdit={v => onChange(idx, 'performance_bonus', v)} />
+      </div>
+      {/* 합계 */}
+      <div className="bg-gray-50 px-4 py-3 space-y-1 border-t border-gray-100">
+        <PayRow label="공제전급여" value={c.before} bold colorClass="text-blue-600" />
+        <PayRow label="공제후급여(3.3%)" value={c.after} bold colorClass="text-emerald-600" />
+      </div>
+    </div>
+  )
+}
+
+// ─── 영업팀 직원 카드 ─────────────────────────────────────
+
+function SalesCard({
+  emp, idx, onChange, onRemove, onAddAward, onUpdateAward, onRemoveAward,
+}: {
+  emp: SalesEmployee; idx: number
+  onChange: (i: number, f: keyof Omit<SalesEmployee, 'awards'>, v: string) => void
+  onRemove: (i: number) => void
+  onAddAward: (i: number) => void
+  onUpdateAward: (ei: number, ai: number, f: keyof AwardItem, v: string) => void
+  onRemoveAward: (ei: number, ai: number) => void
+}) {
+  const c = calcSales(emp)
+  const has12 = emp.contract_count >= 12
+  const promoLabel = emp.contract_count > 0 ? `${emp.contract_count}개` : '갯수 미정'
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+      {/* 헤더 */}
+      <div className="bg-gradient-to-r from-[#C5A258] to-[#d4b56a] px-4 py-3 flex items-center justify-between">
+        <input
+          type="text" value={emp.name}
+          onChange={e => onChange(idx, 'name', e.target.value)}
+          placeholder="사원명"
+          className="bg-transparent text-white font-bold text-sm placeholder-white/40 border-none outline-none w-full"
+        />
+        <button onClick={() => onRemove(idx)} className="text-white/30 hover:text-white/70 text-sm ml-2 shrink-0">✕</button>
+      </div>
+      {/* 항목 */}
+      <div className="px-4 py-3 space-y-0">
+        <PayRow label="계약금매출(VAT제외)" value={emp.contract_revenue} editable autoTag onEdit={v => onChange(idx, 'contract_revenue', v)} />
+        <PayRow label="계약금인센(25%)" value={c.contractInc} />
+        <PayRow
+          label={has12 ? '성과급(+5% ✓ 12개↑)' : '성과급(+5%, 12개↑)'}
+          value={emp.performance_bonus}
+          editable
+          onEdit={v => onChange(idx, 'performance_bonus', v)}
+          colorClass={has12 ? 'text-violet-600' : undefined}
+        />
+        <PayRow
+          label={`프로모션(${promoLabel})`}
+          value={c.promo}
+          sub={c.promo > 0 ? '' : '20/25/30/40개 기준'}
+        />
+        {/* 시상금 */}
+        <div className="py-1.5 border-b border-gray-50">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-400">시상금</span>
+            <div className="flex items-center gap-2">
+              <button onClick={() => onAddAward(idx)}
+                className="text-[10px] text-[#C5A258] border border-[#C5A258]/30 rounded px-1.5 py-0.5 hover:bg-[#C5A258]/10">
+                + 추가
+              </button>
+              <span className="text-xs font-semibold text-gray-700">
+                {c.awardsSum > 0 ? c.awardsSum.toLocaleString('ko-KR') + '원' : '-'}
+              </span>
+            </div>
+          </div>
+          {(emp.awards || []).map((aw, ai) => (
+            <div key={ai} className="flex items-center gap-1.5 mt-1.5">
+              <input type="text" value={aw.reason} placeholder="사유"
+                onChange={e => onUpdateAward(idx, ai, 'reason', e.target.value)}
+                className="flex-1 min-w-0 text-[11px] border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-amber-300 text-gray-600" />
+              <input type="text" inputMode="numeric" value={fmtInput(aw.amount)} placeholder="금액"
+                onChange={e => onUpdateAward(idx, ai, 'amount', e.target.value)}
+                className="w-24 text-right text-[11px] border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-amber-300 text-gray-600" />
+              <button onClick={() => onRemoveAward(idx, ai)} className="text-red-300 hover:text-red-500 text-xs">✕</button>
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* 합계 */}
+      <div className="bg-gray-50 px-4 py-3 space-y-1 border-t border-gray-100">
+        <PayRow label="공제전급여" value={c.before} bold colorClass="text-blue-600" />
+        <PayRow label="공제후급여(3.3%)" value={c.after} bold colorClass="text-emerald-600" />
+      </div>
+    </div>
+  )
+}
+
+// ─── 메인 컴포넌트 ────────────────────────────────────────
 
 export default function PayrollTab() {
-  const [yearMonth, setYearMonth] = useState<string>(thisMonth())
+  const [yearMonth, setYearMonth] = useState(thisMonth())
   const [saving, setSaving]       = useState(false)
   const [loading, setLoading]     = useState(false)
   const [autoLoading, setAutoLoading] = useState(false)
   const [msg, setMsg]             = useState('')
 
-  const [opsEmployees, setOpsEmployees] = useState<OpsEmployee[]>([
+  const [opsEmps, setOpsEmps] = useState<OpsEmployee[]>([
     { ...defaultOps(), name: '관리팀장', base_salary: 2_000_000 },
-    defaultOps(), defaultOps(),
   ])
-
-  const [salesEmployees, setSalesEmployees] = useState<SalesEmployee[]>([
+  const [salesEmps, setSalesEmps] = useState<SalesEmployee[]>([
     { ...defaultSales(), name: '손제후' },
     { ...defaultSales(), name: '김윤지' },
-    defaultSales(),
-    defaultSales(),
   ])
+  const [costs, setCosts]   = useState<OtherCosts>(defaultCosts())
+  const [revTotals, setRevTotals] = useState<{ sales: number; ops: number; opsContract: number } | null>(null)
 
-  const [otherCosts, setOtherCosts] = useState<OtherCosts>(defaultOtherCosts())
-
-  // 총매출 (revenue API에서 이번달 자동)
-  const [revenueTotals, setRevenueTotals] = useState<{ sales: number; ops: number; opsContract: number } | null>(null)
-
-  // ── Revenue 자동 로드 (이번달) ───────────────────────────
-  const autoLoadRevenue = useCallback(async () => {
+  // ── 자동 반영 ─────────────────────────────────────────────
+  const autoLoad = useCallback(async () => {
     setAutoLoading(true)
+    setMsg('')
     try {
-      const res = await fetch('/api/revenue')
+      const res  = await fetch('/api/revenue')
       const data = await res.json()
 
-      const thisM = thisMonth()
-      const salesEntries: any[]   = (data.thisMonthSales || [])
-      const opsEntries: any[]     = (data.thisMonthOps || [])
-      const contractEntries: any[] = (data.thisMonthOpsContracts || [])
+      const salesEntries: any[]    = data.thisMonthSales    || []
+      const opsEntries: any[]      = data.thisMonthOps      || []
+      const contractEntries: any[] = data.thisMonthOpsContracts || []
 
-      // 총매출 저장
-      setRevenueTotals({
+      setRevTotals({
         sales:       salesEntries.reduce((s: number, e: any) => s + (e.amount || 0), 0),
         ops:         opsEntries.reduce((s: number, e: any) => s + (e.amount || 0), 0),
         opsContract: contractEntries.reduce((s: number, e: any) => s + (e.amount || 0), 0),
       })
 
-      // 영업팀 per-user 집계
+      // 영업팀 — 이름 기준 집계 (sales_user_name 또는 owner_id로 fallback)
       const salesByName: Record<string, { amount: number; count: number }> = {}
       for (const e of salesEntries) {
         const name = (e.sales_user_name || '').trim()
@@ -165,67 +294,70 @@ export default function PayrollTab() {
         salesByName[name].count++
       }
 
-      // 관리팀 per-user 집계
-      const opsFeeByName: Record<string, number> = {}
+      setSalesEmps(prev => prev.map(emp => {
+        if (!emp.name) return emp
+        const key = Object.keys(salesByName).find(k => k === emp.name || k.includes(emp.name) || emp.name.includes(k))
+        if (!key) return emp
+        const rev = salesByName[key]
+        const autoPerf = rev.count >= 12 ? Math.round(rev.amount * 0.05) : emp.performance_bonus
+        return { ...emp, contract_revenue: rev.amount, contract_count: rev.count, performance_bonus: autoPerf }
+      }))
+
+      // 관리팀 — 이름 기준 집계
+      const opsFeeByName: Record<string, number>  = {}
+      const opsPutoByName: Record<string, number> = {}
       for (const e of opsEntries) {
         const name = (e.ops_user_name || '').trim()
         if (!name) continue
         opsFeeByName[name] = (opsFeeByName[name] || 0) + (e.amount || 0)
       }
-      const opsContractByName: Record<string, number> = {}
       for (const e of contractEntries) {
         const name = (e.ops_user_name || '').trim()
         if (!name) continue
-        opsContractByName[name] = (opsContractByName[name] || 0) + (e.amount || 0)
+        opsPutoByName[name] = (opsPutoByName[name] || 0) + (e.amount || 0)
       }
-
-      // 영업팀 자동 채우기
-      setSalesEmployees(prev => prev.map(emp => {
+      setOpsEmps(prev => prev.map(emp => {
         if (!emp.name) return emp
-        const rev = salesByName[emp.name]
-        if (!rev) return emp
-        return { ...emp, contract_revenue: rev.amount, contract_count: rev.count }
-      }))
-
-      // 관리팀 자동 채우기
-      setOpsEmployees(prev => prev.map(emp => {
-        if (!emp.name) return emp
-        const fee  = opsFeeByName[emp.name] || 0
-        const puto = opsContractByName[emp.name] || 0
-        return { ...emp, fee_revenue: fee, puto_revenue: puto }
+        const key = Object.keys(opsFeeByName).find(k => k === emp.name || k.includes(emp.name) || emp.name.includes(k))
+        const pKey = Object.keys(opsPutoByName).find(k => k === emp.name || k.includes(emp.name) || emp.name.includes(k))
+        return {
+          ...emp,
+          fee_revenue:  key  ? opsFeeByName[key]   : emp.fee_revenue,
+          puto_revenue: pKey ? opsPutoByName[pKey]  : emp.puto_revenue,
+        }
       }))
 
       setMsg('✅ 이달 매출 자동 반영 완료')
     } catch {
-      setMsg('자동 로드 실패')
+      setMsg('❌ 자동 로드 실패')
     } finally {
       setAutoLoading(false)
     }
   }, [])
 
-  // ── 저장된 데이터 불러오기 ────────────────────────────────
+  // ── 불러오기 ──────────────────────────────────────────────
   async function handleLoad() {
     setLoading(true)
     setMsg('')
     const res  = await fetch(`/api/payroll?year_month=${yearMonth}`)
     const json = await res.json()
     if (json.record?.employees) {
-      const emps = json.record.employees
-      if (emps.ops_employees)  setOpsEmployees(emps.ops_employees)
-      if (emps.sales_employees) setSalesEmployees(emps.sales_employees)
-      if (emps.other_costs)    setOtherCosts({ ...defaultOtherCosts(), ...emps.other_costs })
-      if (emps.revenue_totals) setRevenueTotals(emps.revenue_totals)
+      const d = json.record.employees
+      if (d.ops_employees)    setOpsEmps(d.ops_employees)
+      if (d.sales_employees)  setSalesEmps(d.sales_employees)
+      if (d.other_costs)      setCosts({ ...defaultCosts(), ...d.other_costs })
+      if (d.revenue_totals)   setRevTotals(d.revenue_totals)
       setMsg('불러오기 완료')
     } else {
-      setMsg('저장 데이터 없음 — 이달 매출 자동 반영 중...')
-      if (yearMonth === thisMonth()) await autoLoadRevenue()
+      if (yearMonth === thisMonth()) await autoLoad()
+      else setMsg('저장된 데이터 없음')
     }
     setLoading(false)
   }
 
-  useEffect(() => { handleLoad() }, [yearMonth])
+  useEffect(() => { handleLoad() }, [yearMonth]) // eslint-disable-line
 
-  // ── 저장 ─────────────────────────────────────────────────
+  // ── 저장 ──────────────────────────────────────────────────
   async function handleSave() {
     setSaving(true)
     setMsg('')
@@ -234,434 +366,252 @@ export default function PayrollTab() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         year_month: yearMonth,
-        employees: {
-          ops_employees: opsEmployees,
-          sales_employees: salesEmployees,
-          other_costs: otherCosts,
-          revenue_totals: revenueTotals,
-        },
+        employees: { ops_employees: opsEmps, sales_employees: salesEmps, other_costs: costs, revenue_totals: revTotals },
         memo: '',
       }),
     })
     const json = await res.json()
-    setMsg(json.record ? '저장 완료' : '저장 실패: ' + json.error)
+    setMsg(json.record ? '저장 완료 ✓' : '저장 실패: ' + json.error)
     setSaving(false)
   }
 
-  // ── 관리팀 집계 ───────────────────────────────────────────
-  const opsCalcs              = opsEmployees.map(calcOps)
-  const opsTotalBase          = opsEmployees.reduce((s, e) => s + Number(e.base_salary), 0)
-  const opsTotalFeeRevenue    = opsEmployees.reduce((s, e) => s + Number(e.fee_revenue), 0)
-  const opsTotalPutoRevenue   = opsEmployees.reduce((s, e) => s + Number(e.puto_revenue), 0)
-  const opsTotalFeeIncentive  = opsCalcs.reduce((s, c) => s + c.feeIncentive, 0)
-  const opsTotalPutoIncentive = opsCalcs.reduce((s, c) => s + c.putoIncentive, 0)
-  const opsTotalPerformance   = opsEmployees.reduce((s, e) => s + Number(e.performance_bonus), 0)
-  const opsTotalBefore        = opsCalcs.reduce((s, c) => s + c.beforeDeduction, 0)
-  const opsTotalAfter         = opsCalcs.reduce((s, c) => s + c.afterDeduction, 0)
+  // ── 업데이트 헬퍼 ─────────────────────────────────────────
+  function updateOps(i: number, f: keyof OpsEmployee, v: string) {
+    setOpsEmps(prev => { const n = [...prev]; n[i] = { ...n[i], [f]: f === 'name' ? v : parseInput(v) }; return n })
+  }
+  function removeOps(i: number) { setOpsEmps(prev => prev.filter((_, j) => j !== i)) }
 
-  // ── 영업팀 집계 ───────────────────────────────────────────
-  const salesCalcs               = salesEmployees.map(calcSales)
-  const salesTotalContractRevenue = salesEmployees.reduce((s, e) => s + Number(e.contract_revenue), 0)
-  const salesTotalContractIncentive = salesCalcs.reduce((s, c) => s + c.contractIncentive, 0)
-  const salesTotalPromotion       = salesCalcs.reduce((s, c) => s + c.promotion, 0)
-  const salesTotalPerformance     = salesEmployees.reduce((s, e) => s + Number(e.performance_bonus), 0)
-  const salesTotalAwards          = salesCalcs.reduce((s, c) => s + c.awardsTotal, 0)
-  const salesTotalBefore          = salesCalcs.reduce((s, c) => s + c.beforeDeduction, 0)
-  const salesTotalAfter           = salesCalcs.reduce((s, c) => s + c.afterDeduction, 0)
+  function updateSales(i: number, f: keyof Omit<SalesEmployee, 'awards'>, v: string) {
+    setSalesEmps(prev => { const n = [...prev]; n[i] = { ...n[i], [f]: f === 'name' ? v : parseInput(v) }; return n })
+  }
+  function removeSales(i: number) { setSalesEmps(prev => prev.filter((_, j) => j !== i)) }
+  function addAward(ei: number) {
+    setSalesEmps(prev => { const n = [...prev]; n[ei] = { ...n[ei], awards: [...(n[ei].awards || []), { reason: '', amount: 0 }] }; return n })
+  }
+  function updateAward(ei: number, ai: number, f: keyof AwardItem, v: string) {
+    setSalesEmps(prev => {
+      const n = [...prev]; const aw = [...(n[ei].awards || [])]
+      aw[ai] = { ...aw[ai], [f]: f === 'amount' ? parseInput(v) : v }
+      n[ei] = { ...n[ei], awards: aw }; return n
+    })
+  }
+  function removeAward(ei: number, ai: number) {
+    setSalesEmps(prev => { const n = [...prev]; n[ei] = { ...n[ei], awards: n[ei].awards.filter((_, j) => j !== ai) }; return n })
+  }
 
-  // ── 회사 손익 ─────────────────────────────────────────────
-  const totalRevenue  = (revenueTotals?.sales || 0) + (revenueTotals?.ops || 0) + (revenueTotals?.opsContract || 0)
+  // ── 손익 집계 ─────────────────────────────────────────────
+  const opsCalcs   = opsEmps.map(calcOps)
+  const salesCalcs = salesEmps.map(calcSales)
+
+  const opsTotalBefore   = opsCalcs.reduce((s, c) => s + c.before, 0)
+  const salesTotalBefore = salesCalcs.reduce((s, c) => s + c.before, 0)
+  const laborCost = opsTotalBefore + salesTotalBefore
+
+  const totalRevenue  = (revTotals?.sales || 0) + (revTotals?.ops || 0) + (revTotals?.opsContract || 0)
   const tax           = Math.round(totalRevenue * 0.10)
-  const laborCost     = opsTotalBefore + salesTotalBefore
-  const dbCost        = Number(otherCosts.db_count) * Number(otherCosts.db_unit_price)
-  const otherItemsTotal = (otherCosts.sales_other_items || []).reduce((s, i) => s + Number(i.amount || 0), 0)
-  const otherTotal    = dbCost + Number(otherCosts.rent) + Number(otherCosts.mgmt) + Number(otherCosts.sales_fixed) + otherItemsTotal
-  const totalCost     = tax + laborCost + otherTotal
-  const netProfit     = totalRevenue - totalCost
-
-  // ── 헬퍼 ─────────────────────────────────────────────────
-  function updateOps(i: number, field: keyof OpsEmployee, value: string) {
-    setOpsEmployees(prev => {
-      const next = [...prev]
-      next[i] = { ...next[i], [field]: field === 'name' ? value : Number(value) }
-      return next
-    })
-  }
-  function updateSales(i: number, field: keyof Omit<SalesEmployee, 'awards'>, value: string) {
-    setSalesEmployees(prev => {
-      const next = [...prev]
-      next[i] = { ...next[i], [field]: field === 'name' ? value : Number(value) }
-      return next
-    })
-  }
-  function addAward(empIdx: number) {
-    setSalesEmployees(prev => {
-      const next = [...prev]
-      next[empIdx] = { ...next[empIdx], awards: [...(next[empIdx].awards || []), { reason: '', amount: 0 }] }
-      return next
-    })
-  }
-  function updateAward(empIdx: number, awardIdx: number, field: keyof AwardItem, value: string) {
-    setSalesEmployees(prev => {
-      const next = [...prev]
-      const awards = [...(next[empIdx].awards || [])]
-      awards[awardIdx] = { ...awards[awardIdx], [field]: field === 'amount' ? Number(value) : value }
-      next[empIdx] = { ...next[empIdx], awards }
-      return next
-    })
-  }
-  function removeAward(empIdx: number, awardIdx: number) {
-    setSalesEmployees(prev => {
-      const next = [...prev]
-      next[empIdx] = { ...next[empIdx], awards: next[empIdx].awards.filter((_, j) => j !== awardIdx) }
-      return next
-    })
-  }
-  function addOtherItem() {
-    setOtherCosts(prev => ({ ...prev, sales_other_items: [...(prev.sales_other_items || []), { label: '', amount: 0 }] }))
-  }
-  function updateOtherItem(i: number, field: keyof OtherCostItem, value: string) {
-    setOtherCosts(prev => {
-      const items = [...(prev.sales_other_items || [])]
-      items[i] = { ...items[i], [field]: field === 'amount' ? Number(value) : value }
-      return { ...prev, sales_other_items: items }
-    })
-  }
-  function removeOtherItem(i: number) {
-    setOtherCosts(prev => ({ ...prev, sales_other_items: prev.sales_other_items.filter((_, j) => j !== i) }))
-  }
+  const dbCost        = Number(costs.db_count) * Number(costs.db_unit_price)
+  const otherItemsSum = (costs.sales_other_items || []).reduce((s, i) => s + Number(i.amount || 0), 0)
+  const otherTotal    = dbCost + Number(costs.rent) + Number(costs.mgmt) + Number(costs.sales_fixed) + otherItemsSum
+  const netProfit     = totalRevenue - tax - laborCost - otherTotal
 
   const isCurrentMonth = yearMonth === thisMonth()
 
-  return (
-    <div className="space-y-6 pb-8">
+  // 이름 있는 직원만 표시
+  const namedOps   = opsEmps.filter(e => e.name.trim())
+  const namedSales = salesEmps.filter(e => e.name.trim())
 
-      {/* 헤더 */}
+  return (
+    <div className="space-y-6 pb-10">
+
+      {/* ── 헤더 바 ── */}
       <div className="flex items-center gap-3 flex-wrap">
         <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)}
-          className="border border-gray-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
+          className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
 
         {isCurrentMonth && (
-          <button onClick={autoLoadRevenue} disabled={autoLoading}
-            className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 disabled:opacity-40 text-blue-700 border border-blue-200 px-3 py-1.5 rounded text-xs font-medium">
-            {autoLoading ? '⏳ 불러오는 중...' : '🔄 이달 매출 자동 반영'}
+          <button onClick={autoLoad} disabled={autoLoading}
+            className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 disabled:opacity-40 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
+            {autoLoading ? '⏳ 반영 중...' : '🔄 이달 매출 자동 반영'}
           </button>
         )}
 
         <button onClick={handleSave} disabled={saving}
-          className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white px-4 py-1.5 rounded text-sm font-medium">
-          {saving ? '저장 중...' : '저장'}
+          className="bg-[#1B2A45] hover:bg-[#1B2A45]/90 disabled:opacity-40 text-white px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors">
+          {saving ? '저장 중...' : '💾 저장'}
         </button>
 
-        {loading && <span className="text-xs text-blue-500">불러오는 중...</span>}
-        {msg && <span className="text-xs text-gray-500">{msg}</span>}
+        {loading && <span className="text-xs text-blue-500 animate-pulse">불러오는 중...</span>}
+        {msg && <span className={`text-xs font-medium ${msg.includes('✅') || msg.includes('완료') ? 'text-emerald-600' : msg.includes('❌') || msg.includes('실패') ? 'text-red-500' : 'text-gray-500'}`}>{msg}</span>}
       </div>
 
-      {/* ── 2열 테이블 ── */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      {/* ── 2단 레이아웃 ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* 관리팀 */}
-        <div>
-          <h3 className="text-sm font-bold text-gray-700 mb-2">관리팀</h3>
-          <div className="overflow-x-auto rounded-xl border border-gray-100">
-            <table className="min-w-max w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-3 py-2 text-xs text-gray-500 text-left whitespace-nowrap border-r border-gray-100">항목</th>
-                  {opsEmployees.map((_, i) => (
-                    <th key={i} className="px-3 py-2 text-xs text-gray-500 text-center whitespace-nowrap border-r border-gray-100">
-                      <input type="text" value={opsEmployees[i].name}
-                        onChange={e => updateOps(i, 'name', e.target.value)}
-                        className="border border-gray-200 rounded px-2 py-0.5 text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-500 w-20"
-                        placeholder={`직원${i + 1}`} />
-                    </th>
-                  ))}
-                  <th className="px-3 py-2 text-xs text-gray-500 text-center whitespace-nowrap">소계</th>
-                </tr>
-              </thead>
-              <tbody>
-                <OpsRow label="기본급" values={opsEmployees.map(e => e.base_salary)} total={opsTotalBase}
-                  isEditable onChange={(i, v) => updateOps(i, 'base_salary', v)} />
-                <OpsRow label="수수료매출(VAT제외)" values={opsEmployees.map(e => e.fee_revenue)} total={opsTotalFeeRevenue}
-                  isEditable onChange={(i, v) => updateOps(i, 'fee_revenue', v)} autoHint />
-                <OpsRow label="수수료인센(10%)" values={opsCalcs.map(c => c.feeIncentive)} total={opsTotalFeeIncentive} />
-                <OpsRow label="뿌토매출(VAT제외)" values={opsEmployees.map(e => e.puto_revenue)} total={opsTotalPutoRevenue}
-                  isEditable onChange={(i, v) => updateOps(i, 'puto_revenue', v)} autoHint />
-                <OpsRow label="뿌토인센(35%)" values={opsCalcs.map(c => c.putoIncentive)} total={opsTotalPutoIncentive} />
-                <OpsRow label="성과급" values={opsEmployees.map(e => e.performance_bonus)} total={opsTotalPerformance}
-                  isEditable onChange={(i, v) => updateOps(i, 'performance_bonus', v)} />
-                <OpsRow label="공제전급여" values={opsCalcs.map(c => c.beforeDeduction)} total={opsTotalBefore}
-                  highlight="blue" bold />
-                <OpsRow label="공제후급여(3.3%)" values={opsCalcs.map(c => c.afterDeduction)} total={opsTotalAfter}
-                  highlight="emerald" bold />
-              </tbody>
-            </table>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-[#1B2A45]">관리팀</h3>
+            {namedOps.length > 0 && (
+              <span className="text-xs text-gray-400">
+                합계 공제후 <span className="font-bold text-[#1B2A45]">{opsCalcs.filter((_, i) => opsEmps[i].name).reduce((s, c) => s + c.after, 0).toLocaleString('ko-KR')}원</span>
+              </span>
+            )}
           </div>
-          <button onClick={() => setOpsEmployees(prev => [...prev, defaultOps()])}
-            className="mt-2 text-xs text-blue-600 hover:text-blue-800 border border-blue-200 rounded px-3 py-1">
+
+          {opsEmps.map((emp, i) => (
+            <OpsCard key={i} emp={emp} idx={i} onChange={updateOps} onRemove={removeOps} />
+          ))}
+
+          <button onClick={() => setOpsEmps(prev => [...prev, defaultOps()])}
+            className="w-full py-2 border border-dashed border-gray-300 rounded-xl text-xs text-gray-400 hover:border-[#1B2A45]/40 hover:text-[#1B2A45]/60 transition-colors">
             + 직원 추가
           </button>
         </div>
 
         {/* 영업팀 */}
-        <div>
-          <h3 className="text-sm font-bold text-gray-700 mb-2">영업팀</h3>
-          <div className="overflow-x-auto rounded-xl border border-gray-100">
-            <table className="min-w-max w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-3 py-2 text-xs text-gray-500 text-left whitespace-nowrap border-r border-gray-100">항목</th>
-                  {salesEmployees.map((_, i) => (
-                    <th key={i} className="px-3 py-2 text-xs text-gray-500 text-center whitespace-nowrap border-r border-gray-100">
-                      <input type="text" value={salesEmployees[i].name}
-                        onChange={e => updateSales(i, 'name', e.target.value)}
-                        className="border border-gray-200 rounded px-2 py-0.5 text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-500 w-20"
-                        placeholder={`사원${i + 1}`} />
-                    </th>
-                  ))}
-                  <th className="px-3 py-2 text-xs text-gray-500 text-center whitespace-nowrap">소계</th>
-                </tr>
-              </thead>
-              <tbody>
-                {/* 계약금 매출 */}
-                <SalesRow label="계약금매출(VAT제외)"
-                  values={salesEmployees.map(e => e.contract_revenue)} total={salesTotalContractRevenue}
-                  isEditable onChange={(i, v) => updateSales(i, 'contract_revenue', v)} autoHint />
-                {/* 계약수 */}
-                <SalesRow label="계약수"
-                  values={salesEmployees.map(e => e.contract_count)} total={salesEmployees.reduce((s, e) => s + Number(e.contract_count), 0)}
-                  isEditable onChange={(i, v) => updateSales(i, 'contract_count', v)} autoHint />
-                {/* 계약금 인센 */}
-                <SalesRow label="계약금인센(25%+)"
-                  values={salesCalcs.map(c => c.contractIncentive)} total={salesTotalContractIncentive}
-                  subValues={salesEmployees.map((e, i) => salesCalcs[i].extraRate > 0 ? '+5%(12개↑)' : '')} />
-                {/* 프로모션 */}
-                <SalesRow label="프로모션"
-                  values={salesCalcs.map(c => c.promotion)} total={salesTotalPromotion}
-                  subValues={salesEmployees.map(e => promotionLabel(e.contract_count))} />
-                {/* 성과급 */}
-                <SalesRow label="성과급"
-                  values={salesEmployees.map(e => e.performance_bonus)} total={salesTotalPerformance}
-                  isEditable onChange={(i, v) => updateSales(i, 'performance_bonus', v)} />
-                {/* 시상금 */}
-                <SalesRow label="시상금"
-                  values={salesCalcs.map(c => c.awardsTotal)} total={salesTotalAwards}
-                  highlight="violet" />
-                {/* 공제전급여 */}
-                <SalesRow label="공제전급여"
-                  values={salesCalcs.map(c => c.beforeDeduction)} total={salesTotalBefore}
-                  highlight="blue" bold />
-                {/* 공제후급여 */}
-                <SalesRow label="공제후급여(3.3%)"
-                  values={salesCalcs.map(c => c.afterDeduction)} total={salesTotalAfter}
-                  highlight="emerald" bold />
-              </tbody>
-            </table>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-[#1B2A45]">영업팀</h3>
+            {namedSales.length > 0 && (
+              <span className="text-xs text-gray-400">
+                합계 공제후 <span className="font-bold text-[#1B2A45]">{salesCalcs.filter((_, i) => salesEmps[i].name).reduce((s, c) => s + c.after, 0).toLocaleString('ko-KR')}원</span>
+              </span>
+            )}
           </div>
-          <button onClick={() => setSalesEmployees(prev => [...prev, defaultSales()])}
-            className="mt-2 text-xs text-blue-600 hover:text-blue-800 border border-blue-200 rounded px-3 py-1">
+
+          {salesEmps.map((emp, i) => (
+            <SalesCard key={i} emp={emp} idx={i}
+              onChange={updateSales} onRemove={removeSales}
+              onAddAward={addAward} onUpdateAward={updateAward} onRemoveAward={removeAward} />
+          ))}
+
+          <button onClick={() => setSalesEmps(prev => [...prev, defaultSales()])}
+            className="w-full py-2 border border-dashed border-gray-300 rounded-xl text-xs text-gray-400 hover:border-[#C5A258]/60 hover:text-[#C5A258]/80 transition-colors">
             + 직원 추가
           </button>
-
-          {/* 시상금 상세 */}
-          {salesEmployees.some(e => e.name) && (
-            <div className="mt-4 bg-violet-50 border border-violet-100 rounded-xl p-3">
-              <p className="text-xs font-bold text-violet-700 mb-2">🏆 시상금 상세</p>
-              <div className="space-y-3">
-                {salesEmployees.map((emp, empIdx) => emp.name ? (
-                  <div key={empIdx}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-semibold text-violet-800">{emp.name}</span>
-                      <button onClick={() => addAward(empIdx)}
-                        className="text-[10px] text-violet-600 border border-violet-200 rounded px-2 py-0.5 hover:bg-violet-100">
-                        + 추가
-                      </button>
-                    </div>
-                    {(emp.awards || []).length === 0 ? (
-                      <p className="text-[11px] text-gray-400 pl-2">없음</p>
-                    ) : (
-                      <div className="space-y-1.5">
-                        {emp.awards.map((award, ai) => (
-                          <div key={ai} className="flex items-center gap-2">
-                            <input type="text" value={award.reason} placeholder="사유"
-                              onChange={e => updateAward(empIdx, ai, 'reason', e.target.value)}
-                              className="border border-gray-200 rounded px-2 py-1 text-xs flex-1 focus:outline-none focus:ring-1 focus:ring-violet-400" />
-                            <input type="number" value={award.amount || ''} placeholder="금액"
-                              onChange={e => updateAward(empIdx, ai, 'amount', e.target.value)}
-                              className="border border-gray-200 rounded px-2 py-1 text-xs w-28 focus:outline-none focus:ring-1 focus:ring-violet-400" />
-                            <span className="text-[10px] text-gray-400 whitespace-nowrap">
-                              {award.amount > 0 ? (award.amount / 10000).toFixed(0) + '만' : ''}
-                            </span>
-                            <button onClick={() => removeAward(empIdx, ai)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : null)}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* 회사 손익 요약 */}
-      <div className="bg-white rounded-xl border border-gray-100 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-gray-700">회사 손익 요약</h3>
-          {revenueTotals && (
-            <span className="text-[10px] text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
-              📡 매출 자동 반영됨
-            </span>
+      {/* ── 회사 손익 요약 ── */}
+      <div className="bg-white rounded-2xl border border-[#E8E2D4] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[#E8E2D4] flex items-center justify-between bg-gradient-to-r from-[#1B2A45]/3 to-transparent">
+          <h3 className="text-sm font-bold text-[#1B2A45]">회사 손익 요약</h3>
+          {revTotals && (
+            <span className="text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-100 px-2 py-0.5 rounded-full">📡 매출 자동 반영됨</span>
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* 좌측: 수치 */}
-          <div className="space-y-2">
+        <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          {/* 좌: 매출 + 운영비 입력 */}
+          <div className="space-y-4">
             {/* 매출 내역 */}
-            <div className="bg-gray-50 rounded-lg p-3 space-y-1.5">
-              <SummaryRow label="영업팀 매출" value={revenueTotals?.sales || 0} />
-              <SummaryRow label="관리팀 수수료 매출" value={revenueTotals?.ops || 0} />
-              <SummaryRow label="관리팀 계약(뿌토) 매출" value={revenueTotals?.opsContract || 0} />
-              <div className="border-t border-gray-200 pt-1.5">
-                <SummaryRow label="총 매출" value={totalRevenue} bold />
+            <div className="bg-[#1B2A45]/3 rounded-xl p-4 space-y-2">
+              <p className="text-[11px] font-bold text-[#1B2A45]/50 uppercase tracking-widest mb-2">매출 내역</p>
+              <SumRow label="영업팀 매출" value={revTotals?.sales || 0} />
+              <SumRow label="관리팀 수수료 매출" value={revTotals?.ops || 0} />
+              <SumRow label="관리팀 뿌토 매출" value={revTotals?.opsContract || 0} />
+              <div className="border-t border-[#1B2A45]/10 pt-2">
+                <SumRow label="총 매출" value={totalRevenue} bold />
               </div>
             </div>
-            <SummaryRow label="세금 (10%)" value={tax} />
-            <SummaryRow label="인건비 (세전)" value={laborCost} />
 
             {/* 운영비 */}
-            <div className="border-t border-gray-100 pt-2">
-              <p className="text-xs font-semibold text-gray-500 mb-2">운영비</p>
+            <div className="space-y-2">
+              <p className="text-[11px] font-bold text-[#1B2A45]/50 uppercase tracking-widest">운영비</p>
 
-              {/* DB 비용 */}
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs text-gray-500 w-28 shrink-0">DB 공급</span>
-                <div className="flex items-center gap-1">
-                  <input type="number" value={otherCosts.db_count}
-                    onChange={e => setOtherCosts(prev => ({ ...prev, db_count: Number(e.target.value) }))}
-                    className="border border-gray-200 rounded px-2 py-1 text-xs w-16 focus:outline-none"
-                    placeholder="갯수" min="0" />
-                  <span className="text-[10px] text-gray-400">개</span>
-                  <span className="text-[10px] text-gray-400 mx-1">×</span>
-                  <input type="number" value={otherCosts.db_unit_price}
-                    onChange={e => setOtherCosts(prev => ({ ...prev, db_unit_price: Number(e.target.value) }))}
-                    className="border border-gray-200 rounded px-2 py-1 text-xs w-20 focus:outline-none"
-                    placeholder="단가" min="0" />
-                  <span className="text-[10px] text-gray-400">원</span>
-                  <span className="text-xs text-gray-500 ml-1">= {dbCost > 0 ? (dbCost / 10000).toFixed(0) + '만원' : '-'}</span>
+              {/* DB */}
+              <div className="flex items-center justify-between py-1.5 border-b border-gray-50">
+                <span className="text-xs text-gray-500">DB 공급 비용</span>
+                <div className="flex items-center gap-1.5 text-xs">
+                  <input type="text" inputMode="numeric" value={fmtInput(costs.db_count)} placeholder="0"
+                    onChange={e => setCosts(p => ({ ...p, db_count: parseInput(e.target.value) }))}
+                    className="w-14 text-center border border-gray-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                  <span className="text-gray-400">개 × </span>
+                  <input type="text" inputMode="numeric" value={fmtInput(costs.db_unit_price)} placeholder="40,000"
+                    onChange={e => setCosts(p => ({ ...p, db_unit_price: parseInput(e.target.value) }))}
+                    className="w-20 text-center border border-gray-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                  <span className="text-gray-400">원</span>
+                  <span className="font-semibold text-gray-700 w-16 text-right">{dbCost > 0 ? dbCost.toLocaleString('ko-KR') + '원' : '-'}</span>
                 </div>
               </div>
 
-              {[
-                { key: 'rent' as keyof OtherCosts, label: '임대료' },
-                { key: 'mgmt' as keyof OtherCosts, label: '관리비' },
-                { key: 'sales_fixed' as keyof OtherCosts, label: '영업 고정비용' },
-              ].map(({ key, label }) => (
-                <div key={key} className="flex items-center gap-2 mb-1.5">
-                  <span className="text-xs text-gray-500 w-28 shrink-0">{label}</span>
-                  <input type="number" value={otherCosts[key] as number}
-                    onChange={e => setOtherCosts(prev => ({ ...prev, [key]: Number(e.target.value) }))}
-                    className="border border-gray-200 rounded px-2 py-1 text-xs w-32 focus:outline-none" min="0" />
-                  <span className="text-xs text-gray-400">
-                    {((otherCosts[key] as number) / 10000).toFixed(0)}만원
-                  </span>
+              {([
+                ['rent',        '임대료',         costs.rent],
+                ['mgmt',        '관리비',         costs.mgmt],
+                ['sales_fixed', '영업 고정비용',   costs.sales_fixed],
+              ] as [keyof OtherCosts, string, number][]).map(([key, label, val]) => (
+                <div key={key} className="flex items-center justify-between py-1.5 border-b border-gray-50">
+                  <span className="text-xs text-gray-500">{label}</span>
+                  <div className="flex items-center gap-2">
+                    <input type="text" inputMode="numeric" value={fmtInput(val)} placeholder="0"
+                      onChange={e => setCosts(p => ({ ...p, [key]: parseInput(e.target.value) }))}
+                      className="w-28 text-right border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                  </div>
                 </div>
               ))}
 
-              {/* 영업 기타비용 */}
-              <div className="mt-2">
-                <div className="flex items-center gap-1 mb-1.5">
+              {/* 기타비용 */}
+              <div>
+                <div className="flex items-center gap-2 py-1 mb-1">
                   <span className="text-xs text-gray-500">영업 기타비용</span>
-                  <button onClick={addOtherItem}
-                    className="text-[10px] text-blue-600 border border-blue-200 rounded px-2 py-0.5 hover:bg-blue-50">
-                    + 추가
-                  </button>
+                  <button onClick={() => setCosts(p => ({ ...p, sales_other_items: [...(p.sales_other_items || []), { label: '', amount: 0 }] }))}
+                    className="text-[10px] text-blue-500 border border-blue-200 rounded px-2 py-0.5 hover:bg-blue-50">+ 추가</button>
                 </div>
-                {(otherCosts.sales_other_items || []).map((item, i) => (
+                {(costs.sales_other_items || []).map((item, i) => (
                   <div key={i} className="flex items-center gap-2 mb-1.5">
                     <input type="text" value={item.label} placeholder="품목명"
-                      onChange={e => updateOtherItem(i, 'label', e.target.value)}
-                      className="border border-gray-200 rounded px-2 py-1 text-xs flex-1 focus:outline-none" />
-                    <input type="number" value={item.amount || ''} placeholder="금액"
-                      onChange={e => updateOtherItem(i, 'amount', e.target.value)}
-                      className="border border-gray-200 rounded px-2 py-1 text-xs w-28 focus:outline-none" min="0" />
-                    <span className="text-[10px] text-gray-400 w-10 text-right">
-                      {item.amount > 0 ? (item.amount / 10000).toFixed(0) + '만' : ''}
-                    </span>
-                    <button onClick={() => removeOtherItem(i)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                      onChange={e => { const arr = [...costs.sales_other_items]; arr[i] = { ...arr[i], label: e.target.value }; setCosts(p => ({ ...p, sales_other_items: arr })) }}
+                      className="flex-1 min-w-0 border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none" />
+                    <input type="text" inputMode="numeric" value={fmtInput(item.amount)} placeholder="금액"
+                      onChange={e => { const arr = [...costs.sales_other_items]; arr[i] = { ...arr[i], amount: parseInput(e.target.value) }; setCosts(p => ({ ...p, sales_other_items: arr })) }}
+                      className="w-28 text-right border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none" />
+                    <button onClick={() => setCosts(p => ({ ...p, sales_other_items: p.sales_other_items.filter((_, j) => j !== i) }))} className="text-red-300 hover:text-red-500 text-xs">✕</button>
                   </div>
                 ))}
-                {(otherCosts.sales_other_items || []).length === 0 && (
-                  <p className="text-[11px] text-gray-300">없음</p>
+                {(costs.sales_other_items || []).length === 0 && (
+                  <p className="text-[11px] text-gray-300 pl-1">없음</p>
                 )}
               </div>
             </div>
           </div>
 
-          {/* 우측: 요약 */}
-          <div className="space-y-3">
-            <div className="bg-gray-50 rounded-lg p-3 space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-500">DB 비용</span>
-                <span>{dbCost > 0 ? fmtW(dbCost) : '-'}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-500">임대료</span>
-                <span>{fmtW(otherCosts.rent)}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-500">관리비</span>
-                <span>{fmtW(otherCosts.mgmt)}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-500">영업 고정비용</span>
-                <span>{fmtW(otherCosts.sales_fixed)}</span>
-              </div>
-              {(otherCosts.sales_other_items || []).map((item, i) => (
-                <div key={i} className="flex justify-between text-xs">
-                  <span className="text-gray-500">{item.label || '기타'}</span>
-                  <span>{fmtW(item.amount)}</span>
-                </div>
+          {/* 우: 결과 요약 */}
+          <div className="flex flex-col gap-3">
+            <div className="bg-gray-50 rounded-xl p-4 space-y-2">
+              <p className="text-[11px] font-bold text-[#1B2A45]/50 uppercase tracking-widest mb-2">비용 내역</p>
+              <SumRow label="세금 (10%)" value={tax} negative />
+              <SumRow label="인건비 (세전)" value={laborCost} negative />
+              <SumRow label="DB 비용" value={dbCost} negative />
+              <SumRow label="임대료" value={costs.rent} negative />
+              <SumRow label="관리비" value={costs.mgmt} negative />
+              <SumRow label="영업 고정비용" value={costs.sales_fixed} negative />
+              {(costs.sales_other_items || []).map((item, i) => (
+                <SumRow key={i} label={item.label || '기타'} value={item.amount} negative />
               ))}
-              <div className="border-t border-gray-200 pt-1.5">
-                <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-gray-600">총 운영비</span>
-                  <span>{fmtW(otherTotal)}</span>
-                </div>
+              <div className="border-t border-gray-200 pt-2">
+                <SumRow label="총 비용" value={totalRevenue > 0 ? tax + laborCost + otherTotal : 0} negative bold />
               </div>
             </div>
 
-            <div className="bg-gray-50 rounded-lg p-3 space-y-1.5">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">총 매출</span>
-                <span className="font-semibold text-blue-700">{totalRevenue > 0 ? fmtW(totalRevenue) : '-'}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">세금 (10%)</span>
-                <span className="text-orange-600">-{tax > 0 ? fmtW(tax) : '-'}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">인건비</span>
-                <span className="text-amber-600">-{laborCost > 0 ? fmtW(laborCost) : '-'}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">운영비</span>
-                <span className="text-violet-600">-{otherTotal > 0 ? fmtW(otherTotal) : '-'}</span>
-              </div>
-            </div>
-
-            <div className={`rounded-xl p-4 ${netProfit >= 0 ? 'bg-emerald-50 border border-emerald-100' : 'bg-red-50 border border-red-100'}`}>
-              <p className="text-xs text-gray-500 mb-1">순이익</p>
-              <p className={`text-2xl font-black ${netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                {totalRevenue > 0 ? fmtW(netProfit) : '—'}
+            <div className={`rounded-2xl p-5 ${netProfit >= 0 ? 'bg-emerald-50 border border-emerald-100' : 'bg-red-50 border border-red-100'}`}>
+              <p className="text-xs font-bold text-gray-400 mb-1">순이익</p>
+              <p className={`text-3xl font-black tracking-tight ${netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                {totalRevenue > 0 ? netProfit.toLocaleString('ko-KR') + '원' : '—'}
               </p>
               {totalRevenue > 0 && (
-                <p className="text-[10px] text-gray-400 mt-1">
-                  이익률 {((netProfit / totalRevenue) * 100).toFixed(1)}%
-                </p>
+                <p className="text-[11px] text-gray-400 mt-1.5">이익률 {((netProfit / totalRevenue) * 100).toFixed(1)}%</p>
               )}
+            </div>
+
+            {/* 팀별 인건비 소계 */}
+            <div className="bg-gray-50 rounded-xl p-4 space-y-2">
+              <p className="text-[11px] font-bold text-[#1B2A45]/50 uppercase tracking-widest mb-2">인건비 내역</p>
+              <SumRow label="관리팀 공제전 합계" value={opsTotalBefore} />
+              <SumRow label="영업팀 공제전 합계" value={salesTotalBefore} />
+              <div className="border-t border-gray-200 pt-2">
+                <SumRow label="합계" value={laborCost} bold />
+              </div>
             </div>
           </div>
         </div>
@@ -670,90 +620,14 @@ export default function PayrollTab() {
   )
 }
 
-// ─── 헬퍼 행 컴포넌트 ────────────────────────────────────
+// ─── SumRow 헬퍼 ─────────────────────────────────────────
 
-function OpsRow({
-  label, values, total, isEditable, onChange, highlight, bold, autoHint,
-}: {
-  label: string; values: number[]; total: number
-  isEditable?: boolean; onChange?: (i: number, v: string) => void
-  highlight?: 'blue' | 'emerald'; bold?: boolean; autoHint?: boolean
-}) {
-  const colorMap = { blue: 'text-blue-600', emerald: 'text-emerald-600' }
-  const textColor = highlight ? colorMap[highlight] : 'text-gray-800'
-
+function SumRow({ label, value, bold, negative }: { label: string; value: number; bold?: boolean; negative?: boolean }) {
   return (
-    <tr className="border-t border-gray-100">
-      <td className={`px-3 py-1.5 text-xs whitespace-nowrap border-r border-gray-100 ${bold ? 'font-semibold ' + textColor : 'text-gray-500'}`}>
-        {label}
-        {autoHint && <span className="ml-1 text-[9px] text-blue-400">자동</span>}
-      </td>
-      {values.map((v, i) => (
-        <td key={i} className="px-2 py-1 border-r border-gray-100">
-          {isEditable && onChange ? (
-            <input type="number" value={v || ''} onChange={e => onChange(i, e.target.value)}
-              className={INPUT_CLS} min="0" placeholder="0" />
-          ) : (
-            <span className={`${CALC_CLS} block ${bold ? 'font-semibold ' + textColor : ''}`}>
-              {v > 0 ? v.toLocaleString('ko-KR') : '-'}
-            </span>
-          )}
-        </td>
-      ))}
-      <td className={`${CALC_CLS} ${bold ? 'font-bold ' + textColor : ''}`}>
-        {total > 0 ? total.toLocaleString('ko-KR') : '-'}
-      </td>
-    </tr>
-  )
-}
-
-function SalesRow({
-  label, values, total, isEditable, onChange, highlight, bold, autoHint, subValues,
-}: {
-  label: string; values: number[]; total: number
-  isEditable?: boolean; onChange?: (i: number, v: string) => void
-  highlight?: 'blue' | 'emerald' | 'violet'; bold?: boolean; autoHint?: boolean
-  subValues?: string[]
-}) {
-  const colorMap = { blue: 'text-blue-600', emerald: 'text-emerald-600', violet: 'text-violet-600' }
-  const textColor = highlight ? colorMap[highlight] : 'text-gray-800'
-
-  return (
-    <tr className="border-t border-gray-100">
-      <td className={`px-3 py-1.5 text-xs whitespace-nowrap border-r border-gray-100 ${bold ? 'font-semibold ' + textColor : 'text-gray-500'}`}>
-        {label}
-        {autoHint && <span className="ml-1 text-[9px] text-blue-400">자동</span>}
-      </td>
-      {values.map((v, i) => (
-        <td key={i} className="px-2 py-1 border-r border-gray-100">
-          {isEditable && onChange ? (
-            <input type="number" value={v || ''} onChange={e => onChange(i, e.target.value)}
-              className={INPUT_CLS} min="0" placeholder="0" />
-          ) : (
-            <div>
-              <span className={`${CALC_CLS} block ${bold ? 'font-semibold ' + textColor : ''}`}>
-                {v > 0 ? v.toLocaleString('ko-KR') : '-'}
-              </span>
-              {subValues?.[i] && subValues[i] !== '-' && (
-                <span className="block text-[9px] text-gray-400 text-right pr-2">{subValues[i]}</span>
-              )}
-            </div>
-          )}
-        </td>
-      ))}
-      <td className={`${CALC_CLS} ${bold ? 'font-bold ' + textColor : ''}`}>
-        {total > 0 ? total.toLocaleString('ko-KR') : '-'}
-      </td>
-    </tr>
-  )
-}
-
-function SummaryRow({ label, value, bold }: { label: string; value: number; bold?: boolean }) {
-  return (
-    <div className={`flex justify-between ${bold ? 'text-sm font-bold' : 'text-sm'}`}>
-      <span className="text-gray-500">{label}</span>
-      <span className={bold ? 'text-[#1B2A45]' : 'font-semibold'}>
-        {value > 0 ? value.toLocaleString('ko-KR') + '원' : '-'}
+    <div className="flex justify-between items-center">
+      <span className={`text-xs ${bold ? 'font-bold text-[#1B2A45]' : 'text-gray-500'}`}>{label}</span>
+      <span className={`text-xs font-semibold ${bold ? 'text-[#1B2A45] text-sm' : negative && value > 0 ? 'text-red-500' : 'text-gray-700'}`}>
+        {value > 0 ? (negative ? '-' : '') + value.toLocaleString('ko-KR') + '원' : '-'}
       </span>
     </div>
   )
