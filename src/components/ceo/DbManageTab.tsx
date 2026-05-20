@@ -25,8 +25,8 @@ interface Employee {
 // ──────────────────────────────────────────────────────────────────────────────
 // DbManageTab — CEO 전용 DB 관리 탭
 // ──────────────────────────────────────────────────────────────────────────────
-export default function DbManageTab({ initialView = 'trash' }: { initialView?: 'trash' | 'duplicate' | 'employees' }) {
-  const [view, setView] = useState<'trash' | 'duplicate' | 'employees'>(initialView)
+export default function DbManageTab({ initialView = 'trash' }: { initialView?: 'trash' | 'duplicate' | 'employees' | 'delete_requests' }) {
+  const [view, setView] = useState<'trash' | 'duplicate' | 'employees' | 'delete_requests'>(initialView)
 
   // ── 쓰레기통 ──────────────────────────────────────────────────────────────
   const [trashList, setTrashList] = useState<Customer[]>([])
@@ -86,11 +86,71 @@ export default function DbManageTab({ initialView = 'trash' }: { initialView?: '
     setEmpLoading(false)
   }, [])
 
+  // ── 직가DB 삭제 요청 ──────────────────────────────────────────────────────
+  const [deleteReqList, setDeleteReqList] = useState<Customer[]>([])
+  const [delReqLoading, setDelReqLoading] = useState(false)
+  const [processingId, setProcessingId] = useState<string | null>(null)
+
+  const loadDeleteRequests = useCallback(async () => {
+    setDelReqLoading(true)
+    try {
+      const res = await fetch('/api/customers')
+      const data = await res.json()
+      const all: Customer[] = data.customers || []
+      setDeleteReqList(all.filter(c => c.status === 'db010' && c.details?.delete_requested))
+    } catch {}
+    setDelReqLoading(false)
+  }, [])
+
+  // 수락: 삭제DB로 이동
+  async function approveDeleteRequest(id: string) {
+    setProcessingId(id)
+    const todayIso = new Date().toISOString().slice(0, 10)
+    const customer = deleteReqList.find(c => c.id === id)
+    const d = customer?.details || {}
+    await fetch(`/api/customers/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: 'trash',
+        details: {
+          employee_deleted: true,
+          deleted_at: todayIso,
+          deleted_by: d.delete_requested_by || '',
+          delete_approved_at: todayIso,
+          delete_requested: false,
+        },
+      }),
+    })
+    setDeleteReqList(prev => prev.filter(c => c.id !== id))
+    setProcessingId(null)
+  }
+
+  // 거절: 요청 플래그 초기화 → 직가DB 원복
+  async function rejectDeleteRequest(id: string) {
+    setProcessingId(id)
+    await fetch(`/api/customers/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        details: {
+          delete_requested: false,
+          delete_request_reason: null,
+          delete_requested_at: null,
+          delete_requested_by: null,
+        },
+      }),
+    })
+    setDeleteReqList(prev => prev.filter(c => c.id !== id))
+    setProcessingId(null)
+  }
+
   useEffect(() => {
     if (view === 'trash') loadTrash()
     else if (view === 'duplicate') loadDuplicates()
     else if (view === 'employees') loadEmployees()
-  }, [view, loadTrash, loadDuplicates, loadEmployees])
+    else if (view === 'delete_requests') loadDeleteRequests()
+  }, [view, loadTrash, loadDuplicates, loadEmployees, loadDeleteRequests])
 
   // ── 쓰레기통 고객 영구삭제 ──────────────────────────────────────────────
   async function hardDeleteSelected() {
@@ -160,8 +220,9 @@ export default function DbManageTab({ initialView = 'trash' }: { initialView?: '
     <div className="space-y-4 max-w-5xl mx-auto">
       <div className="flex items-center gap-2 flex-wrap">
         {[
-          { key: 'trash' as const,     label: '🗑 거절 DB 쓰레기통' },
-          { key: 'duplicate' as const, label: '♻️ 중복 DB 감지' },
+          { key: 'delete_requests' as const, label: '📨 직가DB 삭제요청' },
+          { key: 'trash' as const,           label: '🗑 거절 DB 쓰레기통' },
+          { key: 'duplicate' as const,       label: '♻️ 중복 DB 감지' },
         ].map(v => (
           <button key={v.key} onClick={() => setView(v.key)}
             className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-colors ${
@@ -173,6 +234,74 @@ export default function DbManageTab({ initialView = 'trash' }: { initialView?: '
           </button>
         ))}
       </div>
+
+      {/* ── 직가DB 삭제 요청 검토 ── */}
+      {view === 'delete_requests' && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-gray-800">📨 직가DB 삭제 요청</h3>
+              <p className="text-xs text-gray-400 mt-0.5">직원이 요청한 직가DB 삭제 — 수락 시 삭제DB로 이동, 거절 시 원복</p>
+            </div>
+            <button onClick={loadDeleteRequests}
+              className="px-3 py-1.5 text-xs bg-white border border-gray-200 text-gray-600 rounded-xl hover:border-gray-400 transition-colors">
+              🔄 새로고침
+            </button>
+          </div>
+
+          {delReqLoading ? (
+            <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
+          ) : deleteReqList.length === 0 ? (
+            <div className="bg-white border border-[#E8E2D4] rounded-xl p-12 text-center">
+              <p className="text-2xl mb-2">✅</p>
+              <p className="text-sm text-gray-400">대기 중인 삭제 요청이 없습니다</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {deleteReqList.map(c => {
+                const d = c.details || {}
+                const company = d.company || c.name || '—'
+                const isPending = processingId === c.id
+                return (
+                  <div key={c.id} className="bg-white border border-amber-200 rounded-xl p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-gray-800 text-sm">{company}</span>
+                          <span className="text-xs text-gray-400">{c.name}</span>
+                          <span className="text-xs text-gray-400">{c.phone}</span>
+                          <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full">삭제요청</span>
+                        </div>
+                        <div className="mt-1.5 text-xs text-gray-500 space-y-0.5">
+                          <div><span className="text-gray-400">요청자:</span> <span className="font-medium">{d.delete_requested_by || '—'}</span></div>
+                          <div><span className="text-gray-400">요청일:</span> <span>{d.delete_requested_at || '—'}</span></div>
+                          {d.delete_request_reason && (
+                            <div><span className="text-gray-400">사유:</span> <span className="text-gray-700">"{d.delete_request_reason}"</span></div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <button
+                          disabled={isPending}
+                          onClick={() => approveDeleteRequest(c.id)}
+                          className="px-3 py-2 text-xs font-bold bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white rounded-xl transition-colors">
+                          {isPending ? '처리중...' : '✅ 수락'}
+                        </button>
+                        <button
+                          disabled={isPending}
+                          onClick={() => rejectDeleteRequest(c.id)}
+                          className="px-3 py-2 text-xs font-bold bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 rounded-xl transition-colors">
+                          {isPending ? '처리중...' : '❌ 거절'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── 거절 DB 쓰레기통 ── */}
       {view === 'trash' && (

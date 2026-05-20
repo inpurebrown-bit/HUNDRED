@@ -193,10 +193,15 @@ export default function CeoDashboard() {
     if (outcome === 'accepted') { setInstallable(false); setInstallPrompt(null) }
   }
 
-  // 검색용 고객 캐시 초기 로드
+  // 삭제 요청 카운트
+  const [deleteReqCount, setDeleteReqCount] = useState(0)
+
+  // 검색용 고객 캐시 초기 로드 + 삭제요청 카운트
   useEffect(() => {
     fetch('/api/customers').then(r => r.json()).then(d => {
-      setAllCustomersCache(d.customers || [])
+      const all = d.customers || []
+      setAllCustomersCache(all)
+      setDeleteReqCount(all.filter((c: any) => c.status === 'db010' && c.details?.delete_requested).length)
     }).catch(() => {})
   }, [])
 
@@ -225,7 +230,7 @@ export default function CeoDashboard() {
     { key: 'minutesreports',label: '📒 회의록·보고함' },
     { key: 'calendar',      label: '📅 일정관리' },
     { key: 'ailogs',        label: '🔍 AI 질문 로그' },
-    { key: 'trash',         label: '🗑 DB 쓰레기통' },
+    { key: 'trash',         label: deleteReqCount > 0 ? `🗑 DB 쓰레기통 (요청 ${deleteReqCount})` : '🗑 DB 쓰레기통' },
   ]
 
   return (
@@ -1273,7 +1278,7 @@ function RevenueTab() {
 
 // ─── 거절 DB 쓰레기통 전용 탭 ────────────────────────────────
 function TrashOnlyTab() {
-  return <DbManageTab initialView="trash" />
+  return <DbManageTab initialView="delete_requests" />
 }
 
 // ─── 중복 DB 전용 탭 ──────────────────────────────────────

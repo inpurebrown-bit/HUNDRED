@@ -314,6 +314,44 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
     ))
   }, [userName])
 
+  // 직가DB 전용 삭제요청 — 대표 승인 후 삭제
+  const requestDeleteDb010 = useCallback(async (id: string) => {
+    const customer = customers.find(c => c.id === id)
+    if (!customer) return
+    const d = (customer.details as any) || {}
+    const company = d.company || customer.name || '해당 업체'
+
+    if (d.delete_requested) {
+      showToast('이미 대표님께 삭제 요청이 전송됐습니다. 승인 대기 중입니다.', 'error')
+      return
+    }
+
+    const reason = window.prompt(
+      `"${company}" 직가DB 삭제를 대표님께 요청합니다.\n\n사유를 입력해주세요 (선택사항):`,
+      ''
+    )
+    if (reason === null) return // 취소
+
+    const todayIso = new Date().toISOString().slice(0, 10)
+    await fetch(`/api/customers/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        details: {
+          delete_requested: true,
+          delete_request_reason: reason.trim(),
+          delete_requested_at: todayIso,
+          delete_requested_by: userName,
+        },
+      }),
+    })
+    setCustomers(prev => prev.map(c => c.id === id
+      ? { ...c, details: { ...(c.details || {}), delete_requested: true, delete_request_reason: reason.trim(), delete_requested_at: todayIso, delete_requested_by: userName } }
+      : c
+    ))
+    showToast(`📨 "${company}" 삭제 요청이 대표님께 전달됐습니다`)
+  }, [customers, userName, showToast])
+
   const updateCustomer = useCallback(async (id: string, patch: Record<string, any>) => {
     await patchCustomer(id, patch)
   }, [patchCustomer])
@@ -578,6 +616,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
 
   // ── Filtered lists ────────────────────────────────────────────────
   const db010List = customers.filter(c => c.status === 'db010')
+  const db010PendingDelete = db010List.filter(c => !!(c as any).details?.delete_requested)
   const activeCustomers = customers.filter(c => ['lead', 'consulting'].includes(c.status))
   const contractedCustomers = customers.filter(c => c.status === 'contracted')
   const emotionalCustomers = customers.filter(c => c.status === 'emotional')
@@ -1102,6 +1141,16 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               />
             )}
 
+            {/* 삭제 요청 대기 배너 */}
+            {db010PendingDelete.length > 0 && (
+              <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5">
+                <span className="text-amber-500 text-base">⏳</span>
+                <p className="text-xs text-amber-700 font-medium">
+                  삭제 요청 대기 중 <strong>{db010PendingDelete.length}건</strong> — 대표님 승인을 기다리고 있습니다.
+                </p>
+              </div>
+            )}
+
             {loading ? (
               <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
             ) : db010List.length === 0 ? (
@@ -1117,7 +1166,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 userName={userName}
                 onUpdate={updateCustomer}
                 onStatusChange={async (id, status) => moveCustomer(id, status as any)}
-                onDelete={async (id) => deleteCustomer(id)}
+                onDelete={async (id) => requestDeleteDb010(id)}
               />
             )}
           </div>
