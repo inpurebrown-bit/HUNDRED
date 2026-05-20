@@ -21,14 +21,13 @@ import DbManageTab from './DbManageTab'
 
 // 매출·손익·급여명세서 통합 탭 (결제율은 전체현황으로 이동)
 function AnalyticsTab() {
-  const [sub, setSub] = useState<'revenue' | 'payroll' | 'pnl' | 'payslip'>('revenue')
+  const [sub, setSub] = useState<'revenue' | 'payroll' | 'payslip'>('revenue')
   return (
     <div>
       <div className="flex gap-2 mb-5 flex-wrap">
         {([
           { key: 'revenue', label: '💰 매출 관리' },
           { key: 'payroll', label: '💼 급여·손익' },
-          { key: 'pnl',     label: '💹 손익계산' },
           { key: 'payslip', label: '📋 급여명세서' },
         ] as const).map(t => (
           <button key={t.key} onClick={() => setSub(t.key)}
@@ -41,7 +40,6 @@ function AnalyticsTab() {
       </div>
       {sub === 'revenue' && <RevenueTab />}
       {sub === 'payroll' && <PayrollTab />}
-      {sub === 'pnl'     && <PnlSubView />}
       {sub === 'payslip' && <PayslipTab />}
     </div>
   )
