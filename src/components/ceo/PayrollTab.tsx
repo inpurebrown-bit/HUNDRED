@@ -31,6 +31,8 @@ interface OtherCosts {
   mgmt: number
   sales_fixed: number
   sales_other_items: OtherCostItem[]
+  personal_card: number
+  personal_rent: number
 }
 
 // ─── 계산 ─────────────────────────────────────────────────
@@ -94,7 +96,8 @@ function defaultSales(): SalesEmployee {
   return { name: '', contract_revenue: 0, contract_count: 0, performance_bonus: 0, awards: [] }
 }
 function defaultCosts(): OtherCosts {
-  return { db_count: 0, db_unit_price: 40000, rent: 650000, mgmt: 400000, sales_fixed: 820000, sales_other_items: [] }
+  return { db_count: 0, db_unit_price: 40000, rent: 650000, mgmt: 400000, sales_fixed: 820000, sales_other_items: [],
+           personal_card: 3_000_000, personal_rent: 650_000 }
 }
 
 // ─── PayRow 헬퍼 ─────────────────────────────────────────
@@ -492,6 +495,7 @@ export default function PayrollTab() {
   const otherItemsSum = (costs.sales_other_items || []).reduce((s, i) => s + Number(i.amount || 0), 0)
   const otherTotal    = dbCost + Number(costs.rent) + Number(costs.mgmt) + autoSalesFixed + otherItemsSum
   const netProfit     = totalRevenue - tax - laborCost - otherTotal
+  const realTakeHome  = netProfit - Number(costs.personal_card) - Number(costs.personal_rent)
 
   const isCurrentMonth = yearMonth === thisMonth()
 
@@ -727,13 +731,40 @@ export default function PayrollTab() {
               </div>
             </div>
 
-            {/* 인건비 내역 */}
-            <div className="bg-gray-50 rounded-xl p-4 space-y-2">
-              <p className="text-[10px] font-bold text-[#1B2A45]/40 uppercase tracking-widest mb-2">인건비 내역</p>
-              <SumRow label="관리팀 공제전 합계" value={opsTotalBefore} />
-              <SumRow label="영업팀 공제전 합계" value={salesTotalBefore} />
-              <div className="border-t border-gray-200 pt-2">
-                <SumRow label="합계" value={laborCost} bold />
+            {/* 대표 실수령 */}
+            <div className={`rounded-xl border overflow-hidden ${realTakeHome >= 0 ? 'border-emerald-100' : 'border-red-100'}`}>
+              <div className={`px-4 py-2 flex items-center justify-between ${realTakeHome >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
+                <span className="text-xs font-bold text-gray-500">대표 실수령</span>
+                <span className="text-[10px] text-gray-400">순이익에서 개인지출 차감</span>
+              </div>
+              <div className="bg-white px-4 py-3 space-y-2">
+                {/* 개인카드 */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">개인 카드값</span>
+                  <div className="flex items-center gap-1.5">
+                    <input type="text" inputMode="numeric" value={fmtInput(costs.personal_card)} placeholder="0"
+                      onChange={e => setCosts(p => ({ ...p, personal_card: parseInput(e.target.value) }))}
+                      className="w-24 text-right border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300" />
+                    <span className="text-[10px] text-red-400 font-medium">-</span>
+                  </div>
+                </div>
+                {/* 개인 월세 */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">개인 월세</span>
+                  <div className="flex items-center gap-1.5">
+                    <input type="text" inputMode="numeric" value={fmtInput(costs.personal_rent)} placeholder="0"
+                      onChange={e => setCosts(p => ({ ...p, personal_rent: parseInput(e.target.value) }))}
+                      className="w-24 text-right border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300" />
+                    <span className="text-[10px] text-red-400 font-medium">-</span>
+                  </div>
+                </div>
+                {/* 실수령 */}
+                <div className={`border-t pt-2 flex items-center justify-between ${realTakeHome >= 0 ? 'border-emerald-100' : 'border-red-100'}`}>
+                  <span className="text-xs font-bold text-gray-600">실제 남는 금액</span>
+                  <span className={`text-lg font-black ${realTakeHome >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {totalRevenue > 0 ? realTakeHome.toLocaleString('ko-KR') + '원' : '—'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
