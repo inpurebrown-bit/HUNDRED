@@ -24,6 +24,7 @@ interface MonthlyRevenue {
   month: string
   영업팀: number
   관리팀: number
+  관리팀계약?: number
   합계: number
 }
 
@@ -459,7 +460,8 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
     return m.month === mmStr || m.month === thisMonthStr
   })
   const thisMonthRevRaw = thisMonthRevEntry?.합계 ?? 0
-  const thisMonthOpsRaw = thisMonthRevEntry?.관리팀 ?? 0
+  // 관리팀 = 수수료(관리팀) + 계약매출(관리팀계약) 합산
+  const thisMonthOpsRaw = (thisMonthRevEntry?.관리팀 ?? 0) + (thisMonthRevEntry?.관리팀계약 ?? 0)
   const thisMonthRevDisplay =
     thisMonthRevRaw >= 10000
       ? (thisMonthRevRaw / 10000).toFixed(0) + '만원'
@@ -520,7 +522,8 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
   })
   const lastMonthRevRaw   = lastMonthRevEntry?.합계 ?? 0
   const lastMonthSalesRaw = lastMonthRevEntry?.영업팀 ?? 0
-  const lastMonthOpsRaw   = lastMonthRevEntry?.관리팀 ?? 0
+  // 관리팀 = 수수료 + 계약매출 합산
+  const lastMonthOpsRaw   = (lastMonthRevEntry?.관리팀 ?? 0) + (lastMonthRevEntry?.관리팀계약 ?? 0)
   const thisMonthSalesRaw = thisMonthRevEntry?.영업팀 ?? 0
   const thisMonthTax = Math.round(thisMonthRevRaw * 0.1)
   const lastMonthTax = Math.round(lastMonthRevRaw * 0.1)
