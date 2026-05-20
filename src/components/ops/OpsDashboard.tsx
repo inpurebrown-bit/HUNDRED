@@ -2757,7 +2757,12 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
 // ──────────────────────────────────────────────────────────────────────
 // OpsContractTab (관리팀계약 - 뿌토DB 계약된 업체 확인용 / 읽기전용)
 // ──────────────────────────────────────────────────────────────────────
-function OpsContractTab({ userName }: { userName: string }) {
+function OpsContractTab({ userName, openPanelIds, onToggle, onScriptToggle }: {
+  userName: string
+  openPanelIds: string[]
+  onToggle: (id: string) => void
+  onScriptToggle: (id: string, val: boolean) => void
+}) {
   const [contracts, setContracts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -2814,7 +2819,7 @@ function OpsContractTab({ userName }: { userName: string }) {
         </div>
       </div>
 
-      {/* 목록 */}
+      {/* 카드 그리드 */}
       {loading ? (
         <div className="text-center py-12 text-gray-400">불러오는 중...</div>
       ) : contracts.length === 0 ? (
@@ -2823,39 +2828,16 @@ function OpsContractTab({ userName }: { userName: string }) {
           <span className="text-xs text-gray-300 mt-1 block">신규DB 탭에서 계약하기를 눌러 계약을 진행하세요</span>
         </div>
       ) : (
-        <div className="space-y-2">
-          {contracts.map(c => {
-            const companyName = c.customers?.details?.company || c.customers?.name || c.customer_name || '—'
-            const putoAmt = parseInt(String(c.details?.puto_contract_amount || '0').replace(/[^0-9]/g, '') || '0')
-            const directAmt = parseInt(String(c.details?.contract_amount || '0').replace(/[^0-9]/g, '') || '0')
-            const contractAmt = putoAmt || directAmt
-            const contractDate = c.details?.puto_contract_date || c.details?.contract_date || ''
-            const manager = c.ops_user_name || c.details?.ops_user_name || '—'
-            const stage = PIPELINE_STAGES.find(s => s.key === c.progress_stage)
-            return (
-              <div key={c.id} className="bg-white border border-[#E8E2D4] rounded-xl px-4 py-3 flex items-center justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-[#1B2A45] text-sm" style={{ wordBreak: 'break-all' }}>{companyName}</span>
-                    {manager !== '—' && <span className="text-[10px] bg-sky-50 text-sky-600 border border-sky-100 px-1.5 py-0.5 rounded-full font-medium">👤 {manager}</span>}
-                  </div>
-                  <div className="flex items-center gap-3 mt-1 flex-wrap">
-                    {contractDate && <span className="text-[10px] text-gray-400">계약일: {contractDate}</span>}
-                    {contractAmt > 0 && <span className="text-[11px] font-bold text-sky-700">💰 {fmt(contractAmt)}원</span>}
-                    {c.institution && <span className="text-[10px] text-gray-500">🏦 {c.institution}</span>}
-                  </div>
-                  {c.details?.puto_contract_memo && <p className="text-[10px] text-gray-400 mt-0.5">{c.details.puto_contract_memo}</p>}
-                </div>
-                <div className="shrink-0">
-                  {stage ? (
-                    <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-semibold text-white ${stage.color}`}>{stage.label}</span>
-                  ) : (
-                    <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-gray-100 text-gray-600">{c.progress_stage || '진행중'}</span>
-                  )}
-                </div>
-              </div>
-            )
-          })}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+          {contracts.map(c => (
+            <OpsCard
+              key={c.id}
+              c={c}
+              isOpen={openPanelIds.includes(c.id)}
+              onToggle={onToggle}
+              onScriptToggle={onScriptToggle}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -3893,7 +3875,14 @@ export default function OpsDashboard({ userId, userName }: Props) {
 
         {/* ── 관리팀계약 ── */}
         {activeTab === 'ops_contract' && (
-          <OpsContractTab userName={userName} />
+          <OpsContractTab
+            userName={userName}
+            openPanelIds={openPanelIds}
+            onToggle={togglePanel}
+            onScriptToggle={(id, val) =>
+              handleSave(id, { details: { ...(cases.find(x => x.id === id)?.details || {}), script_sent: val } })
+            }
+          />
         )}
 
         {/* ── 관리팀보고 ── */}

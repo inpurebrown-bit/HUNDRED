@@ -506,7 +506,12 @@ function CeoOpsRevenueView() {
 }
 
 // ─── 뿌토DB 계약업체 뷰 ──────────────────────────────────
-function CeoPutoContractView({ cases }: { cases: OpsCase[] }) {
+function CeoPutoContractView({ cases, openPanelIds, onToggle, onScriptToggle }: {
+  cases: OpsCase[]
+  openPanelIds: string[]
+  onToggle: (id: string) => void
+  onScriptToggle: (id: string, val: boolean) => void
+}) {
   // 뿌토DB에서 계약된 케이스: puto_contract_amount > 0 + new_db 아닌 것
   const contracted = cases.filter(c => {
     const amt = parseInt(String(c.details?.puto_contract_amount || '0').replace(/[^0-9]/g, '') || '0')
@@ -568,39 +573,17 @@ function CeoPutoContractView({ cases }: { cases: OpsCase[] }) {
         </div>
       )}
 
-      {/* 목록 */}
-      <div className="space-y-2">
-        {contracted.map(c => {
-          const companyName = c.customers?.details?.company || c.customers?.name || '—'
-          const amt = parseInt(String(c.details?.puto_contract_amount || '0').replace(/[^0-9]/g, '') || '0')
-          const contractDate = c.details?.puto_contract_date || ''
-          const manager = c.ops_user_name || c.details?.ops_user_name || '미배정'
-          const allStages = [...PIPELINE_STAGES, ...OVERALL_STAGES]
-          const stageInfo = allStages.find(s => s.key === c.progress_stage)
-          return (
-            <div key={c.id} className="bg-white border border-[#E8E2D4] rounded-xl px-4 py-3 flex items-center justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold text-[#1B2A45] text-sm">{companyName}</span>
-                  <span className="text-[10px] bg-sky-50 text-sky-600 border border-sky-100 px-1.5 py-0.5 rounded-full">👤 {manager}</span>
-                </div>
-                <div className="flex items-center gap-3 mt-1 flex-wrap">
-                  {contractDate && <span className="text-[10px] text-gray-400">계약일: {contractDate}</span>}
-                  {amt > 0 && <span className="text-[11px] font-bold text-sky-700">💰 {fmtMoney(amt)}</span>}
-                  {c.institution && <span className="text-[10px] text-gray-500">🏦 {c.institution}</span>}
-                </div>
-                {c.details?.puto_contract_memo && <p className="text-[10px] text-gray-400 mt-0.5">{c.details.puto_contract_memo}</p>}
-              </div>
-              <div className="shrink-0">
-                {stageInfo ? (
-                  <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-semibold text-white ${stageInfo.color}`}>{stageInfo.label}</span>
-                ) : (
-                  <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-gray-100 text-gray-600">{c.progress_stage || '진행중'}</span>
-                )}
-              </div>
-            </div>
-          )
-        })}
+      {/* 카드 그리드 */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+        {contracted.map(c => (
+          <CeoCaseCard
+            key={c.id}
+            c={c}
+            isOpen={openPanelIds.includes(c.id)}
+            onToggle={onToggle}
+            onScriptToggle={onScriptToggle}
+          />
+        ))}
       </div>
     </div>
   )
@@ -831,23 +814,29 @@ export default function OpsCeoTab() {
         <CeoOpsRevenueView />
       ) : view === 'puto_contract' ? (
         loading ? <div className="text-center py-12 text-gray-400">불러오는 중...</div>
-                : <CeoPutoContractView cases={filtered} />
+                : <CeoPutoContractView cases={filtered} openPanelIds={openPanelIds} onToggle={togglePanel} onScriptToggle={handleScriptToggle} />
       ) : loading ? (
         <div className="text-center py-12 text-gray-400">불러오는 중...</div>
       ) : view === 'active' ? (
         <InstitutionGroupedView cases={activeCases} openPanelIds={openPanelIds} onToggle={togglePanel} onScriptToggle={handleScriptToggle} onApprove={handleApprove} />
       ) : (
-        <div className="space-y-2">
-          {viewCases.length === 0 ? (
-            <div className="bg-white rounded-xl border border-[#E8E2D4] p-12 text-center text-gray-400 text-sm">
-              {view === 'refund' ? '환불 업체가 없습니다' : view === 'newdb' ? '뿌토DB가 없습니다' : '종료 업체가 없습니다'}
-            </div>
-          ) : (
-            viewCases.map(c => (
-              <CeoCaseListRow key={c.id} c={c} isOpen={openPanelIds.includes(c.id)} onToggle={togglePanel} />
-            ))
-          )}
-        </div>
+        viewCases.length === 0 ? (
+          <div className="bg-white rounded-xl border border-[#E8E2D4] p-12 text-center text-gray-400 text-sm">
+            {view === 'refund' ? '환불 업체가 없습니다' : view === 'newdb' ? '뿌토DB가 없습니다' : '종료 업체가 없습니다'}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+            {viewCases.map(c => (
+              <CeoCaseCard
+                key={c.id}
+                c={c}
+                isOpen={openPanelIds.includes(c.id)}
+                onToggle={togglePanel}
+                onScriptToggle={handleScriptToggle}
+              />
+            ))}
+          </div>
+        )
       )}
 
       {/* 배경 오버레이 */}
