@@ -327,7 +327,7 @@ function MonthSection({
             </div>
             {/* 합계 세금 */}
             <div className="mt-2 flex items-center justify-between bg-red-50 rounded-lg px-3 py-2">
-              <span className="text-[10px] text-[#1B2A45]/50">합계 세금 (부가가치세)</span>
+              <span className="text-[10px] text-[#1B2A45]/50">세금</span>
               <span className="text-sm font-black text-red-500">{taxAmount > 0 ? fmtKrw(taxAmount) : '-'}</span>
             </div>
           </>
