@@ -957,11 +957,11 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                         </div>
                         <div className="rounded-xl bg-blue-50 p-3 text-center relative">
                           <p className="text-[9px] text-blue-400 font-semibold mb-1">공급결제율</p>
-                          <p className={`text-xl font-black leading-none ${supRate !== null && supRate >= 15 ? 'text-blue-700' : supRate !== null && supRate >= 13 ? 'text-amber-600' : 'text-red-500'}`}>
+                          <p className={`text-xl font-black leading-none ${supRate !== null && supRate >= 40 ? 'text-blue-700' : supRate !== null && supRate >= 20 ? 'text-amber-500' : supRate !== null && supRate >= 13 ? 'text-orange-500' : 'text-red-500'}`}>
                             {fmtP(supRate)}
                           </p>
-                          <p className="text-[8px] text-blue-400 mt-1">
-                            {supRate === null ? '—' : supRate >= 20 ? '🔥 최상' : supRate >= 15 ? '✅ 양호' : supRate >= 13 ? '⚡ 주의' : '🚨 위험'}
+                          <p className="text-[8px] mt-1">
+                            {supRate === null ? <span className="text-blue-400">—</span> : supRate >= 40 ? <span className="text-blue-500 font-bold">🔥 최상</span> : supRate >= 20 ? <span className="text-amber-500 font-bold">🙂 쏘쏘</span> : supRate >= 13 ? <span className="text-orange-500 font-bold">⚡ 주의</span> : <span className="text-red-500 font-bold">🚨 위험</span>}
                           </p>
                         </div>
                       </div>
