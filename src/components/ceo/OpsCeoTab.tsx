@@ -56,7 +56,12 @@ function fmtMoney(n: number) {
 }
 
 // ─── Case Card (grid) ─────────────────────────────────────
-function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle }: { c: OpsCase; isOpen: boolean; onToggle: (id: string) => void; onScriptToggle: (id: string, val: boolean) => void }) {
+function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
+  c: OpsCase; isOpen: boolean
+  onToggle: (id: string) => void
+  onScriptToggle: (id: string, val: boolean) => void
+  onApprove?: (id: string, action: 'approve' | 'reject') => void
+}) {
   const allStages     = [...PIPELINE_STAGES, ...OVERALL_STAGES]
   const companyName   = c.customers?.details?.company || c.customers?.name || '—'
   const overallStage  = allStages.find(s => s.key === c.progress_stage)
@@ -131,6 +136,24 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle }: { c: OpsCase; isOp
         </div>
       )}
 
+      {/* 승인 대기 — 빠른 승인/반려 버튼 */}
+      {onApprove && (c.progress_stage === '환불예정' || c.progress_stage === '종료예정') && (
+        <div className="mt-2 flex gap-1" onClick={e => e.stopPropagation()}>
+          <button
+            onClick={() => onApprove(c.id, 'approve')}
+            className={`flex-1 text-[9px] font-bold py-1 rounded-lg text-white transition-colors ${
+              c.progress_stage === '환불예정' ? 'bg-rose-500 hover:bg-rose-600' : 'bg-orange-500 hover:bg-orange-600'
+            }`}>
+            ✅ {c.progress_stage === '환불예정' ? '환불' : '종료'}
+          </button>
+          <button
+            onClick={() => onApprove(c.id, 'reject')}
+            className="flex-1 text-[9px] font-bold py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors">
+            ❌ 반려
+          </button>
+        </div>
+      )}
+
       <div className="mt-1.5 flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
         <input type="checkbox" id={`ceo-script-${c.id}`} checked={scriptSent}
           onChange={e => onScriptToggle(c.id, e.target.checked)}
@@ -188,11 +211,12 @@ function CeoCaseListRow({ c, isOpen, onToggle }: { c: OpsCase; isOpen: boolean; 
 }
 
 // ─── Institution Grouped View (진행중) ────────────────────
-function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle }: {
+function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle, onApprove }: {
   cases: OpsCase[]
   openPanelIds: string[]
   onToggle: (id: string) => void
   onScriptToggle: (id: string, val: boolean) => void
+  onApprove: (id: string, action: 'approve' | 'reject') => void
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
@@ -251,7 +275,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
             {isOpen && (
               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
                 {items.map(c => (
-                  <CeoCaseCard key={`${inst}-${c.id}`} c={c} isOpen={openPanelIds.includes(c.id)} onToggle={onToggle} onScriptToggle={onScriptToggle} />
+                  <CeoCaseCard key={`${inst}-${c.id}`} c={c} isOpen={openPanelIds.includes(c.id)} onToggle={onToggle} onScriptToggle={onScriptToggle} onApprove={isPending ? onApprove : undefined} />
                 ))}
               </div>
             )}
@@ -464,6 +488,16 @@ export default function OpsCeoTab() {
     handleSave(id, { details: { ...(c.details || {}), script_sent: val } })
   }
 
+  // 환불예정/종료예정 → 대표 승인(환불/종료) 또는 반려(진행중)
+  function handleApprove(id: string, action: 'approve' | 'reject') {
+    const c = cases.find(x => x.id === id)
+    if (!c) return
+    const nextStage = action === 'approve'
+      ? (c.progress_stage === '환불예정' ? '환불' : '종료')
+      : '진행중'
+    handleSave(id, { progress_stage: nextStage })
+  }
+
   const q = search.trim().toLowerCase()
   const filtered = q
     ? cases.filter(c =>
@@ -553,7 +587,7 @@ export default function OpsCeoTab() {
       ) : loading ? (
         <div className="text-center py-12 text-gray-400">불러오는 중...</div>
       ) : view === 'active' ? (
-        <InstitutionGroupedView cases={activeCases} openPanelIds={openPanelIds} onToggle={togglePanel} onScriptToggle={handleScriptToggle} />
+        <InstitutionGroupedView cases={activeCases} openPanelIds={openPanelIds} onToggle={togglePanel} onScriptToggle={handleScriptToggle} onApprove={handleApprove} />
       ) : (
         <div className="space-y-2">
           {viewCases.length === 0 ? (
