@@ -33,14 +33,30 @@ export function isActiveRow(
 }
 
 /**
- * 입금액 → 계약 가중치
- * 입금액 33만원 이하(부가세 포함 기준) = 0.5개
- * 그 외 = 1개
- * ※ 계약금(contract_fee)이 아닌 실입금액(payment_amount) 기준
+ * 입금액 → 계약 가중치 (부가세미포함 기준)
+ *
+ * 부가세미포함 30만원 이하          → 0.5개
+ * 부가세미포함 31만원 ~ 99만원 이하  → 1개
+ * 부가세미포함 100만원 ~ 149만원 이하 → 2개
+ * 부가세미포함 150만원 ~ 199만원 이하 → 3개
+ * 부가세미포함 200만원 ~ 249만원 이하 → 4개
+ * 이후 50만원 단위로 1씩 추가
+ *
+ * @param paymentAmount  실입금액(payment_amount) — 부가세 포함 또는 제외
+ * @param vatIncluded    true: 부가세 포함 금액(÷1.1), false: 이미 부가세 제외, undefined: 부가세 포함으로 간주
  */
-export function contractWeight(paymentAmountStr: string | number | undefined): number {
-  if (!paymentAmountStr) return 0
-  const n = parseInt(String(paymentAmountStr).replace(/[^0-9]/g, ''), 10) || 0
-  if (n <= 0) return 0
-  return n <= 330000 ? 0.5 : 1
+export function contractWeight(
+  paymentAmount: string | number | undefined,
+  vatIncluded?: boolean,
+): number {
+  if (!paymentAmount) return 0
+  const amt = parseInt(String(paymentAmount).replace(/[^0-9]/g, ''), 10) || 0
+  if (amt <= 0) return 0
+
+  // 부가세미포함 금액 산출
+  const vatExcl = vatIncluded === false ? amt : Math.round(amt / 1.1)
+
+  if (vatExcl <= 300000) return 0.5                                        // ≤30만
+  if (vatExcl < 1000000) return 1                                          // 31만~99만
+  return Math.floor((vatExcl - 1000000) / 500000) + 2                     // 100만~: 2,3,4...
 }

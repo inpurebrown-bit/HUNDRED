@@ -840,7 +840,7 @@ export default function SalesCeoTab() {
       total: mine.length,
       lead: mine.filter((c: any) => ['lead', 'consulting'].includes(c.status)).length,
       db010: mine.filter((c: any) => c.status === 'db010').length,
-      contracted: contracted.reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount), 0),
+      contracted: contracted.reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0),
       revenue: contracted.reduce((sum, c) => sum + parseNum((c as any).details?.my_revenue), 0),
     }
   }), [customers, salesPeople])
@@ -876,11 +876,11 @@ export default function SalesCeoTab() {
   [lastMonthContracted])
 
   const thisMonthContractCount = useMemo(() =>
-    thisMonthContracted.reduce((s, c) => s + contractWeight((c as any).details?.payment_amount), 0),
+    thisMonthContracted.reduce((s, c) => s + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0),
   [thisMonthContracted])
 
   const lastMonthContractCount = useMemo(() =>
-    lastMonthContracted.reduce((s, c) => s + contractWeight((c as any).details?.payment_amount), 0),
+    lastMonthContracted.reduce((s, c) => s + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0),
   [lastMonthContracted])
 
   // 인별 이번달 매출
@@ -892,7 +892,7 @@ export default function SalesCeoTab() {
       name,
       revenue: mine.reduce((s, c) => s + parseNum((c as any).details?.my_revenue), 0),
       payment: mine.reduce((s, c) => s + parseNum((c as any).details?.payment_amount), 0),
-      count:   mine.reduce((s, c) => s + contractWeight((c as any).details?.payment_amount), 0),
+      count:   mine.reduce((s, c) => s + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0),
     }
   }), [salesPeople, thisMonthContracted])
   const bizElapsed = getElapsedBusinessDays(now.getFullYear(), now.getMonth(), now.getDate())
@@ -906,7 +906,7 @@ export default function SalesCeoTab() {
           c.status === 'contracted' &&
           (c.sales_user_name === name || (c as any).details?.sales_user_name === name)
         )
-        .reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount), 0)
+        .reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0)
       const totalContracted = cfg.base + dbContracted
       // floor(소수점 2자리 버림) — 반올림 시 12.999...→13.00이 되어 공급 오계산 방지
       const rate = cfg.supplied > 0 ? Math.floor(totalContracted / cfg.supplied * 10000) / 100 : 0

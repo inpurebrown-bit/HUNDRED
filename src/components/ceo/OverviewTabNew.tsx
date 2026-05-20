@@ -43,6 +43,7 @@ interface Contract {
   sales_user_id: string
   sales_user_name: string
   contract_amount: number
+  vat_included?: boolean
   status: string
   progress_stage?: string
   tax_invoice_requested?: boolean
@@ -443,6 +444,7 @@ export default function OverviewTabNew() {
     sales_user_id: c.owner_id || c.details?.sales_user_id || '',
     sales_user_name: c.details?.sales_user_name || c.sales_user_name || '',
     contract_amount: parseInt(String(c.details?.payment_amount || '0').replace(/[^0-9]/g, ''), 10) || 0,
+    vat_included: c.details?.vat_included,
     status: 'contracted',
   }))
   // 두 소스 합치기 (중복 방지: customer_id 기준)
@@ -504,7 +506,7 @@ export default function OverviewTabNew() {
       const uid = c.sales_user_id
       if (!uid) continue
       if (!userMap[uid]) userMap[uid] = { name: c.sales_user_name ?? uid, count: 0 }
-      userMap[uid].count += contractWeight(c.contract_amount)
+      userMap[uid].count += contractWeight(c.contract_amount, c.vat_included)
     }
 
     // 직책 제거 이름 정규화 (payrate 목표 매칭용)
@@ -556,7 +558,7 @@ export default function OverviewTabNew() {
         (c.sales_user_name === name) &&
         (c.created_at ?? '').slice(0, 7) === thisMonthStr
       )
-      .reduce((s: number, c: any) => s + contractWeight(c.contract_amount), 0)
+      .reduce((s: number, c: any) => s + contractWeight(c.contract_amount, c.vat_included), 0)
     const totalContracted = base + dbContracted
     const rate = supplied > 0 ? Math.floor(totalContracted / supplied * 10000) / 100 : 0
     const recommended = calcRecommendedSupply(rate, bizElapsed)
@@ -632,7 +634,7 @@ export default function OverviewTabNew() {
         <MonthSection
           title={`${thisMonth}월 현황`}
           loading={loading}
-          contractCount={thisMonthContracts.reduce((s, c) => s + contractWeight(c.contract_amount), 0)}
+          contractCount={thisMonthContracts.reduce((s, c) => s + contractWeight(c.contract_amount, c.vat_included), 0)}
           inProgressCount={thisInProgress}
           taxAmount={thisMonthTax}
           employeeRows={thisMonthRows}
@@ -645,7 +647,7 @@ export default function OverviewTabNew() {
         <MonthSection
           title={`${lastMonth}월 현황`}
           loading={loading}
-          contractCount={lastMonthContracts.reduce((s, c) => s + contractWeight(c.contract_amount), 0)}
+          contractCount={lastMonthContracts.reduce((s, c) => s + contractWeight(c.contract_amount, c.vat_included), 0)}
           inProgressCount={lastInProgress}
           taxAmount={lastMonthTax}
           employeeRows={lastMonthRows}

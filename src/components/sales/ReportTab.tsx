@@ -196,11 +196,13 @@ export default function ReportTab({ userId, userName }: Props) {
   }, [userName])
 
   // ── 이번달/오늘 계약 자동집계 ───────────────────────────
-  function contractWeight(paymentAmount: string | number | undefined): number {
-    const amt = typeof paymentAmount === 'number'
-      ? paymentAmount
-      : parseFloat(String(paymentAmount || '0').replace(/[^0-9.]/g, ''))
-    return (!isNaN(amt) && amt > 0 && amt <= 330000) ? 0.5 : 1
+  function contractWeight(paymentAmount: string | number | undefined, vatIncluded?: boolean): number {
+    const amt = parseInt(String(paymentAmount || '0').replace(/[^0-9]/g, ''), 10) || 0
+    if (amt <= 0) return 0
+    const vatExcl = vatIncluded === false ? amt : Math.round(amt / 1.1)
+    if (vatExcl <= 300000) return 0.5
+    if (vatExcl < 1000000) return 1
+    return Math.floor((vatExcl - 1000000) / 500000) + 2
   }
 
   function cleanNameLocal(s: string): string {
@@ -218,10 +220,10 @@ export default function ReportTab({ userId, userName }: Props) {
   })
   const autoTodayContracts = myContracts
     .filter((c: any) => (c.details?.contract_date || '').startsWith(todayStr))
-    .reduce((sum: number, c: any) => sum + contractWeight(c.details?.payment_amount), 0)
+    .reduce((sum: number, c: any) => sum + contractWeight(c.details?.payment_amount, c.details?.vat_included), 0)
   const autoMonthContracts = myContracts
     .filter((c: any) => (c.details?.contract_date || '').startsWith(monthStr))
-    .reduce((sum: number, c: any) => sum + contractWeight(c.details?.payment_amount), 0)
+    .reduce((sum: number, c: any) => sum + contractWeight(c.details?.payment_amount, c.details?.vat_included), 0)
 
   const [showYesterdayPreview, setShowYesterdayPreview] = useState(false)
 

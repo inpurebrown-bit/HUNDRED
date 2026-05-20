@@ -522,9 +522,9 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
     (c.sales_user_name === userName || (c as any).details?.sales_user_name === userName) &&
     ((c as any).details?.contract_date || '').slice(0, 7) === thisMonth
   )
-  // 가중 계약수 (입금액 33만원 이하 = 0.5개)
+  // 가중 계약수 (부가세미포함 기준)
   const myDbContracted = thisMonthContracted.reduce(
-    (sum, c) => sum + contractWeight((c as any).details?.payment_amount), 0
+    (sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0
   )
   const myTotalContracted = mySupplyCfg ? mySupplyCfg.base + myDbContracted : myDbContracted
 
@@ -630,7 +630,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   )
   const thisMonthTotalRevenue = thisMonthRevenue.reduce((sum, c) => sum + pNum((c as any).details?.my_revenue), 0)
   const thisMonthTotalPaid    = thisMonthRevenue.reduce((sum, c) => sum + pNum((c as any).details?.payment_amount), 0)
-  const thisMonthContractCount = thisMonthRevenue.reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount), 0)
+  const thisMonthContractCount = thisMonthRevenue.reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0)
 
   // 전체 합계
   const totalRevenue = revenueCustomers
@@ -890,10 +890,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   const contractMonth = ((c as any).details?.contract_date || (c as any).created_at || '').slice(0, 7)
                   return isDirectType && c.status === 'contracted' && contractMonth === thisMonth
                 })
-                .reduce((sum, c) => {
-                  const amt = Number((c as any).details?.payment_amount || 0)
-                  return sum + (amt <= 330000 ? 0.5 : 1)
-                }, 0)
+                .reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0)
               const dirCnt    = dirCntAuto > 0 ? dirCntAuto : Number(pr?.direct_count ?? 0)
               const dirPay    = dirPayAuto > 0 ? dirPayAuto : Number(pr?.direct_payment ?? 0)
               const target    = Number(pr?.target ?? monthlyGoal)
@@ -1374,7 +1371,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 {revenueByMonth.map(([month, list]) => {
                   const mRevenue  = list.filter(c => !c.details?.is_cancelled).reduce((s, c) => s + pNum((c as any).details?.my_revenue), 0)
                   const mPaid     = list.filter(c => !c.details?.is_cancelled).reduce((s, c) => s + pNum((c as any).details?.payment_amount), 0)
-                  const mCount    = list.filter(c => !c.details?.is_cancelled).reduce((s, c) => s + contractWeight((c as any).details?.payment_amount), 0)
+                  const mCount    = list.filter(c => !c.details?.is_cancelled).reduce((s, c) => s + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0)
                   const isThisM   = month === thisMonth
                   return (
                     <div key={month} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
@@ -1396,7 +1393,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                       <div className="divide-y divide-gray-50">
                         {list.map(c => {
                           const cancelled = c.details?.is_cancelled
-                          const weight = contractWeight((c as any).details?.payment_amount)
+                          const weight = contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included)
                           const payAmt = pNum((c as any).details?.payment_amount)
                           const myRev  = pNum((c as any).details?.my_revenue)
                           const fee    = pNum((c as any).details?.contract_fee)

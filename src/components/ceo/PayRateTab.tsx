@@ -423,7 +423,7 @@ function PayRateSubView() {
 
             // 전체 계약 집계 (기존)
             if (c.status === 'contracted' && contractMonth === month) {
-              const w = contractWeight(c.details?.payment_amount)
+              const w = contractWeight(c.details?.payment_amount, c.details?.vat_included)
               byPerson[name] = (byPerson[name] || 0) + w
               if (isDirectType) directPayMap[name] = (directPayMap[name] || 0) + w
               else              supplyPayMap[name]  = (supplyPayMap[name] || 0) + w
