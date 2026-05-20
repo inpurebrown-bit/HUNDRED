@@ -209,7 +209,7 @@ interface MonthSectionProps {
   employeeRows: EmployeeRow[]
   salesRevenueAmount?: number
   opsRevenueAmount?: number
-  opsUserRows?: { name: string; amount: number }[]
+  opsUserRows?: { name: string; feeAmount: number; contractAmount: number; contractCount: number }[]
 }
 
 function fmtKrw(n: number): string {
@@ -271,14 +271,18 @@ function MonthSection({
                   <thead>
                     <tr className="border-b border-[#E8E2D4]">
                       <th className="text-left pb-2 text-[11px] font-semibold text-[#1B2A45]/40">담당자</th>
-                      <th className="text-right pb-2 text-[11px] font-semibold text-[#1B2A45]/40">이달 매출</th>
+                      <th className="text-right pb-2 text-[11px] font-semibold text-[#1B2A45]/40">수수료</th>
+                      <th className="text-right pb-2 text-[11px] font-semibold text-[#1B2A45]/40">계약</th>
+                      <th className="text-right pb-2 text-[11px] font-semibold text-[#1B2A45]/40">계약수</th>
                     </tr>
                   </thead>
                   <tbody>
                     {opsUserRows.map(r => (
                       <tr key={r.name} className="border-b border-[#E8E2D4]/40 last:border-0">
-                        <td className="py-2.5 font-semibold text-[#1B2A45]/80">{r.name}</td>
-                        <td className="py-2.5 text-right font-black text-emerald-600">{fmtKrw(r.amount)}</td>
+                        <td className="py-2 font-semibold text-[#1B2A45]/80">{r.name}</td>
+                        <td className="py-2 text-right font-black text-emerald-600">{r.feeAmount > 0 ? fmtKrw(r.feeAmount) : '-'}</td>
+                        <td className="py-2 text-right font-black text-sky-600">{r.contractAmount > 0 ? fmtKrw(r.contractAmount) : '-'}</td>
+                        <td className="py-2 text-right text-gray-500">{r.contractCount > 0 ? r.contractCount + '건' : '-'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -648,13 +652,18 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
   function buildOpsUserRows(
     opsEntries: { ops_user_name: string; amount: number }[],
     contractEntries: { ops_user_name: string; amount: number }[]
-  ): { name: string; amount: number }[] {
-    const map: Record<string, { name: string; amount: number }> = {}
-    const allEntries = [...(opsEntries ?? []), ...(contractEntries ?? [])]
-    for (const e of allEntries) {
+  ): { name: string; feeAmount: number; contractAmount: number; contractCount: number }[] {
+    const map: Record<string, { name: string; feeAmount: number; contractAmount: number; contractCount: number }> = {}
+    for (const e of (opsEntries ?? [])) {
       const name = e.ops_user_name?.trim() || '관리팀'
-      if (!map[name]) map[name] = { name, amount: 0 }
-      map[name].amount += e.amount
+      if (!map[name]) map[name] = { name, feeAmount: 0, contractAmount: 0, contractCount: 0 }
+      map[name].feeAmount += e.amount
+    }
+    for (const e of (contractEntries ?? [])) {
+      const name = e.ops_user_name?.trim() || '관리팀'
+      if (!map[name]) map[name] = { name, feeAmount: 0, contractAmount: 0, contractCount: 0 }
+      map[name].contractAmount += e.amount
+      map[name].contractCount++
     }
     return Object.values(map)
   }

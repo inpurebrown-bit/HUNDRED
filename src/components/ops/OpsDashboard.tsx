@@ -2984,10 +2984,12 @@ function OpsMiniRevenue({ userName }: { userName: string }) {
         <div className="flex-1 bg-white/10 rounded-lg px-3 py-2 text-center">
           <p className="text-white/50 text-[9px] mb-0.5">수수료 매출</p>
           <p className="text-emerald-300 font-black text-sm">{rev ? fmtMoney(feeTotal) : '—'}</p>
+          <p className="text-white/30 text-[9px] mt-0.5">{rev ? (rev.thisMonthOps?.length || 0) + '건' : ''}</p>
         </div>
         <div className="flex-1 bg-white/10 rounded-lg px-3 py-2 text-center">
           <p className="text-white/50 text-[9px] mb-0.5">계약 매출</p>
           <p className="text-sky-300 font-black text-sm">{rev ? fmtMoney(contractTotal) : '—'}</p>
+          <p className="text-white/30 text-[9px] mt-0.5">{rev ? (rev.thisMonthOpsContracts?.length || 0) + '건' : ''}</p>
         </div>
       </div>
     </div>
