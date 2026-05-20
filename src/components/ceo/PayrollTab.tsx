@@ -222,6 +222,7 @@ function SalesCard({
           label={has12 ? '성과급(+5% ✓ 12개↑)' : '성과급(+5%, 12개↑)'}
           value={emp.performance_bonus}
           editable
+          autoTag={has12}
           onEdit={v => onChange(idx, 'performance_bonus', v)}
           colorClass={has12 ? 'text-violet-600' : undefined}
         />
@@ -345,7 +346,7 @@ export default function PayrollTab() {
         const key = Object.keys(salesByName).find(k => k === emp.name || k.includes(emp.name) || emp.name.includes(k))
         if (!key) return emp
         const rev = salesByName[key]
-        const autoPerf = rev.count >= 12 ? Math.round(rev.amount * 0.05) : emp.performance_bonus
+        const autoPerf = rev.count >= 12 ? Math.round(rev.amount * 0.05) : 0
         return { ...emp, contract_revenue: rev.amount, contract_count: rev.count, performance_bonus: autoPerf }
       })
       setSalesEmps(newSalesEmps)
