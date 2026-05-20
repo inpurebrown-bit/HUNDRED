@@ -1338,58 +1338,137 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                 )}
               </div>
               {/* 추가 입금 블록들 */}
-              {(d.payment_entries || []).map((entry: any, idx: number) => (
-                <div key={entry.id || idx} className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+              {(d.payment_entries || []).map((entry: any, idx: number) => {
+                const entryLocked = !!entry.fee_locked
+                const entryInp = entryLocked
+                  ? 'w-full border border-gray-200 bg-gray-100 rounded-lg px-3 py-2 text-xs text-gray-500 cursor-not-allowed'
+                  : inp
+
+                async function saveEntry() {
+                  if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
+                  const todayStr2 = new Date().toISOString().slice(0, 10)
+                  const entries: any[] = [...(d.payment_entries || [])]
+                  // deposit_date 없으면 오늘로 세팅
+                  if (!entries[idx].date) entries[idx] = { ...entries[idx], date: todayStr2 }
+                  entries[idx] = { ...entries[idx], fee_locked: true }
+                  const mergedDetails2 = { ...(local.details || {}), payment_entries: entries }
+                  const next2 = { ...local, details: mergedDetails2 }
+                  setLocal(next2)
+                  try {
+                    const res2 = await fetch(`/api/ops-cases/${c.id}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ details: mergedDetails2 }),
+                    })
+                    if (!res2.ok) {
+                      const err2 = await res2.json().catch(() => ({}))
+                      alert(`저장 실패: ${err2?.error || res2.status}`)
+                      return
+                    }
+                    onSave(c.id, { details: mergedDetails2 })
+                  } catch {
+                    alert('네트워크 오류로 저장에 실패했습니다.')
+                  }
+                }
+
+                async function unlockEntry() {
+                  const entries: any[] = [...(d.payment_entries || [])]
+                  entries[idx] = { ...entries[idx], fee_locked: false }
+                  const mergedDetails2 = { ...(local.details || {}), payment_entries: entries }
+                  setLocal({ ...local, details: mergedDetails2 })
+                  await fetch(`/api/ops-cases/${c.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ details: mergedDetails2 }),
+                  })
+                  onSave(c.id, { details: mergedDetails2 })
+                }
+
+                return (
+                <div key={entry.id || idx} className={`border rounded-xl p-3 ${entryLocked ? 'bg-blue-50/50 border-blue-200' : 'bg-blue-50 border-blue-200'}`}>
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-[10px] font-bold text-blue-700">💰 {idx + 2}차 입금</p>
-                    <button type="button"
-                      onClick={() => {
-                        const entries: any[] = d.payment_entries || []
-                        detailField('payment_entries', entries.filter((_: any, i: number) => i !== idx))
-                      }}
-                      className="text-[10px] text-red-400 hover:text-red-600 font-bold">✕ 삭제</button>
+                    <div className="flex items-center gap-2">
+                      <p className="text-[10px] font-bold text-blue-700">💰 {idx + 2}차 입금</p>
+                      {entryLocked && <span className="text-[9px] bg-blue-500 text-white px-1.5 py-0.5 rounded-full font-bold">🔒 잠금</span>}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {entryLocked && (isCeo) && (
+                        <button type="button" onClick={unlockEntry}
+                          className="text-[9px] text-orange-500 hover:text-orange-700 font-bold border border-orange-300 rounded px-1.5 py-0.5">
+                          🔓 해제
+                        </button>
+                      )}
+                      {!entryLocked && (
+                        <button type="button"
+                          onClick={() => {
+                            const entries: any[] = d.payment_entries || []
+                            detailField('payment_entries', entries.filter((_: any, i: number) => i !== idx))
+                          }}
+                          className="text-[10px] text-red-400 hover:text-red-600 font-bold">✕ 삭제</button>
+                      )}
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-x-2 gap-y-2">
                     <div className="col-span-2">
                       <label className={lbl}>입금 날짜</label>
-                      <input type="date" value={entry.date || ''} onChange={e => {
+                      <input type="date" value={entry.date || ''} disabled={entryLocked} onChange={e => {
                         const entries: any[] = [...(d.payment_entries || [])]
                         entries[idx] = { ...entries[idx], date: e.target.value }
                         detailField('payment_entries', entries)
-                      }} className={inp} />
+                      }} className={entryInp} />
                     </div>
-                    <div><label className={lbl}>기관명</label><input type="text" value={entry.institution || ''} onChange={e => {
+                    <div><label className={lbl}>기관명</label><input type="text" value={entry.institution || ''} disabled={entryLocked} onChange={e => {
                       const entries: any[] = [...(d.payment_entries || [])]
                       entries[idx] = { ...entries[idx], institution: e.target.value }
                       detailField('payment_entries', entries)
-                    }} className={inp} placeholder="기관명" /></div>
-                    <div><label className={lbl}>상품명</label><input type="text" value={entry.product || ''} onChange={e => {
+                    }} className={entryInp} placeholder="기관명" /></div>
+                    <div><label className={lbl}>상품명</label><input type="text" value={entry.product || ''} disabled={entryLocked} onChange={e => {
                       const entries: any[] = [...(d.payment_entries || [])]
                       entries[idx] = { ...entries[idx], product: e.target.value }
                       detailField('payment_entries', entries)
-                    }} className={inp} placeholder="상품명" /></div>
-                    <div><label className={lbl}>승인금액</label><input type="text" value={entry.approval_amount || ''} onChange={e => {
+                    }} className={entryInp} placeholder="상품명" /></div>
+                    <div><label className={lbl}>승인금액</label><input type="text" value={entry.approval_amount || ''} disabled={entryLocked} onChange={e => {
                       const entries: any[] = [...(d.payment_entries || [])]
                       const amt = parseInt(e.target.value.replace(/[^0-9]/g, ''), 10) || 0
                       const rate = parseFloat(String(entries[idx].fee_rate || '0')) || 0
                       entries[idx] = { ...entries[idx], approval_amount: e.target.value, ...(amt > 0 && rate > 0 ? { fee_amount: String(Math.round(amt * rate / 100)) } : {}) }
                       detailField('payment_entries', entries)
-                    }} className={inp} placeholder="0원" /></div>
-                    <div><label className={lbl}>수수료%</label><input type="text" value={entry.fee_rate || ''} onChange={e => {
+                    }} className={entryInp} placeholder="0원" /></div>
+                    <div><label className={lbl}>수수료%</label><input type="text" value={entry.fee_rate || ''} disabled={entryLocked} onChange={e => {
                       const entries: any[] = [...(d.payment_entries || [])]
                       const rate = parseFloat(e.target.value) || 0
                       const amt = parseInt(String(entries[idx].approval_amount || '0').replace(/[^0-9]/g, ''), 10) || 0
                       entries[idx] = { ...entries[idx], fee_rate: e.target.value, ...(amt > 0 && rate > 0 ? { fee_amount: String(Math.round(amt * rate / 100)) } : {}) }
                       detailField('payment_entries', entries)
-                    }} className={inp} placeholder="%" /></div>
-                    <div className="col-span-2"><label className={lbl}>수수료 <span className="text-blue-600 font-bold">(관리팀 매출)</span></label><input type="text" value={entry.fee_amount || ''} onChange={e => {
-                      const entries: any[] = [...(d.payment_entries || [])]
-                      entries[idx] = { ...entries[idx], fee_amount: e.target.value }
-                      detailField('payment_entries', entries)
-                    }} className={inp} placeholder="0원" /></div>
+                    }} className={entryInp} placeholder="%" /></div>
+                    <div className="col-span-2">
+                      <label className={lbl}>수수료 <span className="text-blue-600 font-bold">(관리팀 매출)</span></label>
+                      {entryLocked ? (
+                        <div className="w-full border border-blue-300 bg-blue-50 rounded-lg px-3 py-2 text-xs font-bold text-blue-700 cursor-default">
+                          {entry.fee_amount ? formatComma(entry.fee_amount) + '원' : '—'}
+                        </div>
+                      ) : (
+                        <input type="text" value={entry.fee_amount || ''} onChange={e => {
+                          const entries: any[] = [...(d.payment_entries || [])]
+                          entries[idx] = { ...entries[idx], fee_amount: e.target.value }
+                          detailField('payment_entries', entries)
+                        }} className={inp} placeholder="0원" />
+                      )}
+                    </div>
                   </div>
+                  {/* 저장하기 버튼 */}
+                  {!entryLocked && (
+                    <div className="mt-3 flex justify-end">
+                      <button type="button" onClick={saveEntry}
+                        disabled={!entry.fee_amount}
+                        className="px-4 py-1.5 rounded-lg text-xs font-bold bg-blue-500 hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors shadow-sm">
+                        💾 저장하기
+                      </button>
+                    </div>
+                  )}
                 </div>
-              ))}
+                )
+              })}
             </div>
           </div>
 

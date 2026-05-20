@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   // ops-cases GET과 동일한 JS 필터 방식으로 owner_id/ops_user_name/details.ops_user_name 모두 매칭
   const opsQuery = supabaseAdmin
     .from('ops_cases')
-    .select('id, details, created_at, updated_at, owner_id, ops_user_name, customer_name, phone')
+    .select('id, details, created_at, owner_id, ops_user_name, customer_name, phone')
 
   const [{ data: custContracted }, { data: opsCasesRaw }] = await Promise.all([
     custQuery,
@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
       const fee1 = parseMoney(d.fee_amount)
       if (fee1 > 0) {
         // deposit_date 우선 → updated_at → created_at → 오늘 (반드시 날짜 있어야 월별 집계 가능)
-        const entryDate = d.deposit_date || c.updated_at?.slice(0, 10) || c.created_at?.slice(0, 10) || todayStr
+        const entryDate = d.deposit_date || c.created_at?.slice(0, 10) || todayStr
         entries.push({
           id: `${c.id}_1`,
           amount: fee1,
@@ -92,7 +92,7 @@ export async function GET(req: NextRequest) {
           entries.push({
             id: `${c.id}_${pe.id || entries.length}`,
             amount: feeN,
-            date: pe.date || c.updated_at?.slice(0, 10) || todayStr,
+            date: pe.date || c.created_at?.slice(0, 10) || todayStr,
             ops_user_id: String(c.owner_id || ''),
             ops_user_name: c.ops_user_name || d.ops_user_name || '',
             company: d.sales_customer_info?.company || d.company || c.customer_name || '',
@@ -116,7 +116,7 @@ export async function GET(req: NextRequest) {
         entries.push({
           id: `${c.id}_puto`,
           amount: putoAmt,
-          date: d.puto_contract_date || c.updated_at?.slice(0, 10) || c.created_at?.slice(0, 10) || '',
+          date: d.puto_contract_date || c.created_at?.slice(0, 10) || '',
           ops_user_id: ownerId, ops_user_name: ownerName,
           company: d.sales_customer_info?.company || c.customer_name || '',
           type: 'puto',
@@ -129,7 +129,7 @@ export async function GET(req: NextRequest) {
           entries.push({
             id: `${c.id}_direct`,
             amount: contractAmt,
-            date: d.contract_date || c.updated_at?.slice(0, 10) || c.created_at?.slice(0, 10) || '',
+            date: d.contract_date || c.created_at?.slice(0, 10) || '',
             ops_user_id: ownerId, ops_user_name: ownerName,
             company: c.customer_name || '',
             type: 'direct',
