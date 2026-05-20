@@ -704,8 +704,8 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
         </div>
 
         {/* 우측: 영업팀·관리팀 매출 카드 (세로 스택) */}
-        <div className="flex sm:flex-col gap-2 sm:w-40">
-          <div className="flex-1 sm:flex-none bg-gradient-to-br from-[#1B2A45] to-[#2a3d5c] rounded-xl p-3 text-white">
+        <div className="flex sm:flex-col gap-2 sm:w-40 sm:self-stretch">
+          <div className="flex-1 bg-gradient-to-br from-[#1B2A45] to-[#2a3d5c] rounded-xl p-3 text-white flex flex-col justify-center">
             <p className="text-[10px] text-white/50 mb-1">영업팀 이달 매출</p>
             {loading ? <Skeleton className="h-6 w-20 bg-white/20" /> : (
               <p className="text-xl font-black leading-tight">{
@@ -717,7 +717,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
             )}
             <p className="text-[9px] text-white/30 mt-0.5">계약 기준</p>
           </div>
-          <div className="flex-1 sm:flex-none bg-gradient-to-br from-emerald-700 to-emerald-600 rounded-xl p-3 text-white">
+          <div className="flex-1 bg-gradient-to-br from-emerald-700 to-emerald-600 rounded-xl p-3 text-white flex flex-col justify-center">
             <p className="text-[10px] text-white/50 mb-1">관리팀 이달 매출</p>
             {loading ? <Skeleton className="h-6 w-20 bg-white/20" /> : (
               <p className="text-xl font-black leading-tight">{thisMonthOpsDisplay}</p>
