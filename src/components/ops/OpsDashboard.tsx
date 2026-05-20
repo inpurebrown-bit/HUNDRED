@@ -38,6 +38,16 @@ function autoHyphenPhone(v: string): string {
   if (d.length <= 7) return `${d.slice(0,3)}-${d.slice(3)}`
   return `${d.slice(0,3)}-${d.slice(3,7)}-${d.slice(7)}`
 }
+/** 숫자에 콤마 포맷 */
+function formatComma(v: string | number): string {
+  const n = typeof v === 'number' ? v : parseInt(String(v).replace(/[^0-9]/g, ''), 10)
+  if (isNaN(n) || n === 0) return ''
+  return n.toLocaleString()
+}
+/** 콤마 제거 후 숫자 파싱 */
+function parseComma(v: string): number {
+  return parseInt(String(v).replace(/[^0-9]/g, ''), 10) || 0
+}
 
 // ── Types ──────────────────────────────────────────────────────────────
 export interface OpsCase {
@@ -319,6 +329,9 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
   const [salesLogOpen, setSalesLogOpen] = useState(false)
   // 인콜일지 수정모드
   const [incallEditing, setIncallEditing] = useState(false)
+  // 1차 입금 저장 상태
+  const [feeSaving, setFeeSaving] = useState(false)
+  const [feeSaved,  setFeeSaved]  = useState(false)
 
   useEffect(() => {
     const next = { ...c }
@@ -437,6 +450,23 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
   function handleCeoReject() {
     handleStageChange('서류받는중')
   }
+  async function handleFeeSave() {
+    setFeeSaving(true)
+    const mergedDetails = { ...(local.details || {}), fee_locked: true }
+    const next = { ...local, details: mergedDetails }
+    setLocal(next)
+    try {
+      await fetch(`/api/ops-cases/${c.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ details: mergedDetails }),
+      })
+      onSave(c.id, { details: mergedDetails })
+      setFeeSaved(true)
+    } finally {
+      setFeeSaving(false)
+    }
+  }
   function schedule(patch: Record<string, any>) {
     if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => onSave(c.id, patch), 1500)
@@ -449,6 +479,8 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
 
   const isPendingApproval = local.progress_stage === '환불예정' || local.progress_stage === '종료예정'
   const isCeo = userRole === 'ceo'
+  // 1차 입금 잠금: fee_locked=true 이고 CEO가 아닐 때 읽기전용
+  const feeLocked = !!d.fee_locked && !isCeo
 
   // 전달화면 모달용 영업팀 기록 추출
   const salesLogs = (local.timeline || []).filter((e: any) => e.source === 'sales')
@@ -1179,29 +1211,106 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
             {/* 기본 첫번째 입금 블록 */}
             <div className="space-y-2">
               {/* 기본 단일 입금 (항상 표시) */}
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
-                <p className="text-[10px] font-bold text-emerald-700 mb-2">💰 1차 입금</p>
-                <div className="grid grid-cols-2 gap-x-2 gap-y-2">
-                  <div className="col-span-2">
-                    <label className={lbl}>입금 날짜</label>
-                    <input type="date" value={d.deposit_date || ''} onChange={e => detailField('deposit_date', e.target.value)} className={inp} />
-                  </div>
-                  <div><label className={lbl}>기관명</label><input type="text" value={d.deposit_institution || ''} onChange={e => detailField('deposit_institution', e.target.value)} className={inp} placeholder="기관명" /></div>
-                  <div><label className={lbl}>상품명</label><input type="text" value={d.deposit_product || ''} onChange={e => detailField('deposit_product', e.target.value)} className={inp} placeholder="상품명" /></div>
-                  <div><label className={lbl}>승인금액</label><input type="text" value={d.approval_amount || ''} onChange={e => {
-                    detailField('approval_amount', e.target.value)
-                    const amt = parseInt(e.target.value.replace(/[^0-9]/g, ''), 10) || 0
-                    const rate = parseFloat(String(d.fee_rate || '0')) || 0
-                    if (amt > 0 && rate > 0) detailField('fee_amount', String(Math.round(amt * rate / 100)))
-                  }} className={inp} placeholder="0원" /></div>
-                  <div><label className={lbl}>수수료%</label><input type="text" value={d.fee_rate || ''} onChange={e => {
-                    detailField('fee_rate', e.target.value)
-                    const rate = parseFloat(e.target.value) || 0
-                    const amt = parseInt(String(d.approval_amount || '0').replace(/[^0-9]/g, ''), 10) || 0
-                    if (amt > 0 && rate > 0) detailField('fee_amount', String(Math.round(amt * rate / 100)))
-                  }} className={inp} placeholder="%" /></div>
-                  <div className="col-span-2"><label className={lbl}>수수료 <span className="text-emerald-600 font-bold">(관리팀 매출)</span></label><input type="text" value={d.fee_amount || ''} onChange={e => detailField('fee_amount', e.target.value)} className={inp + ' font-semibold'} placeholder="0원" /></div>
+              <div className={`border rounded-xl p-3 ${feeLocked ? 'bg-gray-50 border-gray-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <p className={`text-[10px] font-bold ${feeLocked ? 'text-gray-500' : 'text-emerald-700'}`}>
+                    💰 1차 입금 {feeLocked && <span className="ml-1 text-[9px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">🔒 저장됨 (대표만 수정)</span>}
+                  </p>
+                  {isCeo && d.fee_locked && (
+                    <button type="button"
+                      onClick={() => {
+                        const mergedDetails = { ...(local.details || {}), fee_locked: false }
+                        setLocal({ ...local, details: mergedDetails })
+                        onSave(c.id, { details: mergedDetails })
+                        setFeeSaved(false)
+                      }}
+                      className="text-[9px] bg-amber-100 hover:bg-amber-200 text-amber-700 px-2 py-0.5 rounded font-bold transition-colors">
+                      🔓 잠금 해제
+                    </button>
+                  )}
                 </div>
+                {feeLocked ? (
+                  /* 잠금 상태 — 읽기 전용 표시 */
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-xs">
+                    {d.deposit_date && <div className="col-span-2"><span className="text-gray-400">날짜</span> <span className="font-medium text-gray-700">{d.deposit_date}</span></div>}
+                    {d.deposit_institution && <div><span className="text-gray-400">기관명</span><br/><span className="font-medium text-gray-700">{d.deposit_institution}</span></div>}
+                    {d.deposit_product    && <div><span className="text-gray-400">상품명</span><br/><span className="font-medium text-gray-700">{d.deposit_product}</span></div>}
+                    {d.approval_amount && <div><span className="text-gray-400">승인금액</span><br/><span className="font-medium text-gray-700">{formatComma(d.approval_amount)}원</span></div>}
+                    {d.fee_rate       && <div><span className="text-gray-400">수수료율</span><br/><span className="font-medium text-gray-700">{d.fee_rate}%</span></div>}
+                    {d.fee_amount && (
+                      <div className="col-span-2 mt-1 bg-white rounded-lg p-2 border border-gray-200">
+                        <span className="text-gray-400">수수료 (관리팀 매출)</span>
+                        <p className="font-bold text-emerald-700 text-sm mt-0.5">{formatComma(d.fee_amount)}원</p>
+                        {d.fee_vat_included && (
+                          <div className="text-[10px] text-gray-500 mt-1 space-y-0.5">
+                            <p>부가세 포함 내역:</p>
+                            <p>ㄴ 공급가액 {formatComma(Math.round(parseComma(String(d.fee_amount)) / 1.1))}원</p>
+                            <p>ㄴ 부가세 {formatComma(Math.round(parseComma(String(d.fee_amount)) / 11))}원</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* 편집 상태 */
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-2">
+                    <div className="col-span-2">
+                      <label className={lbl}>입금 날짜</label>
+                      <input type="date" value={d.deposit_date || ''} onChange={e => detailField('deposit_date', e.target.value)} className={inp} />
+                    </div>
+                    <div><label className={lbl}>기관명</label><input type="text" value={d.deposit_institution || ''} onChange={e => detailField('deposit_institution', e.target.value)} className={inp} placeholder="기관명" /></div>
+                    <div><label className={lbl}>상품명</label><input type="text" value={d.deposit_product || ''} onChange={e => detailField('deposit_product', e.target.value)} className={inp} placeholder="상품명" /></div>
+                    <div><label className={lbl}>승인금액</label><input type="text"
+                      value={d.approval_amount ? formatComma(d.approval_amount) : ''}
+                      onChange={e => {
+                        const raw = parseComma(e.target.value)
+                        const stored = raw > 0 ? String(raw) : ''
+                        detailField('approval_amount', stored)
+                        const rate = parseFloat(String(d.fee_rate || '0')) || 0
+                        if (raw > 0 && rate > 0) detailField('fee_amount', String(Math.round(raw * rate / 100)))
+                      }} className={inp} placeholder="0원" /></div>
+                    <div><label className={lbl}>수수료%</label><input type="text" value={d.fee_rate || ''} onChange={e => {
+                      detailField('fee_rate', e.target.value)
+                      const rate = parseFloat(e.target.value) || 0
+                      const amt = parseComma(String(d.approval_amount || '0'))
+                      if (amt > 0 && rate > 0) detailField('fee_amount', String(Math.round(amt * rate / 100)))
+                    }} className={inp} placeholder="%" /></div>
+                    <div className="col-span-2">
+                      <label className={lbl}>수수료 <span className="text-emerald-600 font-bold">(관리팀 매출)</span></label>
+                      <input type="text"
+                        value={d.fee_amount ? formatComma(d.fee_amount) : ''}
+                        onChange={e => {
+                          const raw = parseComma(e.target.value)
+                          detailField('fee_amount', raw > 0 ? String(raw) : '')
+                        }} className={inp + ' font-semibold'} placeholder="0원" />
+                    </div>
+                    {/* 부가세 포함 체크박스 */}
+                    <div className="col-span-2">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input type="checkbox" checked={!!d.fee_vat_included}
+                          onChange={e => detailField('fee_vat_included', e.target.checked)}
+                          className="w-3.5 h-3.5 accent-emerald-500" />
+                        <span className="text-xs text-gray-600">수수료에 부가세(VAT) 포함</span>
+                      </label>
+                      {d.fee_vat_included && d.fee_amount && (
+                        <div className="mt-1.5 bg-white border border-emerald-200 rounded-lg px-3 py-1.5 text-[11px] text-gray-500 space-y-0.5">
+                          <p className="font-semibold text-emerald-700">VAT 내역</p>
+                          <p>공급가액: {formatComma(Math.round(parseComma(String(d.fee_amount)) / 1.1))}원</p>
+                          <p>부가세: {formatComma(Math.round(parseComma(String(d.fee_amount)) / 11))}원</p>
+                        </div>
+                      )}
+                    </div>
+                    {/* 저장하기 버튼 */}
+                    <div className="col-span-2 flex justify-end mt-1">
+                      <button type="button"
+                        onClick={handleFeeSave}
+                        disabled={feeSaving || !d.fee_amount}
+                        className="px-4 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors shadow-sm">
+                        {feeSaving ? '저장 중…' : feeSaved ? '✅ 저장됨' : '💾 저장하기'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
               {/* 추가 입금 블록들 */}
               {(d.payment_entries || []).map((entry: any, idx: number) => (
