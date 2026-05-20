@@ -388,7 +388,7 @@ function PayRateSubView() {
     async function load() {
       try {
         const [payRes, custRes, userRes] = await Promise.all([
-          fetch(`/api/payrate?date=${today}`),
+          fetch(`/api/payrate?year_month=${month}`),
           fetch('/api/customers'),
           fetch('/api/users?role=sales'),
         ])
@@ -482,7 +482,7 @@ function PayRateSubView() {
         } else {
           // DB 레코드 없으면 localStorage 폴백 시도
           try {
-            const lsKey = `payrate-draft-${today}`
+            const lsKey = `payrate-draft-${month}`
             const draft = localStorage.getItem(lsKey)
             if (draft) {
               const d = JSON.parse(draft)
@@ -519,7 +519,7 @@ function PayRateSubView() {
     latestState.current = { targetCount, employees, paymentCount, we, tw }
   }, [targetCount, employees, paymentCount, we, tw])
 
-  const LS_KEY = `payrate-draft-${today}`
+  const LS_KEY = `payrate-draft-${month}`
 
   const doSave = useCallback(async (silent = false) => {
     const s = latestState.current

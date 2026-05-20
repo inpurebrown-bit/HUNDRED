@@ -9,8 +9,21 @@ export async function GET(req: NextRequest) {
   const user = session.user as { role?: string; name?: string }
   if (user.role !== 'ceo' && user.role !== 'sales') return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
-  const date = req.nextUrl.searchParams.get('date')
-  const list = req.nextUrl.searchParams.get('list')
+  const date       = req.nextUrl.searchParams.get('date')
+  const list       = req.nextUrl.searchParams.get('list')
+  const year_month = req.nextUrl.searchParams.get('year_month')
+
+  // year_month → 해당 월의 가장 최신 레코드 반환 (날짜 무관)
+  if (year_month) {
+    const { data } = await supabaseAdmin
+      .from('payrate_records')
+      .select('*')
+      .eq('year_month', year_month)
+      .order('record_date', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    return NextResponse.json({ record: data ?? null })
+  }
 
   // list=true → 월별 아카이브 (각 월의 마지막 레코드)
   if (list === 'true') {
