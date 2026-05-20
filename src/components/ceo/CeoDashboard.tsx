@@ -18,17 +18,19 @@ import OpsCeoTab from './OpsCeoTab'
 import PinManageTab from './PinManageTab'
 import MyProfileTab from '@/components/MyProfileTab'
 import DbManageTab from './DbManageTab'
+import PersonalFinanceTab from './PersonalFinanceTab'
 
-// 매출·손익·급여명세서 통합 탭 (결제율은 전체현황으로 이동)
+// 손익·급여 통합 탭
 function AnalyticsTab() {
-  const [sub, setSub] = useState<'revenue' | 'payroll' | 'payslip'>('revenue')
+  const [sub, setSub] = useState<'revenue' | 'payroll' | 'payslip' | 'personal'>('revenue')
   return (
     <div>
       <div className="flex gap-2 mb-5 flex-wrap">
         {([
-          { key: 'revenue', label: '💰 매출 관리' },
-          { key: 'payroll', label: '💼 급여·손익' },
-          { key: 'payslip', label: '📋 급여명세서' },
+          { key: 'revenue',  label: '💰 매출 관리' },
+          { key: 'payroll',  label: '💼 급여·손익' },
+          { key: 'payslip',  label: '📋 급여명세서' },
+          { key: 'personal', label: '🏦 개인재무' },
         ] as const).map(t => (
           <button key={t.key} onClick={() => setSub(t.key)}
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors border ${
@@ -38,9 +40,10 @@ function AnalyticsTab() {
           </button>
         ))}
       </div>
-      {sub === 'revenue' && <RevenueTab />}
-      {sub === 'payroll' && <PayrollTab />}
-      {sub === 'payslip' && <PayslipTab />}
+      {sub === 'revenue'  && <RevenueTab />}
+      {sub === 'payroll'  && <PayrollTab />}
+      {sub === 'payslip'  && <PayslipTab />}
+      {sub === 'personal' && <PersonalFinanceTab />}
     </div>
   )
 }
@@ -224,7 +227,7 @@ export default function CeoDashboard() {
     { key: 'assign',        label: '🔀 계약 배정' },
     { key: 'sales',         label: '👥 영업팀' },
     { key: 'ops',           label: '⚙️ 관리팀' },
-    { key: 'analytics',     label: '💰 매출·손익·결제율·급여' },
+    { key: 'analytics',     label: '💰 손익·급여' },
     { key: 'staffmanage',   label: '🧑‍💼 직원관리' },
     { key: 'minutesreports',label: '📒 회의록·보고함' },
     { key: 'calendar',      label: '📅 일정관리' },
