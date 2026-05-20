@@ -285,19 +285,29 @@ export default function PayrollTab() {
   const [revTotals, setRevTotals] = useState<{ sales: number; ops: number; opsContract: number } | null>(null)
 
   // 개인재무에서 자동 산출 (대출이자 + 구독료)
-  const [pfFixed, setPfFixed] = useState<{ loans: number; subs: number }>({ loans: 0, subs: 0 })
+  // DB 미저장 시 PersonalFinanceTab DEFAULT_LOANS + DEFAULT_SUBS 합계를 기본값으로 사용
+  const PF_FALLBACK_LOANS = 583_000   // 49000 + 114000 + 420000
+  const PF_FALLBACK_SUBS  = 208_153   // DEFAULT_SUBS 16개 합산
+  const [pfFixed, setPfFixed] = useState<{ loans: number; subs: number }>({ loans: PF_FALLBACK_LOANS, subs: PF_FALLBACK_SUBS })
 
   useEffect(() => {
     fetch('/api/personal-finance')
       .then(r => r.json())
       .then(d => {
         const pf = d.record?.employees
-        if (!pf) return
+        if (!pf) {
+          // DB에 저장된 기록 없음 → 기본값 유지
+          setPfFixed({ loans: PF_FALLBACK_LOANS, subs: PF_FALLBACK_SUBS })
+          return
+        }
         const loans = (pf.loans || []).reduce((s: number, l: any) => s + Number(l.p1_monthly || 0), 0)
         const subs  = (pf.subs  || []).reduce((s: number, sub: any) => s + Number(sub.monthly_amount || 0), 0)
-        setPfFixed({ loans, subs })
+        // DB 데이터가 있지만 값이 0인 경우에도 fallback 적용
+        setPfFixed({ loans: loans || PF_FALLBACK_LOANS, subs: subs || PF_FALLBACK_SUBS })
       })
-      .catch(() => {})
+      .catch(() => {
+        setPfFixed({ loans: PF_FALLBACK_LOANS, subs: PF_FALLBACK_SUBS })
+      })
   }, [])
 
   // 자동저장 디바운스
