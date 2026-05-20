@@ -327,13 +327,32 @@ export default function PayrollTab() {
         }
       }))
 
-      setMsg('✅ 이달 매출 자동 반영 완료')
+      // DB 공급 갯수 자동 반영
+      try {
+        const prRes  = await fetch(`/api/payrate?year_month=${yearMonth}`)
+        const prData = await prRes.json()
+        if (prData.record?.employee_details) {
+          const totalSupply = (prData.record.employee_details as any[]).reduce((s: number, emp: any) => {
+            const fromDaily = emp.daily_supplies
+              ? Object.values(emp.daily_supplies).reduce((ss: number, v: any) => ss + Number(v || 0), 0)
+              : 0
+            return s + (fromDaily > 0 ? fromDaily : Number(emp.supply_count || 0))
+          }, 0)
+          if (totalSupply > 0) {
+            setCosts(prev => ({ ...prev, db_count: totalSupply }))
+          }
+        }
+      } catch {
+        // payrate 실패해도 revenue 반영은 성공으로 처리
+      }
+
+      setMsg('✅ 이달 매출·DB갯수 자동 반영 완료')
     } catch {
       setMsg('❌ 자동 로드 실패')
     } finally {
       setAutoLoading(false)
     }
-  }, [])
+  }, [yearMonth])
 
   // ── 불러오기 ──────────────────────────────────────────────
   async function handleLoad() {
