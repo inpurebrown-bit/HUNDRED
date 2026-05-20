@@ -13,10 +13,10 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const role = searchParams.get('role')
 
-  // 영업팀은 영업팀/관리팀 이름 목록만 조회 가능 (DB 트레이드 + 담당자 배정용)
+  // 영업팀/관리팀은 ops 이름 목록만 조회 가능 (담당자 배정용)
   // CEO는 전체 조회 가능
   if (user.role !== 'ceo') {
-    if (user.role === 'sales' && (role === 'sales' || role === 'ops')) {
+    if ((user.role === 'sales' || user.role === 'ops') && (role === 'sales' || role === 'ops')) {
       // 이름만 반환 (민감 정보 제외)
       const { data, error } = await supabaseAdmin
         .from('users')

@@ -490,8 +490,109 @@ function CeoOpsRevenueView() {
   )
 }
 
+// ─── 뿌토DB 계약업체 뷰 ──────────────────────────────────
+function CeoPutoContractView({ cases }: { cases: OpsCase[] }) {
+  // 뿌토DB에서 계약된 케이스: puto_contract_amount > 0 + new_db 아닌 것
+  const contracted = cases.filter(c => {
+    const amt = parseInt(String(c.details?.puto_contract_amount || '0').replace(/[^0-9]/g, '') || '0')
+    return amt > 0 && c.progress_stage !== 'new_db'
+  })
+
+  const totalAmt = contracted.reduce((s, c) => {
+    return s + parseInt(String(c.details?.puto_contract_amount || '0').replace(/[^0-9]/g, '') || '0')
+  }, 0)
+
+  // 담당자별 집계
+  const byManager: Record<string, { count: number; total: number }> = {}
+  contracted.forEach(c => {
+    const name = c.ops_user_name || c.details?.ops_user_name || '미배정'
+    if (!byManager[name]) byManager[name] = { count: 0, total: 0 }
+    byManager[name].count++
+    byManager[name].total += parseInt(String(c.details?.puto_contract_amount || '0').replace(/[^0-9]/g, '') || '0')
+  })
+
+  if (contracted.length === 0) {
+    return (
+      <div className="bg-white rounded-xl border border-[#E8E2D4] p-12 text-center text-gray-400 text-sm">
+        뿌토DB에서 계약된 업체가 없습니다
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4 max-w-4xl">
+      {/* 요약 카드 */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-white border border-[#E8E2D4] rounded-xl p-4 text-center">
+          <p className="text-[10px] text-gray-400 mb-1">총 계약건수</p>
+          <p className="text-2xl font-black text-[#1B2A45]">{contracted.length}</p>
+        </div>
+        <div className="col-span-1 sm:col-span-3 bg-sky-50 border border-sky-100 rounded-xl p-4">
+          <p className="text-[10px] text-sky-400 mb-1">총 계약금액</p>
+          <p className="text-2xl font-black text-sky-700">{fmtMoney(totalAmt)}</p>
+        </div>
+      </div>
+
+      {/* 담당자별 요약 */}
+      {Object.keys(byManager).length > 0 && (
+        <div className="bg-white border border-[#E8E2D4] rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <p className="text-xs font-bold text-gray-500">담당자별 계약 현황</p>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {Object.entries(byManager).sort((a, b) => b[1].total - a[1].total).map(([name, d]) => (
+              <div key={name} className="flex items-center justify-between px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-[#1B2A45]">{name}</span>
+                  <span className="text-[10px] bg-sky-100 text-sky-600 px-2 py-0.5 rounded-full">{d.count}건</span>
+                </div>
+                <span className="text-base font-black text-sky-600">{fmtMoney(d.total)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 목록 */}
+      <div className="space-y-2">
+        {contracted.map(c => {
+          const companyName = c.customers?.details?.company || c.customers?.name || '—'
+          const amt = parseInt(String(c.details?.puto_contract_amount || '0').replace(/[^0-9]/g, '') || '0')
+          const contractDate = c.details?.puto_contract_date || ''
+          const manager = c.ops_user_name || c.details?.ops_user_name || '미배정'
+          const allStages = [...PIPELINE_STAGES, ...OVERALL_STAGES]
+          const stageInfo = allStages.find(s => s.key === c.progress_stage)
+          return (
+            <div key={c.id} className="bg-white border border-[#E8E2D4] rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-[#1B2A45] text-sm">{companyName}</span>
+                  <span className="text-[10px] bg-sky-50 text-sky-600 border border-sky-100 px-1.5 py-0.5 rounded-full">👤 {manager}</span>
+                </div>
+                <div className="flex items-center gap-3 mt-1 flex-wrap">
+                  {contractDate && <span className="text-[10px] text-gray-400">계약일: {contractDate}</span>}
+                  {amt > 0 && <span className="text-[11px] font-bold text-sky-700">💰 {fmtMoney(amt)}</span>}
+                  {c.institution && <span className="text-[10px] text-gray-500">🏦 {c.institution}</span>}
+                </div>
+                {c.details?.puto_contract_memo && <p className="text-[10px] text-gray-400 mt-0.5">{c.details.puto_contract_memo}</p>}
+              </div>
+              <div className="shrink-0">
+                {stageInfo ? (
+                  <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-semibold text-white ${stageInfo.color}`}>{stageInfo.label}</span>
+                ) : (
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-gray-100 text-gray-600">{c.progress_stage || '진행중'}</span>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Component ───────────────────────────────────────
-type OpsView = 'active' | 'refund' | 'completed' | 'newdb' | 'revenue'
+type OpsView = 'active' | 'refund' | 'completed' | 'newdb' | 'puto_contract' | 'revenue'
 
 export default function OpsCeoTab() {
   const [cases, setCases] = useState<OpsCase[]>([])
@@ -614,12 +715,18 @@ export default function OpsCeoTab() {
   const refundCases    = filtered.filter(c => REFUND_STAGE_KEYS.has(c.progress_stage) || c.is_refund)
   const completedCases = filtered.filter(c => COMPLETED_STAGE_KEYS.has(c.progress_stage) || c.is_completed)
 
+  const putoContractCases = filtered.filter(c => {
+    const amt = parseInt(String(c.details?.puto_contract_amount || '0').replace(/[^0-9]/g, '') || '0')
+    return amt > 0 && c.progress_stage !== 'new_db'
+  })
+
   const MENU = [
-    { key: 'active' as OpsView,    label: '🔄 진행중업체', count: activeCases.length },
-    { key: 'refund' as OpsView,    label: '💸 환불업체',   count: refundCases.length },
-    { key: 'completed' as OpsView, label: '✅ 종료업체',   count: completedCases.length },
-    { key: 'newdb' as OpsView,     label: '🆕 신규DB',     count: newdbCases.length },
-    { key: 'revenue' as OpsView,   label: '💰 매출현황',   count: null },
+    { key: 'active' as OpsView,        label: '🔄 진행중업체', count: activeCases.length },
+    { key: 'refund' as OpsView,        label: '💸 환불업체',   count: refundCases.length },
+    { key: 'completed' as OpsView,     label: '✅ 종료업체',   count: completedCases.length },
+    { key: 'newdb' as OpsView,         label: '🗄️ 뿌토DB',    count: newdbCases.length },
+    { key: 'puto_contract' as OpsView, label: '📋 계약업체',   count: putoContractCases.length },
+    { key: 'revenue' as OpsView,       label: '💰 매출현황',   count: null },
   ] as const
 
   const viewCases = view === 'refund' ? refundCases : view === 'completed' ? completedCases : view === 'newdb' ? newdbCases : activeCases
@@ -707,6 +814,9 @@ export default function OpsCeoTab() {
       {/* 목록 */}
       {view === 'revenue' ? (
         <CeoOpsRevenueView />
+      ) : view === 'puto_contract' ? (
+        loading ? <div className="text-center py-12 text-gray-400">불러오는 중...</div>
+                : <CeoPutoContractView cases={filtered} />
       ) : loading ? (
         <div className="text-center py-12 text-gray-400">불러오는 중...</div>
       ) : view === 'active' ? (
@@ -715,7 +825,7 @@ export default function OpsCeoTab() {
         <div className="space-y-2">
           {viewCases.length === 0 ? (
             <div className="bg-white rounded-xl border border-[#E8E2D4] p-12 text-center text-gray-400 text-sm">
-              {view === 'refund' ? '환불 업체가 없습니다' : view === 'newdb' ? '신규 DB가 없습니다' : '종료 업체가 없습니다'}
+              {view === 'refund' ? '환불 업체가 없습니다' : view === 'newdb' ? '뿌토DB가 없습니다' : '종료 업체가 없습니다'}
             </div>
           ) : (
             viewCases.map(c => (

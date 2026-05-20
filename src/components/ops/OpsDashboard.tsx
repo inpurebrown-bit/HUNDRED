@@ -2125,9 +2125,10 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
   onAdded?: () => void
 }) {
   const [contractingCase, setContractingCase] = useState<OpsCase | null>(null)
-  const [form, setForm] = useState({ institution: '', contract_amount: '', stage: '서류받는중', memo: '' })
+  const [form, setForm] = useState({ institution: '', contract_amount: '', stage: '서류받는중', memo: '', manager: '' })
   const [saving, setSaving] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
+  const [opsUsers, setOpsUsers] = useState<{ id: string; name: string }[]>([])
   // 직접 추가 모달
   const [addModal, setAddModal] = useState(false)
   const EMPTY_ADD_FORM = {
@@ -2144,6 +2145,14 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
   function af(field: keyof typeof EMPTY_ADD_FORM, val: string) {
     setAddForm(p => ({ ...p, [field]: val }))
   }
+
+  // ops 직원 목록 불러오기
+  useEffect(() => {
+    fetch('/api/users?role=ops')
+      .then(r => r.json())
+      .then(d => { if (d.users) setOpsUsers(d.users) })
+      .catch(() => {})
+  }, [])
 
   async function handleAddDb() {
     if (!addForm.company.trim()) return
@@ -2191,26 +2200,29 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
 
   function openContractModal(c: OpsCase) {
     setContractingCase(c)
-    setForm({ institution: c.institution || '', contract_amount: '', stage: '서류받는중', memo: '' })
+    setForm({ institution: c.institution || '', contract_amount: '', stage: '서류받는중', memo: '', manager: userName })
   }
 
   function handleContract() {
     if (!contractingCase) return
     setSaving(true)
+    const managerName = form.manager || userName
     const patch: Record<string, any> = {
       progress_stage: form.stage,
       institution: form.institution || contractingCase.institution,
+      ops_user_name: managerName,
       details: {
         ...(contractingCase.details || {}),
         puto_contract_amount: form.contract_amount,
         puto_contract_date: new Date().toISOString().slice(0, 10),
         puto_contract_memo: form.memo,
+        ops_user_name: managerName,
       },
       timeline: [
         ...(contractingCase.timeline || []),
         {
           user: userName,
-          content: `🆕 뿌토DB 계약 시작 → ${form.institution || '기관미정'}${form.contract_amount ? ' / ' + Number(form.contract_amount.replace(/[^0-9]/g,'')).toLocaleString() + '원' : ''}`,
+          content: `🆕 뿌토DB 계약 시작 → ${form.institution || '기관미정'}${form.contract_amount ? ' / ' + Number(form.contract_amount.replace(/[^0-9]/g,'')).toLocaleString() + '원' : ''} / 담당: ${managerName}`,
           created_at: nowKST(),
         },
       ],
@@ -2300,6 +2312,21 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-sky-400">
                   {PIPELINE_STAGES.map(s => (
                     <option key={s.key} value={s.key}>{s.label}</option>
+                  ))}
+                </select>
+              </div>
+              {/* 담당 관리자 배정 */}
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 mb-1 block">👤 담당 관리자 배정</label>
+                <select
+                  value={form.manager}
+                  onChange={e => setForm(p => ({ ...p, manager: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-sky-400">
+                  {opsUsers.length === 0 && (
+                    <option value={userName}>{userName} (현재 담당자)</option>
+                  )}
+                  {opsUsers.map(u => (
+                    <option key={u.id} value={u.name}>{u.name}{u.name === userName ? ' (나)' : ''}</option>
                   ))}
                 </select>
               </div>
@@ -2713,17 +2740,11 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// OpsContractTab (관리팀계약 - 거절DB 직접계약)
+// OpsContractTab (관리팀계약 - 뿌토DB 계약된 업체 확인용 / 읽기전용)
 // ──────────────────────────────────────────────────────────────────────
 function OpsContractTab({ userName }: { userName: string }) {
   const [contracts, setContracts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({
-    company: '', name: '', phone: '', contract_date: '',
-    contract_amount: '', memo: '',
-  })
 
   useEffect(() => { loadContracts() }, [])
 
@@ -2731,173 +2752,84 @@ function OpsContractTab({ userName }: { userName: string }) {
     setLoading(true)
     const res = await fetch('/api/ops-cases')
     const data = await res.json()
-    const opsContracts = (data.cases || []).filter((c: any) => c.details?.is_ops_direct_contract === true)
-    setContracts(opsContracts)
+    // 뿌토DB에서 계약된 케이스 (puto_contract_amount > 0, new_db 아닌 것)
+    const putoContracts = (data.cases || []).filter((c: any) =>
+      c.details?.puto_contract_amount &&
+      parseInt(String(c.details.puto_contract_amount).replace(/[^0-9]/g, '') || '0') > 0 &&
+      c.progress_stage !== 'new_db'
+    )
+    // 직접계약도 포함
+    const directContracts = (data.cases || []).filter((c: any) =>
+      c.details?.is_ops_direct_contract === true &&
+      !putoContracts.find((p: any) => p.id === c.id)
+    )
+    setContracts([...putoContracts, ...directContracts])
     setLoading(false)
   }
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    if (!form.company.trim()) return
-    setSaving(true)
-    try {
-      // 고객 생성 후 ops_case 생성
-      const custRes = await fetch('/api/customers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: form.name,
-          phone: form.phone,
-          status: 'contracted',
-          details: {
-            company: form.company,
-            sales_user_name: userName,
-            contract_date: form.contract_date,
-          },
-        }),
-      })
-      if (custRes.ok) {
-        const custData = await custRes.json()
-        const customerId = custData.customer?.id || custData.id
-        if (customerId) {
-          await fetch('/api/ops-cases', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              customer_id: customerId,
-              progress_stage: '서류받는중',
-              details: {
-                is_ops_direct_contract: true,
-                contract_source: 'rejected_db',
-                commission_rate: 50,
-                contract_amount: form.contract_amount,
-                ops_contract_memo: form.memo,
-                contract_date: form.contract_date,
-              },
-              timeline: [{ user: userName, content: '관리팀 직접계약 등록 (거절DB)', created_at: nowKST() }],
-            }),
-          })
-        }
-      }
-      setForm({ company: '', name: '', phone: '', contract_date: '', contract_amount: '', memo: '' })
-      setShowForm(false)
-      loadContracts()
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  // 총 수수료 계산 (50%)
-  const totalCommission = contracts.reduce((sum, c) => {
-    const amt = parseFloat((c.details?.contract_amount || '0').replace(/[^0-9.]/g, ''))
-    return sum + (isNaN(amt) ? 0 : amt * 0.5)
+  const totalContractAmt = contracts.reduce((sum, c) => {
+    const puto = parseInt(String(c.details?.puto_contract_amount || '0').replace(/[^0-9]/g, '') || '0')
+    const direct = parseInt(String(c.details?.contract_amount || '0').replace(/[^0-9]/g, '') || '0')
+    return sum + (puto || direct)
   }, 0)
 
   return (
     <div className="space-y-4 max-w-5xl mx-auto">
       {/* 헤더 */}
-      <div className="bg-gradient-to-r from-[#1B2A45] to-violet-700 rounded-xl px-5 py-4 text-white">
+      <div className="bg-gradient-to-r from-[#1B2A45] to-sky-700 rounded-xl px-5 py-4 text-white">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h2 className="font-bold text-base">📝 관리팀 직접계약</h2>
-            <p className="text-white/60 text-xs mt-0.5">거절DB 넘겨받아 계약한 업체 (계약금의 50% 지급)</p>
+            <h2 className="font-bold text-base">📋 계약업체 현황</h2>
+            <p className="text-white/60 text-xs mt-0.5">뿌토DB에서 계약 처리된 업체 목록 (읽기전용)</p>
           </div>
-          <button onClick={() => setShowForm(p => !p)}
-            className="bg-[#C5A258] hover:bg-[#C5A258]/90 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">
-            + 계약 등록
+          <button onClick={loadContracts}
+            className="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+            🔄 새로고침
           </button>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <div className="bg-white/10 rounded-lg px-3 py-2 text-center">
             <p className="text-white/50 text-[10px]">총 계약 건수</p>
             <p className="text-white font-black text-xl">{contracts.length}</p>
           </div>
           <div className="bg-white/10 rounded-lg px-3 py-2 text-center">
-            <p className="text-white/50 text-[10px]">예상 수수료 합계 (50%)</p>
-            <p className="text-white font-black text-lg">{fmt(totalCommission)}원</p>
-          </div>
-          <div className="bg-white/10 rounded-lg px-3 py-2 text-center">
-            <p className="text-white/50 text-[10px]">수수료율</p>
-            <p className="text-white font-black text-xl">50%</p>
+            <p className="text-white/50 text-[10px]">총 계약금액</p>
+            <p className="text-white font-black text-lg">{fmt(totalContractAmt)}원</p>
           </div>
         </div>
       </div>
-
-      {/* 등록 폼 */}
-      {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-100 p-5 space-y-4">
-          <h3 className="font-semibold text-[#1B2A45] text-sm">📋 신규 관리팀 계약 등록</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {[
-              { key: 'company', label: '업체명', placeholder: '업체명 입력', required: true },
-              { key: 'name', label: '대표명', placeholder: '대표자명' },
-              { key: 'phone', label: '연락처', placeholder: '010-0000-0000' },
-              { key: 'contract_date', label: '계약일', type: 'date' },
-              { key: 'contract_amount', label: '계약금액 (원)', placeholder: '예: 3000000' },
-              { key: 'memo', label: '메모', placeholder: '특이사항' },
-            ].map((f: any) => (
-              <div key={f.key}>
-                <label className="text-xs text-gray-500 mb-1 block font-medium">{f.label}{f.required && ' *'}</label>
-                <input
-                  type={f.type || 'text'}
-                  value={(form as any)[f.key]}
-                  onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-                  placeholder={f.placeholder}
-                  required={f.required}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-violet-400"
-                />
-              </div>
-            ))}
-          </div>
-          {form.contract_amount && (
-            <div className="bg-violet-50 rounded-lg px-4 py-2 text-sm">
-              <span className="text-violet-700 font-semibold">
-                예상 수수료 (50%): {fmt(parseFloat(form.contract_amount.replace(/[^0-9.]/g, '') || '0') * 0.5)}원
-              </span>
-            </div>
-          )}
-          <div className="flex gap-2">
-            <button type="button" onClick={() => setShowForm(false)}
-              className="flex-1 border border-gray-200 text-gray-600 py-2 rounded-lg text-sm hover:bg-gray-50">
-              취소
-            </button>
-            <button type="submit" disabled={saving}
-              className="flex-1 bg-violet-500 hover:bg-violet-600 disabled:opacity-50 text-white py-2 rounded-lg text-sm font-semibold transition-colors">
-              {saving ? '등록 중...' : '✅ 계약 등록'}
-            </button>
-          </div>
-        </form>
-      )}
 
       {/* 목록 */}
       {loading ? (
         <div className="text-center py-12 text-gray-400">불러오는 중...</div>
       ) : contracts.length === 0 ? (
         <div className="bg-white rounded-xl border border-[#E8E2D4] p-12 text-center text-gray-400 text-sm">
-          등록된 관리팀 직접계약이 없습니다<br />
-          <span className="text-xs text-gray-300 mt-1 block">거절DB를 넘겨받아 계약한 업체를 등록하세요</span>
+          계약된 업체가 없습니다<br />
+          <span className="text-xs text-gray-300 mt-1 block">신규DB 탭에서 계약하기를 눌러 계약을 진행하세요</span>
         </div>
       ) : (
         <div className="space-y-2">
           {contracts.map(c => {
-            const companyName = c.customers?.details?.company || c.customers?.name || '—'
-            const amt = parseFloat((c.details?.contract_amount || '0').replace(/[^0-9.]/g, ''))
-            const commission = isNaN(amt) ? 0 : amt * 0.5
+            const companyName = c.customers?.details?.company || c.customers?.name || c.customer_name || '—'
+            const putoAmt = parseInt(String(c.details?.puto_contract_amount || '0').replace(/[^0-9]/g, '') || '0')
+            const directAmt = parseInt(String(c.details?.contract_amount || '0').replace(/[^0-9]/g, '') || '0')
+            const contractAmt = putoAmt || directAmt
+            const contractDate = c.details?.puto_contract_date || c.details?.contract_date || ''
+            const manager = c.ops_user_name || c.details?.ops_user_name || '—'
             const stage = PIPELINE_STAGES.find(s => s.key === c.progress_stage)
             return (
               <div key={c.id} className="bg-white border border-[#E8E2D4] rounded-xl px-4 py-3 flex items-center justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-[#1B2A45] text-sm" style={{ wordBreak: 'break-all' }}>{companyName}</span>
-                    <span className="text-xs text-gray-400">{c.customers?.name}</span>
-                    <span className="text-[10px] text-gray-400">{formatPhone(c.customers?.phone || '')}</span>
+                    {manager !== '—' && <span className="text-[10px] bg-sky-50 text-sky-600 border border-sky-100 px-1.5 py-0.5 rounded-full font-medium">👤 {manager}</span>}
                   </div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    {c.details?.contract_date && <span className="text-[10px] text-gray-400">계약일: {c.details.contract_date}</span>}
-                    {amt > 0 && <span className="text-[10px] text-gray-500">계약금: {fmt(amt)}원</span>}
-                    {commission > 0 && <span className="text-[10px] font-bold text-violet-600">수수료: {fmt(commission)}원</span>}
+                  <div className="flex items-center gap-3 mt-1 flex-wrap">
+                    {contractDate && <span className="text-[10px] text-gray-400">계약일: {contractDate}</span>}
+                    {contractAmt > 0 && <span className="text-[11px] font-bold text-sky-700">💰 {fmt(contractAmt)}원</span>}
+                    {c.institution && <span className="text-[10px] text-gray-500">🏦 {c.institution}</span>}
                   </div>
-                  {c.details?.ops_contract_memo && <p className="text-[10px] text-gray-400 mt-0.5">{c.details.ops_contract_memo}</p>}
+                  {c.details?.puto_contract_memo && <p className="text-[10px] text-gray-400 mt-0.5">{c.details.puto_contract_memo}</p>}
                 </div>
                 <div className="shrink-0">
                   {stage ? (
