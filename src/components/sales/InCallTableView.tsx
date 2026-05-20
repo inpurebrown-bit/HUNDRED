@@ -1102,6 +1102,15 @@ function CustomerCard({
         }`}
         onClick={() => onExpand(expanded ? null : c.id)}
       >
+        {/* 관리팀 담당자 배지 — 전송 완료 후 우측 상단 */}
+        {isTransferred && opsUserName && (
+          <div className="absolute top-1 right-1" onClick={e => e.stopPropagation()}>
+            <span className="text-[8px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1 py-0.5 rounded leading-none">
+              {opsUserName}
+            </span>
+          </div>
+        )}
+
         {/* 3-dot 메뉴 — 자금팀 전송 전만 표시 */}
         {!isTransferred && (
           <div

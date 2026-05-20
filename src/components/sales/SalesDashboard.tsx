@@ -739,7 +739,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             <div className="px-5 py-4 space-y-3">
               <p className="text-xs text-gray-500 font-medium">담당 관리팀 직원을 선택하세요</p>
               <div className="flex flex-wrap gap-2">
-                {opsUserList.map(u => (
+                {opsUserList.filter(u => u.name !== 'ops-tester').map(u => (
                   <button key={u.id}
                     onClick={() => setOpsTransferModal(p => ({ ...p, opsUserId: u.id, opsUserName: u.name }))}
                     className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-colors ${
@@ -751,11 +751,11 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   </button>
                 ))}
               </div>
-              {opsUserList.length === 0 && (
-                <p className="text-xs text-gray-400 text-center py-2">등록된 관리팀 직원이 없습니다<br />(미배정으로 전송됩니다)</p>
+              {opsUserList.filter(u => u.name !== 'ops-tester').length === 0 && (
+                <p className="text-xs text-gray-400 text-center py-2">등록된 관리팀 직원이 없습니다</p>
               )}
             </div>
-            <div className="px-5 pb-5 flex gap-2">
+            <div className="px-5 pb-4 flex gap-2 relative">
               <button onClick={() => setOpsTransferModal({ customer: null, opsUserId: '', opsUserName: '' })}
                 className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50">
                 취소
@@ -763,14 +763,29 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               <button
                 onClick={async () => {
                   const { customer, opsUserId, opsUserName } = opsTransferModal
-                  if (!customer) return
+                  if (!customer || !opsUserId) return
                   setOpsTransferModal({ customer: null, opsUserId: '', opsUserName: '' })
-                  await doTransferToOps(customer, opsUserId || undefined, opsUserName || undefined)
+                  await doTransferToOps(customer, opsUserId, opsUserName)
                   showToast('✅ 자금팀 전송 완료!')
                 }}
-                className="flex-1 bg-amber-500 hover:bg-amber-600 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
-                📤 {opsTransferModal.opsUserId ? `${opsTransferModal.opsUserName}에게 전송` : '미배정으로 전송'}
+                disabled={!opsTransferModal.opsUserId}
+                className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
+                📤 {opsTransferModal.opsUserId ? `${opsTransferModal.opsUserName}에게 전송` : '담당자 선택 필요'}
               </button>
+            </div>
+            {/* 테스터 — 우측 하단 작게 */}
+            <div className="flex justify-end px-5 pb-4">
+              {opsUserList.filter(u => u.name === 'ops-tester').map(u => (
+                <button key={u.id}
+                  onClick={() => setOpsTransferModal(p => ({ ...p, opsUserId: u.id, opsUserName: u.name }))}
+                  className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
+                    opsTransferModal.opsUserId === u.id
+                      ? 'bg-gray-400 text-white border-gray-400'
+                      : 'text-gray-300 border-gray-200 hover:text-gray-500'
+                  }`}>
+                  테스터
+                </button>
+              ))}
             </div>
           </div>
         </div>
