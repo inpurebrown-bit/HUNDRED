@@ -31,6 +31,17 @@ interface OtherCost {
 // ── 상수 ──────────────────────────────────────────────────────────────────────
 const TESTER = 'TESTER'
 
+function rateGrade(rate: number | null, top: number) {
+  if (rate === null || rate === undefined) return { label: '—', cls: 'text-gray-400' }
+  if (rate >= top)        return { label: '🔥최상', cls: 'text-blue-600 font-bold' }
+  if (rate >= top - 5)    return { label: '✨우수', cls: 'text-cyan-600 font-bold' }
+  if (rate >= top - 10)   return { label: '✅양호', cls: 'text-emerald-600 font-bold' }
+  if (rate >= top - 15)   return { label: '📊보통', cls: 'text-amber-500 font-bold' }
+  if (rate >= top - 20)   return { label: '⚠️미흡', cls: 'text-orange-400 font-bold' }
+  if (rate >= top - 25)   return { label: '⚡부진', cls: 'text-orange-600 font-bold' }
+  return                         { label: '🚨위험', cls: 'text-red-500 font-bold' }
+}
+
 // 직책 제거 이름 정규화 (예: "손제후 수석팀장" → "손제후")
 function cleanName(s: string): string {
   return s.replace(/\s*(수석팀장|팀장|팀원|대리|과장|부장|차장|이사|수석|매니저|주임|사원).*/g, '').trim()
@@ -300,6 +311,9 @@ function EmpCard({
         <div className="bg-blue-50 rounded-xl py-2 text-center">
           <p className="text-[9px] text-blue-500">공급결제율</p>
           <p className="text-sm font-black text-blue-700">{fmtPct(supplyRate)}</p>
+          {supplyRate !== null && (
+            <p className={`text-[9px] mt-0.5 ${rateGrade(supplyRate, 40).cls}`}>{rateGrade(supplyRate, 40).label}</p>
+          )}
         </div>
         <div className="bg-violet-50 rounded-xl py-2 text-center">
           <p className="text-[9px] text-violet-500">직접결제율</p>
@@ -308,6 +322,9 @@ function EmpCard({
         <div className="bg-teal-50 rounded-xl py-2 text-center">
           <p className="text-[9px] text-teal-600">총결제율</p>
           <p className="text-sm font-black text-teal-700">{fmtPct(totalRate)}</p>
+          {totalRate !== null && (
+            <p className={`text-[9px] mt-0.5 ${rateGrade(totalRate, 30).cls}`}>{rateGrade(totalRate, 30).label}</p>
+          )}
         </div>
         <div className={`rounded-xl py-2 text-center ${dailyRec === 0 && supplyRate !== null ? 'bg-red-50' : 'bg-amber-50'}`}>
           <p className={`text-[9px] ${dailyRec === 0 && supplyRate !== null ? 'text-red-500' : 'text-amber-600'}`}>공급예정</p>
@@ -616,32 +633,64 @@ function PayRateSubView() {
   return (
     <div className="space-y-5 pb-8">
 
-      {/* ─── 이번달 계약 자동집계 (contractWeight 기준) ─── */}
+      {/* ─── 이번달 계약 자동집계 (compact) ─── */}
       {autoStats.length > 0 && (
-        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 rounded-2xl p-4">
-          <p className="text-[11px] font-bold text-emerald-700 mb-3">🤖 이번달 계약 자동집계</p>
-          <div className="flex gap-3 flex-wrap">
+        <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2.5 flex items-center gap-3 flex-wrap">
+          <span className="text-[10px] font-bold text-emerald-600 shrink-0">🤖 이번달 계약</span>
+          <div className="flex gap-2 flex-wrap flex-1">
             {autoStats.map(s => (
-              <div key={s.name} className="bg-white rounded-xl px-4 py-3 border border-emerald-100 text-center shadow-sm min-w-[80px]">
-                <p className="text-[10px] text-gray-400 mb-0.5">{s.name}</p>
-                <p className="text-2xl font-black text-emerald-700">
+              <div key={s.name} className="bg-white rounded-lg px-3 py-1.5 border border-emerald-100 flex items-center gap-1.5">
+                <span className="text-[10px] text-gray-400">{s.name}</span>
+                <span className="text-sm font-black text-emerald-700">
                   {s.contracted % 1 === 0 ? s.contracted : s.contracted.toFixed(1)}
-                  <span className="text-xs font-normal text-gray-400 ml-0.5">건</span>
-                </p>
+                </span>
+                <span className="text-[9px] text-gray-400">건</span>
               </div>
             ))}
             {autoStats.length > 1 && (
-              <div className="bg-emerald-600 rounded-xl px-4 py-3 text-center shadow-sm min-w-[80px]">
-                <p className="text-[10px] text-white/70 mb-0.5">합계</p>
-                <p className="text-2xl font-black text-white">
+              <div className="bg-emerald-600 rounded-lg px-3 py-1.5 flex items-center gap-1.5">
+                <span className="text-[10px] text-white/70">합계</span>
+                <span className="text-sm font-black text-white">
                   {paymentCount % 1 === 0 ? paymentCount : paymentCount.toFixed(1)}
-                  <span className="text-xs font-normal text-white/70 ml-0.5">건</span>
-                </p>
+                </span>
+                <span className="text-[9px] text-white/70">건</span>
               </div>
             )}
           </div>
         </div>
       )}
+
+      {/* ─── 👥 직원별 현황 (영업일기준보다 먼저) ─── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+        <h3 className="text-sm font-bold text-gray-800 mb-4">👥 직원별 현황</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {employees.filter(r => r.name !== TESTER).map((row, i) => (
+            <EmpCard
+              key={i} row={row} idx={i} we={we} tw={tw}
+              onChange={updateEmp} onRemove={removeEmp}
+              autoData={autoByPerson[cleanName(row.name)] || autoByPerson[row.name] || { supply_payment: 0, direct_count: 0, direct_payment: 0 }}
+            />
+          ))}
+        </div>
+        {employees.length >= 2 && (
+          <div className="mt-4 bg-[#1B2A45] rounded-2xl p-4 grid grid-cols-3 gap-3 text-white text-center">
+            <div>
+              <p className="text-[10px] text-white/50 mb-0.5">총 목표</p>
+              <p className="text-lg font-black">{totTarget}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-white/50 mb-0.5">총 결제</p>
+              <p className="text-lg font-black text-emerald-400">{totPayment}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-white/50 mb-0.5">공급결제율</p>
+              <p className="text-lg font-black text-blue-400">
+                {totSupRate !== null ? totSupRate.toFixed(1) + '%' : '—'}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* ─── 📈 영업일 기준 ─── */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
@@ -675,37 +724,6 @@ function PayRateSubView() {
       </div>
 
       {/* ─── 👥 직원별 현황 ─── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-        <h3 className="text-sm font-bold text-gray-800 mb-4">👥 직원별 현황</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {employees.filter(r => r.name !== TESTER).map((row, i) => (
-            <EmpCard
-              key={i} row={row} idx={i} we={we} tw={tw}
-              onChange={updateEmp} onRemove={removeEmp}
-              autoData={autoByPerson[cleanName(row.name)] || autoByPerson[row.name] || { supply_payment: 0, direct_count: 0, direct_payment: 0 }}
-            />
-          ))}
-        </div>
-        {employees.length >= 2 && (
-          <div className="mt-4 bg-[#1B2A45] rounded-2xl p-4 grid grid-cols-3 gap-3 text-white text-center">
-            <div>
-              <p className="text-[10px] text-white/50 mb-0.5">총 목표</p>
-              <p className="text-lg font-black">{totTarget}</p>
-            </div>
-            <div>
-              <p className="text-[10px] text-white/50 mb-0.5">총 결제</p>
-              <p className="text-lg font-black text-emerald-400">{totPayment}</p>
-            </div>
-            <div>
-              <p className="text-[10px] text-white/50 mb-0.5">공급결제율</p>
-              <p className="text-lg font-black text-blue-400">
-                {totSupRate !== null ? totSupRate.toFixed(1) + '%' : '—'}
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* ─── 저장 ─── */}
       <div className="flex items-center justify-end gap-3">
         {saveMsg && (

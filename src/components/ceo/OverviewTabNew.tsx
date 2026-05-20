@@ -224,7 +224,8 @@ interface MonthSectionProps {
   inProgressCount: number
   taxAmount: number
   employeeRows: EmployeeRow[]
-  revenueAmount?: number
+  salesRevenueAmount?: number
+  opsRevenueAmount?: number
 }
 
 function fmtKrw(n: number): string {
@@ -252,22 +253,21 @@ function MonthSection({
   inProgressCount,
   taxAmount,
   employeeRows,
-  revenueAmount = 0,
+  salesRevenueAmount = 0,
+  opsRevenueAmount = 0,
 }: MonthSectionProps) {
-  const vatAmount = Math.round(revenueAmount * 0.1)
+  const totalRevenue = salesRevenueAmount + opsRevenueAmount
 
   return (
     <section className="bg-white rounded-2xl border border-[#E8E2D4] overflow-hidden">
       <div className="px-5 py-4 border-b border-[#E8E2D4] flex items-center justify-between bg-gradient-to-r from-[#1B2A45]/3 to-transparent">
         <h2 className="font-bold text-[#1B2A45] text-base">{title}</h2>
-        <div className="flex items-center gap-3">
-          <span className="text-[11px] text-[#1B2A45]/40 bg-[#1B2A45]/5 px-2 py-1 rounded-lg">
-            계약 {(contractCount % 1 === 0 ? contractCount : contractCount.toFixed(1))}건
-          </span>
-        </div>
+        <span className="text-[11px] text-[#1B2A45]/40 bg-[#1B2A45]/5 px-2 py-1 rounded-lg">
+          계약 {(contractCount % 1 === 0 ? contractCount : contractCount.toFixed(1))}건
+        </span>
       </div>
 
-      {/* 직원별 현황 FIRST */}
+      {/* 직원별 현황 */}
       <div className="px-5 py-4 border-b border-[#E8E2D4]/60">
         <p className="text-[11px] font-bold text-[#1B2A45]/40 uppercase tracking-widest mb-3">직원별 현황</p>
         {loading ? <Skeleton className="h-32 w-full" /> : (
@@ -275,7 +275,7 @@ function MonthSection({
         )}
       </div>
 
-      {/* 영업일 기준 현황 SECOND */}
+      {/* 이달 집계 */}
       <div className="px-5 py-4">
         <p className="text-[11px] font-bold text-[#1B2A45]/40 uppercase tracking-widest mb-3">이달 집계</p>
         {loading ? (
@@ -284,17 +284,22 @@ function MonthSection({
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              { label: '진행중 건수', value: inProgressCount + '건', color: 'text-violet-600', bg: 'bg-violet-50' },
-              { label: '발생 매출', value: fmtKrw(revenueAmount), color: 'text-[#C5A258]', bg: 'bg-amber-50' },
-              { label: '발생 세금 (10%)', value: taxAmount > 0 ? fmtKrw(taxAmount) : '-', color: 'text-red-500', bg: 'bg-red-50' },
-              { label: '발생 부가세', value: vatAmount > 0 ? fmtKrw(vatAmount) : '-', color: 'text-orange-500', bg: 'bg-orange-50' },
-            ].map(s => (
-              <div key={s.label} className={`${s.bg} rounded-xl p-3`}>
-                <p className="text-[10px] text-[#1B2A45]/50 mb-1">{s.label}</p>
-                <p className={`text-lg font-black ${s.color}`}>{s.value}</p>
-              </div>
-            ))}
+            <div className="bg-[#1B2A45] rounded-xl p-3">
+              <p className="text-[10px] text-white/50 mb-1">영업팀 발생매출</p>
+              <p className="text-lg font-black text-white">{fmtKrw(salesRevenueAmount)}</p>
+            </div>
+            <div className="bg-emerald-700 rounded-xl p-3">
+              <p className="text-[10px] text-white/50 mb-1">관리팀 발생매출</p>
+              <p className="text-lg font-black text-white">{fmtKrw(opsRevenueAmount)}</p>
+            </div>
+            <div className="bg-violet-50 rounded-xl p-3">
+              <p className="text-[10px] text-[#1B2A45]/50 mb-1">진행중 건수</p>
+              <p className="text-lg font-black text-violet-600">{inProgressCount}건</p>
+            </div>
+            <div className="bg-red-50 rounded-xl p-3">
+              <p className="text-[10px] text-[#1B2A45]/50 mb-1">발생 세금 (10%)</p>
+              <p className="text-lg font-black text-red-500">{taxAmount > 0 ? fmtKrw(taxAmount) : '-'}</p>
+            </div>
           </div>
         )}
       </div>
@@ -508,12 +513,15 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
       !completedStages.includes(c.progress_stage ?? '')
   ).length
 
-  // Tax
-  const lastMonthRevRaw =
-    revenueData?.monthly?.find(m => {
-      const mmStr = String(lastMonth).padStart(2, '0') + '월'
-      return m.month === mmStr || m.month === lastMonthStr
-    })?.합계 ?? 0
+  // Last month revenue breakdown
+  const lastMonthRevEntry = revenueData?.monthly?.find(m => {
+    const mmStr = String(lastMonth).padStart(2, '0') + '월'
+    return m.month === mmStr || m.month === lastMonthStr
+  })
+  const lastMonthRevRaw   = lastMonthRevEntry?.합계 ?? 0
+  const lastMonthSalesRaw = lastMonthRevEntry?.영업팀 ?? 0
+  const lastMonthOpsRaw   = lastMonthRevEntry?.관리팀 ?? 0
+  const thisMonthSalesRaw = thisMonthRevEntry?.영업팀 ?? 0
   const thisMonthTax = Math.round(thisMonthRevRaw * 0.1)
   const lastMonthTax = Math.round(lastMonthRevRaw * 0.1)
 
@@ -624,95 +632,98 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
   return (
     <div className="space-y-5 pb-10">
 
-      {/* ══ 퀵 액션 카드 ══ */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {/* 오늘 보고 */}
-        <button
-          onClick={() => onNavigate?.('minutesreports')}
-          className="group bg-white hover:bg-[#1B2A45] border border-[#E8E2D4] hover:border-[#1B2A45] rounded-2xl p-4 text-left transition-all duration-200 hover:shadow-md"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xl">📝</span>
-            {!loading && <span className="text-[10px] bg-[#1B2A45]/8 group-hover:bg-white/20 text-[#1B2A45]/50 group-hover:text-white/70 px-2 py-0.5 rounded-full font-medium">보고탭 이동 →</span>}
-          </div>
-          <p className="text-[11px] text-[#1B2A45]/50 group-hover:text-white/50">오늘 보고</p>
-          {loading ? <Skeleton className="h-7 w-12 mt-1" /> : (
-            <p className="text-2xl font-black text-[#1B2A45] group-hover:text-white mt-0.5">{todayReports.length}<span className="text-sm font-medium ml-0.5">건</span></p>
-          )}
-        </button>
+      {/* ══ 퀵 액션 + 매출 카드 통합 행 ══ */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        {/* 좌측: 4개 퀵액션 카드 (2×2) */}
+        <div className="grid grid-cols-2 gap-2 flex-1">
+          {/* 오늘 보고 */}
+          <button
+            onClick={() => onNavigate?.('minutesreports')}
+            className="group bg-white hover:bg-[#1B2A45] border border-[#E8E2D4] hover:border-[#1B2A45] rounded-xl p-3 text-left transition-all duration-200 hover:shadow-md"
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-base">📝</span>
+              {!loading && <span className="text-[9px] bg-[#1B2A45]/8 group-hover:bg-white/20 text-[#1B2A45]/40 group-hover:text-white/60 px-1.5 py-0.5 rounded-full">→</span>}
+            </div>
+            <p className="text-[10px] text-[#1B2A45]/50 group-hover:text-white/50">오늘 보고</p>
+            {loading ? <Skeleton className="h-6 w-10 mt-0.5" /> : (
+              <p className="text-xl font-black text-[#1B2A45] group-hover:text-white mt-0.5">{todayReports.length}<span className="text-xs font-medium ml-0.5">건</span></p>
+            )}
+          </button>
 
-        {/* 오늘 일정 */}
-        <button
-          onClick={() => onNavigate?.('calendar')}
-          className="group bg-white hover:bg-[#1B2A45] border border-[#E8E2D4] hover:border-[#1B2A45] rounded-2xl p-4 text-left transition-all duration-200 hover:shadow-md"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xl">📅</span>
-            {!loading && <span className="text-[10px] bg-[#1B2A45]/8 group-hover:bg-white/20 text-[#1B2A45]/50 group-hover:text-white/70 px-2 py-0.5 rounded-full font-medium">캘린더 →</span>}
-          </div>
-          <p className="text-[11px] text-[#1B2A45]/50 group-hover:text-white/50">오늘 일정</p>
-          {loading ? <Skeleton className="h-7 w-12 mt-1" /> : (
-            <p className="text-2xl font-black text-[#1B2A45] group-hover:text-white mt-0.5">{todayEvents.length}<span className="text-sm font-medium ml-0.5">건</span></p>
-          )}
-        </button>
+          {/* 오늘 일정 */}
+          <button
+            onClick={() => onNavigate?.('calendar')}
+            className="group bg-white hover:bg-[#1B2A45] border border-[#E8E2D4] hover:border-[#1B2A45] rounded-xl p-3 text-left transition-all duration-200 hover:shadow-md"
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-base">📅</span>
+              {!loading && <span className="text-[9px] bg-[#1B2A45]/8 group-hover:bg-white/20 text-[#1B2A45]/40 group-hover:text-white/60 px-1.5 py-0.5 rounded-full">→</span>}
+            </div>
+            <p className="text-[10px] text-[#1B2A45]/50 group-hover:text-white/50">오늘 일정</p>
+            {loading ? <Skeleton className="h-6 w-10 mt-0.5" /> : (
+              <p className="text-xl font-black text-[#1B2A45] group-hover:text-white mt-0.5">{todayEvents.length}<span className="text-xs font-medium ml-0.5">건</span></p>
+            )}
+          </button>
 
-        {/* 영업팀 심사요청 */}
-        <button
-          onClick={() => onNavigate?.('sales', 'inspection')}
-          className="group bg-white hover:bg-amber-500 border border-amber-200 hover:border-amber-500 rounded-2xl p-4 text-left transition-all duration-200 hover:shadow-md"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xl">🔍</span>
-            {!loading && <span className="text-[10px] bg-amber-50 group-hover:bg-white/20 text-amber-600 group-hover:text-white/70 px-2 py-0.5 rounded-full font-medium">심사탭 →</span>}
-          </div>
-          <p className="text-[11px] text-amber-600 group-hover:text-white/70">영업팀 심사요청</p>
-          {loading ? <Skeleton className="h-7 w-12 mt-1" /> : (
-            <p className="text-2xl font-black text-amber-600 group-hover:text-white mt-0.5">
-              {allCustomers.filter((c: any) => c.details?.inspection_status === 'pending').length}
-              <span className="text-sm font-medium ml-0.5">건</span>
-            </p>
-          )}
-        </button>
+          {/* 심사요청 */}
+          <button
+            onClick={() => onNavigate?.('sales', 'inspection')}
+            className="group bg-white hover:bg-amber-500 border border-amber-200 hover:border-amber-500 rounded-xl p-3 text-left transition-all duration-200 hover:shadow-md"
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-base">🔍</span>
+              {!loading && <span className="text-[9px] bg-amber-50 group-hover:bg-white/20 text-amber-500 group-hover:text-white/60 px-1.5 py-0.5 rounded-full">→</span>}
+            </div>
+            <p className="text-[10px] text-amber-600 group-hover:text-white/70">심사요청</p>
+            {loading ? <Skeleton className="h-6 w-10 mt-0.5" /> : (
+              <p className="text-xl font-black text-amber-600 group-hover:text-white mt-0.5">
+                {allCustomers.filter((c: any) => c.details?.inspection_status === 'pending').length}
+                <span className="text-xs font-medium ml-0.5">건</span>
+              </p>
+            )}
+          </button>
 
-        {/* 영업팀 A/S요청 */}
-        <button
-          onClick={() => onNavigate?.('sales', 'as')}
-          className="group bg-white hover:bg-orange-500 border border-orange-200 hover:border-orange-500 rounded-2xl p-4 text-left transition-all duration-200 hover:shadow-md"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xl">🔧</span>
-            {!loading && <span className="text-[10px] bg-orange-50 group-hover:bg-white/20 text-orange-500 group-hover:text-white/70 px-2 py-0.5 rounded-full font-medium">A/S탭 →</span>}
-          </div>
-          <p className="text-[11px] text-orange-500 group-hover:text-white/70">영업팀 A/S요청</p>
-          {loading ? <Skeleton className="h-7 w-12 mt-1" /> : (
-            <p className="text-2xl font-black text-orange-500 group-hover:text-white mt-0.5">
-              {allCustomers.filter((c: any) => (c as any).details?.as_requested === true && !(c as any).details?.as_resolved).length}
-              <span className="text-sm font-medium ml-0.5">건</span>
-            </p>
-          )}
-        </button>
-      </div>
-
-      {/* ══ 매출 카드 ══ */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="bg-gradient-to-br from-[#1B2A45] to-[#2a3d5c] rounded-2xl p-5 text-white">
-          <p className="text-xs text-white/50 mb-1">영업팀 이달 매출</p>
-          {loading ? <Skeleton className="h-9 w-28 bg-white/20" /> : (
-            <p className="text-3xl font-black">{
-              (() => {
-                const salesRaw = thisMonthRevEntry?.영업팀 ?? 0
-                return salesRaw >= 10000 ? (salesRaw / 10000).toFixed(0) + '만원' : salesRaw > 0 ? salesRaw.toLocaleString() + '원' : '-'
-              })()
-            }</p>
-          )}
-          <p className="text-[11px] text-white/40 mt-1">영업팀 계약 기준</p>
+          {/* A/S요청 */}
+          <button
+            onClick={() => onNavigate?.('sales', 'as')}
+            className="group bg-white hover:bg-orange-500 border border-orange-200 hover:border-orange-500 rounded-xl p-3 text-left transition-all duration-200 hover:shadow-md"
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-base">🔧</span>
+              {!loading && <span className="text-[9px] bg-orange-50 group-hover:bg-white/20 text-orange-400 group-hover:text-white/60 px-1.5 py-0.5 rounded-full">→</span>}
+            </div>
+            <p className="text-[10px] text-orange-500 group-hover:text-white/70">A/S요청</p>
+            {loading ? <Skeleton className="h-6 w-10 mt-0.5" /> : (
+              <p className="text-xl font-black text-orange-500 group-hover:text-white mt-0.5">
+                {allCustomers.filter((c: any) => (c as any).details?.as_requested === true && !(c as any).details?.as_resolved).length}
+                <span className="text-xs font-medium ml-0.5">건</span>
+              </p>
+            )}
+          </button>
         </div>
-        <div className="bg-gradient-to-br from-emerald-700 to-emerald-600 rounded-2xl p-5 text-white">
-          <p className="text-xs text-white/50 mb-1">관리팀 이달 매출</p>
-          {loading ? <Skeleton className="h-9 w-28 bg-white/20" /> : (
-            <p className="text-3xl font-black">{thisMonthOpsDisplay}</p>
-          )}
-          <p className="text-[11px] text-white/40 mt-1">관리팀 진행 기준</p>
+
+        {/* 우측: 영업팀·관리팀 매출 카드 (세로 스택) */}
+        <div className="flex sm:flex-col gap-2 sm:w-40">
+          <div className="flex-1 sm:flex-none bg-gradient-to-br from-[#1B2A45] to-[#2a3d5c] rounded-xl p-3 text-white">
+            <p className="text-[10px] text-white/50 mb-1">영업팀 이달 매출</p>
+            {loading ? <Skeleton className="h-6 w-20 bg-white/20" /> : (
+              <p className="text-xl font-black leading-tight">{
+                (() => {
+                  const r = thisMonthSalesRaw
+                  return r >= 10000 ? (r / 10000).toFixed(0) + '만원' : r > 0 ? r.toLocaleString() + '원' : '-'
+                })()
+              }</p>
+            )}
+            <p className="text-[9px] text-white/30 mt-0.5">계약 기준</p>
+          </div>
+          <div className="flex-1 sm:flex-none bg-gradient-to-br from-emerald-700 to-emerald-600 rounded-xl p-3 text-white">
+            <p className="text-[10px] text-white/50 mb-1">관리팀 이달 매출</p>
+            {loading ? <Skeleton className="h-6 w-20 bg-white/20" /> : (
+              <p className="text-xl font-black leading-tight">{thisMonthOpsDisplay}</p>
+            )}
+            <p className="text-[9px] text-white/30 mt-0.5">진행 기준</p>
+          </div>
         </div>
       </div>
 
@@ -730,7 +741,8 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           inProgressCount={thisInProgress}
           taxAmount={thisMonthTax}
           employeeRows={thisMonthRows}
-          revenueAmount={thisMonthRevRaw}
+          salesRevenueAmount={thisMonthSalesRaw}
+          opsRevenueAmount={thisMonthOpsRaw}
         />
       </div>
 
@@ -743,7 +755,8 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           inProgressCount={lastInProgress}
           taxAmount={lastMonthTax}
           employeeRows={lastMonthRows}
-          revenueAmount={lastMonthRevRaw}
+          salesRevenueAmount={lastMonthSalesRaw}
+          opsRevenueAmount={lastMonthOpsRaw}
         />
       </div>
 
