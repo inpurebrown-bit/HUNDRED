@@ -43,7 +43,7 @@ const thisMonth = (): string => {
 // ─── 관리팀 계산 ─────────────────────────────────────────
 
 function calcOps(emp: OpsEmployee) {
-  const contractIncentive = Math.round(Number(emp.contract_revenue) * 0.5)
+  const contractIncentive = Math.round(Number(emp.contract_revenue) * 0.35)
   const feeIncentive = Math.round(Number(emp.fee_revenue) * 0.1)
   const beforeDeduction = Number(emp.base_salary) + contractIncentive + feeIncentive + Number(emp.performance_bonus) - Number(emp.deduction)
   const afterDeduction = Math.round(beforeDeduction * (1 - 0.033))
@@ -87,7 +87,8 @@ export default function PayrollTab() {
   })
 
   const [opsEmployees, setOpsEmployees] = useState<OpsEmployee[]>([
-    defaultOps(), defaultOps(), defaultOps(), defaultOps(),
+    { ...defaultOps(), name: '관리팀장', base_salary: 2000000 },
+    defaultOps(), defaultOps(), defaultOps(),
   ])
 
   const [salesEmployees, setSalesEmployees] = useState<SalesEmployee[]>([
@@ -240,7 +241,7 @@ export default function PayrollTab() {
                 <OpsRow label="계약금 매출(VAT제외)" values={opsEmployees.map(e => e.contract_revenue)} total={opsTotalContractRevenue}
                   isEditable onChange={(i,v) => updateOps(i,'contract_revenue',v)} />
                 {/* 계약 인센 */}
-                <OpsRow label="계약 인센(50%)" values={opsCalcs.map(c => c.contractIncentive)} total={opsTotalContractIncentive} />
+                <OpsRow label="계약 인센(35%)" values={opsCalcs.map(c => c.contractIncentive)} total={opsTotalContractIncentive} />
                 {/* 수수료 매출 */}
                 <OpsRow label="수수료 매출(VAT제외)" values={opsEmployees.map(e => e.fee_revenue)} total={opsTotalFeeRevenue}
                   isEditable onChange={(i,v) => updateOps(i,'fee_revenue',v)} />
