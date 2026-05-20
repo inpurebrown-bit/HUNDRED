@@ -948,7 +948,7 @@ function CustomerCard({
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>
-                <h2 className="font-bold text-[#1B2A45] text-sm">📤 관리팀 전송</h2>
+                <h2 className="font-bold text-[#1B2A45] text-sm">📤 자금팀 전송</h2>
                 <p className="text-[11px] text-gray-400 mt-0.5">{c.company || c.name}</p>
               </div>
               <button onClick={() => setQuickTransferOpen(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
@@ -985,7 +985,7 @@ function CustomerCard({
               </button>
               <button onClick={handleQuickTransfer} disabled={qtLoading}
                 className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
-                {qtLoading ? '전송중...' : '📤 관리팀 전송'}
+                {qtLoading ? '전송중...' : '📤 자금팀 전송'}
               </button>
             </div>
           </div>
@@ -1323,7 +1323,7 @@ function CustomerCard({
             }}
             className="mt-1.5 w-full text-[9px] bg-amber-500 hover:bg-amber-600 text-white rounded py-1 font-semibold transition-colors"
           >
-            📤 관리팀 전송
+            📤 자금팀 전송
           </button>
         )}
         {tabType === 'contracted' && isTransferred && (
@@ -1395,12 +1395,6 @@ function CustomerCard({
                       ↩ 직접
                     </button>
                   </>
-                )}
-                {onTransferToOps && tabType === 'contracted' && (
-                  <button type="button" onClick={() => { onTransferToOps(c); onExpand(null) }}
-                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-amber-500 text-white">
-                    📤 자금팀 전송
-                  </button>
                 )}
                 {/* DB 트레이드 */}
                 <div className="relative" ref={tradeRef}>

@@ -150,7 +150,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const [salesUserNames, setSalesUserNames] = useState<string[]>([])
   // 관리팀 직원 목록 (전송 담당자 배정용)
   const [opsUserList, setOpsUserList] = useState<{ id: string; name: string }[]>([])
-  // 관리팀 전송 모달 상태
+  // 자금팀 전송 모달 상태
   const [opsTransferModal, setOpsTransferModal] = useState<{ customer: Customer | null; opsUserId: string; opsUserName: string }>({
     customer: null, opsUserId: '', opsUserName: '',
   })
@@ -710,7 +710,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   // ── Render ────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#FAF8F3]">
-      {/* ── 관리팀 전송 담당자 선택 모달 ── */}
+      {/* ── 자금팀 전송 담당자 선택 모달 ── */}
       {opsTransferModal.customer && (
         <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4"
           onClick={e => { if (e.target === e.currentTarget) setOpsTransferModal({ customer: null, opsUserId: '', opsUserName: '' }) }}>
@@ -753,7 +753,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   if (!customer) return
                   setOpsTransferModal({ customer: null, opsUserId: '', opsUserName: '' })
                   await doTransferToOps(customer, opsUserId || undefined, opsUserName || undefined)
-                  showToast('✅ 관리팀 전송 완료!')
+                  showToast('✅ 자금팀 전송 완료!')
                 }}
                 className="flex-1 bg-amber-500 hover:bg-amber-600 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
                 📤 {opsTransferModal.opsUserId ? `${opsTransferModal.opsUserName}에게 전송` : '미배정으로 전송'}

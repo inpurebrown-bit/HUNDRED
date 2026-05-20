@@ -559,12 +559,12 @@ export default function CustomerCard({
                   </div>
                 </div>
 
-                {/* 관리팀 전송 */}
+                {/* 자금팀 전송 */}
                 <div className="flex flex-wrap items-center gap-3 pt-1">
                   {details.ops_transferred ? (
                     <>
                       <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-full text-xs font-semibold">
-                        ✅ 관리팀 전송 완료
+                        ✅ 자금팀 전송 완료
                       </span>
                       <div className="flex items-center gap-2">
                         <label className="text-xs text-gray-500">환불/취소</label>
