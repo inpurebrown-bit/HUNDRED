@@ -750,37 +750,6 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
       {/* ══ 공지사항 ══ */}
       <NoticeSection />
 
-      {/* ══ 공급기준표 ══ */}
-      <div className="bg-white rounded-2xl border border-[#E8E2D4] overflow-hidden">
-        <div className="px-5 py-3.5 border-b border-[#E8E2D4] flex items-center justify-between">
-          <h2 className="font-bold text-[#1B2A45] text-sm">📊 결제율 공급기준표</h2>
-          <span className="text-[10px] text-[#1B2A45]/40">영업일 기준 내일 공급 권장 수</span>
-        </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-[#FAF8F3]">
-              <th className="text-left px-5 py-2.5 text-xs font-semibold text-[#1B2A45]/50">기준 조건</th>
-              <th className="px-5 py-2.5 text-xs font-semibold text-[#C5A258] text-center">권장 공급 수</th>
-              <th className="px-5 py-2.5 text-xs font-semibold text-[#1B2A45]/40 text-center">비고</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#E8E2D4]/60">
-            {SUPPLY_RATE_TABLE.map(row => (
-              <tr key={row.condition} className={row.supply === 0 ? 'bg-red-50/40' : ''}>
-                <td className="px-5 py-3 text-sm text-[#1B2A45]">{row.condition}</td>
-                <td className={`px-5 py-3 text-center font-bold text-base ${row.supply === 0 ? 'text-red-500' : 'text-[#C5A258]'}`}>{row.supply}개</td>
-                <td className="px-5 py-3 text-center text-xs text-[#1B2A45]/40">
-                  {row.supply === 5 && row.minRate === null ? '초기 안정 공급' : row.supply === 6 ? '최대 공급' : row.supply === 0 ? '공급 중단' : ''}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="px-5 py-3 bg-[#FAF8F3] border-t border-[#E8E2D4]/60">
-          <p className="text-xs text-[#1B2A45]/50">※ 결제율 = 이달 계약건수 ÷ 금일 공급건수 × 100 | 영업일 2일차까지는 결제율 무관하게 5개 공급</p>
-        </div>
-      </div>
-
     </div>
   )
 }

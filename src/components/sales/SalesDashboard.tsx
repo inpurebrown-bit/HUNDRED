@@ -1066,37 +1066,6 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               )
             })()}
 
-            {/* 공급기준표 */}
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-                <h3 className="text-sm font-bold text-gray-700">📊 공급기준표</h3>
-                <span className="text-[10px] text-gray-400">결제율 기준 내일 공급 권장</span>
-              </div>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">기준</th>
-                    <th className="px-4 py-2.5 text-xs font-semibold text-[#C5A258] text-center">권장 공급</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {SUPPLY_RATE_TABLE.map(row => {
-                    const isActive = isActiveRow(row, contractRate, bizElapsed)
-                    return (
-                      <tr key={row.condition} className={isActive ? 'bg-amber-50' : ''}>
-                        <td className={`px-4 py-2.5 text-xs ${isActive ? 'font-bold text-amber-700' : 'text-gray-600'}`}>
-                          {isActive && <span className="mr-1">▶</span>}{row.condition}
-                        </td>
-                        <td className={`px-4 py-2.5 text-center font-bold ${row.supply === 0 ? 'text-red-500' : isActive ? 'text-amber-600 text-base' : 'text-gray-700'}`}>
-                          {row.supply}개
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-
             {/* 공지사항 */}
             {generalNotices.length > 0 ? (
               <div className="space-y-2">
