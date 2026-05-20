@@ -540,9 +540,29 @@ interface PersonSupply {
 type SupplyConfig = Record<string, PersonSupply>
 
 // ════════════════════════════════════════════════════════════════════════════════
+const DIARY_TESTER = 'TESTER'
+
+// 고객 배열에서 월별 인별 계약수 실시간 계산
+function buildLivePayMap(customers: Customer[], ym: string): Record<string, { supply: number; direct: number }> {
+  const map: Record<string, { supply: number; direct: number }> = {}
+  for (const c of customers) {
+    if (c.status !== 'contracted') continue
+    const contractMonth = ((c as any).details?.contract_date || (c as any).created_at || '').slice(0, 7)
+    if (contractMonth !== ym) continue
+    const name = ((c as any).details?.sales_user_name || '').trim()
+    if (!name || name === DIARY_TESTER) continue
+    const w = contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included)
+    const isDirectType = (c as any).status === 'db010' || !!(c as any).details?.db010_month
+    if (!map[name]) map[name] = { supply: 0, direct: 0 }
+    if (isDirectType) map[name].direct += w
+    else              map[name].supply += w
+  }
+  return map
+}
+
 //  영업일지: 월별 아카이브 뷰
 // ════════════════════════════════════════════════════════════════════════════════
-function SalesDiaryView() {
+function SalesDiaryView({ customers }: { customers: Customer[] }) {
   const [records, setRecords] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null)
@@ -558,6 +578,8 @@ function SalesDiaryView() {
   }, [])
 
   const thisMonth = new Date().toISOString().slice(0, 7)
+  // 이번달 실시간 계약수 맵 (contractWeight 기준)
+  const livePayMap = useMemo(() => buildLivePayMap(customers, thisMonth), [customers, thisMonth])
 
   if (loading) return (
     <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center text-gray-400 text-sm">
@@ -604,11 +626,15 @@ function SalesDiaryView() {
             {isOpen && emps.length > 0 && (
               <div className="border-t border-gray-100 px-5 py-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {emps.filter((e: any) => e.name).map((e: any, ei: number) => {
+                  {emps.filter((e: any) => e.name && e.name !== DIARY_TESTER).map((e: any, ei: number) => {
                     const ds = e.daily_supplies || {}
                     const supplyCount = Object.values(ds).reduce((s: number, v: any) => s + Number(v || 0), 0)
-                    const total = Number(e.supply_payment || 0) + Number(e.direct_payment || 0)
-                    const supplyRate = supplyCount > 0 ? (Number(e.supply_payment || 0) / supplyCount * 100) : null
+                    // 이번달: 실시간 contractWeight 값 우선, 과거달: 저장값
+                    const live = isCurrent ? livePayMap[e.name] : undefined
+                    const supplyPay = live ? Math.max(Number(e.supply_payment || 0), live.supply) : Number(e.supply_payment || 0)
+                    const directPay = live ? Math.max(Number(e.direct_payment || 0), live.direct) : Number(e.direct_payment || 0)
+                    const total = supplyPay + directPay
+                    const supplyRate = supplyCount > 0 ? (supplyPay / supplyCount * 100) : null
                     const achievePct = Number(e.target) > 0 ? Math.round(total / Number(e.target) * 100) : 0
                     const daysArr = Object.entries(ds).filter(([, v]) => Number(v) > 0)
 
@@ -639,6 +665,7 @@ function SalesDiaryView() {
                           <div className="bg-white rounded-lg py-1.5">
                             <p className="text-[8px] text-gray-400">공급결제율</p>
                             <p className="text-sm font-black text-blue-700">{supplyRate !== null ? supplyRate.toFixed(1) + '%' : '—'}</p>
+                            {isCurrent && live && <p className="text-[7px] text-blue-400 mt-0.5">실시간</p>}
                           </div>
                           <div className="bg-white rounded-lg py-1.5">
                             <p className="text-[8px] text-gray-400">목표</p>
@@ -1313,7 +1340,7 @@ export default function SalesCeoTab() {
       )}
 
       {/* ── 영업일지 뷰 ── */}
-      {ceoView === 'diary' && <SalesDiaryView />}
+      {ceoView === 'diary' && <SalesDiaryView customers={customers} />}
 
       {/* ── DB 이동 뷰 ── */}
       {ceoView === 'transfer' && (
@@ -1354,8 +1381,9 @@ export default function SalesCeoTab() {
         {personThisMonth.length === 0 ? (
           <p className="text-white/40 text-xs">등록된 영업사원 없음</p>
         ) : (
+          <>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-            {personThisMonth.map(p => (
+            {personThisMonth.filter(p => p.name !== 'TESTER').map(p => (
               <div key={p.name} className="bg-white/10 rounded-xl px-3 py-2.5">
                 <div className="flex items-center gap-1.5 mb-1">
                   <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-bold">{p.name.charAt(0)}</div>
@@ -1371,6 +1399,18 @@ export default function SalesCeoTab() {
               </div>
             ))}
           </div>
+          {/* TESTER 계정 — 테스트용, 별도 표시 */}
+          {personThisMonth.some(p => p.name === 'TESTER') && (
+            <div className="flex items-center gap-2 mt-1 opacity-40">
+              <span className="text-[9px] text-white/50 border border-white/20 rounded px-1.5 py-0.5">테스트 계정</span>
+              {personThisMonth.filter(p => p.name === 'TESTER').map(p => (
+                <span key={p.name} className="text-[9px] text-white/40">
+                  TESTER · 매출 {p.revenue > 0 ? fmtWon(p.revenue) : '—'} · 계약 {p.count % 1 === 0 ? p.count : p.count.toFixed(1)}건
+                </span>
+              ))}
+            </div>
+          )}
+          </>
         )}
 
         {/* 전체 합계 (부가 표시) */}
