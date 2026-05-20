@@ -21,20 +21,25 @@ const PIPELINE_STAGES = [
   { key: '진행중',     label: '진행중',     color: 'bg-blue-400'    },
   { key: '환불',       label: '환불',       color: 'bg-rose-500'    },
   { key: '종료',       label: '종료',       color: 'bg-neutral-400' },
+  { key: '환불예정',   label: '환불예정',   color: 'bg-rose-400'    },
+  { key: '종료예정',   label: '종료예정',   color: 'bg-orange-400'  },
 ]
 const OVERALL_STAGES = [
   { key: '서류받는중', label: '서류받는중', color: 'bg-gray-500'  },
   { key: '진행중',     label: '진행중',     color: 'bg-blue-500'  },
   { key: '홀딩',       label: '홀딩',       color: 'bg-slate-400' },
 ]
-const INST_DIRECT   = ['중진공','소진공(혁신)','소진공(신취)','소진공(재도전)','서민금융(미소)']
-const INST_INDIRECT = ['기보','신보','재단']
-const INDIRECT_SET  = new Set(INST_INDIRECT)
+const INST_DIRECT    = ['중진공','소진공(혁신)','소진공(신취)','소진공(재도전)','서민금융(미소)']
+const INST_INDIRECT  = ['기보','신보','재단']
+const INDIRECT_SET   = new Set(INST_INDIRECT)
 const ALL_INST_ORDER = [...INST_DIRECT, ...INST_INDIRECT]
 
-const ACTIVE_STAGE_KEYS    = new Set(['서류받는중','접수전','신청완료','반려보정','실사대기','실사완료','승인대기','승인','부결','입금전','홀딩','검토중','접수','진행중','assigned','absorbed','doc_collect','reviewing','approved','executing','rejected'])
+const ACTIVE_STAGE_KEYS    = new Set(['서류받는중','접수전','신청완료','반려보정','실사대기','실사완료','승인대기','승인','부결','입금전','홀딩','검토중','접수','진행중','assigned','absorbed','doc_collect','reviewing','approved','executing','rejected','환불예정','종료예정'])
 const REFUND_STAGE_KEYS    = new Set(['환불','refunded'])
 const COMPLETED_STAGE_KEYS = new Set(['종료','완료','completed'])
+const PENDING_REFUND_KEYS  = new Set(['환불예정'])
+const PENDING_DONE_KEYS    = new Set(['종료예정'])
+const NEWDB_STAGE_KEYS     = new Set(['new_db'])
 
 function formatKST(isoStr: string) {
   if (!isoStr) return { date: '', time: '' }
@@ -44,7 +49,13 @@ function formatKST(isoStr: string) {
   return { date, time }
 }
 
-// ─── Case Card (8-col grid) ───────────────────────────────
+function fmtMoney(n: number) {
+  if (n >= 100_000_000) return (n / 100_000_000).toFixed(1) + '억'
+  if (n >= 10_000) return Math.round(n / 10_000) + '만원'
+  return n.toLocaleString() + '원'
+}
+
+// ─── Case Card (grid) ─────────────────────────────────────
 function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle }: { c: OpsCase; isOpen: boolean; onToggle: (id: string) => void; onScriptToggle: (id: string, val: boolean) => void }) {
   const allStages     = [...PIPELINE_STAGES, ...OVERALL_STAGES]
   const companyName   = c.customers?.details?.company || c.customers?.name || '—'
@@ -73,7 +84,6 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle }: { c: OpsCase; isOp
       <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{c.customers?.phone}</p>
       {c.ops_user_name && <p className="text-[9px] text-violet-500 mt-0.5">{c.ops_user_name}</p>}
 
-      {/* 기관 항상 표시 */}
       {allInstitutions.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-0.5 justify-center">
           {allInstitutions.map(inst => (
@@ -84,7 +94,6 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle }: { c: OpsCase; isOp
         </div>
       )}
 
-      {/* 전체 진행단계 */}
       <div className="mt-1.5">
         {overallStage ? (
           <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold text-white ${overallStage.color}`}>{overallStage.label}</span>
@@ -93,7 +102,6 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle }: { c: OpsCase; isOp
         ) : null}
       </div>
 
-      {/* 직접자금 진행단계 */}
       {directStage && (
         <div className="mt-0.5">
           <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold text-white ${directInfo?.color || 'bg-blue-400'}`}>
@@ -101,8 +109,6 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle }: { c: OpsCase; isOp
           </span>
         </div>
       )}
-
-      {/* 간접자금 진행단계 */}
       {indirectStage && (
         <div className="mt-0.5">
           <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold text-white ${indirectInfo?.color || 'bg-violet-400'}`}>
@@ -111,7 +117,6 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle }: { c: OpsCase; isOp
         </div>
       )}
 
-      {/* 핸들링 배지 */}
       {(c.details?.handling_no_contact || c.details?.handling_no_fit || c.details?.handling_mindless) && (
         <div className="mt-0.5 flex flex-wrap gap-0.5 justify-center">
           {c.details?.handling_no_contact && <span className="text-[8px] bg-red-100 text-red-600 px-1 py-0.5 rounded font-bold">📵연락안됨</span>}
@@ -120,7 +125,12 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle }: { c: OpsCase; isOp
         </div>
       )}
 
-      {/* 스크립트 발송 체크 */}
+      {c.details?.is_holding && (
+        <div className="mt-0.5">
+          <span className="text-[8px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold">🔒홀딩</span>
+        </div>
+      )}
+
       <div className="mt-1.5 flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
         <input type="checkbox" id={`ceo-script-${c.id}`} checked={scriptSent}
           onChange={e => onScriptToggle(c.id, e.target.checked)}
@@ -134,7 +144,7 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle }: { c: OpsCase; isOp
   )
 }
 
-// ─── CaseListRow (환불/종료 리스트) ───────────────────────
+// ─── CaseListRow (환불/종료/신규DB 리스트) ────────────────
 function CeoCaseListRow({ c, isOpen, onToggle }: { c: OpsCase; isOpen: boolean; onToggle: (id: string) => void }) {
   const companyName = c.customers?.details?.company || c.customers?.name || '—'
   const stage = c.progress_stage || '—'
@@ -186,13 +196,17 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
+  const isHolding  = (c: OpsCase) => !!(c.details?.is_holding)
   const isHandling = (c: OpsCase) =>
     !!(c.details?.handling_no_contact || c.details?.handling_no_fit || c.details?.handling_mindless)
 
-  const handlingCases = cases.filter(c => isHandling(c))
-  const regularCases  = cases.filter(c => !isHandling(c))
+  // 승인 대기 (환불예정/종료예정) — 최상단 별도 그룹
+  const pendingCases  = cases.filter(c => PENDING_REFUND_KEYS.has(c.progress_stage) || PENDING_DONE_KEYS.has(c.progress_stage))
+  const holdingCases  = cases.filter(c => !PENDING_REFUND_KEYS.has(c.progress_stage) && !PENDING_DONE_KEYS.has(c.progress_stage) && isHolding(c))
+  const handlingCases = cases.filter(c => !PENDING_REFUND_KEYS.has(c.progress_stage) && !PENDING_DONE_KEYS.has(c.progress_stage) && !isHolding(c) && isHandling(c))
+  const regularCases  = cases.filter(c => !PENDING_REFUND_KEYS.has(c.progress_stage) && !PENDING_DONE_KEYS.has(c.progress_stage) && !isHolding(c) && !isHandling(c))
 
-  const instGroups = ALL_INST_ORDER.map(inst => ({
+  const instGroups: { inst: string; items: OpsCase[] }[] = ALL_INST_ORDER.map(inst => ({
     inst,
     items: regularCases.filter(c =>
       (c.institution || '').split(',').map((s: string) => s.trim()).includes(inst)
@@ -200,8 +214,10 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
   })).filter(g => g.items.length > 0)
 
   const unassigned = regularCases.filter(c => !c.institution || c.institution.trim() === '')
-  if (unassigned.length > 0) instGroups.unshift({ inst: '신규유입', items: unassigned })
+  if (unassigned.length > 0)    instGroups.unshift({ inst: '신규유입', items: unassigned })
   if (handlingCases.length > 0) instGroups.push({ inst: '🔧 핸들링', items: handlingCases })
+  if (holdingCases.length > 0)  instGroups.push({ inst: '🔒 홀딩', items: holdingCases })
+  if (pendingCases.length > 0)  instGroups.unshift({ inst: '⏳ 대표 승인 대기', items: pendingCases })
 
   if (instGroups.length === 0) {
     return <div className="bg-white rounded-xl border border-[#E8E2D4] p-12 text-center text-[#1B2A45]/40 text-sm">진행중인 업체가 없습니다</div>
@@ -211,15 +227,19 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
     <div className="space-y-4">
       {instGroups.map(({ inst, items }) => {
         const isIndirect = INDIRECT_SET.has(inst)
+        const isPending  = inst === '⏳ 대표 승인 대기'
+        const isHoldingG = inst === '🔒 홀딩'
         const isOpen = !collapsed[inst]
         return (
           <div key={inst}>
             <button onClick={() => setCollapsed(p => ({ ...p, [inst]: !p[inst] }))}
               className={`w-full flex items-center justify-between py-2.5 px-4 rounded-xl mb-2 transition-colors ${
-                isIndirect ? 'bg-violet-600 hover:bg-violet-700'
-                  : inst === '신규유입' ? 'bg-emerald-500 hover:bg-emerald-600'
-                  : inst === '🔧 핸들링' ? 'bg-slate-500 hover:bg-slate-600'
-                  : 'bg-[#1B2A45] hover:bg-[#1B2A45]/90'
+                isPending   ? 'bg-rose-500 hover:bg-rose-600'
+                : isHoldingG ? 'bg-indigo-600 hover:bg-indigo-700'
+                : isIndirect ? 'bg-violet-600 hover:bg-violet-700'
+                : inst === '신규유입'  ? 'bg-emerald-500 hover:bg-emerald-600'
+                : inst === '🔧 핸들링' ? 'bg-slate-500 hover:bg-slate-600'
+                : 'bg-[#1B2A45] hover:bg-[#1B2A45]/90'
               }`}>
               <div className="flex items-center gap-2">
                 <span className="text-white font-bold text-sm">{inst}</span>
@@ -242,11 +262,134 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
   )
 }
 
+// ─── CEO Ops Revenue View ──────────────────────────────────
+function CeoOpsRevenueView() {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  function load() {
+    setLoading(true)
+    fetch('/api/revenue')
+      .then(r => r.json())
+      .then(d => { setData(d); setLoading(false) })
+      .catch(() => setLoading(false))
+  }
+  useEffect(() => { load() }, [])
+
+  const now = new Date()
+  const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
+  const allEntries: { company: string; amount: number; date: string; userName: string }[] =
+    (data?.thisMonthOps || []).map((e: any) => ({
+      company: e.company || '—',
+      amount: e.amount || 0,
+      date: e.date || '',
+      userName: e.ops_user_name || '—',
+    }))
+  const totalThis = allEntries.reduce((s, e) => s + e.amount, 0)
+
+  // 담당자별 합산
+  const byUser: Record<string, number> = {}
+  allEntries.forEach(e => {
+    byUser[e.userName] = (byUser[e.userName] || 0) + e.amount
+  })
+
+  const monthly: { month: string; amount: number }[] = (data?.monthly || []).map((m: any) => ({
+    month: m.month,
+    amount: m.관리팀 || 0,
+  }))
+
+  if (loading) return <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
+
+  return (
+    <div className="max-w-2xl space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-bold text-[#1B2A45] text-base">💰 관리팀 매출 현황</h3>
+        <button onClick={load} className="text-xs bg-white border border-[#E8E2D4] text-[#1B2A45]/60 px-3 py-1.5 rounded-lg hover:border-[#1B2A45]/30">🔄 새로고침</button>
+      </div>
+
+      {/* 이달 총 */}
+      <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-5 text-white">
+        <p className="text-emerald-100 text-xs font-semibold mb-1">{now.getMonth() + 1}월 관리팀 수수료 수입 (전체)</p>
+        <p className="text-3xl font-black">{fmtMoney(totalThis)}</p>
+        <p className="text-emerald-200 text-xs mt-1">{allEntries.length}건</p>
+      </div>
+
+      {/* 담당자별 합산 */}
+      {Object.keys(byUser).length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <p className="text-xs font-bold text-gray-500">담당자별 이달 수수료</p>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {Object.entries(byUser).sort((a, b) => b[1] - a[1]).map(([name, amt]) => (
+              <div key={name} className="flex items-center justify-between px-4 py-3">
+                <span className="text-sm font-semibold text-[#1B2A45]">{name}</span>
+                <span className="text-base font-black text-emerald-600">{fmtMoney(amt)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 이달 건별 내역 */}
+      {allEntries.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <p className="text-xs font-bold text-gray-500">이달 수수료 내역 (전체)</p>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {allEntries.map((e, i) => (
+              <div key={i} className="flex items-center justify-between px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-[#1B2A45]">{e.company}</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">{e.userName}{e.date ? ` · ${e.date}` : ''}</p>
+                </div>
+                <span className="text-base font-black text-emerald-600">{fmtMoney(e.amount)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {allEntries.length === 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-gray-400 text-sm">이달 수수료 내역이 없습니다</div>
+      )}
+
+      {/* 월별 추이 */}
+      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100">
+          <p className="text-xs font-bold text-gray-500">월별 관리팀 수수료 추이</p>
+        </div>
+        <div className="p-4 space-y-2">
+          {monthly.map((m, i) => {
+            const max = Math.max(...monthly.map(x => x.amount), 1)
+            const pct = Math.round((m.amount / max) * 100)
+            const isCurrent = m.month === String(now.getMonth() + 1).padStart(2, '0') + '월'
+            return (
+              <div key={i} className="flex items-center gap-3">
+                <span className={`text-[11px] w-10 shrink-0 font-medium ${isCurrent ? 'text-emerald-600' : 'text-gray-400'}`}>{m.month}</span>
+                <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                  <div className={`h-full rounded-full ${isCurrent ? 'bg-emerald-500' : 'bg-teal-300'}`} style={{ width: pct + '%' }} />
+                </div>
+                <span className={`text-xs font-bold w-16 text-right ${isCurrent ? 'text-emerald-700' : 'text-gray-600'}`}>
+                  {m.amount > 0 ? fmtMoney(m.amount) : '—'}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Component ───────────────────────────────────────
+type OpsView = 'active' | 'refund' | 'completed' | 'newdb' | 'revenue'
+
 export default function OpsCeoTab() {
   const [cases, setCases] = useState<OpsCase[]>([])
   const [loading, setLoading] = useState(true)
-  const [view, setView] = useState<'active' | 'refund' | 'completed'>('active')
+  const [view, setView] = useState<OpsView>('active')
   const [search, setSearch] = useState('')
   const [openPanelIds, setOpenPanelIds] = useState<string[]>([])
   const [closingPanelIds, setClosingPanelIds] = useState<string[]>([])
@@ -267,11 +410,13 @@ export default function OpsCeoTab() {
 
   useEffect(() => { load() }, [])
 
+  // ⚡ details 머지 버그 수정: 패치 시 기존 details와 머지
   const handleSave = useCallback((id: string, patch: Record<string, any>) => {
     setCases(prev => prev.map(c => {
       if (c.id !== id) return c
+      const mergedDetails = patch.details ? { ...(c.details || {}), ...patch.details } : c.details
       const mergedTimeline = patch.timeline !== undefined ? patch.timeline : c.timeline
-      return { ...c, ...patch, timeline: mergedTimeline }
+      return { ...c, ...patch, details: mergedDetails, timeline: mergedTimeline }
     }))
     if (autoSaveTimers.current[id]) clearTimeout(autoSaveTimers.current[id])
     autoSaveTimers.current[id] = setTimeout(async () => {
@@ -283,7 +428,6 @@ export default function OpsCeoTab() {
     }, 1500)
   }, [])
 
-  // 패널 열리면 배경 스크롤 잠금
   useEffect(() => {
     if (openPanelIds.length > 0) {
       document.body.style.overflow = 'hidden'
@@ -300,15 +444,10 @@ export default function OpsCeoTab() {
       setClosingPanelIds(prev => prev.filter(x => x !== id))
     }, 300)
   }
-
   function closeAllPanels() {
     setClosingPanelIds([...openPanelIds])
-    setTimeout(() => {
-      setOpenPanelIds([])
-      setClosingPanelIds([])
-    }, 300)
+    setTimeout(() => { setOpenPanelIds([]); setClosingPanelIds([]) }, 300)
   }
-
   function togglePanel(id: string) {
     if (openPanelIds.includes(id)) {
       closePanel(id)
@@ -319,14 +458,12 @@ export default function OpsCeoTab() {
       })
     }
   }
-
   function handleScriptToggle(id: string, val: boolean) {
     const c = cases.find(x => x.id === id)
     if (!c) return
     handleSave(id, { details: { ...(c.details || {}), script_sent: val } })
   }
 
-  // 필터
   const q = search.trim().toLowerCase()
   const filtered = q
     ? cases.filter(c =>
@@ -337,20 +474,25 @@ export default function OpsCeoTab() {
       )
     : cases
 
-  const activeCases    = filtered.filter(c => ACTIVE_STAGE_KEYS.has(c.progress_stage) || (!REFUND_STAGE_KEYS.has(c.progress_stage) && !COMPLETED_STAGE_KEYS.has(c.progress_stage) && !c.is_refund && !c.is_completed))
+  const newdbCases     = filtered.filter(c => NEWDB_STAGE_KEYS.has(c.progress_stage))
+  const activeCases    = filtered.filter(c =>
+    !NEWDB_STAGE_KEYS.has(c.progress_stage) && (
+      ACTIVE_STAGE_KEYS.has(c.progress_stage) ||
+      (!REFUND_STAGE_KEYS.has(c.progress_stage) && !COMPLETED_STAGE_KEYS.has(c.progress_stage) && !c.is_refund && !c.is_completed)
+    )
+  )
   const refundCases    = filtered.filter(c => REFUND_STAGE_KEYS.has(c.progress_stage) || c.is_refund)
   const completedCases = filtered.filter(c => COMPLETED_STAGE_KEYS.has(c.progress_stage) || c.is_completed)
 
-  const viewCases = view === 'refund' ? refundCases : view === 'completed' ? completedCases : activeCases
-
-  // 통계
-  const totalRevenue = activeCases.reduce((s, c) => s + (c.revenue || 0), 0)
-
   const MENU = [
-    { key: 'active',    label: '진행중업체', count: activeCases.length },
-    { key: 'refund',    label: '환불업체',   count: refundCases.length },
-    { key: 'completed', label: '종료업체',   count: completedCases.length },
+    { key: 'active' as OpsView,    label: '🔄 진행중업체', count: activeCases.length },
+    { key: 'refund' as OpsView,    label: '💸 환불업체',   count: refundCases.length },
+    { key: 'completed' as OpsView, label: '✅ 종료업체',   count: completedCases.length },
+    { key: 'newdb' as OpsView,     label: '🆕 신규DB',     count: newdbCases.length },
+    { key: 'revenue' as OpsView,   label: '💰 매출현황',   count: null },
   ] as const
+
+  const viewCases = view === 'refund' ? refundCases : view === 'completed' ? completedCases : view === 'newdb' ? newdbCases : activeCases
 
   return (
     <div className="space-y-4 pb-8 max-w-5xl mx-auto">
@@ -369,38 +511,46 @@ export default function OpsCeoTab() {
           </div>
         </div>
         {/* 통계 */}
-        <div className="grid grid-cols-3 gap-3 mb-3">
-          <div className="bg-white/10 rounded-lg px-3 py-2 text-center">
-            <p className="text-white/50 text-[10px]">진행업체</p>
-            <p className="text-white font-black text-xl">{activeCases.length}</p>
+        <div className="grid grid-cols-4 gap-2 mb-3">
+          <div className="bg-white/10 rounded-lg px-2 py-2 text-center">
+            <p className="text-white/50 text-[9px]">진행업체</p>
+            <p className="text-white font-black text-lg">{activeCases.length}</p>
           </div>
-          <div className="bg-white/10 rounded-lg px-3 py-2 text-center">
-            <p className="text-white/50 text-[10px]">환불</p>
-            <p className="text-white font-black text-xl">{refundCases.length}</p>
+          <div className="bg-white/10 rounded-lg px-2 py-2 text-center">
+            <p className="text-white/50 text-[9px]">신규DB</p>
+            <p className="text-white font-black text-lg">{newdbCases.length}</p>
           </div>
-          <div className="bg-white/10 rounded-lg px-3 py-2 text-center">
-            <p className="text-white/50 text-[10px]">종료</p>
-            <p className="text-white font-black text-xl">{completedCases.length}</p>
+          <div className="bg-white/10 rounded-lg px-2 py-2 text-center">
+            <p className="text-white/50 text-[9px]">환불</p>
+            <p className="text-white font-black text-lg">{refundCases.length}</p>
+          </div>
+          <div className="bg-white/10 rounded-lg px-2 py-2 text-center">
+            <p className="text-white/50 text-[9px]">종료</p>
+            <p className="text-white font-black text-lg">{completedCases.length}</p>
           </div>
         </div>
         {/* 뷰 탭 */}
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 flex-wrap">
           {MENU.map(m => (
             <button key={m.key} onClick={() => setView(m.key)}
               className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
                 view === m.key ? 'bg-white text-[#1B2A45]' : 'bg-white/10 text-white/70 hover:bg-white/20'
               }`}>
               {m.label}
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                view === m.key ? 'bg-[#1B2A45] text-white' : 'bg-white/20 text-white'
-              }`}>{m.count}</span>
+              {m.count !== null && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                  view === m.key ? 'bg-[#1B2A45] text-white' : 'bg-white/20 text-white'
+                }`}>{m.count}</span>
+              )}
             </button>
           ))}
         </div>
       </div>
 
       {/* 목록 */}
-      {loading ? (
+      {view === 'revenue' ? (
+        <CeoOpsRevenueView />
+      ) : loading ? (
         <div className="text-center py-12 text-gray-400">불러오는 중...</div>
       ) : view === 'active' ? (
         <InstitutionGroupedView cases={activeCases} openPanelIds={openPanelIds} onToggle={togglePanel} onScriptToggle={handleScriptToggle} />
@@ -408,7 +558,7 @@ export default function OpsCeoTab() {
         <div className="space-y-2">
           {viewCases.length === 0 ? (
             <div className="bg-white rounded-xl border border-[#E8E2D4] p-12 text-center text-gray-400 text-sm">
-              {view === 'refund' ? '환불 업체가 없습니다' : '종료 업체가 없습니다'}
+              {view === 'refund' ? '환불 업체가 없습니다' : view === 'newdb' ? '신규 DB가 없습니다' : '종료 업체가 없습니다'}
             </div>
           ) : (
             viewCases.map(c => (
@@ -418,15 +568,12 @@ export default function OpsCeoTab() {
         </div>
       )}
 
-      {/* ── 배경 오버레이 ── */}
+      {/* 배경 오버레이 */}
       {openPanelIds.length > 0 && (
-        <div
-          className="fixed inset-0 bg-black/40 z-[99] transition-opacity duration-300"
-          onClick={closeAllPanels}
-        />
+        <div className="fixed inset-0 bg-black/40 z-[99] transition-opacity duration-300" onClick={closeAllPanels} />
       )}
 
-      {/* ── 우측 슬라이딩 패널 ── */}
+      {/* 우측 슬라이딩 패널 */}
       {openPanelIds.map((id, panelIndex) => {
         const c = cases.find(x => x.id === id)
         if (!c) return null
