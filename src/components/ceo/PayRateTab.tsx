@@ -418,18 +418,18 @@ function PayRateSubView() {
             const contractMonth  = (c.details?.contract_date || c.created_at || '').slice(0, 7)
             // 직가 등록월: db010_month 우선, 없으면 접수일, 없으면 created_at
             const receptionMonth = (c.details?.db010_month || c.details?.reception_date || c.created_at || '').slice(0, 7)
-            const isLead   = (c.status === 'lead' || c.status === 'consulting') && !c.details?.db010_month
-            const isDirect = c.status === 'db010' || !!c.details?.db010_month
+            // 계약 완료 시에도 원래 출처(공가/직가) 기준으로 분류
+            const isDirectType = c.status === 'db010' || !!c.details?.db010_month
 
             // 전체 계약 집계 (기존)
             if (c.status === 'contracted' && contractMonth === month) {
               const w = contractWeight(c.details?.payment_amount)
               byPerson[name] = (byPerson[name] || 0) + w
-              if (isLead)   supplyPayMap[name]  = (supplyPayMap[name]  || 0) + w
-              if (isDirect) directPayMap[name]  = (directPayMap[name]  || 0) + w
+              if (isDirectType) directPayMap[name] = (directPayMap[name] || 0) + w
+              else              supplyPayMap[name]  = (supplyPayMap[name] || 0) + w
             }
             // 직접수: 거절/삭제 이동해도 카운트 유지 (direct_count_voided=true일 때만 제외)
-            const isDirectMonth = isDirect && receptionMonth === month
+            const isDirectMonth = isDirectType && receptionMonth === month
             const isVoided = c.details?.direct_count_voided === true
             if (isDirectMonth && !isVoided) {
               directCntMap[name] = (directCntMap[name] || 0) + 1
@@ -741,6 +741,14 @@ export function PnlSubView() {
   const [dbUnitPrice,    setDbUnitPrice]    = useState(0)
   const [dbPurchaseCost, setDbPurchaseCost] = useState(0)
 
+  // 3개월 손익 비교
+  const [monthlyRevenue, setMonthlyRevenue] = useState<{ month: string; fullMonth: string; 영업팀: number; 관리팀: number; 관리팀계약: number; 합계: number }[]>([])
+  useEffect(() => {
+    fetch('/api/revenue').then(r => r.json()).then(j => {
+      if (j.monthly) setMonthlyRevenue(j.monthly)
+    }).catch(() => {})
+  }, [])
+
   const salesTotal       = salesEmps.reduce((s, e) => s + Number(e.sales_vat_incl), 0)
   const opsFeeTotal      = opsEmps.reduce((s, e) => s + Number(e.fee_vat_incl), 0)
   const opsContractTotal = opsEmps.reduce((s, e) => s + Number(e.contract_vat_incl), 0)
@@ -838,8 +846,55 @@ export function PnlSubView() {
     setOpsEmps(prev => { const n = [...prev]; n[i] = { ...n[i], [f]: f === 'name' ? v : Number(v) }; return n })
   }
 
+  // 월별 비교용 최근 3개월
+  const last3 = monthlyRevenue.slice(-3)
+
   return (
     <div className="space-y-5 pb-8">
+      {/* ── 월별 손익 3개월 비교 ── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5">
+        <h3 className="text-sm font-bold text-gray-800 mb-3">📊 월별 매출 3개월 비교</h3>
+        {last3.length === 0 ? (
+          <p className="text-xs text-gray-400">데이터 불러오는 중...</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-gray-50 text-[11px] text-gray-500 uppercase tracking-wide">
+                  <th className="px-3 py-2 text-left">구분</th>
+                  {last3.map(m => (
+                    <th key={m.fullMonth} className="px-3 py-2 text-right">
+                      {m.month}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { label: '영업팀 매출', key: '영업팀' as const, color: 'text-blue-700' },
+                  { label: '관리팀 수수료', key: '관리팀' as const, color: 'text-emerald-700' },
+                  { label: '관리팀 계약', key: '관리팀계약' as const, color: 'text-violet-700' },
+                  { label: '합계', key: '합계' as const, color: 'text-gray-900' },
+                ].map(row => (
+                  <tr key={row.key} className={`border-t border-gray-50 ${row.key === '합계' ? 'font-bold bg-gray-50' : ''}`}>
+                    <td className="px-3 py-2 text-xs text-gray-500">{row.label}</td>
+                    {last3.map(m => (
+                      <td key={m.fullMonth} className={`px-3 py-2 text-right text-xs ${row.color}`}>
+                        {m[row.key] > 0
+                          ? (m[row.key] >= 100000000
+                            ? (m[row.key] / 100000000).toFixed(1) + '억'
+                            : (m[row.key] / 10000).toFixed(0) + '만')
+                          : <span className="text-gray-300 text-[10px]">아직 매출 입력 전</span>}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       <div className="flex items-center justify-between">
         <p className="text-[11px] text-gray-400">{today}</p>
         <div className="flex items-center gap-3">

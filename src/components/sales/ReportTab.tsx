@@ -203,11 +203,18 @@ export default function ReportTab({ userId, userName }: Props) {
     return (!isNaN(amt) && amt > 0 && amt <= 330000) ? 0.5 : 1
   }
 
+  function cleanNameLocal(s: string): string {
+    return s.replace(/\s*(수석팀장|팀장|팀원|대리|과장|부장|차장|이사|수석|매니저|주임|사원).*/g, '').trim()
+  }
+
   const todayStr   = today()
   const monthStr   = todayStr.slice(0, 7)
   const myContracts = allCustomers.filter((c: any) => {
-    const owner = c.details?.sales_user_name || c.sales_user_name || ''
-    return c.status === 'contracted' && owner === userName
+    const owner = (c.details?.sales_user_name || c.sales_user_name || '').trim()
+    return c.status === 'contracted' && (
+      owner === userName ||
+      cleanNameLocal(owner) === cleanNameLocal(userName)
+    )
   })
   const autoTodayContracts = myContracts
     .filter((c: any) => (c.details?.contract_date || '').startsWith(todayStr))

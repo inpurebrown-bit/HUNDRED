@@ -108,6 +108,27 @@ export default function CalendarTab() {
   useEffect(() => { load() }, [year, month])
   useEffect(() => { if (!autoSyncing) load() }, [autoSyncing])
 
+  // 오늘 일정 있으면 브라우저 알림 (최초 1회, localStorage로 중복 방지)
+  useEffect(() => {
+    const todayEvents = events.filter(e => e.start_date <= todayStr && e.end_date >= todayStr)
+    if (todayEvents.length === 0) return
+    const lsKey = `cal-notif-${todayStr}`
+    if (typeof window !== 'undefined' && !localStorage.getItem(lsKey)) {
+      localStorage.setItem(lsKey, '1')
+      if ('Notification' in window && Notification.permission === 'granted') {
+        const titles = todayEvents.slice(0, 3).map(e => {
+          const t = e.start_time ? e.start_time.slice(0, 5) + ' ' : ''
+          return t + e.title
+        }).join(' · ')
+        new Notification(`📅 오늘 일정 ${todayEvents.length}건`, {
+          body: titles,
+          tag: 'calendar-today',
+        })
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events])
+
   async function submitEvent(e: FormEvent) {
     e.preventDefault()
     await fetch('/api/events', {

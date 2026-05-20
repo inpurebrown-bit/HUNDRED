@@ -430,7 +430,7 @@ export default function PayslipTab() {
     finally { setSaving(false) }
   }, [employees])
 
-  // 급여대장에서 매출 자동 불러오기
+  // 급여대장에서 매출 자동 불러오기 (없으면 고객 DB로 폴백)
   async function handleLoad() {
     setLoading(true)
     setMsg('')
@@ -438,6 +438,7 @@ export default function PayslipTab() {
       const res = await fetch(`/api/payroll?year_month=${yearMonth}`)
       const json = await res.json()
       if (json.record?.employees) {
+        // 급여대장 데이터 있음
         const emps = json.record.employees
         const allEmps: any[] = [
           ...(emps.ops_employees || []).map((e: any) => ({ ...e, team: 'ops' })),
@@ -446,7 +447,7 @@ export default function PayslipTab() {
         const updates: Record<string, Partial<EmpFinancial>> = {}
         for (const emp of allEmps) {
           if (!emp.name) continue
-          const match = employees.find(e => e.name === emp.name)
+          const match = employees.find(e => e.name === emp.name || e.name.startsWith(emp.name) || emp.name.startsWith(e.name))
           if (match) {
             const rev = Number(emp.contract_revenue || 0)
             updates[match.id] = {
@@ -462,9 +463,47 @@ export default function PayslipTab() {
           }
           return next
         })
-        setMsg('✅ 매출 불러오기 완료')
+        setMsg('✅ 급여대장에서 매출 불러오기 완료')
       } else {
-        setMsg('저장된 급여 데이터가 없습니다.')
+        // 폴백: 고객 DB에서 직접 계산
+        const custRes = await fetch('/api/customers')
+        const custJson = await custRes.json()
+        const custs: any[] = custJson.customers || []
+        const updates: Record<string, Partial<EmpFinancial>> = {}
+        employees.forEach(emp => {
+          const cleanN = (s: string) => s.replace(/\s*(수석팀장|팀장|팀원|대리|과장|부장|차장|이사|수석|매니저|주임|사원).*/g, '').trim()
+          const myContracts = custs.filter((c: any) =>
+            c.status === 'contracted' &&
+            ((c.details?.contract_date || '').slice(0, 7) === yearMonth) &&
+            (() => {
+              const owner = (c.details?.sales_user_name || c.sales_user_name || '').trim()
+              return owner === emp.name || cleanN(owner) === cleanN(emp.name)
+            })()
+          )
+          const revenue = myContracts.reduce((s: number, c: any) =>
+            s + (parseInt(String(c.details?.my_revenue || '0').replace(/[^0-9]/g, ''), 10) || 0), 0)
+          const count = myContracts.reduce((s: number, c: any) => {
+            const amt = Number(c.details?.payment_amount || 0)
+            return s + (amt <= 330000 && amt > 0 ? 0.5 : 1)
+          }, 0)
+          if (revenue > 0 || count > 0) {
+            const tier = getGalsuTier(count)
+            updates[emp.id] = {
+              ...(financials[emp.id] || DEFAULT_FINANCIAL),
+              revenue,
+              contract_count: count,
+              galsu_promo: tier ? tier.amount : 0,
+            }
+          }
+        })
+        setFinancials(prev => {
+          const next = { ...prev }
+          for (const [id, patch] of Object.entries(updates)) {
+            next[id] = { ...(next[id] || DEFAULT_FINANCIAL), ...patch }
+          }
+          return next
+        })
+        setMsg(Object.keys(updates).length > 0 ? '✅ 고객 DB에서 매출 불러오기 완료' : '이달 계약 데이터가 없습니다.')
       }
     } catch { setMsg('❌ 불러오기 실패') }
     finally { setLoading(false) }
@@ -676,7 +715,11 @@ export default function PayslipTab() {
                             </span>
                           </label>
                           <input type="number" value={currentFinancial.contract_count}
-                            onChange={e => updateFinancial({ contract_count: Number(e.target.value) })}
+                            onChange={e => {
+                              const cnt = Number(e.target.value)
+                              const tier = getGalsuTier(cnt)
+                              updateFinancial({ contract_count: cnt, galsu_promo: tier ? tier.amount : 0 })
+                            }}
                             className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
                         </div>
                         <div>

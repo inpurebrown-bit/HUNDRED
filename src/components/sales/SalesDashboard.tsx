@@ -50,7 +50,7 @@ const MONTHLY_GOALS: Record<string, number> = {
 // All sales users for assignee dropdown (legacy — replaced by dynamic salesUserNames)
 const SALES_USERS: string[] = []
 
-type SalesTab = 'board' | 'db010' | 'customers' | 'contracted' | 'emotional' | 'trash' | 'revenue' | 'report' | 'profile'
+type SalesTab = 'board' | 'db010' | 'customers' | 'contracted' | 'emotional' | 'trash' | 'deleted' | 'revenue' | 'report' | 'profile'
 
 // ── Component ──────────────────────────────────────────────────────────
 export default function SalesDashboard({ userId, userName, username }: Props) {
@@ -297,10 +297,22 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   }, [])
 
   const deleteCustomer = useCallback(async (id: string) => {
-    if (!confirm('삭제하시겠습니까?')) return
-    await fetch(`/api/customers/${id}`, { method: 'DELETE' })
-    setCustomers(prev => prev.filter(c => c.id !== id))
-  }, [])
+    if (!confirm('삭제하시겠습니까?\n(삭제DB 탭에 보관됩니다)')) return
+    // 소프트 삭제: status=trash + employee_deleted 플래그
+    const todayIso = new Date().toISOString().slice(0, 10)
+    await fetch(`/api/customers/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: 'trash',
+        details: { employee_deleted: true, deleted_at: todayIso, deleted_by: userName },
+      }),
+    })
+    setCustomers(prev => prev.map(c => c.id === id
+      ? { ...c, status: 'trash', details: { ...(c.details || {}), employee_deleted: true, deleted_at: todayIso, deleted_by: userName } }
+      : c
+    ))
+  }, [userName])
 
   const updateCustomer = useCallback(async (id: string, patch: Record<string, any>) => {
     await patchCustomer(id, patch)
@@ -569,7 +581,8 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const activeCustomers = customers.filter(c => ['lead', 'consulting'].includes(c.status))
   const contractedCustomers = customers.filter(c => c.status === 'contracted')
   const emotionalCustomers = customers.filter(c => c.status === 'emotional')
-  const trashCustomers = customers.filter(c => c.status === 'trash')
+  const trashCustomers = customers.filter(c => c.status === 'trash' && !(c as any).details?.employee_deleted)
+  const deletedCustomers = customers.filter(c => c.status === 'trash' && !!(c as any).details?.employee_deleted)
   // 매출: 계약 상태인 모든 고객 (ops 전송 여부 무관)
   const revenueCustomers = customers.filter(c => c.status === 'contracted')
 
@@ -649,6 +662,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
     { key: 'contracted', label: '✅ 계약 업체',   count: contractedCustomers.length },
     { key: 'emotional',  label: '💬 감성톡(거절업체)',      count: emotionalCustomers.length },
     { key: 'trash',      label: '🗑 자체거절',    count: trashCustomers.length },
+    { key: 'deleted',    label: '🗂 삭제DB',      count: deletedCustomers.length },
     { key: 'revenue',    label: '💰 매출',        count: revenueCustomers.length },
     { key: 'report',     label: '📝 보고' },
     { key: 'profile',    label: '👤 사원정보' },
@@ -848,7 +862,18 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               const pr = myPayrateRow
               const ds = pr?.daily_supplies || {}
               const supCnt    = Object.values(ds).reduce((s: number, v: any) => s + Number(v || 0), 0)
-              const supPay    = Number(pr?.supply_payment ?? 0)
+              // 공급결제: 공가 출신 계약 완료 건 실시간 집계 (dirPayAuto 방식 동일)
+              const supPayAuto = customers
+                .filter(c => {
+                  const isDirectType = c.status === 'db010' || !!(c as any).details?.db010_month
+                  const cMonth = ((c as any).details?.contract_date || '').slice(0, 7)
+                  return !isDirectType && c.status === 'contracted' && cMonth === thisMonth
+                })
+                .reduce((sum, c) => {
+                  const amt = Number((c as any).details?.payment_amount || 0)
+                  return sum + (amt > 0 && amt <= 330000 ? 0.5 : 1)
+                }, 0)
+              const supPay = supPayAuto > 0 ? supPayAuto : Number(pr?.supply_payment ?? 0)
               // 직접수: 저장된 값 말고 customers DB에서 이번달 db010 실시간 카운트
               // 직접수: db010_month(신규) 또는 접수일/등록일 기준 — 거절/삭제 이동 후에도 카운트 유지
               const dirCntAuto = customers.filter(c => {
@@ -1259,6 +1284,57 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
           </div>
         )}
 
+        {/* ══════════ 직원 삭제DB ══════════ */}
+        {activeTab === 'deleted' && (
+          <div className="space-y-3">
+            <div className="bg-gradient-to-r from-[#1B2A45] to-gray-700 rounded-xl px-5 py-3.5">
+              <h2 className="text-sm font-bold text-white">🗂 직원 삭제DB</h2>
+              <p className="text-white/50 text-[11px] mt-0.5">총 {deletedCustomers.length}건 · 직원이 삭제 처리한 업체</p>
+            </div>
+            <p className="text-xs text-gray-400 bg-gray-50 border border-gray-100 rounded-lg px-4 py-2">
+              직원이 삭제 버튼으로 처리한 업체입니다. 복구 시 상태 변경 메뉴를 사용하세요.
+            </p>
+            {loading ? (
+              <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
+            ) : deletedCustomers.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
+                삭제된 업체가 없습니다.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {deletedCustomers.map(c => {
+                  const d = (c as any).details || {}
+                  return (
+                    <div key={c.id} className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{d.company || c.company || c.name || '(업체명 없음)'}</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                          {c.name} · {c.phone}
+                          {d.deleted_by && <span className="ml-2 text-red-400">삭제: {d.deleted_by}</span>}
+                          {d.deleted_at && <span className="ml-1 text-gray-300">({d.deleted_at})</span>}
+                        </p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          await fetch(`/api/customers/${c.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ status: 'lead', details: { employee_deleted: false } }),
+                          })
+                          loadAll()
+                        }}
+                        className="shrink-0 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg font-medium transition-colors"
+                      >
+                        복구
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ══════════ 매출 ══════════ */}
         {activeTab === 'revenue' && (
           <div className="space-y-4">
@@ -1270,11 +1346,12 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             {/* ── 이번달 요약 카드 ── */}
             <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">📅 {thisMonth} 이번달</p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                 {[
                   { label: '계약 갯수', value: thisMonthContractCount % 1 === 0 ? `${thisMonthContractCount}개` : `${thisMonthContractCount.toFixed(1)}개`, color: 'text-[#C5A258]' },
                   { label: '본인 매출', value: fmtWon(thisMonthTotalRevenue), color: 'text-emerald-600' },
-                  { label: '총 입금액', value: fmtWon(thisMonthTotalPaid), color: 'text-sky-600' },
+                  { label: '입금액(VAT포함)', value: fmtWon(thisMonthTotalPaid), color: 'text-sky-600' },
+                  { label: '입금액(부가세제외)', value: thisMonthTotalPaid > 0 ? fmtWon(Math.round(thisMonthTotalPaid / 1.1)) : '—', color: 'text-blue-600' },
                   { label: '취소건수', value: `${cancelledCount}건`, color: 'text-red-500' },
                 ].map(s => (
                   <div key={s.label} className="bg-gray-50 rounded-lg px-3 py-2 text-center">
@@ -1322,6 +1399,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                           const cancelled = c.details?.is_cancelled
                           const weight = contractWeight((c as any).details?.payment_amount)
                           const payAmt = pNum((c as any).details?.payment_amount)
+                          const payAmtVatExcl = payAmt > 0 ? Math.round(payAmt / 1.1) : 0
                           const myRev  = pNum((c as any).details?.my_revenue)
                           const fee    = pNum((c as any).details?.contract_fee)
                           return (
@@ -1345,14 +1423,18 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                                   }
                                 </div>
                               </div>
-                              <div className={`grid grid-cols-3 gap-2 mt-2 text-[11px] ${cancelled ? 'opacity-40' : ''}`}>
+                              <div className={`grid grid-cols-4 gap-2 mt-2 text-[11px] ${cancelled ? 'opacity-40' : ''}`}>
                                 <div className="bg-gray-50 rounded-lg px-2 py-1.5">
                                   <p className="text-[9px] text-gray-400 mb-0.5">계약금</p>
                                   <p className="font-semibold text-gray-700">{fee > 0 ? fmtWon(fee) : '—'}</p>
                                 </div>
                                 <div className="bg-sky-50 rounded-lg px-2 py-1.5">
-                                  <p className="text-[9px] text-gray-400 mb-0.5">입금액</p>
+                                  <p className="text-[9px] text-gray-400 mb-0.5">입금액(VAT포함)</p>
                                   <p className="font-semibold text-sky-700">{payAmt > 0 ? fmtWon(payAmt) : '—'}</p>
+                                </div>
+                                <div className="bg-blue-50 rounded-lg px-2 py-1.5">
+                                  <p className="text-[9px] text-gray-400 mb-0.5">입금액(부가세제외)</p>
+                                  <p className="font-semibold text-blue-700">{payAmtVatExcl > 0 ? fmtWon(payAmtVatExcl) : '—'}</p>
                                 </div>
                                 <div className="bg-emerald-50 rounded-lg px-2 py-1.5">
                                   <p className="text-[9px] text-gray-400 mb-0.5">본인 매출</p>

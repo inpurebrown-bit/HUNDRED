@@ -859,7 +859,7 @@ export default function SalesCeoTab() {
   // ── 이번달 / 저번달 매출 · 계약 수 ──────────────────────
   const thisMonthContracted = useMemo(() =>
     customers.filter(c => c.status === 'contracted' &&
-      ((c as any).details?.contract_date || c.created_at || '').slice(0, 7) === thisMonthStr),
+      ((c as any).details?.contract_date || '').slice(0, 7) === thisMonthStr),
   [customers, thisMonthStr])
 
   const lastMonthContracted = useMemo(() =>
