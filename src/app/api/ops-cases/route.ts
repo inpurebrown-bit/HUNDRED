@@ -186,7 +186,7 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
   const user = session.user as any
-  if (user.role !== 'sales' && user.role !== 'ceo') {
+  if (user.role !== 'sales' && user.role !== 'ceo' && user.role !== 'ops') {
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
 

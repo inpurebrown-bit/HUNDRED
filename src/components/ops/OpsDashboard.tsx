@@ -1949,15 +1949,64 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
 // ──────────────────────────────────────────────────────────────────────
 // OpsNewDbTab (신규DB - 대표에게 배정받은 뿌토 DB)
 // ──────────────────────────────────────────────────────────────────────
-function OpsNewDbTab({ cases, userName, onSave }: {
+function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
   cases: OpsCase[]
   userName: string
   onSave: (id: string, patch: Record<string, any>) => void
+  onAdded?: () => void
 }) {
   const [contractingCase, setContractingCase] = useState<OpsCase | null>(null)
   const [form, setForm] = useState({ institution: '', contract_amount: '', stage: '서류받는중', memo: '' })
   const [saving, setSaving] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
+  // 직접 추가 모달
+  const [addModal, setAddModal] = useState(false)
+  const [addForm, setAddForm] = useState({ company: '', name: '', phone: '', memo: '' })
+  const [addSaving, setAddSaving] = useState(false)
+
+  async function handleAddDb() {
+    if (!addForm.company.trim()) return
+    setAddSaving(true)
+    try {
+      // 고객 생성
+      const custRes = await fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: addForm.name || addForm.company,
+          phone: addForm.phone || '00000000000',
+          status: 'lead',
+          details: { company: addForm.company, ops_user_name: userName },
+        }),
+      })
+      const custData = custRes.ok ? await custRes.json() : null
+      const customerId = custData?.customer?.id || custData?.id || null
+
+      // ops_case 생성 (stage: new_db)
+      await fetch('/api/ops-cases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_name: addForm.company,
+          phone: addForm.phone || '00000000000',
+          customer_id: customerId,
+          stage: 'new_db',
+          ops_user_name: userName,
+          details: {
+            ops_user_name: userName,
+            company: addForm.company,
+            ...(addForm.memo ? { ops_add_memo: addForm.memo } : {}),
+          },
+          timeline: [{ user: userName, content: `신규DB 직접 추가: ${addForm.company}`, created_at: nowKST() }],
+        }),
+      })
+      setAddForm({ company: '', name: '', phone: '', memo: '' })
+      setAddModal(false)
+      onAdded?.()
+    } finally {
+      setAddSaving(false)
+    }
+  }
 
   function openContractModal(c: OpsCase) {
     setContractingCase(c)
@@ -2099,14 +2148,70 @@ function OpsNewDbTab({ cases, userName, onSave }: {
         </div>
       )}
 
+      {/* 직접 추가 모달 */}
+      {addModal && (
+        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4"
+          onClick={e => { if (e.target === e.currentTarget) setAddModal(false) }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="bg-gradient-to-r from-[#1B2A45] to-emerald-700 px-5 py-4 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-white text-sm">➕ 신규DB 직접 추가</h3>
+                <p className="text-white/60 text-xs mt-0.5">내가 발굴한 DB를 직접 등록합니다</p>
+              </div>
+              <button onClick={() => setAddModal(false)} className="text-white/60 hover:text-white text-lg">✕</button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 mb-1 block">🏢 업체명 *</label>
+                <input type="text" value={addForm.company} onChange={e => setAddForm(p => ({ ...p, company: e.target.value }))}
+                  placeholder="업체명 입력" autoFocus
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400" />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 mb-1 block">👤 대표자명</label>
+                <input type="text" value={addForm.name} onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))}
+                  placeholder="대표자명 (선택)"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400" />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 mb-1 block">📞 연락처</label>
+                <input type="tel" value={addForm.phone} onChange={e => setAddForm(p => ({ ...p, phone: autoHyphenPhone(e.target.value) }))}
+                  placeholder="010-0000-0000 (선택)"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400" />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 mb-1 block">📝 메모</label>
+                <textarea value={addForm.memo} onChange={e => setAddForm(p => ({ ...p, memo: e.target.value }))}
+                  rows={2} placeholder="특이사항 (선택)"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-400 resize-none" />
+              </div>
+            </div>
+            <div className="px-5 pb-5 flex gap-2">
+              <button onClick={() => setAddModal(false)}
+                className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50">취소</button>
+              <button onClick={handleAddDb} disabled={addSaving || !addForm.company.trim()}
+                className="flex-1 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
+                {addSaving ? '추가 중...' : '✅ 추가하기'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 헤더 */}
       <div className="bg-gradient-to-r from-[#1B2A45] to-sky-700 rounded-xl px-5 py-4 text-white">
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="font-bold text-base">🆕 신규DB (뿌토)</h2>
-            <p className="text-white/60 text-xs mt-0.5">대표로부터 배정받은 DB · 계약 처리 시 진행중업체로 자동 이동</p>
+            <p className="text-white/60 text-xs mt-0.5">배정받은 DB · 계약 처리 시 진행중업체로 자동 이동</p>
           </div>
-          <span className="bg-white/20 text-white font-black text-xl px-4 py-1.5 rounded-xl">{cases.length}</span>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setAddModal(true)}
+              className="bg-emerald-500 hover:bg-emerald-400 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">
+              ➕ 직접 추가
+            </button>
+            <span className="bg-white/20 text-white font-black text-xl px-4 py-1.5 rounded-xl">{cases.length}</span>
+          </div>
         </div>
       </div>
 
@@ -2419,23 +2524,22 @@ interface OpsDailyReport {
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// OpsRevenueTab (관리팀 매출 현황)
+// OpsRevenueTab (개인 매출 현황 — 수수료 + 계약)
 // ──────────────────────────────────────────────────────────────────────
 function OpsRevenueTab({ userName }: { userName: string }) {
-  const [data, setData] = useState<any>(null)
+  const [data, setData]     = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [revenueTab, setRevenueTab] = useState<'fee' | 'contract'>('fee')
 
-  useEffect(() => {
+  function load() {
+    setLoading(true)
     fetch('/api/revenue')
       .then(r => r.json())
       .then(d => { setData(d); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [])
-
-  function parseMoney(v: any) {
-    if (!v) return 0
-    return parseInt(String(v).replace(/[^0-9]/g, ''), 10) || 0
   }
+  useEffect(() => { load() }, [])
+
   function fmtMoney(n: number) {
     if (n >= 100_000_000) return (n / 100_000_000).toFixed(1) + '억'
     if (n >= 10_000) return Math.round(n / 10_000) + '만원'
@@ -2443,98 +2547,173 @@ function OpsRevenueTab({ userName }: { userName: string }) {
   }
 
   const now = new Date()
-  const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const monthLabel = now.getMonth() + 1
 
-  // 이달 내 수수료 건 목록 (본인 것만)
-  const myEntries: { company: string; amount: number; date: string }[] = []
-  if (data?.thisMonthOps) {
-    for (const e of data.thisMonthOps) {
-      if (!e.ops_user_name || e.ops_user_name === userName || !userName) {
-        myEntries.push({ company: e.company || '—', amount: e.amount, date: e.date || '' })
-      }
-    }
-  }
-  const myTotal = myEntries.reduce((s, e) => s + e.amount, 0)
+  const matchMe = (e: any) => !e.ops_user_name || e.ops_user_name === userName || !userName
 
-  // 월별 내 매출 (최근 6개월)
-  const monthly: { month: string; amount: number }[] = (data?.monthly || []).map((m: any) => ({
+  // 수수료 매출
+  const feeEntries: { company: string; amount: number; date: string }[] =
+    (data?.thisMonthOps || []).filter(matchMe).map((e: any) => ({
+      company: e.company || '—', amount: e.amount, date: e.date || '',
+    }))
+  const feeTotal = feeEntries.reduce((s, e) => s + e.amount, 0)
+
+  // 계약 매출
+  const contractEntries: { company: string; amount: number; date: string; type: string }[] =
+    (data?.thisMonthOpsContracts || []).filter(matchMe).map((e: any) => ({
+      company: e.company || '—', amount: e.amount, date: e.date || '', type: e.type || '',
+    }))
+  const contractTotal = contractEntries.reduce((s, e) => s + e.amount, 0)
+
+  const totalAll = feeTotal + contractTotal
+
+  // 월별 추이
+  const monthly = (data?.monthly || []).map((m: any) => ({
     month: m.month,
-    amount: m.관리팀 || 0,
+    fee: m.관리팀 || 0,
+    contract: m.관리팀계약 || 0,
+    total: (m.관리팀 || 0) + (m.관리팀계약 || 0),
   }))
 
-  if (loading) return (
-    <div className="text-center py-16 text-[#1B2A45]/40 text-sm">불러오는 중...</div>
-  )
+  if (loading) return <div className="text-center py-16 text-[#1B2A45]/40 text-sm animate-pulse">불러오는 중...</div>
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
+
+      {/* 타이틀 + 새로고침 */}
       <div className="flex items-center justify-between">
-        <h2 className="font-bold text-[#1B2A45] text-base">💰 관리팀 매출 현황</h2>
-        <button onClick={() => {
-          setLoading(true)
-          fetch('/api/revenue').then(r => r.json()).then(d => { setData(d); setLoading(false) }).catch(() => setLoading(false))
-        }} className="text-xs bg-white border border-[#E8E2D4] text-[#1B2A45]/60 px-3 py-1.5 rounded-lg hover:border-[#1B2A45]/30 transition-colors">
+        <div>
+          <h2 className="font-black text-[#1B2A45] text-lg">{userName || '—'} 매출 현황</h2>
+          <p className="text-xs text-gray-400 mt-0.5">{now.getFullYear()}년 {monthLabel}월</p>
+        </div>
+        <button onClick={load}
+          className="flex items-center gap-1.5 text-xs bg-white border border-[#E8E2D4] text-[#1B2A45]/60 px-3 py-1.5 rounded-lg hover:border-[#1B2A45]/30 transition-colors">
           🔄 새로고침
         </button>
       </div>
 
-      {/* 이달 총 매출 강조 블록 */}
-      <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-5 text-white">
-        <p className="text-emerald-100 text-xs font-semibold mb-1">{now.getMonth() + 1}월 관리팀 수수료 수입</p>
-        <p className="text-3xl font-black tracking-tight">{fmtMoney(myTotal)}</p>
-        <p className="text-emerald-200 text-xs mt-1">{myEntries.length}건</p>
+      {/* 이달 합계 카드 */}
+      <div className="bg-gradient-to-br from-[#1B2A45] to-[#2d4a7a] rounded-2xl p-5 text-white">
+        <p className="text-white/50 text-xs font-semibold mb-1">{monthLabel}월 총 매출</p>
+        <p className="text-4xl font-black tracking-tight">{fmtMoney(totalAll)}</p>
+        <div className="flex gap-4 mt-3">
+          <div className="bg-white/10 rounded-xl px-3 py-2 flex-1 text-center">
+            <p className="text-white/50 text-[10px] mb-0.5">수수료 매출</p>
+            <p className="font-black text-emerald-300">{fmtMoney(feeTotal)}</p>
+            <p className="text-white/40 text-[9px] mt-0.5">{feeEntries.length}건</p>
+          </div>
+          <div className="bg-white/10 rounded-xl px-3 py-2 flex-1 text-center">
+            <p className="text-white/50 text-[10px] mb-0.5">계약 매출</p>
+            <p className="font-black text-sky-300">{fmtMoney(contractTotal)}</p>
+            <p className="text-white/40 text-[9px] mt-0.5">{contractEntries.length}건</p>
+          </div>
+        </div>
       </div>
 
-      {/* 이달 건별 내역 */}
-      {myEntries.length > 0 && (
+      {/* 탭 전환 */}
+      <div className="flex bg-gray-100 rounded-xl p-1 gap-1">
+        {([['fee', '💰 수수료 매출'], ['contract', '📋 계약 매출']] as const).map(([key, label]) => (
+          <button key={key} onClick={() => setRevenueTab(key)}
+            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${revenueTab === key ? 'bg-white text-[#1B2A45] shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* 수수료 매출 탭 */}
+      {revenueTab === 'fee' && (
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100">
-            <p className="text-xs font-bold text-gray-500">이달 수수료 내역</p>
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <p className="text-xs font-bold text-gray-500">이달 수수료 매출 내역</p>
+            <span className="text-xs font-black text-emerald-600">{fmtMoney(feeTotal)}</span>
           </div>
-          <div className="divide-y divide-gray-50">
-            {myEntries.map((e, i) => (
-              <div key={i} className="flex items-center justify-between px-4 py-3">
-                <div>
-                  <p className="text-sm font-semibold text-[#1B2A45]">{e.company}</p>
-                  {e.date && <p className="text-[10px] text-gray-400 mt-0.5">{e.date}</p>}
+          {feeEntries.length === 0 ? (
+            <div className="p-8 text-center text-gray-300 text-sm">이달 수수료 내역이 없습니다</div>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {feeEntries.map((e, i) => (
+                <div key={i} className="flex items-center justify-between px-4 py-3">
+                  <div>
+                    <p className="text-sm font-semibold text-[#1B2A45]">{e.company}</p>
+                    {e.date && <p className="text-[10px] text-gray-400 mt-0.5">{e.date}</p>}
+                  </div>
+                  <span className="text-sm font-black text-emerald-600">{fmtMoney(e.amount)}</span>
                 </div>
-                <span className="text-base font-black text-emerald-600">{fmtMoney(e.amount)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {myEntries.length === 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-gray-400 text-sm">
-          이달 수수료 내역이 없습니다
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* 월별 매출 추이 */}
+      {/* 계약 매출 탭 */}
+      {revenueTab === 'contract' && (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <p className="text-xs font-bold text-gray-500">이달 계약 매출 내역</p>
+            <span className="text-xs font-black text-sky-600">{fmtMoney(contractTotal)}</span>
+          </div>
+          {contractEntries.length === 0 ? (
+            <div className="p-8 text-center text-gray-300 text-sm">이달 계약 내역이 없습니다</div>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {contractEntries.map((e, i) => (
+                <div key={i} className="flex items-center justify-between px-4 py-3">
+                  <div>
+                    <p className="text-sm font-semibold text-[#1B2A45]">{e.company}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      {e.date && <span className="text-[10px] text-gray-400">{e.date}</span>}
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${e.type === 'puto' ? 'bg-sky-100 text-sky-600' : 'bg-violet-100 text-violet-600'}`}>
+                        {e.type === 'puto' ? '뿌토계약' : '직접계약'}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-sm font-black text-sky-600">{fmtMoney(e.amount)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 월별 추이 */}
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100">
-          <p className="text-xs font-bold text-gray-500">월별 관리팀 수수료 수입</p>
+          <p className="text-xs font-bold text-gray-500">월별 매출 추이</p>
         </div>
-        <div className="p-4 space-y-2">
-          {monthly.map((m, i) => {
-            const max = Math.max(...monthly.map(x => x.amount), 1)
-            const pct = Math.round((m.amount / max) * 100)
-            const isCurrent = m.month === String(now.getMonth() + 1).padStart(2, '0') + '월'
+        <div className="p-4 space-y-2.5">
+          {monthly.map((m: any, i: number) => {
+            const max = Math.max(...monthly.map((x: any) => x.total), 1)
+            const feePct     = Math.round((m.fee / max) * 100)
+            const contractPct= Math.round((m.contract / max) * 100)
+            const isCurrent  = m.month === String(monthLabel).padStart(2, '0') + '월'
             return (
-              <div key={i} className="flex items-center gap-3">
-                <span className={`text-[11px] w-10 shrink-0 font-medium ${isCurrent ? 'text-emerald-600' : 'text-gray-400'}`}>{m.month}</span>
-                <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${isCurrent ? 'bg-emerald-500' : 'bg-teal-300'}`}
-                    style={{ width: pct + '%' }}
-                  />
+              <div key={i} className="flex items-center gap-2">
+                <span className={`text-[11px] w-9 shrink-0 font-medium ${isCurrent ? 'text-[#1B2A45] font-bold' : 'text-gray-400'}`}>{m.month}</span>
+                <div className="flex-1 flex flex-col gap-0.5">
+                  {m.fee > 0 && (
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-400 rounded-full" style={{ width: feePct + '%' }} />
+                    </div>
+                  )}
+                  {m.contract > 0 && (
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-sky-400 rounded-full" style={{ width: contractPct + '%' }} />
+                    </div>
+                  )}
+                  {m.fee === 0 && m.contract === 0 && (
+                    <div className="h-2 bg-gray-100 rounded-full" />
+                  )}
                 </div>
-                <span className={`text-xs font-bold w-16 text-right ${isCurrent ? 'text-emerald-700' : 'text-gray-600'}`}>
-                  {m.amount > 0 ? fmtMoney(m.amount) : '—'}
+                <span className={`text-xs font-bold w-16 text-right ${isCurrent ? 'text-[#1B2A45]' : 'text-gray-500'}`}>
+                  {m.total > 0 ? fmtMoney(m.total) : '—'}
                 </span>
               </div>
             )
           })}
+        </div>
+        <div className="px-4 pb-3 flex items-center gap-3">
+          <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-full bg-emerald-400" /><span className="text-[10px] text-gray-400">수수료</span></div>
+          <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-full bg-sky-400" /><span className="text-[10px] text-gray-400">계약</span></div>
         </div>
       </div>
     </div>
@@ -3288,7 +3467,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
 
         {/* ── 신규DB (뿌토) ── */}
         {activeTab === 'newdb' && (
-          <OpsNewDbTab cases={newdbCases} userName={userName} onSave={handleSave} />
+          <OpsNewDbTab cases={newdbCases} userName={userName} onSave={handleSave} onAdded={loadCases} />
         )}
 
         {/* ── 관리팀계약 ── */}

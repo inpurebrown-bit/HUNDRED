@@ -64,12 +64,14 @@ export async function GET(req: NextRequest) {
     })
     .filter(Boolean) as { id: string; amount: number; date: string; sales_user_id: string; sales_user_name: string; company: string }[]
 
+  type OpsEntry = { id: string; amount: number; date: string; ops_user_id: string; ops_user_name: string; company: string }
+
   // ── 관리팀 수수료 리스트 변환 ────────────────────────────────────────
   // fee_amount(1차) + payment_entries[*].fee_amount(추가)
-  const opsEntries = (opsCases || [])
+  const opsEntries: OpsEntry[] = (opsCases || [])
     .flatMap((c: any) => {
       const d = c.details || {}
-      const entries: { id: string; amount: number; date: string; ops_user_id: string; ops_user_name: string; company: string }[] = []
+      const entries: OpsEntry[] = []
       const fee1 = parseMoney(d.fee_amount)
       if (fee1 > 0) {
         entries.push({
@@ -97,13 +99,50 @@ export async function GET(req: NextRequest) {
       return entries
     })
 
+  // ── 관리팀 계약 매출 (뿌토 계약 + 직접계약) ──────────────────────────
+  type OpsContractEntry = OpsEntry & { type: 'puto' | 'direct' }
+  const opsContractEntries: OpsContractEntry[] = (opsCases || [])
+    .flatMap((c: any) => {
+      const d = c.details || {}
+      const entries: OpsContractEntry[] = []
+      const ownerName = c.ops_user_name || d.ops_user_name || ''
+      const ownerId   = String(c.owner_id || '')
+      // 뿌토 계약 (신규DB → 계약)
+      const putoAmt = parseMoney(d.puto_contract_amount)
+      if (putoAmt > 0) {
+        entries.push({
+          id: `${c.id}_puto`,
+          amount: putoAmt,
+          date: d.puto_contract_date || c.updated_at?.slice(0, 10) || c.created_at?.slice(0, 10) || '',
+          ops_user_id: ownerId, ops_user_name: ownerName,
+          company: d.sales_customer_info?.company || c.customer_name || '',
+          type: 'puto',
+        })
+      }
+      // 직접계약 (관리팀 계약 탭)
+      if (d.is_ops_direct_contract) {
+        const contractAmt = parseMoney(d.contract_amount)
+        if (contractAmt > 0) {
+          entries.push({
+            id: `${c.id}_direct`,
+            amount: contractAmt,
+            date: d.contract_date || c.updated_at?.slice(0, 10) || c.created_at?.slice(0, 10) || '',
+            ops_user_id: ownerId, ops_user_name: ownerName,
+            company: c.customer_name || '',
+            type: 'direct',
+          })
+        }
+      }
+      return entries
+    })
+
   // ── 월별 집계 (최근 6개월) ──────────────────────────────────────────
   const now = new Date()
-  const monthlyMap: Record<string, { sales: number; ops: number }> = {}
+  const monthlyMap: Record<string, { sales: number; ops: number; ops_contract: number }> = {}
   for (let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    monthlyMap[key] = { sales: 0, ops: 0 }
+    monthlyMap[key] = { sales: 0, ops: 0, ops_contract: 0 }
   }
 
   salesEntries.forEach(e => {
@@ -114,13 +153,18 @@ export async function GET(req: NextRequest) {
     const key = e.date?.slice(0, 7)
     if (key && monthlyMap[key]) monthlyMap[key].ops += e.amount
   })
+  opsContractEntries.forEach(e => {
+    const key = e.date?.slice(0, 7)
+    if (key && monthlyMap[key]) monthlyMap[key].ops_contract += e.amount
+  })
 
   const monthly = Object.entries(monthlyMap).map(([month, v]) => ({
     month: month.slice(5) + '월',
     fullMonth: month,
     영업팀: v.sales,
     관리팀: v.ops,
-    합계: v.sales + v.ops,
+    관리팀계약: v.ops_contract,
+    합계: v.sales + v.ops + v.ops_contract,
   }))
 
   // ── 직원별 집계 ─────────────────────────────────────────────────────
@@ -144,8 +188,9 @@ export async function GET(req: NextRequest) {
 
   // ── 이달 내역 ────────────────────────────────────────────────────────
   const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const thisMonthSales = salesEntries.filter(e => e.date?.startsWith(thisMonthKey))
-  const thisMonthOps   = opsEntries.filter(e => e.date?.startsWith(thisMonthKey))
+  const thisMonthSales         = salesEntries.filter(e => e.date?.startsWith(thisMonthKey))
+  const thisMonthOps           = opsEntries.filter(e => e.date?.startsWith(thisMonthKey))
+  const thisMonthOpsContracts  = opsContractEntries.filter(e => e.date?.startsWith(thisMonthKey))
 
   const totalSales = salesEntries.reduce((s, e) => s + e.amount, 0)
   const totalOps   = opsEntries.reduce((s, e) => s + e.amount, 0)
@@ -159,6 +204,7 @@ export async function GET(req: NextRequest) {
     total: totalSales + totalOps,
     thisMonthSales,
     thisMonthOps,
+    thisMonthOpsContracts,
     thisMonthKey,
   })
 }
