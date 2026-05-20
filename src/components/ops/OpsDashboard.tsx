@@ -1974,13 +1974,29 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
   const [openId, setOpenId] = useState<string | null>(null)
   // 직접 추가 모달
   const [addModal, setAddModal] = useState(false)
-  const [addForm, setAddForm] = useState({ company: '', name: '', phone: '', memo: '' })
+  const EMPTY_ADD_FORM = {
+    company: '', name: '', phone: '', region: '', reception_date: '',
+    business_type: '', real_work: '', years_in_business: '', employee_count: '', patent: '',
+    revenue_2026: '', revenue_2025: '', revenue_2024: '', revenue_2023: '',
+    loan_kibo: '', loan_shinbo: '', loan_jaedan: '', loan_jinjong: '', loan_sojin: '', loan_other: '', loan_total: '',
+    credit_kcb: '', credit_nice: '', tax_status: '', assets: '',
+    required_funds: '', solution: '', memo: '',
+  }
+  const [addForm, setAddForm] = useState(EMPTY_ADD_FORM)
   const [addSaving, setAddSaving] = useState(false)
+
+  function af(field: keyof typeof EMPTY_ADD_FORM, val: string) {
+    setAddForm(p => ({ ...p, [field]: val }))
+  }
 
   async function handleAddDb() {
     if (!addForm.company.trim()) return
     setAddSaving(true)
     try {
+      const detailsPayload: Record<string, any> = { ops_user_name: userName }
+      const fieldKeys = Object.keys(EMPTY_ADD_FORM) as (keyof typeof EMPTY_ADD_FORM)[]
+      fieldKeys.forEach(k => { if (addForm[k]) detailsPayload[k] = addForm[k] })
+
       // 고객 생성
       const custRes = await fetch('/api/customers', {
         method: 'POST',
@@ -1989,7 +2005,7 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
           name: addForm.name || addForm.company,
           phone: addForm.phone || '00000000000',
           status: 'lead',
-          details: { company: addForm.company, ops_user_name: userName },
+          details: detailsPayload,
         }),
       })
       const custData = custRes.ok ? await custRes.json() : null
@@ -2005,15 +2021,11 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
           customer_id: customerId,
           stage: 'new_db',
           ops_user_name: userName,
-          details: {
-            ops_user_name: userName,
-            company: addForm.company,
-            ...(addForm.memo ? { ops_add_memo: addForm.memo } : {}),
-          },
+          details: detailsPayload,
           timeline: [{ user: userName, content: `신규DB 직접 추가: ${addForm.company}`, created_at: nowKST() }],
         }),
       })
-      setAddForm({ company: '', name: '', phone: '', memo: '' })
+      setAddForm(EMPTY_ADD_FORM)
       setAddModal(false)
       onAdded?.()
     } finally {
@@ -2161,45 +2173,201 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
         </div>
       )}
 
-      {/* 직접 추가 모달 */}
+      {/* 직접 추가 모달 — 인콜일지 전체 필드 */}
       {addModal && (
-        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-2"
           onClick={e => { if (e.target === e.currentTarget) setAddModal(false) }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-            <div className="bg-gradient-to-r from-[#1B2A45] to-emerald-700 px-5 py-4 flex items-center justify-between">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col" style={{ maxHeight: '95vh' }}>
+            {/* 헤더 */}
+            <div className="bg-gradient-to-r from-[#1B2A45] to-emerald-700 px-5 py-4 flex items-center justify-between rounded-t-2xl flex-shrink-0">
               <div>
                 <h3 className="font-bold text-white text-sm">➕ 신규DB 직접 추가</h3>
-                <p className="text-white/60 text-xs mt-0.5">내가 발굴한 DB를 직접 등록합니다</p>
+                <p className="text-white/60 text-xs mt-0.5">내가 발굴한 DB 정보를 입력합니다</p>
               </div>
               <button onClick={() => setAddModal(false)} className="text-white/60 hover:text-white text-lg">✕</button>
             </div>
-            <div className="px-5 py-4 space-y-3">
+
+            {/* 스크롤 바디 */}
+            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-5">
+
+              {/* ── 기본 정보 ── */}
               <div>
-                <label className="text-[10px] font-bold text-gray-400 mb-1 block">🏢 업체명 *</label>
-                <input type="text" value={addForm.company} onChange={e => setAddForm(p => ({ ...p, company: e.target.value }))}
-                  placeholder="업체명 입력" autoFocus
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400" />
+                <p className="text-[11px] font-bold text-emerald-600 mb-2 flex items-center gap-1">
+                  <span className="w-1 h-3 bg-emerald-500 rounded-full inline-block"></span> 기본 정보
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">🏢 업체명 <span className="text-red-400">*</span></label>
+                    <input type="text" value={addForm.company} onChange={e => af('company', e.target.value)}
+                      placeholder="업체명 입력" autoFocus
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">👤 대표자명</label>
+                    <input type="text" value={addForm.name} onChange={e => af('name', e.target.value)}
+                      placeholder="대표자명"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">📞 연락처</label>
+                    <input type="tel" value={addForm.phone} onChange={e => af('phone', autoHyphenPhone(e.target.value))}
+                      placeholder="010-0000-0000"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">📍 지역</label>
+                    <input type="text" value={addForm.region} onChange={e => af('region', e.target.value)}
+                      placeholder="예: 서울 강남구"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">📅 접수일</label>
+                    <input type="date" value={addForm.reception_date} onChange={e => af('reception_date', e.target.value)}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400" />
+                  </div>
+                </div>
               </div>
+
+              {/* ── 업체 정보 ── */}
               <div>
-                <label className="text-[10px] font-bold text-gray-400 mb-1 block">👤 대표자명</label>
-                <input type="text" value={addForm.name} onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))}
-                  placeholder="대표자명 (선택)"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400" />
+                <p className="text-[11px] font-bold text-sky-600 mb-2 flex items-center gap-1">
+                  <span className="w-1 h-3 bg-sky-500 rounded-full inline-block"></span> 업체 정보
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">🏭 업종</label>
+                    <input type="text" value={addForm.business_type} onChange={e => af('business_type', e.target.value)}
+                      placeholder="예: 제조업"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-sky-400" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">🔧 실업종</label>
+                    <input type="text" value={addForm.real_work} onChange={e => af('real_work', e.target.value)}
+                      placeholder="실제 업종"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-sky-400" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">📅 업력</label>
+                    <input type="text" value={addForm.years_in_business} onChange={e => af('years_in_business', e.target.value)}
+                      placeholder="예: 5년"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-sky-400" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">👥 직원수</label>
+                    <input type="text" value={addForm.employee_count} onChange={e => af('employee_count', e.target.value)}
+                      placeholder="예: 10명"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-sky-400" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">🔬 특허</label>
+                    <input type="text" value={addForm.patent} onChange={e => af('patent', e.target.value)}
+                      placeholder="예: 2건"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-sky-400" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">💡 솔루션</label>
+                    <input type="text" value={addForm.solution} onChange={e => af('solution', e.target.value)}
+                      placeholder="예: 기보, 신보"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-sky-400" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">💰 필요자금</label>
+                    <input type="text" value={addForm.required_funds} onChange={e => af('required_funds', e.target.value)}
+                      placeholder="예: 2억"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-sky-400" />
+                  </div>
+                </div>
               </div>
+
+              {/* ── 매출 현황 ── */}
               <div>
-                <label className="text-[10px] font-bold text-gray-400 mb-1 block">📞 연락처</label>
-                <input type="tel" value={addForm.phone} onChange={e => setAddForm(p => ({ ...p, phone: autoHyphenPhone(e.target.value) }))}
-                  placeholder="010-0000-0000 (선택)"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400" />
+                <p className="text-[11px] font-bold text-amber-600 mb-2 flex items-center gap-1">
+                  <span className="w-1 h-3 bg-amber-500 rounded-full inline-block"></span> 매출 현황
+                </p>
+                <div className="grid grid-cols-4 gap-2">
+                  {(['revenue_2026','revenue_2025','revenue_2024','revenue_2023'] as const).map(key => (
+                    <div key={key}>
+                      <label className="text-[10px] font-bold text-gray-400 mb-1 block">
+                        {key === 'revenue_2026' ? '2026년' : key === 'revenue_2025' ? '2025년' : key === 'revenue_2024' ? '2024년' : '2023년'}
+                      </label>
+                      <input type="text" value={addForm[key]} onChange={e => af(key, e.target.value)}
+                        placeholder="매출액"
+                        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400" />
+                    </div>
+                  ))}
+                </div>
               </div>
+
+              {/* ── 기대출 현황 ── */}
+              <div>
+                <p className="text-[11px] font-bold text-violet-600 mb-2 flex items-center gap-1">
+                  <span className="w-1 h-3 bg-violet-500 rounded-full inline-block"></span> 기대출 현황
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    ['loan_kibo','기보'],['loan_shinbo','신보'],['loan_jaedan','재단'],
+                    ['loan_jinjong','진종'],['loan_sojin','소진'],['loan_other','기타'],
+                  ] as [keyof typeof EMPTY_ADD_FORM, string][]).map(([k, label]) => (
+                    <div key={k}>
+                      <label className="text-[10px] font-bold text-gray-400 mb-1 block">{label}</label>
+                      <input type="text" value={addForm[k]} onChange={e => af(k, e.target.value)}
+                        placeholder="금액"
+                        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400" />
+                    </div>
+                  ))}
+                  <div className="col-span-3">
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">합계</label>
+                    <input type="text" value={addForm.loan_total} onChange={e => af('loan_total', e.target.value)}
+                      placeholder="총 대출 합계"
+                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400" />
+                  </div>
+                </div>
+              </div>
+
+              {/* ── 신용·재무 ── */}
+              <div>
+                <p className="text-[11px] font-bold text-rose-600 mb-2 flex items-center gap-1">
+                  <span className="w-1 h-3 bg-rose-500 rounded-full inline-block"></span> 신용·재무
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">신용 KCB</label>
+                    <input type="text" value={addForm.credit_kcb} onChange={e => af('credit_kcb', e.target.value)}
+                      placeholder="예: 750"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-rose-400" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">신용 NICE</label>
+                    <input type="text" value={addForm.credit_nice} onChange={e => af('credit_nice', e.target.value)}
+                      placeholder="예: 740"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-rose-400" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">세금 납부 현황</label>
+                    <input type="text" value={addForm.tax_status} onChange={e => af('tax_status', e.target.value)}
+                      placeholder="정상/연체 등"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-rose-400" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">자산</label>
+                    <input type="text" value={addForm.assets} onChange={e => af('assets', e.target.value)}
+                      placeholder="예: 5억"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-rose-400" />
+                  </div>
+                </div>
+              </div>
+
+              {/* ── 메모 ── */}
               <div>
                 <label className="text-[10px] font-bold text-gray-400 mb-1 block">📝 메모</label>
-                <textarea value={addForm.memo} onChange={e => setAddForm(p => ({ ...p, memo: e.target.value }))}
-                  rows={2} placeholder="특이사항 (선택)"
+                <textarea value={addForm.memo} onChange={e => af('memo', e.target.value)}
+                  rows={3} placeholder="특이사항, 상담 내용 등"
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-400 resize-none" />
               </div>
             </div>
-            <div className="px-5 pb-5 flex gap-2">
+
+            {/* 푸터 버튼 */}
+            <div className="px-5 pb-5 pt-3 flex gap-2 border-t border-gray-100 flex-shrink-0">
               <button onClick={() => setAddModal(false)}
                 className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50">취소</button>
               <button onClick={handleAddDb} disabled={addSaving || !addForm.company.trim()}
@@ -2236,38 +2404,126 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
           <p className="text-xs text-gray-300 mt-1">대표가 뿌토 DB를 배정하면 여기에 표시됩니다</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {cases.map(c => {
-            const company = c.customers?.details?.company || c.customers?.name || '—'
+            const d = c.customers?.details || {}
+            const company = d.company || c.customers?.company || c.customers?.name || '—'
+            const repName = c.customers?.representative || c.customers?.name || ''
+            const phone = c.customers?.phone || ''
+            const businessType = d.business_type || ''
+            const realWork = d.real_work || ''
+            const yearsInBiz = d.years_in_business || ''
+            const loanTotal = d.loan_total || ''
+            const requiredFunds = d.required_funds || ''
+            const solution = d.solution || c.details?.solution || ''
+            const creditKcb = d.credit_kcb || ''
+            const patent = d.patent || ''
+            const revenueLatest = d.revenue_2025 || d.revenue_2024 || ''
             const { date } = formatKST(c.created_at || '')
+            const isSelected = openId === c.id
+            const isSelfAdded = c.details?.ops_user_name === userName && !c.details?.sales_customer_info
+
             return (
               <div key={c.id}
-                className={`bg-white border rounded-xl p-2.5 cursor-pointer hover:shadow-md transition-all text-center relative ${
-                  openId === c.id ? 'ring-2 ring-sky-400 border-sky-300' : 'border-gray-200 hover:border-sky-300'
+                className={`bg-white border rounded-2xl overflow-hidden cursor-pointer hover:shadow-lg transition-all relative ${
+                  isSelected ? 'ring-2 ring-sky-400 border-sky-300 shadow-lg' : 'border-gray-200 hover:border-sky-300'
                 }`}
                 onClick={() => setOpenId(id => id === c.id ? null : c.id)}
               >
-                {/* 배정 뱃지 */}
-                <div className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold mb-1 bg-sky-100 text-sky-700">
-                  🆕 배정
+                {/* 상단 컬러바 */}
+                <div className={`h-1 w-full ${isSelfAdded ? 'bg-gradient-to-r from-emerald-400 to-teal-400' : 'bg-gradient-to-r from-sky-400 to-blue-500'}`} />
+
+                <div className="p-3.5">
+                  {/* 헤더 행: 뱃지 + 업체명 */}
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold ${isSelfAdded ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'}`}>
+                          {isSelfAdded ? '✍️ 직접추가' : '🆕 배정'}
+                        </span>
+                        {solution && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700">
+                            {solution.length > 8 ? solution.slice(0,8)+'…' : solution}
+                          </span>
+                        )}
+                      </div>
+                      <p className="font-bold text-[#1B2A45] text-sm leading-tight truncate">{company}</p>
+                      {repName && repName !== company && (
+                        <p className="text-[11px] text-gray-500 mt-0.5">👤 {repName}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 정보 그리드 */}
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1 mb-3">
+                    {phone && (
+                      <div className="col-span-2 flex items-center gap-1">
+                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">📞 연락처</span>
+                        <span className="text-[11px] font-medium text-gray-700">{formatPhone(phone)}</span>
+                      </div>
+                    )}
+                    {(businessType || realWork) && (
+                      <div className="col-span-2 flex items-center gap-1">
+                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">🏭 업종</span>
+                        <span className="text-[11px] text-gray-700 truncate">{realWork || businessType}</span>
+                      </div>
+                    )}
+                    {yearsInBiz && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">📅 업력</span>
+                        <span className="text-[11px] text-gray-700">{yearsInBiz}</span>
+                      </div>
+                    )}
+                    {creditKcb && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">💳 KCB</span>
+                        <span className="text-[11px] text-gray-700">{creditKcb}</span>
+                      </div>
+                    )}
+                    {patent && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">🔬 특허</span>
+                        <span className="text-[11px] text-gray-700">{patent}</span>
+                      </div>
+                    )}
+                    {revenueLatest && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">📊 매출</span>
+                        <span className="text-[11px] text-gray-700">{revenueLatest}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 기대출 + 필요자금 강조 */}
+                  {(loanTotal || requiredFunds) && (
+                    <div className="flex gap-2 mb-3">
+                      {loanTotal && (
+                        <div className="flex-1 bg-rose-50 border border-rose-100 rounded-lg px-2 py-1.5 text-center">
+                          <p className="text-[9px] text-rose-400 font-medium">기대출합계</p>
+                          <p className="text-[11px] font-bold text-rose-700 mt-0.5">{loanTotal}</p>
+                        </div>
+                      )}
+                      {requiredFunds && (
+                        <div className="flex-1 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1.5 text-center">
+                          <p className="text-[9px] text-emerald-400 font-medium">필요자금</p>
+                          <p className="text-[11px] font-bold text-emerald-700 mt-0.5">{requiredFunds}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 하단: 날짜 + 계약 버튼 */}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[9px] text-gray-300">배정: {date}</span>
+                    <button
+                      type="button"
+                      onClick={e => { e.stopPropagation(); openContractModal(c) }}
+                      className="text-[10px] bg-sky-500 hover:bg-sky-600 text-white rounded-lg px-3 py-1.5 font-semibold transition-colors flex-shrink-0"
+                    >
+                      ✅ 계약하기
+                    </button>
+                  </div>
                 </div>
-                {/* 업체명 */}
-                <p className="font-bold text-[#1B2A45] text-[11px] leading-snug break-all" style={{ wordBreak: 'break-all' }}>
-                  {company}
-                </p>
-                <p className="text-[10px] text-gray-400 mt-0.5">{c.customers?.name}</p>
-                {c.institution && (
-                  <p className="text-[9px] text-violet-500 mt-0.5 font-medium">🏦 {c.institution.split(',')[0].trim()}</p>
-                )}
-                <p className="text-[9px] text-gray-300 mt-0.5">배정: {date}</p>
-                {/* 계약하기 버튼 */}
-                <button
-                  type="button"
-                  onClick={e => { e.stopPropagation(); openContractModal(c) }}
-                  className="mt-1.5 w-full text-[9px] bg-sky-500 hover:bg-sky-600 text-white rounded py-1 font-semibold transition-colors"
-                >
-                  ✅ 계약하기
-                </button>
               </div>
             )
           })}
