@@ -18,7 +18,7 @@ function toDbPatch(body: Record<string, any>) {
     'absorbed','sojin_cert_youth','sojin_cert_general','sojin_cert_disabled',
     'concurrent_institutions','contract_notes','customer_type','commission_rate',
     'stage',
-    'details', 'customer_id', 'updated_at',
+    'details', 'customer_id',
   ]
   for (const k of ALLOWED) {
     if (body[k] !== undefined) patch[k] = body[k]

@@ -466,7 +466,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
       const res = await fetch(`/api/ops-cases/${c.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ details: mergedDetails, updated_at: nowIso }),
+        body: JSON.stringify({ details: mergedDetails }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -474,7 +474,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
         alert(`저장 실패: ${err?.error || res.status}`)
         return
       }
-      onSave(c.id, { details: mergedDetails, updated_at: nowIso })
+      onSave(c.id, { details: mergedDetails })
       setFeeSaved(true)
     } catch (e) {
       console.error('[handleFeeSave] network error:', e)
