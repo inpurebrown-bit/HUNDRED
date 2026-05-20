@@ -211,6 +211,15 @@ function CeoCaseListRow({ c, isOpen, onToggle }: { c: OpsCase; isOpen: boolean; 
 }
 
 // ─── Institution Grouped View (진행중) ────────────────────
+const UPCOMING_STAGES = new Set(['', '미선택', '서류받는중', '접수전'])
+
+function isUpcoming(c: OpsCase, inst: string): boolean {
+  const stage = INDIRECT_SET.has(inst)
+    ? (c.details?.indirect_stage || '')
+    : (c.details?.direct_stage   || '')
+  return UPCOMING_STAGES.has(stage)
+}
+
 function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle, onApprove }: {
   cases: OpsCase[]
   openPanelIds: string[]
@@ -224,7 +233,6 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
   const isHandling = (c: OpsCase) =>
     !!(c.details?.handling_no_contact || c.details?.handling_no_fit || c.details?.handling_mindless)
 
-  // 승인 대기 (환불예정/종료예정) — 최상단 별도 그룹
   const pendingCases  = cases.filter(c => PENDING_REFUND_KEYS.has(c.progress_stage) || PENDING_DONE_KEYS.has(c.progress_stage))
   const holdingCases  = cases.filter(c => !PENDING_REFUND_KEYS.has(c.progress_stage) && !PENDING_DONE_KEYS.has(c.progress_stage) && isHolding(c))
   const handlingCases = cases.filter(c => !PENDING_REFUND_KEYS.has(c.progress_stage) && !PENDING_DONE_KEYS.has(c.progress_stage) && !isHolding(c) && isHandling(c))
@@ -238,7 +246,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
   })).filter(g => g.items.length > 0)
 
   const unassigned = regularCases.filter(c => !c.institution || c.institution.trim() === '')
-  if (unassigned.length > 0)    instGroups.unshift({ inst: '신규유입', items: unassigned })
+  if (unassigned.length > 0)    instGroups.unshift({ inst: '신규 유입', items: unassigned })
   if (handlingCases.length > 0) instGroups.push({ inst: '🔧 핸들링', items: handlingCases })
   if (holdingCases.length > 0)  instGroups.push({ inst: '🔒 홀딩', items: holdingCases })
   if (pendingCases.length > 0)  instGroups.unshift({ inst: '⏳ 대표 승인 대기', items: pendingCases })
@@ -253,31 +261,74 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
         const isIndirect = INDIRECT_SET.has(inst)
         const isPending  = inst === '⏳ 대표 승인 대기'
         const isHoldingG = inst === '🔒 홀딩'
+        const isSpecial  = isPending || isHoldingG || inst === '신규 유입' || inst === '🔧 핸들링'
         const isOpen = !collapsed[inst]
+
+        // 진행/대기 분리 (특수 그룹 제외)
+        const activeItems   = isSpecial ? items : items.filter(c => !isUpcoming(c, inst))
+        const upcomingItems = isSpecial ? []    : items.filter(c =>  isUpcoming(c, inst))
+
         return (
           <div key={inst}>
             <button onClick={() => setCollapsed(p => ({ ...p, [inst]: !p[inst] }))}
               className={`w-full flex items-center justify-between py-2.5 px-4 rounded-xl mb-2 transition-colors ${
-                isPending   ? 'bg-rose-500 hover:bg-rose-600'
+                isPending    ? 'bg-rose-500 hover:bg-rose-600'
                 : isHoldingG ? 'bg-indigo-600 hover:bg-indigo-700'
                 : isIndirect ? 'bg-violet-600 hover:bg-violet-700'
-                : inst === '신규유입'  ? 'bg-emerald-500 hover:bg-emerald-600'
+                : inst === '신규 유입'  ? 'bg-sky-500 hover:bg-sky-600'
                 : inst === '🔧 핸들링' ? 'bg-slate-500 hover:bg-slate-600'
                 : 'bg-[#1B2A45] hover:bg-[#1B2A45]/90'
               }`}>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-white font-bold text-sm">{inst}</span>
-                <span className="bg-[#C5A258] text-white text-xs font-bold px-2 py-0.5 rounded-full">{items.length}</span>
+                <span className="bg-[#C5A258] text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                  진행 {activeItems.length}
+                </span>
+                {upcomingItems.length > 0 && (
+                  <span className="bg-gray-400 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                    대기 {upcomingItems.length}
+                  </span>
+                )}
                 {isIndirect && <span className="text-white/60 text-[10px]">간접자금</span>}
               </div>
               <span className="text-white/60 text-xs">{isOpen ? '▲' : '▼'}</span>
             </button>
             {isOpen && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
-                {items.map(c => (
-                  <CeoCaseCard key={`${inst}-${c.id}`} c={c} isOpen={openPanelIds.includes(c.id)} onToggle={onToggle} onScriptToggle={onScriptToggle} onApprove={isPending ? onApprove : undefined} />
-                ))}
-              </div>
+              isSpecial ? (
+                // 특수 그룹: 단순 그리드
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                  {items.map(c => (
+                    <CeoCaseCard key={`${inst}-${c.id}`} c={c} isOpen={openPanelIds.includes(c.id)} onToggle={onToggle} onScriptToggle={onScriptToggle} onApprove={isPending ? onApprove : undefined} />
+                  ))}
+                </div>
+              ) : (
+                // 기관 그룹: 진행 / 대기 좌우 분리
+                <div className="flex gap-0 items-start">
+                  <div className="w-1/2 min-w-0 pr-3">
+                    {activeItems.length > 0 ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                        {activeItems.map(c => (
+                          <CeoCaseCard key={`${inst}-${c.id}`} c={c} isOpen={openPanelIds.includes(c.id)} onToggle={onToggle} onScriptToggle={onScriptToggle} />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="h-full min-h-[40px]" />
+                    )}
+                  </div>
+                  <div className="w-1/2 min-w-0 border-l-2 border-dashed border-gray-200 pl-3">
+                    <p className="text-[9px] font-bold text-gray-400 mb-1.5 uppercase tracking-wide">📋 다음 자금 대기</p>
+                    {upcomingItems.length > 0 ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                        {upcomingItems.map(c => (
+                          <CeoCaseCard key={`${inst}-upcoming-${c.id}`} c={c} isOpen={openPanelIds.includes(c.id)} onToggle={onToggle} onScriptToggle={onScriptToggle} />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-gray-300 italic">없음</p>
+                    )}
+                  </div>
+                </div>
+              )
             )}
           </div>
         )
