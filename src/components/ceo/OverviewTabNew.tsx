@@ -35,6 +35,8 @@ interface RevenueData {
   totalSales: number
   totalOps: number
   total: number
+  thisMonthOps?: { ops_user_name: string; amount: number }[]
+  thisMonthOpsContracts?: { ops_user_name: string; amount: number }[]
 }
 
 interface Contract {
@@ -207,6 +209,7 @@ interface MonthSectionProps {
   employeeRows: EmployeeRow[]
   salesRevenueAmount?: number
   opsRevenueAmount?: number
+  opsUserRows?: { name: string; amount: number }[]
 }
 
 function fmtKrw(n: number): string {
@@ -236,8 +239,8 @@ function MonthSection({
   employeeRows,
   salesRevenueAmount = 0,
   opsRevenueAmount = 0,
+  opsUserRows = [],
 }: MonthSectionProps) {
-  const totalRevenue = salesRevenueAmount + opsRevenueAmount
 
   return (
     <section className="bg-white rounded-2xl border border-[#E8E2D4] overflow-hidden">
@@ -248,11 +251,43 @@ function MonthSection({
         </span>
       </div>
 
-      {/* 직원별 현황 */}
+      {/* 직원별 현황 — 영업팀(좌) / 관리팀(우) */}
       <div className="px-5 py-4 border-b border-[#E8E2D4]/60">
         <p className="text-[11px] font-bold text-[#1B2A45]/40 uppercase tracking-widest mb-3">직원별 현황</p>
         {loading ? <Skeleton className="h-32 w-full" /> : (
-          <EmployeeTable rows={employeeRows} loading={loading} />
+          <div className="flex gap-5">
+            {/* 영업팀 */}
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold text-[#1B2A45] bg-[#1B2A45]/8 inline-block px-2 py-0.5 rounded mb-2">영업팀</p>
+              <EmployeeTable rows={employeeRows} loading={loading} />
+            </div>
+            {/* 구분선 */}
+            <div className="w-px bg-[#E8E2D4] self-stretch" />
+            {/* 관리팀 */}
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold text-emerald-700 bg-emerald-50 inline-block px-2 py-0.5 rounded mb-2">관리팀</p>
+              {opsUserRows.length > 0 ? (
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-[#E8E2D4]">
+                      <th className="text-left pb-2 text-[11px] font-semibold text-[#1B2A45]/40">담당자</th>
+                      <th className="text-right pb-2 text-[11px] font-semibold text-[#1B2A45]/40">이달 매출</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {opsUserRows.map(r => (
+                      <tr key={r.name} className="border-b border-[#E8E2D4]/40 last:border-0">
+                        <td className="py-2.5 font-semibold text-[#1B2A45]/80">{r.name}</td>
+                        <td className="py-2.5 text-right font-black text-emerald-600">{fmtKrw(r.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="text-[12px] text-[#1B2A45]/30 py-4">매출 없음</p>
+              )}
+            </div>
+          </div>
         )}
       </div>
 
@@ -264,35 +299,38 @@ function MonthSection({
             {[...Array(2)].map((_, i) => <Skeleton key={i} className="h-24" />)}
           </div>
         ) : (
-          <div className="flex gap-3">
-            {/* 영업팀 */}
-            <div className="flex-1 bg-[#1B2A45] rounded-xl p-3 flex flex-col gap-1">
-              <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-0.5">영업팀</p>
-              <div className="flex items-baseline gap-1">
+          <>
+            <div className="flex gap-3">
+              {/* 영업팀 */}
+              <div className="flex-1 bg-[#1B2A45] rounded-xl p-3 flex flex-col gap-1">
+                <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-0.5">영업팀</p>
                 <p className="text-base font-black text-white">{fmtKrw(salesRevenueAmount)}</p>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className="text-[10px] text-white/40">부가세</span>
+                  <span className="text-[11px] font-semibold text-red-300">{salesRevenueAmount > 0 ? fmtKrw(Math.round(salesRevenueAmount / 11)) : '-'}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1 mt-0.5">
-                <span className="text-[10px] text-white/40">부가세(10%)</span>
-                <span className="text-[11px] font-semibold text-red-300">{fmtKrw(Math.round(salesRevenueAmount / 11))}</span>
-              </div>
-            </div>
-            {/* 관리팀 */}
-            <div className="flex-1 bg-emerald-700 rounded-xl p-3 flex flex-col gap-1">
-              <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-0.5">관리팀</p>
-              <div className="flex items-baseline gap-1">
+              {/* 관리팀 */}
+              <div className="flex-1 bg-emerald-700 rounded-xl p-3 flex flex-col gap-1">
+                <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-0.5">관리팀</p>
                 <p className="text-base font-black text-white">{opsRevenueAmount > 0 ? fmtKrw(opsRevenueAmount) : '-'}</p>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className="text-[10px] text-white/40">부가세</span>
+                  <span className="text-[11px] font-semibold text-emerald-200">{opsRevenueAmount > 0 ? fmtKrw(Math.round(opsRevenueAmount / 11)) : '-'}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1 mt-0.5">
-                <span className="text-[10px] text-white/40">부가세(10%)</span>
-                <span className="text-[11px] font-semibold text-emerald-200">{opsRevenueAmount > 0 ? fmtKrw(Math.round(opsRevenueAmount / 11)) : '-'}</span>
+              {/* 진행중 건수 */}
+              <div className="flex-none w-24 bg-violet-50 rounded-xl p-3 flex flex-col justify-center items-center">
+                <p className="text-[10px] text-[#1B2A45]/50 mb-1 text-center">진행중</p>
+                <p className="text-xl font-black text-violet-600">{inProgressCount}<span className="text-sm font-normal ml-0.5">건</span></p>
               </div>
             </div>
-            {/* 진행중 건수 */}
-            <div className="flex-none w-24 bg-violet-50 rounded-xl p-3 flex flex-col justify-center items-center">
-              <p className="text-[10px] text-[#1B2A45]/50 mb-1 text-center">진행중</p>
-              <p className="text-xl font-black text-violet-600">{inProgressCount}<span className="text-sm font-normal ml-0.5">건</span></p>
+            {/* 합계 세금 */}
+            <div className="mt-2 flex items-center justify-between bg-red-50 rounded-lg px-3 py-2">
+              <span className="text-[10px] text-[#1B2A45]/50">합계 세금 (부가가치세)</span>
+              <span className="text-sm font-black text-red-500">{taxAmount > 0 ? fmtKrw(taxAmount) : '-'}</span>
             </div>
-          </div>
+          </>
         )}
       </div>
     </section>
@@ -612,6 +650,25 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
   const thisMonthRows = buildRows(thisMonthContracts, salesGoals, thisElapsed, thisRemaining, true, supplyStats)
   const lastMonthRows = buildRows(lastMonthContracts, lastMonthGoals, lastElapsed, lastRemaining, false)
 
+  // ── 관리팀 이달 직원별 집계 ───────────────────────────────
+  function buildOpsUserRows(
+    opsEntries: { ops_user_name: string; amount: number }[],
+    contractEntries: { ops_user_name: string; amount: number }[]
+  ): { name: string; amount: number }[] {
+    const map: Record<string, { name: string; amount: number }> = {}
+    const allEntries = [...(opsEntries ?? []), ...(contractEntries ?? [])]
+    for (const e of allEntries) {
+      const name = e.ops_user_name?.trim() || '관리팀'
+      if (!map[name]) map[name] = { name, amount: 0 }
+      map[name].amount += e.amount
+    }
+    return Object.values(map)
+  }
+  const thisMonthOpsUserRows = buildOpsUserRows(
+    revenueData?.thisMonthOps ?? [],
+    revenueData?.thisMonthOpsContracts ?? []
+  )
+
   // ── Scroll helpers ───────────────────────────────────────
 
   function scrollTo(ref: RefObject<HTMLDivElement | null>) {
@@ -737,6 +794,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           employeeRows={thisMonthRows}
           salesRevenueAmount={thisMonthSalesRaw}
           opsRevenueAmount={thisMonthOpsRaw}
+          opsUserRows={thisMonthOpsUserRows}
         />
       </div>
 
