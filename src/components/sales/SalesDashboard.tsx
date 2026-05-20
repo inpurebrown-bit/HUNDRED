@@ -926,10 +926,10 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                       <p className="text-[10px] text-white/40">{thisMonth} · 영업일 {bizElapsed}/{bizTotal}일</p>
                       <p className="text-xs font-bold text-white/70 mt-0.5">잔여 {bizRemaining}일 · 목표까지 {fmtV(needed)}개</p>
                       <p className="text-[11px] text-[#C5A258] font-black mt-1">
-                        💰 {thisMonthTotalPaid > 0
-                          ? (thisMonthTotalPaid >= 100000000
-                            ? (thisMonthTotalPaid / 100000000).toFixed(1) + '억'
-                            : (thisMonthTotalPaid / 10000).toFixed(0) + '만원')
+                        💰 {thisMonthTotalRevenue > 0
+                          ? (thisMonthTotalRevenue >= 100000000
+                            ? (thisMonthTotalRevenue / 100000000).toFixed(1) + '억'
+                            : (thisMonthTotalRevenue / 10000).toFixed(0) + '만원')
                           : '매출 없음'}
                       </p>
                     </div>
@@ -1346,12 +1346,11 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             {/* ── 이번달 요약 카드 ── */}
             <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">📅 {thisMonth} 이번달</p>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
                   { label: '계약 갯수', value: thisMonthContractCount % 1 === 0 ? `${thisMonthContractCount}개` : `${thisMonthContractCount.toFixed(1)}개`, color: 'text-[#C5A258]' },
                   { label: '본인 매출', value: fmtWon(thisMonthTotalRevenue), color: 'text-emerald-600' },
                   { label: '입금액(VAT포함)', value: fmtWon(thisMonthTotalPaid), color: 'text-sky-600' },
-                  { label: '입금액(부가세제외)', value: thisMonthTotalPaid > 0 ? fmtWon(Math.round(thisMonthTotalPaid / 1.1)) : '—', color: 'text-blue-600' },
                   { label: '취소건수', value: `${cancelledCount}건`, color: 'text-red-500' },
                 ].map(s => (
                   <div key={s.label} className="bg-gray-50 rounded-lg px-3 py-2 text-center">
@@ -1399,7 +1398,6 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                           const cancelled = c.details?.is_cancelled
                           const weight = contractWeight((c as any).details?.payment_amount)
                           const payAmt = pNum((c as any).details?.payment_amount)
-                          const payAmtVatExcl = payAmt > 0 ? Math.round(payAmt / 1.1) : 0
                           const myRev  = pNum((c as any).details?.my_revenue)
                           const fee    = pNum((c as any).details?.contract_fee)
                           return (
@@ -1423,7 +1421,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                                   }
                                 </div>
                               </div>
-                              <div className={`grid grid-cols-4 gap-2 mt-2 text-[11px] ${cancelled ? 'opacity-40' : ''}`}>
+                              <div className={`grid grid-cols-3 gap-2 mt-2 text-[11px] ${cancelled ? 'opacity-40' : ''}`}>
                                 <div className="bg-gray-50 rounded-lg px-2 py-1.5">
                                   <p className="text-[9px] text-gray-400 mb-0.5">계약금</p>
                                   <p className="font-semibold text-gray-700">{fee > 0 ? fmtWon(fee) : '—'}</p>
@@ -1431,10 +1429,6 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                                 <div className="bg-sky-50 rounded-lg px-2 py-1.5">
                                   <p className="text-[9px] text-gray-400 mb-0.5">입금액(VAT포함)</p>
                                   <p className="font-semibold text-sky-700">{payAmt > 0 ? fmtWon(payAmt) : '—'}</p>
-                                </div>
-                                <div className="bg-blue-50 rounded-lg px-2 py-1.5">
-                                  <p className="text-[9px] text-gray-400 mb-0.5">입금액(부가세제외)</p>
-                                  <p className="font-semibold text-blue-700">{payAmtVatExcl > 0 ? fmtWon(payAmtVatExcl) : '—'}</p>
                                 </div>
                                 <div className="bg-emerald-50 rounded-lg px-2 py-1.5">
                                   <p className="text-[9px] text-gray-400 mb-0.5">본인 매출</p>
