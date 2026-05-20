@@ -299,38 +299,32 @@ function MonthSection({
             {[...Array(2)].map((_, i) => <Skeleton key={i} className="h-24" />)}
           </div>
         ) : (
-          <>
-            <div className="flex gap-3">
-              {/* 영업팀 */}
-              <div className="flex-1 bg-[#1B2A45] rounded-xl p-3 flex flex-col gap-1">
-                <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-0.5">영업팀</p>
-                <p className="text-base font-black text-white">{fmtKrw(salesRevenueAmount)}</p>
-                <div className="flex items-center gap-1 mt-0.5">
-                  <span className="text-[10px] text-white/40">부가세</span>
-                  <span className="text-[11px] font-semibold text-red-300">{salesRevenueAmount > 0 ? fmtKrw(Math.round(salesRevenueAmount / 11)) : '-'}</span>
-                </div>
-              </div>
-              {/* 관리팀 */}
-              <div className="flex-1 bg-emerald-700 rounded-xl p-3 flex flex-col gap-1">
-                <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-0.5">관리팀</p>
-                <p className="text-base font-black text-white">{opsRevenueAmount > 0 ? fmtKrw(opsRevenueAmount) : '-'}</p>
-                <div className="flex items-center gap-1 mt-0.5">
-                  <span className="text-[10px] text-white/40">부가세</span>
-                  <span className="text-[11px] font-semibold text-emerald-200">{opsRevenueAmount > 0 ? fmtKrw(Math.round(opsRevenueAmount / 11)) : '-'}</span>
-                </div>
-              </div>
-              {/* 진행중 건수 */}
-              <div className="flex-none w-24 bg-violet-50 rounded-xl p-3 flex flex-col justify-center items-center">
-                <p className="text-[10px] text-[#1B2A45]/50 mb-1 text-center">진행중</p>
-                <p className="text-xl font-black text-violet-600">{inProgressCount}<span className="text-sm font-normal ml-0.5">건</span></p>
-              </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {/* 영업팀 총매출 */}
+            <div className="bg-[#1B2A45] rounded-xl p-3">
+              <p className="text-[9px] font-bold text-white/50 mb-1.5">영업팀 총매출</p>
+              <p className="text-sm font-black text-white leading-none">{fmtKrw(salesRevenueAmount)}</p>
             </div>
-            {/* 합계 세금 */}
-            <div className="mt-2 flex items-center justify-between bg-red-50 rounded-lg px-3 py-2">
-              <span className="text-[10px] text-[#1B2A45]/50">세금</span>
-              <span className="text-sm font-black text-red-500">{taxAmount > 0 ? fmtKrw(taxAmount) : '-'}</span>
+            {/* 관리팀 총매출 */}
+            <div className="bg-emerald-700 rounded-xl p-3">
+              <p className="text-[9px] font-bold text-white/50 mb-1.5">관리팀 총매출</p>
+              <p className="text-sm font-black text-white leading-none">{opsRevenueAmount > 0 ? fmtKrw(opsRevenueAmount) : '-'}</p>
             </div>
-          </>
+            {/* 발생 부가세 */}
+            <div className="bg-orange-50 border border-orange-100 rounded-xl p-3">
+              <p className="text-[9px] font-bold text-orange-400 mb-1.5">발생 부가세</p>
+              <p className="text-sm font-black text-orange-500 leading-none">
+                {(salesRevenueAmount + opsRevenueAmount) > 0
+                  ? fmtKrw(Math.round((salesRevenueAmount + opsRevenueAmount) / 11))
+                  : '-'}
+              </p>
+            </div>
+            {/* 발생 세금 */}
+            <div className="bg-red-50 border border-red-100 rounded-xl p-3">
+              <p className="text-[9px] font-bold text-red-400 mb-1.5">발생 세금</p>
+              <p className="text-sm font-black text-red-500 leading-none">{taxAmount > 0 ? fmtKrw(taxAmount) : '-'}</p>
+            </div>
+          </div>
         )}
       </div>
     </section>
