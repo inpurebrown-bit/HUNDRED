@@ -23,16 +23,30 @@ export async function GET(req: NextRequest) {
   if (user.role === 'sales') custQuery = custQuery.eq('owner_id', user.id)
 
   // ── 관리팀 매출: ops_cases.details.fee_amount + payment_entries[*].fee_amount ──
-  let opsQuery = supabaseAdmin
+  // ops-cases GET과 동일한 JS 필터 방식으로 owner_id/ops_user_name/details.ops_user_name 모두 매칭
+  const opsQuery = supabaseAdmin
     .from('ops_cases')
     .select('id, details, created_at, updated_at, owner_id, ops_user_name, customer_name, phone')
 
-  if (user.role === 'ops') opsQuery = opsQuery.eq('owner_id', user.id)
-
-  const [{ data: custContracted }, { data: opsCases }] = await Promise.all([
+  const [{ data: custContracted }, { data: opsCasesRaw }] = await Promise.all([
     custQuery,
     opsQuery,
   ])
+
+  let opsCases = opsCasesRaw || []
+  if (user.role === 'ops') {
+    const myId   = String(user.id).trim()
+    const myName = (user.name || '').trim()
+    const isLeader = myName.includes('팀장')
+    if (!isLeader) {
+      opsCases = opsCases.filter((c: any) => {
+        const ownerMatch   = c.owner_id != null && String(c.owner_id).trim() === myId
+        const nameMatch    = c.ops_user_name && c.ops_user_name.trim() === myName
+        const detailsMatch = c.details?.ops_user_name && String(c.details.ops_user_name).trim() === myName
+        return ownerMatch || nameMatch || detailsMatch
+      })
+    }
+  }
 
   // ── 영업팀 계약 리스트 변환 ──────────────────────────────────────────
   const salesEntries = (custContracted || [])
