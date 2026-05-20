@@ -904,6 +904,17 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               const achievePct = target > 0 ? Math.min(100, Math.round(total / target * 100)) : 0
               const fmtV = (v: number) => v % 1 === 0 ? String(v) : v.toFixed(1)
               const fmtP = (v: number | null) => v !== null ? v.toFixed(1) + '%' : '—'
+              // 결제율 등급 — top: 최상 기준값, 5% 구간씩 단계 내려감
+              const rateGrade = (rate: number | null, top: number) => {
+                if (rate === null) return { label: null, numCls: 'text-gray-400' }
+                if (rate >= top)        return { label: <span className="text-blue-500 font-bold">🔥 최상</span>,      numCls: 'text-blue-700' }
+                if (rate >= top - 5)    return { label: <span className="text-cyan-500 font-bold">✨ 우수</span>,      numCls: 'text-cyan-700' }
+                if (rate >= top - 10)   return { label: <span className="text-emerald-500 font-bold">✅ 양호</span>,   numCls: 'text-emerald-700' }
+                if (rate >= top - 15)   return { label: <span className="text-amber-500 font-bold">📊 보통</span>,     numCls: 'text-amber-600' }
+                if (rate >= top - 20)   return { label: <span className="text-orange-400 font-bold">⚠️ 미흡</span>,   numCls: 'text-orange-500' }
+                if (rate >= top - 25)   return { label: <span className="text-orange-600 font-bold">⚡ 부진</span>,    numCls: 'text-orange-700' }
+                return                         { label: <span className="text-red-500 font-bold">🚨 위험</span>,       numCls: 'text-red-600' }
+              }
 
               return (
                 <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
@@ -957,11 +968,11 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                         </div>
                         <div className="rounded-xl bg-blue-50 p-3 text-center relative">
                           <p className="text-[9px] text-blue-400 font-semibold mb-1">공급결제율</p>
-                          <p className={`text-xl font-black leading-none ${supRate !== null && supRate >= 40 ? 'text-blue-700' : supRate !== null && supRate >= 20 ? 'text-amber-500' : supRate !== null && supRate >= 13 ? 'text-orange-500' : 'text-red-500'}`}>
+                          <p className={`text-xl font-black leading-none ${rateGrade(supRate, 40).numCls}`}>
                             {fmtP(supRate)}
                           </p>
                           <p className="text-[8px] mt-1">
-                            {supRate === null ? <span className="text-blue-400">—</span> : supRate >= 40 ? <span className="text-blue-500 font-bold">🔥 최상</span> : supRate >= 20 ? <span className="text-amber-500 font-bold">🙂 쏘쏘</span> : supRate >= 13 ? <span className="text-orange-500 font-bold">⚡ 주의</span> : <span className="text-red-500 font-bold">🚨 위험</span>}
+                            {rateGrade(supRate, 40).label ?? <span className="text-blue-400">—</span>}
                           </p>
                         </div>
                       </div>
@@ -997,7 +1008,10 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                       </div>
                       <div className="px-3">
                         <p className="text-[9px] text-teal-500 font-semibold mb-0.5">총결제율</p>
-                        <p className="text-lg font-black text-teal-700">{fmtP(totRate)}</p>
+                        <p className={`text-lg font-black ${rateGrade(totRate, 30).numCls}`}>{fmtP(totRate)}</p>
+                        <p className="text-[8px] mt-0.5">
+                          {rateGrade(totRate, 30).label ?? <span className="text-teal-400">—</span>}
+                        </p>
                       </div>
                       <div className="pl-3">
                         <p className={`text-[9px] font-semibold mb-0.5 ${supStopped ? 'text-red-400' : 'text-amber-500'}`}>
