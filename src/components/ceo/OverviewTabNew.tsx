@@ -824,6 +824,12 @@ function NoticeSection() {
   const [toast, setToast]           = useState<string|null>(null)
   const [showForm, setShowForm]     = useState(false)
   const [expandedId, setExpandedId] = useState<string|null>(null)
+  const [editingId, setEditingId]   = useState<string|null>(null)
+  const [editTitle, setEditTitle]   = useState('')
+  const [editContent, setEditContent] = useState('')
+  const [editTarget, setEditTarget] = useState<'all'|'sales'|'ops'>('all')
+  const [editImportant, setEditImportant] = useState(false)
+  const [updating, setUpdating]     = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -865,6 +871,32 @@ function NoticeSection() {
     const r = await fetch(`/api/notices?id=${id}`, { method: 'DELETE' })
     if (r.ok) { await load(); setExpandedId(null) }
     else toast_('❌ 삭제 실패')
+  }
+
+  function startEdit(n: any) {
+    setEditingId(n.id)
+    setEditTitle(n.title || '')
+    setEditContent(n.content || '')
+    setEditTarget(n.target_team || 'all')
+    setEditImportant(n.notice_type === 'important')
+  }
+
+  async function handleUpdate(id: string) {
+    if (!editTitle.trim()) return
+    setUpdating(true)
+    const r = await fetch(`/api/notices?id=${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: editTitle.trim(),
+        content: editContent.trim(),
+        target_team: editTarget,
+        notice_type: editImportant ? 'important' : 'general',
+      }),
+    })
+    if (r.ok) { await load(); setEditingId(null); toast_('✅ 공지 수정 완료!') }
+    else toast_('❌ 수정 실패')
+    setUpdating(false)
   }
 
   async function toggleImportant(n: any) {
@@ -961,29 +993,77 @@ function NoticeSection() {
                 {/* 펼쳐진 내용 */}
                 {open && (
                   <div className={`px-5 pb-4 border-t ${imp ? 'border-amber-100' : 'border-gray-50'}`}>
-                    {n.content ? (
-                      <div className={`mt-3 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed rounded-xl p-4 border ${imp ? 'bg-white border-amber-100' : 'bg-[#FAFAF8] border-gray-100'}`}>
-                        {n.content}
+                    {editingId === n.id ? (
+                      /* ── 인라인 수정 폼 ── */
+                      <div className="mt-3 space-y-2">
+                        <input value={editTitle} onChange={e => setEditTitle(e.target.value)}
+                          placeholder="제목 *" required
+                          className="w-full border border-[#C5A258] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A258]/50" />
+                        <textarea value={editContent} onChange={e => setEditContent(e.target.value)}
+                          placeholder="내용 (선택)" rows={4}
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A258]/50 resize-none" />
+                        <div className="flex gap-2 items-center flex-wrap">
+                          <div className="flex gap-1 flex-1 min-w-0">
+                            {(['all','sales','ops'] as const).map(t => (
+                              <button key={t} type="button" onClick={() => setEditTarget(t)}
+                                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${editTarget===t ? 'bg-[#1B2A45] text-white border-[#1B2A45]' : 'border-gray-200 text-gray-500 hover:border-gray-400'}`}>
+                                {t==='all'?'전체':t==='sales'?'영업팀':'관리팀'}
+                              </button>
+                            ))}
+                          </div>
+                          <button type="button" onClick={() => setEditImportant(v => !v)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors shrink-0 ${editImportant ? 'bg-amber-400 text-white border-amber-400' : 'border-gray-200 text-gray-400 hover:border-amber-300 hover:text-amber-500'}`}>
+                            {editImportant ? '⭐ 중요' : '☆ 중요'}
+                          </button>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <button type="button" onClick={() => setEditingId(null)}
+                            className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">
+                            취소
+                          </button>
+                          <button type="button" onClick={() => handleUpdate(n.id)}
+                            disabled={updating || !editTitle.trim()}
+                            className="text-xs px-4 py-1.5 rounded-lg bg-[#C5A258] hover:bg-[#C5A258]/80 disabled:opacity-40 text-white font-bold transition-colors">
+                            {updating ? '저장 중...' : '💾 저장'}
+                          </button>
+                        </div>
                       </div>
                     ) : (
-                      <p className="mt-3 text-sm text-gray-400 italic">내용 없음</p>
+                      /* ── 읽기 모드 ── */
+                      <>
+                        {n.content ? (
+                          <div className={`mt-3 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed rounded-xl p-4 border ${imp ? 'bg-white border-amber-100' : 'bg-[#FAFAF8] border-gray-100'}`}>
+                            {n.content}
+                          </div>
+                        ) : (
+                          <p className="mt-3 text-sm text-gray-400 italic">내용 없음</p>
+                        )}
+                        {/* 액션 버튼 */}
+                        <div className="flex items-center justify-between mt-3">
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => toggleImportant(n)}
+                              className={`text-xs px-3 py-1 rounded-lg font-semibold border transition-colors ${
+                                imp
+                                  ? 'border-amber-300 text-amber-700 bg-amber-100 hover:bg-amber-200'
+                                  : 'border-gray-200 text-gray-400 hover:text-amber-500 hover:border-amber-300 hover:bg-amber-50'
+                              }`}>
+                              {imp ? '⭐ 중요 해제' : '☆ 중요로 설정'}
+                            </button>
+                            <button onClick={() => startEdit(n)}
+                              className="text-xs px-3 py-1 rounded-lg font-semibold border border-gray-200 text-gray-500 hover:text-[#1B2A45] hover:border-[#1B2A45]/30 hover:bg-gray-50 transition-colors">
+                              ✏️ 수정
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-gray-300 sm:hidden">{fmtDate(n.created_at)}</span>
+                            <button onClick={() => del(n.id)}
+                              className="text-xs text-gray-300 hover:text-red-400 transition-colors px-2 py-1 rounded">
+                              🗑 삭제
+                            </button>
+                          </div>
+                        </div>
+                      </>
                     )}
-                    {/* 액션 버튼 */}
-                    <div className="flex items-center justify-between mt-3">
-                      <button onClick={() => toggleImportant(n)}
-                        className={`text-xs px-3 py-1 rounded-lg font-semibold border transition-colors ${
-                          imp
-                            ? 'border-amber-300 text-amber-700 bg-amber-100 hover:bg-amber-200'
-                            : 'border-gray-200 text-gray-400 hover:text-amber-500 hover:border-amber-300 hover:bg-amber-50'
-                        }`}>
-                        {imp ? '⭐ 중요 해제' : '☆ 중요로 설정'}
-                      </button>
-                      <span className="text-[10px] text-gray-300 sm:hidden">{fmtDate(n.created_at)}</span>
-                      <button onClick={() => del(n.id)}
-                        className="text-xs text-gray-300 hover:text-red-400 transition-colors px-2 py-1 rounded">
-                        🗑 삭제
-                      </button>
-                    </div>
                   </div>
                 )}
               </div>
