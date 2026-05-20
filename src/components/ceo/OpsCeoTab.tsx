@@ -62,6 +62,21 @@ function fmtMoney(n: number) {
   return n.toLocaleString() + '원'
 }
 
+// ─── 기관명 축약 ──────────────────────────────────────────
+function abbrevInst(inst: string): string {
+  const MAP: Record<string, string> = {
+    '중진공':        '중진공',
+    '소진공(혁신)':  '소(혁신)',
+    '소진공(신취)':  '소(신취)',
+    '소진공(재도전)':'소(재)',
+    '서민금융(미소)':'서(미소)',
+    '기보':          '기보',
+    '신보':          '신보',
+    '재단':          '재단',
+  }
+  return MAP[inst] || inst
+}
+
 // ─── Case Card (grid) ─────────────────────────────────────
 function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
   c: OpsCase; isOpen: boolean
@@ -105,9 +120,9 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
         <span className="text-[8px] text-gray-400 font-medium truncate">{opsUser || '—'}</span>
       </div>
 
-      {/* ② 업체명 */}
-      <div className="h-[30px] flex items-start justify-center">
-        <p className="font-bold text-[#1B2A45] text-[11px] leading-tight text-center break-all line-clamp-2"
+      {/* ② 업체명 — 네모 박스 */}
+      <div className="h-[34px] flex items-center justify-center border border-gray-300 rounded-lg bg-gray-50 px-1.5 mt-0.5">
+        <p className="font-bold text-[#1B2A45] text-[11px] leading-tight text-center break-all line-clamp-2 w-full"
           style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
           {companyName}
         </p>
@@ -136,9 +151,9 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
 
       {/* ⑥ 직접대출 기관 : 현황 */}
       <div className="h-[18px] flex items-center justify-center gap-1 mt-1">
-        <span className="text-[8px] font-bold text-blue-400 shrink-0">직접</span>
+        <span className="text-[8px] font-bold text-blue-400 shrink-0">직</span>
         {directInsts.length > 0
-          ? <span className="text-[8px] text-blue-700 font-medium truncate">{directInsts.join('·')}</span>
+          ? <span className="text-[8px] text-blue-700 font-medium truncate">{directInsts.map(abbrevInst).join('·')}</span>
           : <span className="text-[8px] text-gray-200">—</span>
         }
         {directStage
@@ -149,9 +164,9 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
 
       {/* ⑦ 간접대출 기관 : 현황 */}
       <div className="h-[18px] flex items-center justify-center gap-1 mt-0.5">
-        <span className="text-[8px] font-bold text-violet-400 shrink-0">간접</span>
+        <span className="text-[8px] font-bold text-violet-400 shrink-0">간</span>
         {indirectInsts.length > 0
-          ? <span className="text-[8px] text-violet-700 font-medium truncate">{indirectInsts.join('·')}</span>
+          ? <span className="text-[8px] text-violet-700 font-medium truncate">{indirectInsts.map(abbrevInst).join('·')}</span>
           : <span className="text-[8px] text-gray-200">—</span>
         }
         {indirectStage
@@ -338,7 +353,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
                 <div className="flex gap-0 items-start">
                   <div className="w-1/2 min-w-0 pr-3">
                     {activeItems.length > 0 ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                         {activeItems.map(c => (
                           <CeoCaseCard key={`${inst}-${c.id}`} c={c} isOpen={openPanelIds.includes(c.id)} onToggle={onToggle} onScriptToggle={onScriptToggle} />
                         ))}
@@ -350,7 +365,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
                   <div className="w-1/2 min-w-0 border-l-2 border-dashed border-gray-200 pl-3">
                     <p className="text-[9px] font-bold text-gray-400 mb-1.5 uppercase tracking-wide">📋 다음 자금 대기</p>
                     {upcomingItems.length > 0 ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                         {upcomingItems.map(c => (
                           <CeoCaseCard key={`${inst}-upcoming-${c.id}`} c={c} isOpen={openPanelIds.includes(c.id)} onToggle={onToggle} onScriptToggle={onScriptToggle} />
                         ))}
