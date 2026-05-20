@@ -1269,20 +1269,24 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                         const rate = parseFloat(String(d.fee_rate || '0')) || 0
                         if (raw > 0 && rate > 0) detailField('fee_amount', String(Math.round(raw * rate / 100)))
                       }} className={inp} placeholder="0원" /></div>
-                    <div><label className={lbl}>수수료%</label><input type="text" value={d.fee_rate || ''} onChange={e => {
-                      detailField('fee_rate', e.target.value)
-                      const rate = parseFloat(e.target.value) || 0
-                      const amt = parseComma(String(d.approval_amount || '0'))
-                      if (amt > 0 && rate > 0) detailField('fee_amount', String(Math.round(amt * rate / 100)))
-                    }} className={inp} placeholder="%" /></div>
+                    <div><label className={lbl}>수수료%</label><input type="text"
+                      inputMode="decimal"
+                      value={d.fee_rate || ''}
+                      onChange={e => {
+                        const val = e.target.value.replace(/[^0-9.]/g, '')
+                        detailField('fee_rate', val)
+                        const rate = parseFloat(val) || 0
+                        const amt = parseComma(String(d.approval_amount || '0'))
+                        if (amt > 0 && rate > 0) detailField('fee_amount', String(Math.round(amt * rate / 100)))
+                      }} className={inp} placeholder="%" /></div>
                     <div className="col-span-2">
-                      <label className={lbl}>수수료 <span className="text-emerald-600 font-bold">(관리팀 매출)</span></label>
-                      <input type="text"
-                        value={d.fee_amount ? formatComma(d.fee_amount) : ''}
-                        onChange={e => {
-                          const raw = parseComma(e.target.value)
-                          detailField('fee_amount', raw > 0 ? String(raw) : '')
-                        }} className={inp + ' font-semibold'} placeholder="0원" />
+                      <label className={lbl}>수수료 <span className="text-emerald-600 font-bold">(관리팀 매출 · 자동산정)</span></label>
+                      <div className="relative">
+                        <input type="text" readOnly
+                          value={d.fee_amount ? formatComma(d.fee_amount) : ''}
+                          className="w-full border border-emerald-300 bg-emerald-50 rounded-lg px-3 py-2 text-xs font-bold text-emerald-700 cursor-default focus:outline-none" placeholder="승인금액 × 수수료% 자동계산" />
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-emerald-500 text-[10px] font-semibold">원</span>
+                      </div>
                     </div>
                     {/* 부가세 포함 체크박스 */}
                     <div className="col-span-2">
