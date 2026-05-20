@@ -454,18 +454,31 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
     // 진행 중인 자동저장 타이머 취소 (race condition 방지)
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
     setFeeSaving(true)
-    const mergedDetails = { ...(local.details || {}), fee_locked: true }
+    const nowIso = new Date().toISOString()
+    const todayStr = nowIso.slice(0, 10)
+    // deposit_date가 없으면 오늘로 자동 세팅 (revenue API date fallback 보장)
+    const baseDetails = { ...(local.details || {}) }
+    if (!baseDetails.deposit_date) baseDetails.deposit_date = todayStr
+    const mergedDetails = { ...baseDetails, fee_locked: true }
     const next = { ...local, details: mergedDetails }
     setLocal(next)
-    const nowIso = new Date().toISOString()
     try {
-      await fetch(`/api/ops-cases/${c.id}`, {
+      const res = await fetch(`/api/ops-cases/${c.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ details: mergedDetails, updated_at: nowIso }),
       })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        console.error('[handleFeeSave] PATCH failed:', err)
+        alert(`저장 실패: ${err?.error || res.status}`)
+        return
+      }
       onSave(c.id, { details: mergedDetails, updated_at: nowIso })
       setFeeSaved(true)
+    } catch (e) {
+      console.error('[handleFeeSave] network error:', e)
+      alert('네트워크 오류로 저장에 실패했습니다.')
     } finally {
       setFeeSaving(false)
     }
@@ -2542,9 +2555,8 @@ function OpsMiniRevenue({ userName }: { userName: string }) {
     return n.toLocaleString() + '원'
   }
 
-  const matchMe = (e: any) => !e.ops_user_name || e.ops_user_name === userName || !userName
-  const feeTotal = (rev?.thisMonthOps || []).filter(matchMe).reduce((s: number, e: any) => s + (e.amount || 0), 0)
-  const contractTotal = (rev?.thisMonthOpsContracts || []).filter(matchMe).reduce((s: number, e: any) => s + (e.amount || 0), 0)
+  const feeTotal = (rev?.thisMonthOps || []).reduce((s: number, e: any) => s + (e.amount || 0), 0)
+  const contractTotal = (rev?.thisMonthOpsContracts || []).reduce((s: number, e: any) => s + (e.amount || 0), 0)
   const total = feeTotal + contractTotal
   const monthLabel = new Date().getMonth() + 1
 
@@ -2596,18 +2608,16 @@ function OpsRevenueTab({ userName }: { userName: string }) {
   const now = new Date()
   const monthLabel = now.getMonth() + 1
 
-  const matchMe = (e: any) => !e.ops_user_name || e.ops_user_name === userName || !userName
-
-  // 수수료 매출
+  // 수수료 매출 (API가 이미 유저별 필터 완료 — 추가 필터 없음)
   const feeEntries: { company: string; amount: number; date: string }[] =
-    (data?.thisMonthOps || []).filter(matchMe).map((e: any) => ({
+    (data?.thisMonthOps || []).map((e: any) => ({
       company: e.company || '—', amount: e.amount, date: e.date || '',
     }))
   const feeTotal = feeEntries.reduce((s, e) => s + e.amount, 0)
 
   // 계약 매출
   const contractEntries: { company: string; amount: number; date: string; type: string }[] =
-    (data?.thisMonthOpsContracts || []).filter(matchMe).map((e: any) => ({
+    (data?.thisMonthOpsContracts || []).map((e: any) => ({
       company: e.company || '—', amount: e.amount, date: e.date || '', type: e.type || '',
     }))
   const contractTotal = contractEntries.reduce((s, e) => s + e.amount, 0)

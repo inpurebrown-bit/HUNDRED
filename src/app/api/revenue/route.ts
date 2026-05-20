@@ -68,19 +68,22 @@ export async function GET(req: NextRequest) {
 
   // ── 관리팀 수수료 리스트 변환 ────────────────────────────────────────
   // fee_amount(1차) + payment_entries[*].fee_amount(추가)
+  const todayStr = new Date().toISOString().slice(0, 10)
   const opsEntries: OpsEntry[] = (opsCases || [])
     .flatMap((c: any) => {
       const d = c.details || {}
       const entries: OpsEntry[] = []
       const fee1 = parseMoney(d.fee_amount)
       if (fee1 > 0) {
+        // deposit_date 우선 → updated_at → created_at → 오늘 (반드시 날짜 있어야 월별 집계 가능)
+        const entryDate = d.deposit_date || c.updated_at?.slice(0, 10) || c.created_at?.slice(0, 10) || todayStr
         entries.push({
           id: `${c.id}_1`,
           amount: fee1,
-          date: d.deposit_date || c.updated_at?.slice(0, 10) || c.created_at?.slice(0, 10) || '',
+          date: entryDate,
           ops_user_id: String(c.owner_id || ''),
           ops_user_name: c.ops_user_name || d.ops_user_name || '',
-          company: d.sales_customer_info?.company || c.customer_name || '',
+          company: d.sales_customer_info?.company || d.company || c.customer_name || '',
         })
       }
       for (const pe of (d.payment_entries || [])) {
@@ -89,10 +92,10 @@ export async function GET(req: NextRequest) {
           entries.push({
             id: `${c.id}_${pe.id || entries.length}`,
             amount: feeN,
-            date: pe.date || c.updated_at?.slice(0, 10) || '',
+            date: pe.date || c.updated_at?.slice(0, 10) || todayStr,
             ops_user_id: String(c.owner_id || ''),
             ops_user_name: c.ops_user_name || d.ops_user_name || '',
-            company: d.sales_customer_info?.company || c.customer_name || '',
+            company: d.sales_customer_info?.company || d.company || c.customer_name || '',
           })
         }
       }
