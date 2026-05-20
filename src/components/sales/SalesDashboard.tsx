@@ -50,7 +50,7 @@ const MONTHLY_GOALS: Record<string, number> = {
 // All sales users for assignee dropdown (legacy — replaced by dynamic salesUserNames)
 const SALES_USERS: string[] = []
 
-type SalesTab = 'board' | 'db010' | 'customers' | 'contracted' | 'emotional' | 'trash' | 'deleted' | 'revenue' | 'report' | 'profile'
+type SalesTab = 'board' | 'db010' | 'customers' | 'contracted' | 'emotional' | 'trash' | 'revenue' | 'report' | 'profile'
 
 // ── Component ──────────────────────────────────────────────────────────
 export default function SalesDashboard({ userId, userName, username }: Props) {
@@ -298,22 +298,35 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   }, [])
 
   const deleteCustomer = useCallback(async (id: string) => {
-    if (!confirm('삭제하시겠습니까?\n(삭제DB 탭에 보관됩니다)')) return
-    // 소프트 삭제: status=trash + employee_deleted 플래그
+    const customer = customers.find(c => c.id === id)
+    if (!customer) return
+    const d = (customer.details as any) || {}
+    const company = d.company || customer.name || '해당 업체'
+    if (d.delete_requested) {
+      showToast('이미 대표님께 삭제 요청이 전송됐습니다. 승인 대기 중입니다.', 'error')
+      return
+    }
+    const reason = window.prompt(`"${company}" 삭제를 대표님께 요청합니다.\n\n사유를 입력해주세요 (선택사항):`, '')
+    if (reason === null) return
     const todayIso = new Date().toISOString().slice(0, 10)
     await fetch(`/api/customers/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        status: 'trash',
-        details: { employee_deleted: true, deleted_at: todayIso, deleted_by: userName },
+        details: {
+          delete_requested: true,
+          delete_reason: reason.trim() || '사유 없음',
+          delete_requested_by: userName,
+          delete_requested_at: todayIso,
+        },
       }),
     })
     setCustomers(prev => prev.map(c => c.id === id
-      ? { ...c, status: 'trash', details: { ...(c.details || {}), employee_deleted: true, deleted_at: todayIso, deleted_by: userName } }
+      ? { ...c, details: { ...(c.details || {}), delete_requested: true, delete_reason: reason.trim() || '사유 없음', delete_requested_by: userName, delete_requested_at: todayIso } }
       : c
     ))
-  }, [userName])
+    showToast('✅ 대표님께 삭제 요청을 전송했습니다.')
+  }, [customers, userName, showToast])
 
   // 직가DB 전용 삭제요청 — 대표 승인 후 삭제
   const requestDeleteDb010 = useCallback(async (id: string) => {
@@ -702,7 +715,6 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
     { key: 'contracted', label: '✅ 계약 업체',   count: contractedCustomers.length },
     { key: 'emotional',  label: '💬 감성톡(거절업체)',      count: emotionalCustomers.length },
     { key: 'trash',      label: '🗑 자체거절',    count: trashCustomers.length },
-    { key: 'deleted',    label: '🗂 삭제DB',      count: deletedCustomers.length },
     { key: 'revenue',    label: '💰 매출',        count: revenueCustomers.length },
     { key: 'report',     label: '📝 보고' },
     { key: 'profile',    label: '👤 사원정보' },
@@ -1348,57 +1360,6 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 onStatusChange={async (id, status) => moveCustomer(id, status as any)}
                 onDelete={async (id) => deleteCustomer(id)}
               />
-            )}
-          </div>
-        )}
-
-        {/* ══════════ 직원 삭제DB ══════════ */}
-        {activeTab === 'deleted' && (
-          <div className="space-y-3">
-            <div className="bg-gradient-to-r from-[#1B2A45] to-gray-700 rounded-xl px-5 py-3.5">
-              <h2 className="text-sm font-bold text-white">🗂 직원 삭제DB</h2>
-              <p className="text-white/50 text-[11px] mt-0.5">총 {deletedCustomers.length}건 · 직원이 삭제 처리한 업체</p>
-            </div>
-            <p className="text-xs text-gray-400 bg-gray-50 border border-gray-100 rounded-lg px-4 py-2">
-              직원이 삭제 버튼으로 처리한 업체입니다. 복구 시 상태 변경 메뉴를 사용하세요.
-            </p>
-            {loading ? (
-              <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
-            ) : deletedCustomers.length === 0 ? (
-              <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
-                삭제된 업체가 없습니다.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {deletedCustomers.map(c => {
-                  const d = (c as any).details || {}
-                  return (
-                    <div key={c.id} className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-800 truncate">{d.company || c.company || c.name || '(업체명 없음)'}</p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">
-                          {c.name} · {c.phone}
-                          {d.deleted_by && <span className="ml-2 text-red-400">삭제: {d.deleted_by}</span>}
-                          {d.deleted_at && <span className="ml-1 text-gray-300">({d.deleted_at})</span>}
-                        </p>
-                      </div>
-                      <button
-                        onClick={async () => {
-                          await fetch(`/api/customers/${c.id}`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ status: 'lead', details: { employee_deleted: false } }),
-                          })
-                          loadAll()
-                        }}
-                        className="shrink-0 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg font-medium transition-colors"
-                      >
-                        복구
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
             )}
           </div>
         )}

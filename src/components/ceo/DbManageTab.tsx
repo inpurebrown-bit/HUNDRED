@@ -97,7 +97,8 @@ export default function DbManageTab({ initialView = 'trash' }: { initialView?: '
       const res = await fetch('/api/customers')
       const data = await res.json()
       const all: Customer[] = data.customers || []
-      setDeleteReqList(all.filter(c => c.status === 'db010' && c.details?.delete_requested))
+      // db010 뿐 아니라 모든 상태의 삭제요청 포함
+      setDeleteReqList(all.filter(c => c.details?.delete_requested))
     } catch {}
     setDelReqLoading(false)
   }, [])
@@ -220,7 +221,7 @@ export default function DbManageTab({ initialView = 'trash' }: { initialView?: '
     <div className="space-y-4 max-w-5xl mx-auto">
       <div className="flex items-center gap-2 flex-wrap">
         {[
-          { key: 'delete_requests' as const, label: '📨 직가DB 삭제요청' },
+          { key: 'delete_requests' as const, label: '📨 삭제 요청' },
           { key: 'trash' as const,           label: '🗑 거절 DB 쓰레기통' },
           { key: 'duplicate' as const,       label: '♻️ 중복 DB 감지' },
         ].map(v => (

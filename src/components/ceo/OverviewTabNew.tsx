@@ -156,7 +156,7 @@ function EmployeeTable({ rows, loading }: { rows: EmployeeRow[]; loading: boolea
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-[#1B2A45]/5">
-            {['담당자', '목표', '결제수', '예상마감', '일필요수', '공급결제율', '총결제율'].map(h => (
+            {['담당자', '목표', '결제수', '예상마감', '일필요수'].map(h => (
               <th key={h} className="text-left py-2.5 px-3 text-xs text-[#1B2A45]/50 font-semibold whitespace-nowrap">
                 {h}
               </th>
@@ -164,52 +164,32 @@ function EmployeeTable({ rows, loading }: { rows: EmployeeRow[]; loading: boolea
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, i) => {
-            const supG = rateGrade(row.supplyRate ?? null, 40)
-            const totG = rateGrade(row.totalRate ?? null, 30)
-            return (
-              <tr key={i} className="border-b border-[#E8E2D4]/60 hover:bg-[#FAF8F3] transition-colors">
-                <td className="py-3 px-3 font-semibold text-[#1B2A45] whitespace-nowrap">{row.name}</td>
-                <td className="py-3 px-3 text-[#1B2A45]/70">
-                  {row.goal === null ? (
-                    <span className="text-[10px] text-[#C5A258] bg-[#C5A258]/10 px-2 py-0.5 rounded-full">미설정</span>
-                  ) : row.goal + '건'}
-                </td>
-                <td className="py-3 px-3">
-                  <span className="font-black text-[#1B2A45] text-base">{row.contracted % 1 === 0 ? row.contracted : row.contracted.toFixed(1)}</span>
-                  <span className="text-xs text-[#1B2A45]/40 ml-0.5">건</span>
-                </td>
-                <td className="py-3 px-3 text-[#1B2A45]/70">
-                  {row.projected !== null ? (row.projected % 1 === 0 ? row.projected : row.projected.toFixed(1)) + '건' : '-'}
-                </td>
-                <td className="py-3 px-3">
-                  {row.dailyNeeded !== null ? (
-                    <span className="text-xs font-bold text-[#C5A258] bg-[#C5A258]/10 px-2 py-0.5 rounded-full">
-                      {row.dailyNeeded}건/일
-                    </span>
-                  ) : (
-                    <span className="text-[#1B2A45]/30 text-xs">—</span>
-                  )}
-                </td>
-                <td className="py-3 px-3">
-                  {row.supplyRate != null ? (
-                    <div>
-                      <span className="text-xs text-[#1B2A45]/50 mr-1">{row.supplyRate.toFixed(1)}%</span>
-                      <span className={`text-[11px] ${supG.cls}`}>{supG.label}</span>
-                    </div>
-                  ) : <span className="text-[#1B2A45]/30 text-xs">—</span>}
-                </td>
-                <td className="py-3 px-3">
-                  {row.totalRate != null ? (
-                    <div>
-                      <span className="text-xs text-[#1B2A45]/50 mr-1">{row.totalRate.toFixed(1)}%</span>
-                      <span className={`text-[11px] ${totG.cls}`}>{totG.label}</span>
-                    </div>
-                  ) : <span className="text-[#1B2A45]/30 text-xs">—</span>}
-                </td>
-              </tr>
-            )
-          })}
+          {rows.map((row, i) => (
+            <tr key={i} className="border-b border-[#E8E2D4]/60 hover:bg-[#FAF8F3] transition-colors">
+              <td className="py-3 px-3 font-semibold text-[#1B2A45] whitespace-nowrap">{row.name}</td>
+              <td className="py-3 px-3 text-[#1B2A45]/70">
+                {row.goal === null ? (
+                  <span className="text-[10px] text-[#C5A258] bg-[#C5A258]/10 px-2 py-0.5 rounded-full">미설정</span>
+                ) : row.goal + '건'}
+              </td>
+              <td className="py-3 px-3">
+                <span className="font-black text-[#1B2A45] text-base">{row.contracted % 1 === 0 ? row.contracted : row.contracted.toFixed(1)}</span>
+                <span className="text-xs text-[#1B2A45]/40 ml-0.5">건</span>
+              </td>
+              <td className="py-3 px-3 text-[#1B2A45]/70">
+                {row.projected !== null ? (row.projected % 1 === 0 ? row.projected : row.projected.toFixed(1)) + '건' : '-'}
+              </td>
+              <td className="py-3 px-3">
+                {row.dailyNeeded !== null ? (
+                  <span className="text-xs font-bold text-[#C5A258] bg-[#C5A258]/10 px-2 py-0.5 rounded-full">
+                    {row.dailyNeeded}건/일
+                  </span>
+                ) : (
+                  <span className="text-[#1B2A45]/30 text-xs">—</span>
+                )}
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
@@ -280,26 +260,37 @@ function MonthSection({
       <div className="px-5 py-4">
         <p className="text-[11px] font-bold text-[#1B2A45]/40 uppercase tracking-widest mb-3">이달 집계</p>
         {loading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-16" />)}
+          <div className="grid grid-cols-2 gap-3">
+            {[...Array(2)].map((_, i) => <Skeleton key={i} className="h-24" />)}
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-[#1B2A45] rounded-xl p-3">
-              <p className="text-[10px] text-white/50 mb-1">영업팀 발생매출</p>
-              <p className="text-lg font-black text-white">{fmtKrw(salesRevenueAmount)}</p>
+          <div className="flex gap-3">
+            {/* 영업팀 */}
+            <div className="flex-1 bg-[#1B2A45] rounded-xl p-3 flex flex-col gap-1">
+              <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-0.5">영업팀</p>
+              <div className="flex items-baseline gap-1">
+                <p className="text-base font-black text-white">{fmtKrw(salesRevenueAmount)}</p>
+              </div>
+              <div className="flex items-center gap-1 mt-0.5">
+                <span className="text-[10px] text-white/40">부가세(10%)</span>
+                <span className="text-[11px] font-semibold text-red-300">{fmtKrw(Math.round(salesRevenueAmount / 11))}</span>
+              </div>
             </div>
-            <div className="bg-emerald-700 rounded-xl p-3">
-              <p className="text-[10px] text-white/50 mb-1">관리팀 발생매출</p>
-              <p className="text-lg font-black text-white">{fmtKrw(opsRevenueAmount)}</p>
+            {/* 관리팀 */}
+            <div className="flex-1 bg-emerald-700 rounded-xl p-3 flex flex-col gap-1">
+              <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-0.5">관리팀</p>
+              <div className="flex items-baseline gap-1">
+                <p className="text-base font-black text-white">{opsRevenueAmount > 0 ? fmtKrw(opsRevenueAmount) : '-'}</p>
+              </div>
+              <div className="flex items-center gap-1 mt-0.5">
+                <span className="text-[10px] text-white/40">부가세(10%)</span>
+                <span className="text-[11px] font-semibold text-emerald-200">{opsRevenueAmount > 0 ? fmtKrw(Math.round(opsRevenueAmount / 11)) : '-'}</span>
+              </div>
             </div>
-            <div className="bg-violet-50 rounded-xl p-3">
-              <p className="text-[10px] text-[#1B2A45]/50 mb-1">진행중 건수</p>
-              <p className="text-lg font-black text-violet-600">{inProgressCount}건</p>
-            </div>
-            <div className="bg-red-50 rounded-xl p-3">
-              <p className="text-[10px] text-[#1B2A45]/50 mb-1">발생 세금 (10%)</p>
-              <p className="text-lg font-black text-red-500">{taxAmount > 0 ? fmtKrw(taxAmount) : '-'}</p>
+            {/* 진행중 건수 */}
+            <div className="flex-none w-24 bg-violet-50 rounded-xl p-3 flex flex-col justify-center items-center">
+              <p className="text-[10px] text-[#1B2A45]/50 mb-1 text-center">진행중</p>
+              <p className="text-xl font-black text-violet-600">{inProgressCount}<span className="text-sm font-normal ml-0.5">건</span></p>
             </div>
           </div>
         )}
