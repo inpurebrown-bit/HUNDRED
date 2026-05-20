@@ -695,10 +695,10 @@ function SalesDiaryView({ customers }: { customers: Customer[] }) {
   )
 }
 
-export default function SalesCeoTab() {
+export default function SalesCeoTab({ initialView }: { initialView?: CeoView }) {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
-  const [ceoView, setCeoView] = useState<CeoView>('customers')
+  const [ceoView, setCeoView] = useState<CeoView>(initialView ?? 'customers')
   const [supplyBannerDismissed, setSupplyBannerDismissed] = useState(false)
   const [personTab, setPersonTab] = useState<string>('all')
   const [statusTab, setStatusTab] = useState<StatusKey>('all')

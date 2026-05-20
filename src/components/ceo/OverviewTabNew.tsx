@@ -82,6 +82,9 @@ interface EmployeeRow {
   remaining: number
   projected: number | null
   dailyNeeded: number | null
+  supplyRate?: number | null   // 공급결제율 (%)
+  totalRate?: number | null    // 총결제율 (%)
+  supplyCount?: number         // 공급수
 }
 
 // ─── Business day utilities (1-indexed month wrappers) ───
@@ -151,47 +154,61 @@ function EmployeeTable({ rows, loading }: { rows: EmployeeRow[]; loading: boolea
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-[#E8E2D4]">
-            {['담당자', '목표', '결제수', '경과영업일', '잔여영업일', '예상마감', '일필요수'].map(h => (
-              <th
-                key={h}
-                className="text-left py-2 px-3 text-xs text-[#1B2A45]/50 font-medium whitespace-nowrap"
-              >
+          <tr className="bg-[#1B2A45]/5">
+            {['담당자', '목표', '결제수', '예상마감', '일필요수', '공급결제율', '총결제율'].map(h => (
+              <th key={h} className="text-left py-2.5 px-3 text-xs text-[#1B2A45]/50 font-semibold whitespace-nowrap">
                 {h}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, i) => (
-            <tr key={i} className="border-b border-[#E8E2D4]/60 hover:bg-[#FAF8F3] transition-colors">
-              <td className="py-2.5 px-3 font-medium text-[#1B2A45] whitespace-nowrap">{row.name}</td>
-              <td className="py-2.5 px-3 text-[#1B2A45]/70">
-                {row.goal === null ? (
-                  <span className="text-xs text-[#C5A258] bg-[#C5A258]/10 px-2 py-0.5 rounded-full">
-                    미설정
-                  </span>
-                ) : (
-                  row.goal + '건'
-                )}
-              </td>
-              <td className="py-2.5 px-3 font-semibold text-[#1B2A45]">{row.contracted % 1 === 0 ? row.contracted : row.contracted.toFixed(1)}건</td>
-              <td className="py-2.5 px-3 text-[#1B2A45]/60">{row.elapsed}일</td>
-              <td className="py-2.5 px-3 text-[#1B2A45]/60">{row.remaining}일</td>
-              <td className="py-2.5 px-3 text-[#1B2A45]/70">
-                {row.projected !== null ? (row.projected % 1 === 0 ? row.projected : row.projected.toFixed(1)) + '건' : '-'}
-              </td>
-              <td className="py-2.5 px-3">
-                {row.dailyNeeded !== null ? (
-                  <span className="text-xs font-semibold text-[#C5A258] bg-[#C5A258]/10 px-2 py-0.5 rounded-full">
-                    {row.dailyNeeded}건/일
-                  </span>
-                ) : (
-                  <span className="text-[#1B2A45]/40">-</span>
-                )}
-              </td>
-            </tr>
-          ))}
+          {rows.map((row, i) => {
+            const supG = rateGrade(row.supplyRate ?? null, 40)
+            const totG = rateGrade(row.totalRate ?? null, 30)
+            return (
+              <tr key={i} className="border-b border-[#E8E2D4]/60 hover:bg-[#FAF8F3] transition-colors">
+                <td className="py-3 px-3 font-semibold text-[#1B2A45] whitespace-nowrap">{row.name}</td>
+                <td className="py-3 px-3 text-[#1B2A45]/70">
+                  {row.goal === null ? (
+                    <span className="text-[10px] text-[#C5A258] bg-[#C5A258]/10 px-2 py-0.5 rounded-full">미설정</span>
+                  ) : row.goal + '건'}
+                </td>
+                <td className="py-3 px-3">
+                  <span className="font-black text-[#1B2A45] text-base">{row.contracted % 1 === 0 ? row.contracted : row.contracted.toFixed(1)}</span>
+                  <span className="text-xs text-[#1B2A45]/40 ml-0.5">건</span>
+                </td>
+                <td className="py-3 px-3 text-[#1B2A45]/70">
+                  {row.projected !== null ? (row.projected % 1 === 0 ? row.projected : row.projected.toFixed(1)) + '건' : '-'}
+                </td>
+                <td className="py-3 px-3">
+                  {row.dailyNeeded !== null ? (
+                    <span className="text-xs font-bold text-[#C5A258] bg-[#C5A258]/10 px-2 py-0.5 rounded-full">
+                      {row.dailyNeeded}건/일
+                    </span>
+                  ) : (
+                    <span className="text-[#1B2A45]/30 text-xs">—</span>
+                  )}
+                </td>
+                <td className="py-3 px-3">
+                  {row.supplyRate != null ? (
+                    <div>
+                      <span className="text-xs text-[#1B2A45]/50 mr-1">{row.supplyRate.toFixed(1)}%</span>
+                      <span className={`text-[11px] ${supG.cls}`}>{supG.label}</span>
+                    </div>
+                  ) : <span className="text-[#1B2A45]/30 text-xs">—</span>}
+                </td>
+                <td className="py-3 px-3">
+                  {row.totalRate != null ? (
+                    <div>
+                      <span className="text-xs text-[#1B2A45]/50 mr-1">{row.totalRate.toFixed(1)}%</span>
+                      <span className={`text-[11px] ${totG.cls}`}>{totG.label}</span>
+                    </div>
+                  ) : <span className="text-[#1B2A45]/30 text-xs">—</span>}
+                </td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>
@@ -217,6 +234,17 @@ function fmtKrw(n: number): string {
   return n.toLocaleString('ko-KR') + '원'
 }
 
+function rateGrade(rate: number | null, top: number) {
+  if (rate === null || rate === undefined) return { label: '—', cls: 'text-gray-400' }
+  if (rate >= top)        return { label: '🔥 최상', cls: 'text-blue-600 font-bold' }
+  if (rate >= top - 5)    return { label: '✨ 우수', cls: 'text-cyan-600 font-bold' }
+  if (rate >= top - 10)   return { label: '✅ 양호', cls: 'text-emerald-600 font-bold' }
+  if (rate >= top - 15)   return { label: '📊 보통', cls: 'text-amber-500 font-bold' }
+  if (rate >= top - 20)   return { label: '⚠️ 미흡', cls: 'text-orange-400 font-bold' }
+  if (rate >= top - 25)   return { label: '⚡ 부진', cls: 'text-orange-600 font-bold' }
+  return                         { label: '🚨 위험', cls: 'text-red-500 font-bold' }
+}
+
 function MonthSection({
   title,
   loading,
@@ -227,42 +255,48 @@ function MonthSection({
   revenueAmount = 0,
 }: MonthSectionProps) {
   const vatAmount = Math.round(revenueAmount * 0.1)
-  const stats = [
-    { label: '이번달 총 계약 수', value: (contractCount % 1 === 0 ? contractCount : contractCount.toFixed(1)) + '건' },
-    { label: '진행중 건수', value: inProgressCount + '건' },
-    { label: '발생 매출', value: fmtKrw(revenueAmount) },
-    { label: '발생 세금 (매출 10%)', value: taxAmount > 0 ? fmtKrw(taxAmount) : '-' },
-    { label: '발생 부가세 (10%)', value: vatAmount > 0 ? fmtKrw(vatAmount) : '-' },
-  ]
 
   return (
-    <section className="bg-white rounded-xl border border-[#E8E2D4] p-5 space-y-4">
-      <h2 className="font-semibold text-[#1B2A45] text-base">{title}</h2>
-
-      {loading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-16" />
-          ))}
+    <section className="bg-white rounded-2xl border border-[#E8E2D4] overflow-hidden">
+      <div className="px-5 py-4 border-b border-[#E8E2D4] flex items-center justify-between bg-gradient-to-r from-[#1B2A45]/3 to-transparent">
+        <h2 className="font-bold text-[#1B2A45] text-base">{title}</h2>
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] text-[#1B2A45]/40 bg-[#1B2A45]/5 px-2 py-1 rounded-lg">
+            계약 {(contractCount % 1 === 0 ? contractCount : contractCount.toFixed(1))}건
+          </span>
         </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          {stats.map(s => (
-            <div key={s.label} className="bg-[#FAF8F3] rounded-lg p-3">
-              <p className="text-xs text-[#1B2A45]/50 mb-1">{s.label}</p>
-              <p className="text-lg font-bold text-[#1B2A45]">{s.value}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      </div>
 
-      <div>
-        <p className="text-xs font-semibold text-[#1B2A45]/50 uppercase tracking-wide mb-2">
-          직원별 결제율 (영업일 기준)
-        </p>
-        <div className="bg-white rounded-xl border border-[#E8E2D4] overflow-hidden">
+      {/* 직원별 현황 FIRST */}
+      <div className="px-5 py-4 border-b border-[#E8E2D4]/60">
+        <p className="text-[11px] font-bold text-[#1B2A45]/40 uppercase tracking-widest mb-3">직원별 현황</p>
+        {loading ? <Skeleton className="h-32 w-full" /> : (
           <EmployeeTable rows={employeeRows} loading={loading} />
-        </div>
+        )}
+      </div>
+
+      {/* 영업일 기준 현황 SECOND */}
+      <div className="px-5 py-4">
+        <p className="text-[11px] font-bold text-[#1B2A45]/40 uppercase tracking-widest mb-3">이달 집계</p>
+        {loading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-16" />)}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: '진행중 건수', value: inProgressCount + '건', color: 'text-violet-600', bg: 'bg-violet-50' },
+              { label: '발생 매출', value: fmtKrw(revenueAmount), color: 'text-[#C5A258]', bg: 'bg-amber-50' },
+              { label: '발생 세금 (10%)', value: taxAmount > 0 ? fmtKrw(taxAmount) : '-', color: 'text-red-500', bg: 'bg-red-50' },
+              { label: '발생 부가세', value: vatAmount > 0 ? fmtKrw(vatAmount) : '-', color: 'text-orange-500', bg: 'bg-orange-50' },
+            ].map(s => (
+              <div key={s.label} className={`${s.bg} rounded-xl p-3`}>
+                <p className="text-[10px] text-[#1B2A45]/50 mb-1">{s.label}</p>
+                <p className={`text-lg font-black ${s.color}`}>{s.value}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   )
@@ -286,7 +320,7 @@ function ChartTooltip({ active, payload, label }: any) {
 
 // ─── Main component ───────────────────────────────────────
 
-export default function OverviewTabNew() {
+export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: string, subView?: string) => void }) {
   const [loading, setLoading] = useState(true)
   const [revenueData, setRevenueData] = useState<RevenueData | null>(null)
   const [assignContracts, setAssignContracts] = useState<Contract[]>([])
@@ -499,7 +533,8 @@ export default function OverviewTabNew() {
     goals: SalesGoal[],
     elapsed: number,
     remaining: number,
-    addBase = false
+    addBase = false,
+    supplyStatsArg: { name: string; rate: number; supplied: number; totalContracted: number }[] = []
   ): EmployeeRow[] {
     const userMap: Record<string, { name: string; count: number }> = {}
     for (const c of contracts) {
@@ -533,6 +568,13 @@ export default function OverviewTabNew() {
           ? Math.ceil((goal - contracted) / remaining)
           : null
 
+      // supplyStats에서 해당 사람의 rate 가져오기
+      const supStat = supplyStatsArg.find(s => s.name === u.name)
+      const supplyRate = supStat && supStat.supplied > 0 ? supStat.rate : null
+      const totalRate = supStat && supStat.supplied > 0
+        ? Math.floor(contracted / supStat.supplied * 10000) / 100
+        : null
+
       return {
         name: u.name,
         goal,
@@ -541,12 +583,12 @@ export default function OverviewTabNew() {
         remaining,
         projected,
         dailyNeeded,
+        supplyRate,
+        totalRate,
+        supplyCount: supStat?.supplied,
       }
     })
   }
-
-  const thisMonthRows = buildRows(thisMonthContracts, salesGoals, thisElapsed, thisRemaining, true)
-  const lastMonthRows = buildRows(lastMonthContracts, lastMonthGoals, lastElapsed, lastRemaining, false)
 
   // ── 오늘 인별 공급 배정 ──────────────────────────────────
   const bizElapsed = _bizElapsed(thisYear, thisMonth - 1, now.getDate())
@@ -562,9 +604,11 @@ export default function OverviewTabNew() {
     const totalContracted = base + dbContracted
     const rate = supplied > 0 ? Math.floor(totalContracted / supplied * 10000) / 100 : 0
     const recommended = calcRecommendedSupply(rate, bizElapsed)
-    return { name, rate, totalContracted, recommended }
+    return { name, rate, totalContracted, recommended, supplied }
   })
 
+  const thisMonthRows = buildRows(thisMonthContracts, salesGoals, thisElapsed, thisRemaining, true, supplyStats)
+  const lastMonthRows = buildRows(lastMonthContracts, lastMonthGoals, lastElapsed, lastRemaining, false)
 
   // ── Scroll helpers ───────────────────────────────────────
 
@@ -578,58 +622,106 @@ export default function OverviewTabNew() {
 
   // ─────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6 pb-10">
+    <div className="space-y-5 pb-10">
 
-      {/* ═══ 1. TOP MINI-CARDS ROW ══════════════════════════ */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <MiniCard
-          icon="📋"
-          label="배정 대기"
-          value={loading ? null : assignContracts.length + '건'}
-          loading={loading}
-          color="text-[#C5A258]"
-          onClick={() => scrollTo(chartRef)}
-        />
-        <MiniCard
-          icon="📝"
-          label="오늘 보고"
-          value={loading ? null : todayReports.length + '건'}
-          loading={loading}
-          color="text-[#1B2A45]"
-          onClick={() => scrollTo(thisMonthRef)}
-        />
-        <MiniCard
-          icon="📅"
-          label="오늘 일정"
-          value={loading ? null : todayEvents.length + '건'}
-          loading={loading}
-          color="text-[#1B2A45]"
-          onClick={() => scrollTo(thisMonthRef)}
-        />
-        <MiniCard
-          icon="💰"
-          label="이달 총매출"
-          value={loading ? null : thisMonthRevDisplay}
-          loading={loading}
-          color="text-[#C5A258]"
-          onClick={() => scrollTo(chartRef)}
-        />
-        <MiniCard
-          icon="🏦"
-          label="관리팀 매출"
-          value={loading ? null : thisMonthOpsDisplay}
-          loading={loading}
-          color="text-emerald-600"
-          onClick={() => scrollTo(chartRef)}
-        />
+      {/* ══ 퀵 액션 카드 ══ */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {/* 오늘 보고 */}
+        <button
+          onClick={() => onNavigate?.('minutesreports')}
+          className="group bg-white hover:bg-[#1B2A45] border border-[#E8E2D4] hover:border-[#1B2A45] rounded-2xl p-4 text-left transition-all duration-200 hover:shadow-md"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xl">📝</span>
+            {!loading && <span className="text-[10px] bg-[#1B2A45]/8 group-hover:bg-white/20 text-[#1B2A45]/50 group-hover:text-white/70 px-2 py-0.5 rounded-full font-medium">보고탭 이동 →</span>}
+          </div>
+          <p className="text-[11px] text-[#1B2A45]/50 group-hover:text-white/50">오늘 보고</p>
+          {loading ? <Skeleton className="h-7 w-12 mt-1" /> : (
+            <p className="text-2xl font-black text-[#1B2A45] group-hover:text-white mt-0.5">{todayReports.length}<span className="text-sm font-medium ml-0.5">건</span></p>
+          )}
+        </button>
+
+        {/* 오늘 일정 */}
+        <button
+          onClick={() => onNavigate?.('calendar')}
+          className="group bg-white hover:bg-[#1B2A45] border border-[#E8E2D4] hover:border-[#1B2A45] rounded-2xl p-4 text-left transition-all duration-200 hover:shadow-md"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xl">📅</span>
+            {!loading && <span className="text-[10px] bg-[#1B2A45]/8 group-hover:bg-white/20 text-[#1B2A45]/50 group-hover:text-white/70 px-2 py-0.5 rounded-full font-medium">캘린더 →</span>}
+          </div>
+          <p className="text-[11px] text-[#1B2A45]/50 group-hover:text-white/50">오늘 일정</p>
+          {loading ? <Skeleton className="h-7 w-12 mt-1" /> : (
+            <p className="text-2xl font-black text-[#1B2A45] group-hover:text-white mt-0.5">{todayEvents.length}<span className="text-sm font-medium ml-0.5">건</span></p>
+          )}
+        </button>
+
+        {/* 영업팀 심사요청 */}
+        <button
+          onClick={() => onNavigate?.('sales', 'inspection')}
+          className="group bg-white hover:bg-amber-500 border border-amber-200 hover:border-amber-500 rounded-2xl p-4 text-left transition-all duration-200 hover:shadow-md"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xl">🔍</span>
+            {!loading && <span className="text-[10px] bg-amber-50 group-hover:bg-white/20 text-amber-600 group-hover:text-white/70 px-2 py-0.5 rounded-full font-medium">심사탭 →</span>}
+          </div>
+          <p className="text-[11px] text-amber-600 group-hover:text-white/70">영업팀 심사요청</p>
+          {loading ? <Skeleton className="h-7 w-12 mt-1" /> : (
+            <p className="text-2xl font-black text-amber-600 group-hover:text-white mt-0.5">
+              {allCustomers.filter((c: any) => c.details?.inspection_status === 'pending').length}
+              <span className="text-sm font-medium ml-0.5">건</span>
+            </p>
+          )}
+        </button>
+
+        {/* 영업팀 A/S요청 */}
+        <button
+          onClick={() => onNavigate?.('sales', 'as')}
+          className="group bg-white hover:bg-orange-500 border border-orange-200 hover:border-orange-500 rounded-2xl p-4 text-left transition-all duration-200 hover:shadow-md"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xl">🔧</span>
+            {!loading && <span className="text-[10px] bg-orange-50 group-hover:bg-white/20 text-orange-500 group-hover:text-white/70 px-2 py-0.5 rounded-full font-medium">A/S탭 →</span>}
+          </div>
+          <p className="text-[11px] text-orange-500 group-hover:text-white/70">영업팀 A/S요청</p>
+          {loading ? <Skeleton className="h-7 w-12 mt-1" /> : (
+            <p className="text-2xl font-black text-orange-500 group-hover:text-white mt-0.5">
+              {allCustomers.filter((c: any) => (c as any).details?.as_requested === true && !(c as any).details?.as_resolved).length}
+              <span className="text-sm font-medium ml-0.5">건</span>
+            </p>
+          )}
+        </button>
       </div>
 
-      {/* ═══ 2. 결제율 대시보드 ═══════════════════════════════ */}
+      {/* ══ 매출 카드 ══ */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="bg-gradient-to-br from-[#1B2A45] to-[#2a3d5c] rounded-2xl p-5 text-white">
+          <p className="text-xs text-white/50 mb-1">영업팀 이달 매출</p>
+          {loading ? <Skeleton className="h-9 w-28 bg-white/20" /> : (
+            <p className="text-3xl font-black">{
+              (() => {
+                const salesRaw = thisMonthRevEntry?.영업팀 ?? 0
+                return salesRaw >= 10000 ? (salesRaw / 10000).toFixed(0) + '만원' : salesRaw > 0 ? salesRaw.toLocaleString() + '원' : '-'
+              })()
+            }</p>
+          )}
+          <p className="text-[11px] text-white/40 mt-1">영업팀 계약 기준</p>
+        </div>
+        <div className="bg-gradient-to-br from-emerald-700 to-emerald-600 rounded-2xl p-5 text-white">
+          <p className="text-xs text-white/50 mb-1">관리팀 이달 매출</p>
+          {loading ? <Skeleton className="h-9 w-28 bg-white/20" /> : (
+            <p className="text-3xl font-black">{thisMonthOpsDisplay}</p>
+          )}
+          <p className="text-[11px] text-white/40 mt-1">관리팀 진행 기준</p>
+        </div>
+      </div>
+
+      {/* ══ 결제율 대시보드 ══ */}
       <div ref={chartRef}>
         <PayRateTab />
       </div>
 
-      {/* ═══ 4. THIS MONTH SECTION ══════════════════════════ */}
+      {/* ══ 이번달 현황 ══ */}
       <div ref={thisMonthRef}>
         <MonthSection
           title={`${thisMonth}월 현황`}
@@ -642,7 +734,7 @@ export default function OverviewTabNew() {
         />
       </div>
 
-      {/* ═══ 4. LAST MONTH SECTION ══════════════════════════ */}
+      {/* ══ 지난달 현황 ══ */}
       <div ref={lastMonthRef}>
         <MonthSection
           title={`${lastMonth}월 현황`}
@@ -655,13 +747,13 @@ export default function OverviewTabNew() {
         />
       </div>
 
-      {/* ═══ 6. 공지사항 ════════════════════════════════════ */}
+      {/* ══ 공지사항 ══ */}
       <NoticeSection />
 
-      {/* ═══ 7. 공급기준표 ══════════════════════════════════ */}
-      <div className="bg-white rounded-xl border border-[#E8E2D4] overflow-hidden">
-        <div className="px-5 py-3 border-b border-[#E8E2D4] flex items-center justify-between">
-          <h2 className="font-semibold text-[#1B2A45] text-base">📊 결제율 공급기준표</h2>
+      {/* ══ 공급기준표 ══ */}
+      <div className="bg-white rounded-2xl border border-[#E8E2D4] overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-[#E8E2D4] flex items-center justify-between">
+          <h2 className="font-bold text-[#1B2A45] text-sm">📊 결제율 공급기준표</h2>
           <span className="text-[10px] text-[#1B2A45]/40">영업일 기준 내일 공급 권장 수</span>
         </div>
         <table className="w-full text-sm">
@@ -676,22 +768,16 @@ export default function OverviewTabNew() {
             {SUPPLY_RATE_TABLE.map(row => (
               <tr key={row.condition} className={row.supply === 0 ? 'bg-red-50/40' : ''}>
                 <td className="px-5 py-3 text-sm text-[#1B2A45]">{row.condition}</td>
-                <td className={`px-5 py-3 text-center font-bold text-base ${
-                  row.supply === 0 ? 'text-red-500' : 'text-[#C5A258]'
-                }`}>{row.supply}개</td>
+                <td className={`px-5 py-3 text-center font-bold text-base ${row.supply === 0 ? 'text-red-500' : 'text-[#C5A258]'}`}>{row.supply}개</td>
                 <td className="px-5 py-3 text-center text-xs text-[#1B2A45]/40">
-                  {row.supply === 5 && row.minRate === null ? '초기 안정 공급' :
-                   row.supply === 6 ? '최대 공급' :
-                   row.supply === 0 ? '공급 중단' : ''}
+                  {row.supply === 5 && row.minRate === null ? '초기 안정 공급' : row.supply === 6 ? '최대 공급' : row.supply === 0 ? '공급 중단' : ''}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
         <div className="px-5 py-3 bg-[#FAF8F3] border-t border-[#E8E2D4]/60">
-          <p className="text-xs text-[#1B2A45]/50">
-            ※ 결제율 = 이달 계약건수 ÷ 금일 공급건수 × 100 | 영업일 2일차까지는 결제율 무관하게 5개 공급
-          </p>
+          <p className="text-xs text-[#1B2A45]/50">※ 결제율 = 이달 계약건수 ÷ 금일 공급건수 × 100 | 영업일 2일차까지는 결제율 무관하게 5개 공급</p>
         </div>
       </div>
 

@@ -123,6 +123,7 @@ export default function CeoDashboard() {
   const ceoId = (session?.user as any)?.id ?? ''
   const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'staffmanage' | 'minutesreports' | 'calendar' | 'ailogs' | 'trash' | 'dbmanage' | 'profile'>('overview')
   const [menuOpen, setMenuOpen] = useState(false)
+  const [salesInitialView, setSalesInitialView] = useState<'customers' | 'inspection' | 'as' | 'transfer' | 'diary' | undefined>(undefined)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [allCustomersCache, setAllCustomersCache] = useState<any[]>([])
@@ -354,9 +355,12 @@ export default function CeoDashboard() {
 
       <div className="px-4 md:px-6 pt-6">
 
-        {activeTab === 'overview'       && <OverviewTabNew />}
+        {activeTab === 'overview'       && <OverviewTabNew onNavigate={(tab, subView) => {
+          setActiveTab(tab as any)
+          if (subView) setSalesInitialView(subView as any)
+        }} />}
         {activeTab === 'assign'         && <AssignBoard />}
-        {activeTab === 'sales'          && <SalesCeoTab />}
+        {activeTab === 'sales'          && <SalesCeoTab initialView={salesInitialView} />}
         {activeTab === 'ops'            && <OpsCeoTab />}
         {activeTab === 'analytics'      && <AnalyticsTab />}
         {activeTab === 'staffmanage'    && <StaffManageTab />}
