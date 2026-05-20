@@ -469,17 +469,30 @@ export default function OpsCeoTab() {
   const [openPanelIds, setOpenPanelIds] = useState<string[]>([])
   const [closingPanelIds, setClosingPanelIds] = useState<string[]>([])
   const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const [revData, setRevData] = useState<any>(null)
+
+  function parseMoney(v: any) { return parseInt(String(v || '0').replace(/[^0-9]/g, ''), 10) || 0 }
+  function fmtM(n: number) {
+    if (n >= 100_000_000) return (n / 100_000_000).toFixed(1) + '억'
+    if (n >= 10_000) return Math.round(n / 10_000) + '만'
+    return n.toLocaleString()
+  }
 
   async function load() {
     setLoading(true)
-    const res = await fetch('/api/ops-cases')
-    const data = await res.json()
-    setCases((data.cases || []).map((c: any) => ({
+    const [casesRes, revRes] = await Promise.all([
+      fetch('/api/ops-cases'),
+      fetch('/api/revenue'),
+    ])
+    const casesData = await casesRes.json()
+    const revJson   = await revRes.json()
+    setCases((casesData.cases || []).map((c: any) => ({
       ...c,
       progress_stage: c.progress_stage || c.stage || '',
       timeline: Array.isArray(c.timeline) ? c.timeline : [],
       institution: c.institution || '',
     })) as OpsCase[])
+    setRevData(revJson)
     setLoading(false)
   }
 
@@ -596,24 +609,51 @@ export default function OpsCeoTab() {
           </div>
         </div>
         {/* 통계 */}
-        <div className="grid grid-cols-4 gap-2 mb-3">
-          <div className="bg-white/10 rounded-lg px-2 py-2 text-center">
-            <p className="text-white/50 text-[9px]">진행업체</p>
-            <p className="text-white font-black text-lg">{activeCases.length}</p>
-          </div>
-          <div className="bg-white/10 rounded-lg px-2 py-2 text-center">
-            <p className="text-white/50 text-[9px]">신규DB</p>
-            <p className="text-white font-black text-lg">{newdbCases.length}</p>
-          </div>
-          <div className="bg-white/10 rounded-lg px-2 py-2 text-center">
-            <p className="text-white/50 text-[9px]">환불</p>
-            <p className="text-white font-black text-lg">{refundCases.length}</p>
-          </div>
-          <div className="bg-white/10 rounded-lg px-2 py-2 text-center">
-            <p className="text-white/50 text-[9px]">종료</p>
-            <p className="text-white font-black text-lg">{completedCases.length}</p>
-          </div>
-        </div>
+        {(() => {
+          const now = new Date()
+          const mk = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`
+          const thisFee      = (revData?.thisMonthOps || []).reduce((s: number, e: any) => s + (e.amount||0), 0)
+          const thisContract = (revData?.thisMonthOpsContracts || []).reduce((s: number, e: any) => s + (e.amount||0), 0)
+          const thisTotal    = thisFee + thisContract
+          const monthLabel   = now.getMonth() + 1
+          return (
+            <>
+              <div className="grid grid-cols-4 gap-2 mb-2">
+                <div className="bg-white/10 rounded-lg px-2 py-2 text-center">
+                  <p className="text-white/50 text-[9px]">진행업체</p>
+                  <p className="text-white font-black text-lg">{activeCases.length}</p>
+                </div>
+                <div className="bg-white/10 rounded-lg px-2 py-2 text-center">
+                  <p className="text-white/50 text-[9px]">신규DB</p>
+                  <p className="text-white font-black text-lg">{newdbCases.length}</p>
+                </div>
+                <div className="bg-white/10 rounded-lg px-2 py-2 text-center">
+                  <p className="text-white/50 text-[9px]">환불</p>
+                  <p className="text-white font-black text-lg">{refundCases.length}</p>
+                </div>
+                <div className="bg-white/10 rounded-lg px-2 py-2 text-center">
+                  <p className="text-white/50 text-[9px]">종료</p>
+                  <p className="text-white font-black text-lg">{completedCases.length}</p>
+                </div>
+              </div>
+              {/* 이달 매출 요약 */}
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <div className="bg-emerald-500/20 border border-emerald-400/30 rounded-lg px-2 py-2 text-center col-span-1">
+                  <p className="text-emerald-300/70 text-[9px]">{monthLabel}월 수수료</p>
+                  <p className="text-emerald-300 font-black text-base">{revData ? fmtM(thisFee) : '—'}</p>
+                </div>
+                <div className="bg-sky-500/20 border border-sky-400/30 rounded-lg px-2 py-2 text-center col-span-1">
+                  <p className="text-sky-300/70 text-[9px]">{monthLabel}월 계약</p>
+                  <p className="text-sky-300 font-black text-base">{revData ? fmtM(thisContract) : '—'}</p>
+                </div>
+                <div className="bg-white/15 border border-white/20 rounded-lg px-2 py-2 text-center col-span-1">
+                  <p className="text-white/50 text-[9px]">{monthLabel}월 합계</p>
+                  <p className="text-white font-black text-base">{revData ? fmtM(thisTotal) : '—'}</p>
+                </div>
+              </div>
+            </>
+          )
+        })()}
         {/* 뷰 탭 */}
         <div className="flex gap-1.5 flex-wrap">
           {MENU.map(m => (

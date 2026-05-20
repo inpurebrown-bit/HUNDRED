@@ -2524,6 +2524,53 @@ interface OpsDailyReport {
 }
 
 // ──────────────────────────────────────────────────────────────────────
+// OpsMiniRevenue — 대시보드 탭에 인라인 표시되는 매출 요약
+// ──────────────────────────────────────────────────────────────────────
+function OpsMiniRevenue({ userName }: { userName: string }) {
+  const [rev, setRev] = useState<any>(null)
+
+  useEffect(() => {
+    fetch('/api/revenue')
+      .then(r => r.json())
+      .then(d => setRev(d))
+      .catch(() => {})
+  }, [])
+
+  function fmtMoney(n: number) {
+    if (n >= 100_000_000) return (n / 100_000_000).toFixed(1) + '억'
+    if (n >= 10_000) return Math.round(n / 10_000) + '만원'
+    return n.toLocaleString() + '원'
+  }
+
+  const matchMe = (e: any) => !e.ops_user_name || e.ops_user_name === userName || !userName
+  const feeTotal = (rev?.thisMonthOps || []).filter(matchMe).reduce((s: number, e: any) => s + (e.amount || 0), 0)
+  const contractTotal = (rev?.thisMonthOpsContracts || []).filter(matchMe).reduce((s: number, e: any) => s + (e.amount || 0), 0)
+  const total = feeTotal + contractTotal
+  const monthLabel = new Date().getMonth() + 1
+
+  return (
+    <div className="bg-gradient-to-r from-[#1B2A45] to-[#2d4a7a] rounded-xl px-5 py-4 text-white mt-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-white/70 text-xs font-semibold">{monthLabel}월 내 매출</p>
+        <button onClick={() => fetch('/api/revenue').then(r=>r.json()).then(d=>setRev(d))}
+          className="text-white/40 hover:text-white/70 text-[10px]">🔄</button>
+      </div>
+      <p className="text-2xl font-black tracking-tight">{rev ? fmtMoney(total) : '—'}</p>
+      <div className="flex gap-3 mt-3">
+        <div className="flex-1 bg-white/10 rounded-lg px-3 py-2 text-center">
+          <p className="text-white/50 text-[9px] mb-0.5">수수료 매출</p>
+          <p className="text-emerald-300 font-black text-sm">{rev ? fmtMoney(feeTotal) : '—'}</p>
+        </div>
+        <div className="flex-1 bg-white/10 rounded-lg px-3 py-2 text-center">
+          <p className="text-white/50 text-[9px] mb-0.5">계약 매출</p>
+          <p className="text-sky-300 font-black text-sm">{rev ? fmtMoney(contractTotal) : '—'}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────
 // OpsRevenueTab (개인 매출 현황 — 수수료 + 계약)
 // ──────────────────────────────────────────────────────────────────────
 function OpsRevenueTab({ userName }: { userName: string }) {
@@ -3351,6 +3398,9 @@ export default function OpsDashboard({ userId, userName }: Props) {
                 </button>
               </div>
               <DashboardOverview cases={cases} />
+
+              {/* 이달 매출 요약 */}
+              <OpsMiniRevenue userName={userName} />
 
               {/* 공지사항 */}
               {notices.length > 0 && (
