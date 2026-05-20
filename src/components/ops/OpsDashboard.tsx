@@ -451,17 +451,20 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
     handleStageChange('서류받는중')
   }
   async function handleFeeSave() {
+    // 진행 중인 자동저장 타이머 취소 (race condition 방지)
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
     setFeeSaving(true)
     const mergedDetails = { ...(local.details || {}), fee_locked: true }
     const next = { ...local, details: mergedDetails }
     setLocal(next)
+    const nowIso = new Date().toISOString()
     try {
       await fetch(`/api/ops-cases/${c.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ details: mergedDetails }),
+        body: JSON.stringify({ details: mergedDetails, updated_at: nowIso }),
       })
-      onSave(c.id, { details: mergedDetails })
+      onSave(c.id, { details: mergedDetails, updated_at: nowIso })
       setFeeSaved(true)
     } finally {
       setFeeSaving(false)
@@ -479,8 +482,8 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
 
   const isPendingApproval = local.progress_stage === '환불예정' || local.progress_stage === '종료예정'
   const isCeo = userRole === 'ceo'
-  // 1차 입금 잠금: fee_locked=true 이고 CEO가 아닐 때 읽기전용
-  const feeLocked = !!d.fee_locked && !isCeo
+  // 1차 입금 잠금: fee_locked=true 이면 읽기전용 (CEO도 동일, 단 CEO는 잠금해제 버튼 표시)
+  const feeLocked = !!d.fee_locked
 
   // 전달화면 모달용 영업팀 기록 추출
   const salesLogs = (local.timeline || []).filter((e: any) => e.source === 'sales')
