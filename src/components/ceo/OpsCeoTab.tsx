@@ -41,6 +41,13 @@ const PENDING_REFUND_KEYS  = new Set(['환불예정'])
 const PENDING_DONE_KEYS    = new Set(['종료예정'])
 const NEWDB_STAGE_KEYS     = new Set(['new_db'])
 
+function formatPhone(p: string) {
+  const d = p.replace(/\D/g, '')
+  if (d.length === 11) return `${d.slice(0,3)}-${d.slice(3,7)}-${d.slice(7)}`
+  if (d.length === 10) return `${d.slice(0,3)}-${d.slice(3,6)}-${d.slice(6)}`
+  return p
+}
+
 function formatKST(isoStr: string) {
   if (!isoStr) return { date: '', time: '' }
   const d = new Date(isoStr)
@@ -64,97 +71,122 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
 }) {
   const allStages     = [...PIPELINE_STAGES, ...OVERALL_STAGES]
   const companyName   = c.customers?.details?.company || c.customers?.name || '—'
+  const repName       = c.customers?.representative || c.customers?.details?.representative || ''
+  const phone         = c.customers?.phone || ''
   const overallStage  = allStages.find(s => s.key === c.progress_stage)
   const directStage   = c.details?.direct_stage  || ''
   const indirectStage = c.details?.indirect_stage || ''
   const directInfo    = allStages.find(s => s.key === directStage)
   const indirectInfo  = allStages.find(s => s.key === indirectStage)
   const scriptSent    = c.details?.script_sent || false
+  const opsUser       = c.ops_user_name || ''
   const allInstitutions = (c.institution || '').split(',').map((s: string) => s.trim()).filter(Boolean)
+  const directInsts   = allInstitutions.filter(i => !INDIRECT_SET.has(i))
+  const indirectInsts = allInstitutions.filter(i => INDIRECT_SET.has(i))
+
+  const warningBadges = [
+    c.details?.is_holding && '🔒홀딩',
+    c.progress_stage === '환불예정' && '⏳환불예정',
+    c.progress_stage === '종료예정' && '⏳종료예정',
+    c.details?.handling_no_contact && '📵연락안됨',
+    c.details?.handling_no_fit     && '🚫곳없음',
+    c.details?.handling_mindless   && '🔄무지성',
+  ].filter(Boolean) as string[]
 
   return (
     <div
       onClick={() => onToggle(c.id)}
-      className={`bg-white border rounded-xl p-2.5 cursor-pointer hover:shadow-md transition-all text-center ${
+      className={`bg-white border rounded-xl p-2 cursor-pointer hover:shadow-md transition-all relative flex flex-col ${
         isOpen ? 'ring-2 ring-violet-400 border-violet-300' : 'border-gray-200 hover:border-violet-300'
       }`}
     >
-      <p className="font-bold text-[#1B2A45] text-[11px] leading-snug"
-        style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
-        {companyName}
-      </p>
-      {c.customers?.name && c.customers.name !== companyName && (
-        <p className="text-[10px] text-gray-400 mt-0.5">{c.customers.name}</p>
-      )}
-      <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{c.customers?.phone}</p>
-      {c.ops_user_name && <p className="text-[9px] text-violet-500 mt-0.5">{c.ops_user_name}</p>}
-
-      {allInstitutions.length > 0 && (
-        <div className="mt-1 flex flex-wrap gap-0.5 justify-center">
-          {allInstitutions.map(inst => (
-            <span key={inst} className={`text-[8px] px-1 py-0.5 rounded font-medium ${
-              INDIRECT_SET.has(inst) ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'
-            }`}>{inst}</span>
-          ))}
-        </div>
-      )}
-
-      <div className="mt-1.5">
-        {overallStage ? (
-          <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold text-white ${overallStage.color}`}>{overallStage.label}</span>
-        ) : c.progress_stage ? (
-          <span className="inline-block px-2 py-0.5 rounded-full text-[9px] font-bold text-white bg-gray-400">{c.progress_stage}</span>
-        ) : null}
+      {/* ① 담당자명 — 좌측 최상단 */}
+      <div className="h-[14px] flex items-center mb-0.5">
+        <span className="text-[8px] text-gray-400 font-medium truncate">{opsUser || '—'}</span>
       </div>
 
-      {directStage && (
-        <div className="mt-0.5">
-          <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold text-white ${directInfo?.color || 'bg-blue-400'}`}>
-            직: {directStage}
-          </span>
-        </div>
-      )}
-      {indirectStage && (
-        <div className="mt-0.5">
-          <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold text-white ${indirectInfo?.color || 'bg-violet-400'}`}>
-            간: {indirectStage}
-          </span>
-        </div>
-      )}
+      {/* ② 업체명 */}
+      <div className="h-[30px] flex items-start justify-center">
+        <p className="font-bold text-[#1B2A45] text-[11px] leading-tight text-center break-all line-clamp-2"
+          style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
+          {companyName}
+        </p>
+      </div>
 
-      {(c.details?.handling_no_contact || c.details?.handling_no_fit || c.details?.handling_mindless) && (
-        <div className="mt-0.5 flex flex-wrap gap-0.5 justify-center">
-          {c.details?.handling_no_contact && <span className="text-[8px] bg-red-100 text-red-600 px-1 py-0.5 rounded font-bold">📵연락안됨</span>}
-          {c.details?.handling_no_fit     && <span className="text-[8px] bg-orange-100 text-orange-600 px-1 py-0.5 rounded font-bold">🚫곳없음</span>}
-          {c.details?.handling_mindless   && <span className="text-[8px] bg-slate-100 text-slate-600 px-1 py-0.5 rounded font-bold">🔄무지성</span>}
-        </div>
-      )}
+      {/* ③ 대표명 */}
+      <div className="h-[16px] flex items-center justify-center mt-0.5">
+        <p className="text-[10px] text-gray-400 truncate">{repName || <span className="text-gray-200">—</span>}</p>
+      </div>
 
-      {c.details?.is_holding && (
-        <div className="mt-0.5">
-          <span className="text-[8px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold">🔒홀딩</span>
+      {/* ④ 전화번호 */}
+      <div className="h-[14px] flex items-center justify-center mt-0.5">
+        <p className="text-[9px] text-gray-400 font-mono">{phone ? formatPhone(phone) : <span className="text-gray-200">—</span>}</p>
+      </div>
+
+      {/* ⑤ 전체 진행현황 */}
+      <div className="h-[20px] flex items-center justify-center mt-1">
+        {overallStage ? (
+          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold text-white ${overallStage.color}`}>{overallStage.label}</span>
+        ) : c.progress_stage ? (
+          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold text-white bg-gray-400">{c.progress_stage}</span>
+        ) : (
+          <span className="text-[9px] text-gray-200">—</span>
+        )}
+      </div>
+
+      {/* ⑥ 직접대출 기관 : 현황 */}
+      <div className="h-[18px] flex items-center justify-center gap-1 mt-1">
+        <span className="text-[8px] font-bold text-blue-400 shrink-0">직접</span>
+        {directInsts.length > 0
+          ? <span className="text-[8px] text-blue-700 font-medium truncate">{directInsts.join('·')}</span>
+          : <span className="text-[8px] text-gray-200">—</span>
+        }
+        {directStage
+          ? <span className={`shrink-0 text-[8px] font-bold text-white px-1 py-0.5 rounded ${directInfo?.color || 'bg-blue-400'}`}>{directStage}</span>
+          : <span className="text-[8px] text-gray-200"></span>
+        }
+      </div>
+
+      {/* ⑦ 간접대출 기관 : 현황 */}
+      <div className="h-[18px] flex items-center justify-center gap-1 mt-0.5">
+        <span className="text-[8px] font-bold text-violet-400 shrink-0">간접</span>
+        {indirectInsts.length > 0
+          ? <span className="text-[8px] text-violet-700 font-medium truncate">{indirectInsts.join('·')}</span>
+          : <span className="text-[8px] text-gray-200">—</span>
+        }
+        {indirectStage
+          ? <span className={`shrink-0 text-[8px] font-bold text-white px-1 py-0.5 rounded ${indirectInfo?.color || 'bg-violet-400'}`}>{indirectStage}</span>
+          : <span className="text-[8px] text-gray-200"></span>
+        }
+      </div>
+
+      {/* 경고 뱃지 */}
+      {warningBadges.length > 0 && (
+        <div className="mt-1 flex flex-wrap gap-0.5 justify-center">
+          {warningBadges.map(b => (
+            <span key={b} className="text-[8px] bg-orange-50 text-orange-500 border border-orange-200 px-1 py-0.5 rounded font-bold">{b}</span>
+          ))}
         </div>
       )}
 
       {/* 승인 대기 — 빠른 승인/반려 버튼 */}
       {onApprove && (c.progress_stage === '환불예정' || c.progress_stage === '종료예정') && (
-        <div className="mt-2 flex gap-1" onClick={e => e.stopPropagation()}>
-          <button
-            onClick={() => onApprove(c.id, 'approve')}
+        <div className="mt-1.5 flex gap-1" onClick={e => e.stopPropagation()}>
+          <button onClick={() => onApprove(c.id, 'approve')}
             className={`flex-1 text-[9px] font-bold py-1 rounded-lg text-white transition-colors ${
               c.progress_stage === '환불예정' ? 'bg-rose-500 hover:bg-rose-600' : 'bg-orange-500 hover:bg-orange-600'
             }`}>
             ✅ {c.progress_stage === '환불예정' ? '환불' : '종료'}
           </button>
-          <button
-            onClick={() => onApprove(c.id, 'reject')}
+          <button onClick={() => onApprove(c.id, 'reject')}
             className="flex-1 text-[9px] font-bold py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors">
             ❌ 반려
           </button>
         </div>
       )}
 
-      <div className="mt-1.5 flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
+      {/* ⑧ 스크립트 발송 */}
+      <div className="mt-auto pt-1.5 flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
         <input type="checkbox" id={`ceo-script-${c.id}`} checked={scriptSent}
           onChange={e => onScriptToggle(c.id, e.target.checked)}
           className="w-3 h-3 accent-violet-500 cursor-pointer" />
