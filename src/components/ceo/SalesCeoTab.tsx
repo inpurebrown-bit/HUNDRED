@@ -884,15 +884,17 @@ export default function SalesCeoTab() {
   [lastMonthContracted])
 
   // 인별 이번달 매출
-  const personThisMonth = useMemo(() => salesPeople.map(name => ({
-    name,
-    revenue: thisMonthContracted
-      .filter(c => (c as any).details?.sales_user_name === name || c.sales_user_name === name)
-      .reduce((s, c) => s + parseNum((c as any).details?.my_revenue), 0),
-    count: thisMonthContracted
-      .filter(c => (c as any).details?.sales_user_name === name || c.sales_user_name === name)
-      .reduce((s, c) => s + contractWeight((c as any).details?.payment_amount), 0),
-  })), [salesPeople, thisMonthContracted])
+  const personThisMonth = useMemo(() => salesPeople.map(name => {
+    const mine = thisMonthContracted.filter(
+      c => (c as any).details?.sales_user_name === name || c.sales_user_name === name
+    )
+    return {
+      name,
+      revenue: mine.reduce((s, c) => s + parseNum((c as any).details?.my_revenue), 0),
+      payment: mine.reduce((s, c) => s + parseNum((c as any).details?.payment_amount), 0),
+      count:   mine.reduce((s, c) => s + contractWeight((c as any).details?.payment_amount), 0),
+    }
+  }), [salesPeople, thisMonthContracted])
   const bizElapsed = getElapsedBusinessDays(now.getFullYear(), now.getMonth(), now.getDate())
 
   const supplyStats = useMemo(() => {
@@ -1361,6 +1363,11 @@ export default function SalesCeoTab() {
                 </div>
                 <p className="text-base font-black text-[#C5A258]">{fmtWon(p.revenue)}</p>
                 <p className="text-[10px] text-white/40 mt-0.5">계약 {p.count % 1 === 0 ? p.count : p.count.toFixed(1)}건</p>
+                <div className="mt-0.5 text-[9px] text-white/30 leading-relaxed">
+                  <span>입금 {p.payment > 0 ? fmtWon(p.payment) : '—'}</span>
+                  <span className="mx-0.5 text-white/15">·</span>
+                  <span>매출 {p.revenue > 0 ? fmtWon(p.revenue) : '—'}</span>
+                </div>
               </div>
             ))}
           </div>

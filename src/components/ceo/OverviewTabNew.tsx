@@ -206,6 +206,14 @@ interface MonthSectionProps {
   inProgressCount: number
   taxAmount: number
   employeeRows: EmployeeRow[]
+  revenueAmount?: number
+}
+
+function fmtKrw(n: number): string {
+  if (n <= 0) return '-'
+  if (n >= 100000000) return (n / 100000000).toFixed(1) + '억원'
+  if (n >= 10000) return (n / 10000).toFixed(0) + '만원'
+  return n.toLocaleString('ko-KR') + '원'
 }
 
 function MonthSection({
@@ -215,11 +223,15 @@ function MonthSection({
   inProgressCount,
   taxAmount,
   employeeRows,
+  revenueAmount = 0,
 }: MonthSectionProps) {
+  const vatAmount = Math.round(revenueAmount * 0.1)
   const stats = [
     { label: '이번달 총 계약 수', value: (contractCount % 1 === 0 ? contractCount : contractCount.toFixed(1)) + '건' },
     { label: '진행중 건수', value: inProgressCount + '건' },
-    { label: '발생 세금 (매출 10%)', value: taxAmount > 0 ? (taxAmount / 10000).toFixed(0) + '만원' : '-' },
+    { label: '발생 매출', value: fmtKrw(revenueAmount) },
+    { label: '발생 세금 (매출 10%)', value: taxAmount > 0 ? fmtKrw(taxAmount) : '-' },
+    { label: '발생 부가세 (10%)', value: vatAmount > 0 ? fmtKrw(vatAmount) : '-' },
   ]
 
   return (
@@ -227,13 +239,13 @@ function MonthSection({
       <h2 className="font-semibold text-[#1B2A45] text-base">{title}</h2>
 
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {[...Array(3)].map((_, i) => (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          {[...Array(5)].map((_, i) => (
             <Skeleton key={i} className="h-16" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {stats.map(s => (
             <div key={s.label} className="bg-[#FAF8F3] rounded-lg p-3">
               <p className="text-xs text-[#1B2A45]/50 mb-1">{s.label}</p>
@@ -285,6 +297,7 @@ export default function OverviewTabNew() {
   const [salesGoals, setSalesGoals] = useState<SalesGoal[]>([])
   const [lastMonthGoals, setLastMonthGoals] = useState<SalesGoal[]>([])
   const [supplyConfigMap, setSupplyConfigMap] = useState<Record<string, { base?: number }>>({})
+  const [payRateEmps, setPayRateEmps] = useState<{ name: string; target: number }[]>([])
 
   // Section refs for scroll-to
   const chartRef = useRef<HTMLDivElement>(null)
@@ -317,6 +330,7 @@ export default function OverviewTabNew() {
           goalsRes,
           lastGoalsRes,
           supplyRes,
+          payRateRes,
         ] = await Promise.all([
           fetch('/api/revenue').catch(() => null),
           fetch('/api/assign').catch(() => null),
@@ -328,6 +342,7 @@ export default function OverviewTabNew() {
           fetch(`/api/sales-goals?year_month=${thisMonthStr}`).catch(() => null),
           fetch(`/api/sales-goals?year_month=${lastMonthStr}`).catch(() => null),
           fetch('/api/supply-config').catch(() => null),
+          fetch(`/api/payrate?year_month=${thisMonthStr}`).catch(() => null),
         ])
 
         const [
@@ -341,6 +356,7 @@ export default function OverviewTabNew() {
           goalsData,
           lastGoalsData,
           supplyData,
+          payRateData,
         ] = await Promise.all([
           revRes?.json().catch(() => ({})) ?? {},
           assignRes?.json().catch(() => ({})) ?? {},
@@ -352,6 +368,7 @@ export default function OverviewTabNew() {
           goalsRes?.json().catch(() => ({})) ?? {},
           lastGoalsRes?.json().catch(() => ({})) ?? {},
           supplyRes?.json().catch(() => ({})) ?? {},
+          payRateRes?.json().catch(() => ({})) ?? {},
         ])
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -367,6 +384,9 @@ export default function OverviewTabNew() {
         setLastMonthGoals(a(lastGoalsData).sales_goals ?? a(lastGoalsData).goals ?? [])
         // config 형식: { month, people: { 이름: { goal, base, supplied } } }
         setSupplyConfigMap(a(supplyData).config?.people ?? a(supplyData).config ?? {})
+        // payrate 직원별 목표 개수
+        const empDetails: any[] = a(payRateData).record?.employee_details ?? []
+        setPayRateEmps(empDetails.map((e: any) => ({ name: String(e.name || ''), target: Number(e.target || 0) })))
       } catch {
         // silently ignore
       } finally {
@@ -487,9 +507,21 @@ export default function OverviewTabNew() {
       userMap[uid].count += contractWeight(c.contract_amount)
     }
 
+    // 직책 제거 이름 정규화 (payrate 목표 매칭용)
+    const stripTitle = (s: string) =>
+      s.replace(/\s*(수석팀장|팀장|팀원|대리|과장|부장|차장|이사|수석|매니저|주임|사원).*/g, '').trim()
+
     return Object.values(userMap).map(u => {
       const goalEntry = goals.find(g => g.user_name === u.name)
-      const goal = goalEntry ? Number(goalEntry.goal_count) : null
+      // payrate employee_details에서 직원별 목표 개수 가져오기 (salesGoals 없을 시 폴백)
+      const payRateEntry = payRateEmps.find(
+        e => e.name === u.name || stripTitle(e.name) === stripTitle(u.name)
+      )
+      const goal = goalEntry
+        ? Number(goalEntry.goal_count)
+        : payRateEntry?.target
+        ? payRateEntry.target
+        : null
       const base = addBase ? (supplyConfigMap[u.name]?.base ?? 0) : 0
       const contracted = u.count + base
       const projected =
@@ -604,6 +636,7 @@ export default function OverviewTabNew() {
           inProgressCount={thisInProgress}
           taxAmount={thisMonthTax}
           employeeRows={thisMonthRows}
+          revenueAmount={thisMonthRevRaw}
         />
       </div>
 
@@ -616,6 +649,7 @@ export default function OverviewTabNew() {
           inProgressCount={lastInProgress}
           taxAmount={lastMonthTax}
           employeeRows={lastMonthRows}
+          revenueAmount={lastMonthRevRaw}
         />
       </div>
 
