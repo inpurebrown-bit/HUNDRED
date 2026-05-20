@@ -156,6 +156,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   })
   const [installPrompt, setInstallPrompt] = useState<any>(null)
   const [installable, setInstallable] = useState(false)
+  const [expandedNoticeId, setExpandedNoticeId] = useState<string | null>(null)
 
   useEffect(() => {
     const handler = (e: any) => { e.preventDefault(); setInstallPrompt(e); setInstallable(true) }
@@ -1067,22 +1068,63 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             })()}
 
             {/* 공지사항 */}
-            {generalNotices.length > 0 ? (
-              <div className="space-y-2">
-                <h3 className="text-sm font-bold text-gray-700">📢 공지사항</h3>
-                {generalNotices.map(n => (
-                  <div key={n.id} className="bg-white border border-[#E8E2D4] rounded-xl px-5 py-4">
-                    <p className="font-semibold text-[#1B2A45] text-sm">{n.title}</p>
-                    {n.content && <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{n.content}</p>}
-                    <p className="text-xs text-gray-300 mt-2">{new Date(n.created_at).toLocaleDateString('ko-KR')}</p>
+            {(() => {
+              const ntTeamColor = (t: string) => t === 'sales' ? 'bg-blue-100 text-blue-700' : t === 'ops' ? 'bg-violet-100 text-violet-700' : 'bg-gray-100 text-gray-600'
+              const ntTeamLabel = (t: string) => t === 'sales' ? '영업팀' : t === 'ops' ? '관리팀' : '전체'
+              const ntFmtDate = (s: string) => {
+                const d = new Date(s)
+                return `${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}. ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
+              }
+              return generalNotices.length > 0 ? (
+                <div className="bg-white border border-[#E8E2D4] rounded-xl overflow-hidden">
+                  <div className="px-5 py-3 border-b border-[#E8E2D4] bg-[#FAFAF8]">
+                    <h3 className="text-sm font-bold text-[#1B2A45]">📢 공지사항</h3>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-white border border-[#E8E2D4] rounded-xl p-6 text-center text-gray-400 text-sm">
-                공지사항 없음
-              </div>
-            )}
+                  <div className="divide-y divide-[#F0EBE0]">
+                    {generalNotices.map(n => {
+                      const isImportant = n.notice_type === 'important'
+                      const isExpanded = expandedNoticeId === n.id
+                      return (
+                        <div key={n.id} className={isImportant ? 'bg-amber-50' : 'bg-white'}>
+                          {/* 제목 행 - 클릭으로 펼치기 */}
+                          <button
+                            type="button"
+                            onClick={() => setExpandedNoticeId(isExpanded ? null : n.id)}
+                            className="w-full text-left px-4 py-3 flex items-center gap-2 hover:bg-black/[0.02] transition-colors"
+                          >
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 ${ntTeamColor(n.target_team)}`}>
+                              {ntTeamLabel(n.target_team)}
+                            </span>
+                            {isImportant && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-400 text-white shrink-0">⭐ 중요</span>
+                            )}
+                            <span className={`text-sm font-semibold flex-1 truncate ${isImportant ? 'text-amber-900' : 'text-[#1B2A45]'}`}>
+                              {n.title}
+                            </span>
+                            <span className="text-[10px] text-gray-300 shrink-0">{ntFmtDate(n.created_at)}</span>
+                            <span className={`text-[10px] ml-1 shrink-0 transition-transform ${isExpanded ? 'text-gray-500' : 'text-gray-300'}`}>
+                              {isExpanded ? '▲' : '▼'}
+                            </span>
+                          </button>
+                          {/* 펼쳐진 내용 */}
+                          {isExpanded && n.content && (
+                            <div className={`px-4 pb-4 border-t ${isImportant ? 'border-amber-100' : 'border-gray-50'}`}>
+                              <div className={`mt-3 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed rounded-xl p-4 border ${isImportant ? 'bg-white border-amber-100' : 'bg-[#FAFAF8] border-gray-100'}`}>
+                                {n.content}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white border border-[#E8E2D4] rounded-xl p-6 text-center text-gray-400 text-sm">
+                  공지사항 없음
+                </div>
+              )
+            })()}
           </div>
         )}
 
