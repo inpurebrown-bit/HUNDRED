@@ -241,7 +241,7 @@ function PayslipDocument({ emp, financial, yearMonth }: {
                 </td>
               </tr>
               <tr>
-                <td className={tdL}>③ 승급프로모션</td>
+                <td className={tdL}>③ 프로모션</td>
                 <td className={tdV}>
                   {financial.contract_count >= 20
                     ? <span className="text-emerald-700 font-medium">{financial.contract_count}건 구간</span>
@@ -251,13 +251,17 @@ function PayslipDocument({ emp, financial, yearMonth }: {
                   {salesCalc.promo > 0 ? fmt(salesCalc.promo) : '-'}
                 </td>
               </tr>
-              {(financial.awards || []).map((a, i) => (
-                <tr key={i}>
-                  <td className={tdL}>④ 시상금</td>
-                  <td className={tdV}>{a.reason || '-'}</td>
-                  <td className={tdN + ' text-amber-700 font-semibold'}>{fmt(a.amount)}</td>
-                </tr>
-              ))}
+              <tr>
+                <td className={tdL}>④ 시상금</td>
+                <td className={tdV}>
+                  {(financial.awards || []).length > 0
+                    ? (financial.awards || []).map(a => a.reason || '-').join(', ')
+                    : '-'}
+                </td>
+                <td className={tdN + (salesCalc.awardsSum > 0 ? ' text-amber-700 font-semibold' : '')}>
+                  {salesCalc.awardsSum > 0 ? fmt(salesCalc.awardsSum) : '0'}
+                </td>
+              </tr>
               {(financial.allowance_details || []).map((a, i) => (
                 <tr key={i}>
                   <td className={tdL}>제수당</td>
@@ -358,7 +362,7 @@ function PayslipDocument({ emp, financial, yearMonth }: {
           <thead>
             <tr>
               <th colSpan={5} className="border border-gray-400 px-2 py-1 bg-gray-100 text-center font-bold">
-                승급프로모션 구간 안내
+                프로모션 구간 안내
               </th>
             </tr>
             <tr>
