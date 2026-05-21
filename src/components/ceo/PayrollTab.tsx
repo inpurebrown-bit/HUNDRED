@@ -171,9 +171,9 @@ function OpsCard({
       {/* 항목 */}
       <div className="px-4 py-3 space-y-0">
         <PayRow label="기본급" value={emp.base_salary} editable onEdit={v => onChange(idx, 'base_salary', v)} />
-        <PayRow label="수수료매출(VAT제외)" value={emp.fee_revenue} editable autoTag onEdit={v => onChange(idx, 'fee_revenue', v)} />
+        <PayRow label="수수료매출(VAT제외)" value={emp.fee_revenue} autoTag />
         <PayRow label="수수료인센(10%)" value={c.feeInc} />
-        <PayRow label="뿌토매출(VAT제외)" value={emp.puto_revenue} editable autoTag onEdit={v => onChange(idx, 'puto_revenue', v)} />
+        <PayRow label="뿌토매출(VAT제외)" value={emp.puto_revenue} autoTag />
         <PayRow label="뿌토인센(35%)" value={c.putoInc} />
         <PayRow label="성과급" value={emp.performance_bonus} editable onEdit={v => onChange(idx, 'performance_bonus', v)} />
       </div>
@@ -219,7 +219,7 @@ function SalesCard({
       </div>
       {/* 항목 */}
       <div className="px-4 py-3 space-y-0">
-        <PayRow label="계약금매출(VAT제외)" value={emp.contract_revenue} editable autoTag onEdit={v => onChange(idx, 'contract_revenue', v)} />
+        <PayRow label="계약금매출(VAT제외)" value={emp.contract_revenue} autoTag />
         <PayRow label="계약금인센(25%)" value={c.contractInc} />
         <PayRow
           label={has12 ? '성과급(+5% ✓ 12개↑)' : '성과급(+5%, 12개↑)'}
@@ -271,6 +271,7 @@ export default function PayrollTab() {
   const [yearMonth, setYearMonth] = useState(thisMonth())
   const [loading, setLoading]         = useState(false)
   const [autoLoading, setAutoLoading] = useState(false)
+  const [saving, setSaving]           = useState(false)
   const [msg, setMsg]                 = useState('')
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
 
@@ -527,6 +528,21 @@ export default function PayrollTab() {
           </button>
         )}
 
+        <button
+          onClick={async () => {
+            setSaving(true)
+            setMsg('')
+            try {
+              await doSave(opsEmps, salesEmps, costs, revTotals)
+              setMsg('✅ 저장 완료')
+            } catch { setMsg('❌ 저장 실패') }
+            finally { setSaving(false) }
+          }}
+          disabled={saving}
+          className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors">
+          {saving ? '⏳ 저장 중...' : '💾 저장하기'}
+        </button>
+
         {loading && <span className="text-xs text-blue-500 animate-pulse">불러오는 중...</span>}
 
         {msg && (
@@ -611,21 +627,29 @@ export default function PayrollTab() {
 
         {/* KPI 3개 */}
         <div className="grid grid-cols-3 divide-x divide-[#E8E2D4] border-b border-[#E8E2D4]">
-          {[
-            { label: '총 매출', value: totalRevenue, color: 'text-[#1B2A45]' },
-            { label: '총 비용', value: totalRevenue > 0 ? tax + laborCost + otherTotal : 0, color: 'text-red-500' },
-            { label: '순이익', value: netProfit, color: netProfit >= 0 ? 'text-emerald-600' : 'text-red-600' },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="px-5 py-4 text-center">
-              <p className="text-[10px] text-gray-400 font-medium mb-1">{label}</p>
-              <p className={`text-xl font-black ${color} tracking-tight`}>
-                {value > 0 ? value.toLocaleString('ko-KR') + '원' : totalRevenue > 0 && label === '순이익' ? value.toLocaleString('ko-KR') + '원' : '—'}
+          <div className="px-5 py-4 text-center">
+            <p className="text-[10px] text-gray-400 font-medium mb-1">총 매출</p>
+            <p className="text-xl font-black text-[#1B2A45] tracking-tight">
+              {totalRevenue > 0 ? totalRevenue.toLocaleString('ko-KR') + '원' : '—'}
+            </p>
+          </div>
+          <div className="px-5 py-4 text-center">
+            <p className="text-[10px] text-gray-400 font-medium mb-1">총 매입</p>
+            <p className="text-xl font-black text-red-500 tracking-tight">
+              {totalRevenue > 0 ? (tax + laborCost + otherTotal).toLocaleString('ko-KR') + '원' : '—'}
+            </p>
+          </div>
+          <div className={`px-5 py-4 text-center ${netProfit >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
+            <p className="text-[10px] font-bold mb-1 ${netProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}">💰 순이익</p>
+            <p className={`text-xl font-black tracking-tight ${netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+              {totalRevenue > 0 ? netProfit.toLocaleString('ko-KR') + '원' : '—'}
+            </p>
+            {totalRevenue > 0 && (
+              <p className={`text-[10px] mt-0.5 ${netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                이익률 {((netProfit / totalRevenue) * 100).toFixed(1)}%
               </p>
-              {label === '순이익' && totalRevenue > 0 && (
-                <p className="text-[10px] text-gray-400 mt-0.5">이익률 {((netProfit / totalRevenue) * 100).toFixed(1)}%</p>
-              )}
-            </div>
-          ))}
+            )}
+          </div>
         </div>
 
         <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -649,18 +673,20 @@ export default function PayrollTab() {
               <p className="text-[10px] font-bold text-[#1B2A45]/40 uppercase tracking-widest mb-2">운영비</p>
 
               {/* DB — 갯수 잠금, 단가만 편집 */}
-              <div className="flex items-center justify-between py-2 border-b border-gray-50">
+              <div className="flex items-center justify-between py-2 border-b border-gray-50 gap-2">
                 <span className="text-xs text-gray-500 shrink-0">DB 공급비용</span>
-                <div className="flex items-center gap-1.5 text-xs shrink-0">
-                  <span className="flex items-center gap-1 bg-gray-100 text-gray-500 rounded px-2 py-1 font-mono">
+                <div className="flex items-center gap-1 text-xs shrink-0 flex-wrap justify-end">
+                  <span className="flex items-center gap-1 bg-gray-100 text-gray-500 rounded px-1.5 py-1 font-mono whitespace-nowrap">
                     🔒 <span className="font-bold text-gray-700">{costs.db_count}</span>개
                   </span>
                   <span className="text-gray-300">×</span>
-                  <input type="text" inputMode="numeric" value={fmtInput(costs.db_unit_price)} placeholder="40,000"
-                    onChange={e => setCosts(p => ({ ...p, db_unit_price: parseInput(e.target.value) }))}
-                    className="w-20 text-center border border-gray-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400" />
-                  <span className="text-gray-400">원</span>
-                  <span className="font-bold text-gray-700 w-16 text-right">{dbCost > 0 ? dbCost.toLocaleString('ko-KR') + '원' : '-'}</span>
+                  <div className="flex items-center gap-0.5 whitespace-nowrap">
+                    <input type="text" inputMode="numeric" value={fmtInput(costs.db_unit_price)} placeholder="40,000"
+                      onChange={e => setCosts(p => ({ ...p, db_unit_price: parseInput(e.target.value) }))}
+                      className="w-18 text-center border border-gray-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                    <span className="text-gray-400 ml-0.5">원</span>
+                  </div>
+                  <span className="font-bold text-gray-700 whitespace-nowrap">{dbCost > 0 ? '= ' + dbCost.toLocaleString('ko-KR') + '원' : '-'}</span>
                 </div>
               </div>
 
@@ -726,7 +752,7 @@ export default function PayrollTab() {
 
             {/* 비용 내역 */}
             <div className="bg-gray-50 rounded-xl p-4 space-y-2">
-              <p className="text-[10px] font-bold text-[#1B2A45]/40 uppercase tracking-widest mb-2">비용 내역</p>
+              <p className="text-[10px] font-bold text-[#1B2A45]/40 uppercase tracking-widest mb-2">매입 내역</p>
               <SumRow label="세금 (10%)"        value={tax}           negative />
               <SumRow label="인건비 (세전)"      value={laborCost}     negative />
               <SumRow label="DB 비용"            value={dbCost}        negative />
@@ -737,7 +763,7 @@ export default function PayrollTab() {
                 <SumRow key={i} label={item.label || '기타'} value={item.amount} negative />
               ))}
               <div className="border-t border-gray-200 pt-2">
-                <SumRow label="총 비용" value={totalRevenue > 0 ? tax + laborCost + otherTotal : 0} negative bold />
+                <SumRow label="총 매입" value={totalRevenue > 0 ? tax + laborCost + otherTotal : 0} negative bold />
               </div>
             </div>
 
