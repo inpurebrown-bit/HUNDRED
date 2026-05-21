@@ -1460,6 +1460,19 @@ function CustomerCard({
                 {getOpsStageStyle(opsStatus.stage).label}
               </span>
             )}
+            {/* 대표 전용: 직가 전환 (전송 여부 상관없이 항상 표시) */}
+            {userName === 'ceo' && onMarkDirect && !(c.details as any)?.is_direct && (
+              <button type="button"
+                onClick={async () => {
+                  if (confirm(`"${(c.details as any)?.company || c.company || c.name}" 업체를\n직가로 전환하시겠습니까?\n\n✅ 공급결제 → 직접결제로 즉시 재계산됩니다.\n⚠️ 결제율 탭에서 해당 직원 공급수를 -1 해주세요.`)) {
+                    await onMarkDirect(c.id)
+                    onExpand(null)
+                  }
+                }}
+                className="px-2.5 py-1 rounded text-[11px] font-semibold bg-violet-600 hover:bg-violet-700 text-white">
+                🔁 직가 전환
+              </button>
+            )}
             {/* 미팅일지 출력 버튼 */}
             <button
               type="button"
