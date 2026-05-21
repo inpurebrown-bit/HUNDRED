@@ -157,6 +157,7 @@ export interface Props {
   onDelete: (id: string) => Promise<void>
   onTransferToOps?: (customer: Customer) => Promise<void>
   onCeoTransfer?: (id: string, destPerson: string, destBucket: string, destRole: 'sales' | 'ops') => Promise<void>
+  onMarkDirect?: (id: string) => Promise<void>  // 대표 전용: 공가→직가 전환
   showOwner?: boolean
 }
 
@@ -730,6 +731,7 @@ interface CardProps {
   onDelete: Props['onDelete']
   onTransferToOps?: Props['onTransferToOps']
   onCeoTransfer?: Props['onCeoTransfer']
+  onMarkDirect?: Props['onMarkDirect']
 }
 
 function CustomerCard({
@@ -749,6 +751,7 @@ function CustomerCard({
   onDelete,
   onTransferToOps,
   onCeoTransfer,
+  onMarkDirect,
 }: CardProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [ceoMoveOpen, setCeoMoveOpen] = useState(false)
@@ -1182,6 +1185,21 @@ function CustomerCard({
                     <button type="button" onClick={() => { setCeoMoveOpen(true); setMenuOpen(false) }}
                       className="w-full text-left px-3 py-2 text-xs hover:bg-amber-50 text-amber-600 font-semibold">
                       🔀 DB 이동
+                    </button>
+                  </>
+                )}
+                {/* 대표 전용: 공가→직가 전환 */}
+                {userName === 'ceo' && onMarkDirect && !(c.details as any)?.is_direct && (
+                  <>
+                    <div className="border-t border-gray-100 my-0.5" />
+                    <button type="button" onClick={async () => {
+                      if (confirm(`"${(c.details as any)?.company || c.company || c.name}" 업체를 직가로 전환하시겠습니까?\n\n⚠️ 전환 후 결제율 탭에서 해당 직원 공급수를 -1 해주세요.`)) {
+                        await onMarkDirect(c.id)
+                        setMenuOpen(false)
+                      }
+                    }}
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-violet-50 text-violet-600 font-semibold">
+                      🔁 직가로 전환
                     </button>
                   </>
                 )}
@@ -1886,6 +1904,7 @@ export default function InCallTableView({
   onDelete,
   onTransferToOps,
   onCeoTransfer,
+  onMarkDirect,
   showOwner = false,
 }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -1951,6 +1970,7 @@ export default function InCallTableView({
                     onDelete={onDelete}
                     onTransferToOps={onTransferToOps}
                     onCeoTransfer={onCeoTransfer}
+                    onMarkDirect={onMarkDirect}
                   />
                 )
               })}

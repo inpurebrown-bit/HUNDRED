@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import InCallTableView from '@/components/sales/InCallTableView'
 import type { Customer } from '@/components/sales/InCallTableView'
+import InCallForm, { emptyInCallData, InCallData } from '@/components/sales/InCallForm'
 import { SUPPLY_RATE_TABLE, calcRecommendedSupply, isActiveRow, contractWeight } from '@/lib/supplyRules'
 import { getElapsedBusinessDays } from '@/lib/businessDays'
 
@@ -712,8 +713,9 @@ export default function SalesCeoTab({ initialView }: { initialView?: CeoView }) 
   const [officialSalesUsers, setOfficialSalesUsers] = useState<string[]>([])
   // 대표 직가업체 추가 폼
   const [showCeoDirectForm, setShowCeoDirectForm] = useState(false)
-  const [ceoDirectForm, setCeoDirectForm] = useState({ company: '', name: '', phone: '', region: '', business_type: '', notes: '' })
   const [ceoDirectSaving, setCeoDirectSaving] = useState(false)
+  // 직가업체 등록 후 자동 관리팀 전송 대기
+  const [ceoDirectTransferQueue, setCeoDirectTransferQueue] = useState<Customer | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -1116,28 +1118,57 @@ export default function SalesCeoTab({ initialView }: { initialView?: CeoView }) 
     })
   }
 
-  // 대표 직가업체 등록
-  async function submitCeoDirect() {
-    if (!ceoDirectForm.company.trim() && !ceoDirectForm.name.trim()) return
+  // 공가 → 직가 전환 (대표 전용, 기존 고객 소급 처리)
+  async function handleMarkDirect(id: string) {
+    const c = customers.find(x => x.id === id)
+    const details = (c as any)?.details || {}
+    const thisMonth = new Date().toISOString().slice(0, 7)
+    await updateCustomer(id, {
+      details: {
+        is_direct: true,
+        db010_month: details.db010_month || details.reception_date?.slice(0, 7) || thisMonth,
+      },
+    })
+  }
+
+  // 대표 직가업체 등록 (InCallForm으로 받은 데이터)
+  async function submitCeoDirect(data: InCallData) {
     setCeoDirectSaving(true)
     try {
       const now = new Date()
       const db010Month = now.toISOString().slice(0, 7)
       const payload = {
-        name:    ceoDirectForm.name.trim() || ceoDirectForm.company.trim(),
-        phone:   ceoDirectForm.phone.trim(),
-        company: ceoDirectForm.company.trim(),
-        notes:   ceoDirectForm.notes.trim(),
+        name:    data.name,
+        phone:   data.phone,
+        company: data.company,
+        notes:   data.notes,
         status:  'db010',
         details: {
-          company:        ceoDirectForm.company.trim(),
-          region:         ceoDirectForm.region.trim(),
-          business_type:  ceoDirectForm.business_type.trim(),
-          reception_date: now.toISOString().slice(0, 10),
-          sales_user_name: 'CEO직가',
-          db010_month:    db010Month,
-          is_direct:      true,
-          ceo_direct:     true,  // 대표 직접 등록 마커
+          company:          data.company,
+          corp_type:        data.corp_type,
+          region:           data.region,
+          business_reg_no:  data.business_reg_no,
+          assignee:         data.assignee,
+          reception_date:   data.reception_date || now.toISOString().slice(0, 10),
+          business_type:    data.business_type,
+          years_in_business: data.years_in_business,
+          employee_count:   data.employee_count,
+          loan_kibo:        data.loan_kibo || data.loan_policy,
+          loan_policy:      data.loan_policy,
+          loan_credit:      data.loan_credit,
+          revenue_2026:     data.revenue_2026,
+          revenue_2025:     data.revenue_2025,
+          revenue_2024:     data.revenue_2024,
+          revenue_2023:     data.revenue_2023,
+          credit_score:     data.credit_score,
+          tax_delinquency:  data.tax_delinquency,
+          assets:           data.assets,
+          required_funds:   data.required_funds,
+          sensitivity:      data.sensitivity,
+          sales_user_name:  'CEO직가',
+          db010_month:      db010Month,
+          is_direct:        true,
+          ceo_direct:       true,   // 대표 직접 등록 마커
         },
       }
       const res = await fetch('/api/customers', {
@@ -1146,11 +1177,12 @@ export default function SalesCeoTab({ initialView }: { initialView?: CeoView }) 
         body: JSON.stringify(payload),
       })
       if (res.ok) {
-        const data = await res.json()
-        setCustomers(prev => [data.customer || data, ...prev])
-        setCeoDirectForm({ company: '', name: '', phone: '', region: '', business_type: '', notes: '' })
+        const json = await res.json()
+        const newCustomer = json.customer || json
+        setCustomers(prev => [newCustomer, ...prev])
         setShowCeoDirectForm(false)
-        // 직가DB 탭으로 이동
+        // 등록 직후 관리팀 전송 대기 (인콜카드 생성)
+        setCeoDirectTransferQueue(newCustomer)
         setCeoView('customers')
         setStatusTab('db010')
       }
@@ -1218,49 +1250,49 @@ export default function SalesCeoTab({ initialView }: { initialView?: CeoView }) 
         </button>
       </div>
 
-      {/* ── 대표 직가업체 등록 모달 ── */}
+      {/* ── 대표 직가업체 등록 모달 (전체 인콜일지 폼) ── */}
       {showCeoDirectForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-gray-900">➕ 직가업체 등록 (대표)</h3>
-              <button onClick={() => setShowCeoDirectForm(false)} className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 py-8 overflow-y-auto">
+          <div className="w-full max-w-2xl">
+            <div className="bg-violet-600 rounded-t-2xl px-5 py-3 flex items-center justify-between">
+              <span className="text-white font-bold text-sm">➕ 직가업체 인콜일지 등록 (대표)</span>
+              <button onClick={() => setShowCeoDirectForm(false)} className="text-white/70 hover:text-white text-lg">✕</button>
             </div>
-            <p className="text-xs text-violet-600 bg-violet-50 rounded-xl px-3 py-2">
-              대표가 직접 인콜받은 소개업체를 등록합니다. 직가DB로 분류되며 관리팀 전송 후 자금팀이 처리합니다.
-            </p>
-            <div className="space-y-3">
-              {([
-                ['company', '업체명 *', 'text', '업체명 입력'],
-                ['name', '대표자명', 'text', '대표자 이름'],
-                ['phone', '연락처', 'tel', '010-0000-0000'],
-                ['region', '지역', 'text', '서울, 경기 등'],
-                ['business_type', '업종', 'text', '제조업, 서비스업 등'],
-                ['notes', '메모', 'text', '특이사항'],
-              ] as [keyof typeof ceoDirectForm, string, string, string][]).map(([key, label, type, ph]) => (
-                <div key={key}>
-                  <label className="text-xs font-medium text-gray-500 mb-1 block">{label}</label>
-                  <input
-                    type={type}
-                    value={ceoDirectForm[key]}
-                    onChange={e => setCeoDirectForm(prev => ({ ...prev, [key]: e.target.value }))}
-                    placeholder={ph}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
-                  />
-                </div>
-              ))}
+            <div className="bg-violet-50 px-5 py-2.5 text-xs text-violet-700 border-x border-violet-200">
+              ✅ 직가DB로 분류 · <b>CEO직가</b>로 저장 · 등록 후 관리팀 전송하여 인콜카드 생성
             </div>
-            <div className="flex gap-2 pt-1">
-              <button onClick={() => setShowCeoDirectForm(false)}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">
-                취소
-              </button>
-              <button onClick={submitCeoDirect} disabled={ceoDirectSaving || (!ceoDirectForm.company.trim() && !ceoDirectForm.name.trim())}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-violet-700">
-                {ceoDirectSaving ? '등록 중...' : '✅ 직가업체 등록'}
-              </button>
-            </div>
+            <InCallForm
+              title="직가업체 인콜일지"
+              salesUsers={['CEO직가', ...salesPeople]}
+              submitting={ceoDirectSaving}
+              submitLabel="✅ 직가업체 등록 + 관리팀 전송 대기"
+              onSubmit={submitCeoDirect}
+              onCancel={() => setShowCeoDirectForm(false)}
+            />
           </div>
+        </div>
+      )}
+
+      {/* ── 직가업체 등록 완료 → 관리팀 전송 배너 ── */}
+      {ceoDirectTransferQueue && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-white border border-violet-300 shadow-2xl rounded-2xl px-5 py-4 flex items-center gap-4 max-w-lg w-full mx-4">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-violet-700">✅ 직가업체 등록 완료!</p>
+            <p className="text-xs text-gray-600 mt-0.5 truncate">
+              <b>{(ceoDirectTransferQueue as any).details?.company || ceoDirectTransferQueue.company || ceoDirectTransferQueue.name}</b> — 지금 관리팀으로 전송하여 인콜카드를 생성하세요
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              const c = ceoDirectTransferQueue
+              setCeoDirectTransferQueue(null)
+              // 해당 고객 카드를 열고 DB 이동 모달 트리거
+              setCeoView('transfer')
+            }}
+            className="shrink-0 px-4 py-2 bg-violet-600 text-white text-xs font-bold rounded-xl hover:bg-violet-700 transition-colors">
+            📤 관리팀 전송
+          </button>
+          <button onClick={() => setCeoDirectTransferQueue(null)} className="text-gray-400 hover:text-gray-600 shrink-0">✕</button>
         </div>
       )}
 
@@ -1640,6 +1672,7 @@ export default function SalesCeoTab({ initialView }: { initialView?: CeoView }) 
           onStatusChange={changeStatus}
           onDelete={deleteCustomer}
           onCeoTransfer={handleCeoTransfer}
+          onMarkDirect={handleMarkDirect}
         />
       )}
       </>)}
