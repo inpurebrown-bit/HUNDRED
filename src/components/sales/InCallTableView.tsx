@@ -755,6 +755,25 @@ function CustomerCard({
 }: CardProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [ceoMoveOpen, setCeoMoveOpen] = useState(false)
+
+  // 직가DB로 설정: status + is_direct 플래그 + db010_month 동시 설정
+  async function setToDirectDb() {
+    const thisMonth = new Date().toISOString().slice(0, 7)
+    await onUpdate(c.id, {
+      details: {
+        is_direct: true,
+        db010_month: (c.details as any)?.db010_month || thisMonth,
+      },
+    })
+    await onStatusChange(c.id, 'db010')
+  }
+  // 공가DB로 되돌릴 때 직가 플래그 해제
+  async function setToSupplyDb(targetStatus: 'lead' | 'db010' = 'lead') {
+    if (targetStatus === 'lead') {
+      await onUpdate(c.id, { details: { is_direct: false } })
+    }
+    await onStatusChange(c.id, targetStatus)
+  }
   const [contractModalOpen, setContractModalOpen] = useState(false)
   const [quickTransferOpen, setQuickTransferOpen] = useState(false)
   const [qtCheckedGroup, setQtCheckedGroup] = useState(false)
@@ -1155,7 +1174,7 @@ function CustomerCard({
                   </button>
                 )}
                 {tabType === 'lead' && (
-                  <button type="button" onClick={() => { onStatusChange(c.id, 'db010'); setMenuOpen(false) }}
+                  <button type="button" onClick={async () => { await setToDirectDb(); setMenuOpen(false) }}
                     className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-indigo-600 font-medium">
                     📥 직가DB로 전송
                   </button>
@@ -1166,7 +1185,7 @@ function CustomerCard({
                       className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 text-blue-600 font-medium">
                       ↩ 공급으로 돌리기
                     </button>
-                    <button type="button" onClick={() => { onStatusChange(c.id, 'db010'); setMenuOpen(false) }}
+                    <button type="button" onClick={async () => { await setToDirectDb(); setMenuOpen(false) }}
                       className="w-full text-left px-3 py-2 text-xs hover:bg-indigo-50 text-indigo-600 font-medium">
                       ↩ 직접으로 돌리기
                     </button>
@@ -1406,18 +1425,18 @@ function CustomerCard({
                   </button>
                 )}
                 {tabType === 'lead' && (
-                  <button type="button" onClick={() => { onStatusChange(c.id, 'db010'); onExpand(null) }}
+                  <button type="button" onClick={async () => { await setToDirectDb(); onExpand(null) }}
                     className="px-2.5 py-1 rounded text-[11px] font-semibold bg-indigo-600 text-white hover:bg-indigo-700">
                     📥 직가DB로 전송
                   </button>
                 )}
                 {tabType !== 'lead' && tabType !== 'db010' && (
                   <>
-                    <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); onExpand(null) }}
+                    <button type="button" onClick={async () => { await setToSupplyDb('lead'); onExpand(null) }}
                       className="px-2.5 py-1 rounded text-[11px] font-semibold bg-blue-500 text-white hover:bg-blue-600">
                       ↩ 공급
                     </button>
-                    <button type="button" onClick={() => { onStatusChange(c.id, 'db010'); onExpand(null) }}
+                    <button type="button" onClick={async () => { await setToDirectDb(); onExpand(null) }}
                       className="px-2.5 py-1 rounded text-[11px] font-semibold bg-indigo-500 text-white hover:bg-indigo-600">
                       ↩ 직접
                     </button>
