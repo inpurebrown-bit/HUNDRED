@@ -943,9 +943,10 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               const supPay = supPayAuto
               // 직접수: 저장된 값 말고 customers DB에서 이번달 db010 실시간 카운트
               // 직접수: db010_month(신규) 또는 is_direct 플래그 기준 — 거절/삭제 이동 후에도 카운트 유지
+              // ⚡ reception_date는 통화접수일(지난달 가능)이므로 폴백에서 제외 → created_at 기준으로만 판단
               const dirCntAuto = customers.filter(c => {
                 const regMonth = (c as any).details?.db010_month
-                  || ((c as any).details?.reception_date || (c as any).created_at || '').slice(0, 7)
+                  || ((c as any).created_at || '').slice(0, 7)
                 return isDirectFn(c) && regMonth === thisMonth && !(c as any).details?.direct_count_voided
               }).length
               // 직접결제: customers DB에서 직가 출신 계약 완료 건 실시간 집계

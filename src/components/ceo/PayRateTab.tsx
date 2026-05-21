@@ -434,7 +434,8 @@ function PayRateSubView() {
             if (!name || name === TESTER) return
             const contractMonth  = (c.details?.contract_date || c.created_at || '').slice(0, 7)
             // 직가 등록월: db010_month 우선, 없으면 접수일, 없으면 created_at
-            const receptionMonth = (c.details?.db010_month || c.details?.reception_date || c.created_at || '').slice(0, 7)
+            // ⚡ reception_date는 통화접수일(지난달 가능)이므로 폴백에서 제외 → created_at 기준으로만 판단
+            const receptionMonth = (c.details?.db010_month || c.created_at || '').slice(0, 7)
             // 계약 완료 시에도 원래 출처(공가/직가) 기준으로 분류 (is_direct 플래그 포함)
             const isDirectType = c.status === 'db010' || !!c.details?.db010_month || !!c.details?.is_direct
 
@@ -446,6 +447,7 @@ function PayRateSubView() {
               else              supplyPayMap[name]  = (supplyPayMap[name] || 0) + w
             }
             // 직접수: 거절/삭제 이동해도 카운트 유지 (direct_count_voided=true일 때만 제외)
+            // ⚡ reception_date는 통화접수일(지난달 가능)이므로 폴백에서 제외 → created_at 기준으로만 판단
             const isDirectMonth = isDirectType && receptionMonth === month
             const isVoided = c.details?.direct_count_voided === true
             if (isDirectMonth && !isVoided) {
