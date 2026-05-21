@@ -166,11 +166,11 @@ function EmpCard({
   const total       = supplyPayment + directPayment
   const supplyRate  = supplyCount > 0 ? (supplyPayment / supplyCount * 100) : null
   const directRate  = directCount > 0 ? (directPayment / directCount * 100) : null
-  const totalRate   = (supplyCount + directCount) > 0
-    ? ((supplyPayment + directPayment) / (supplyCount + directCount) * 100) : null
+  // 총결제율 = 총계약수(공가+직가) / 공급갯수 × 100
+  const totalRate   = supplyCount > 0 ? ((supplyPayment + directPayment) / supplyCount * 100) : null
   const needed      = Number(row.target) - total
-  // 공급예정: 내일 공급 권장 수 (기준표 기반 일일권장, 잔여일 곱하지 않음)
-  const dailyRec    = supplyRate !== null ? calcRecommendedSupply(supplyRate, we) : 0
+  // 공급예정: 총결제율 기준 권장 공급 수
+  const dailyRec    = totalRate !== null ? calcRecommendedSupply(totalRate, we) : 0
   const supplyNeeded = dailyRec > 0 ? dailyRec : null
 
   const status     = we > 0 && tw > 0 ? (total / we >= Number(row.target) / tw ? 'GOOD' : 'BAD') : '-'
@@ -435,8 +435,8 @@ function PayRateSubView() {
             const contractMonth  = (c.details?.contract_date || c.created_at || '').slice(0, 7)
             // 직가 등록월: db010_month 우선, 없으면 접수일, 없으면 created_at
             const receptionMonth = (c.details?.db010_month || c.details?.reception_date || c.created_at || '').slice(0, 7)
-            // 계약 완료 시에도 원래 출처(공가/직가) 기준으로 분류
-            const isDirectType = c.status === 'db010' || !!c.details?.db010_month
+            // 계약 완료 시에도 원래 출처(공가/직가) 기준으로 분류 (is_direct 플래그 포함)
+            const isDirectType = c.status === 'db010' || !!c.details?.db010_month || !!c.details?.is_direct
 
             // 전체 계약 집계 (기존)
             if (c.status === 'contracted' && contractMonth === month) {
@@ -628,7 +628,8 @@ function PayRateSubView() {
   const totDirectPay = employees.filter(r => r.name !== TESTER)
     .reduce((s, r) => s + Number(r.direct_payment), 0)
   const totPayment   = totSupplyPay + totDirectPay
-  const totSupRate   = totSupply > 0 ? (totSupplyPay / totSupply * 100) : null
+  // 총결제율 = (공가+직가) / 공급갯수 × 100
+  const totTotalRate = totSupply > 0 ? (totPayment / totSupply * 100) : null
 
   return (
     <div className="space-y-5 pb-8">
@@ -683,9 +684,9 @@ function PayRateSubView() {
               <p className="text-lg font-black text-emerald-400">{totPayment}</p>
             </div>
             <div>
-              <p className="text-[10px] text-white/50 mb-0.5">공급결제율</p>
-              <p className="text-lg font-black text-blue-400">
-                {totSupRate !== null ? totSupRate.toFixed(1) + '%' : '—'}
+              <p className="text-[10px] text-white/50 mb-0.5">총결제율</p>
+              <p className="text-lg font-black text-teal-400">
+                {totTotalRate !== null ? totTotalRate.toFixed(1) + '%' : '—'}
               </p>
             </div>
           </div>

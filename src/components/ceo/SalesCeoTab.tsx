@@ -552,7 +552,7 @@ function buildLivePayMap(customers: Customer[], ym: string): Record<string, { su
     const name = ((c as any).details?.sales_user_name || '').trim()
     if (!name || name === DIARY_TESTER) continue
     const w = contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included)
-    const isDirectType = (c as any).status === 'db010' || !!(c as any).details?.db010_month
+    const isDirectType = (c as any).status === 'db010' || !!(c as any).details?.db010_month || !!(c as any).details?.is_direct
     if (!map[name]) map[name] = { supply: 0, direct: 0 }
     if (isDirectType) map[name].direct += w
     else              map[name].supply += w
@@ -710,6 +710,10 @@ export default function SalesCeoTab({ initialView }: { initialView?: CeoView }) 
   const [supplySaving, setSupplySaving] = useState(false)
   // 실제 영업팀 사용자 목록 (DB의 users 테이블 기준)
   const [officialSalesUsers, setOfficialSalesUsers] = useState<string[]>([])
+  // 대표 직가업체 추가 폼
+  const [showCeoDirectForm, setShowCeoDirectForm] = useState(false)
+  const [ceoDirectForm, setCeoDirectForm] = useState({ company: '', name: '', phone: '', region: '', business_type: '', notes: '' })
+  const [ceoDirectSaving, setCeoDirectSaving] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -1112,6 +1116,48 @@ export default function SalesCeoTab({ initialView }: { initialView?: CeoView }) 
     })
   }
 
+  // 대표 직가업체 등록
+  async function submitCeoDirect() {
+    if (!ceoDirectForm.company.trim() && !ceoDirectForm.name.trim()) return
+    setCeoDirectSaving(true)
+    try {
+      const now = new Date()
+      const db010Month = now.toISOString().slice(0, 7)
+      const payload = {
+        name:    ceoDirectForm.name.trim() || ceoDirectForm.company.trim(),
+        phone:   ceoDirectForm.phone.trim(),
+        company: ceoDirectForm.company.trim(),
+        notes:   ceoDirectForm.notes.trim(),
+        status:  'db010',
+        details: {
+          company:        ceoDirectForm.company.trim(),
+          region:         ceoDirectForm.region.trim(),
+          business_type:  ceoDirectForm.business_type.trim(),
+          reception_date: now.toISOString().slice(0, 10),
+          sales_user_name: 'CEO직가',
+          db010_month:    db010Month,
+          is_direct:      true,
+          ceo_direct:     true,  // 대표 직접 등록 마커
+        },
+      }
+      const res = await fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setCustomers(prev => [data.customer || data, ...prev])
+        setCeoDirectForm({ company: '', name: '', phone: '', region: '', business_type: '', notes: '' })
+        setShowCeoDirectForm(false)
+        // 직가DB 탭으로 이동
+        setCeoView('customers')
+        setStatusTab('db010')
+      }
+    } catch {}
+    setCeoDirectSaving(false)
+  }
+
   if (loading) return (
     <div className="space-y-3 py-8 animate-pulse">
       {[1,2,3].map(i => <div key={i} className="h-20 rounded-2xl bg-gray-100" />)}
@@ -1166,7 +1212,57 @@ export default function SalesCeoTab({ initialView }: { initialView?: CeoView }) 
           )}>
           📒 영업일지
         </button>
+        <button type="button" onClick={() => setShowCeoDirectForm(true)}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border transition-colors bg-violet-600 text-white border-violet-600 hover:bg-violet-700">
+          ➕ 직가업체
+        </button>
       </div>
+
+      {/* ── 대표 직가업체 등록 모달 ── */}
+      {showCeoDirectForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-gray-900">➕ 직가업체 등록 (대표)</h3>
+              <button onClick={() => setShowCeoDirectForm(false)} className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+            </div>
+            <p className="text-xs text-violet-600 bg-violet-50 rounded-xl px-3 py-2">
+              대표가 직접 인콜받은 소개업체를 등록합니다. 직가DB로 분류되며 관리팀 전송 후 자금팀이 처리합니다.
+            </p>
+            <div className="space-y-3">
+              {([
+                ['company', '업체명 *', 'text', '업체명 입력'],
+                ['name', '대표자명', 'text', '대표자 이름'],
+                ['phone', '연락처', 'tel', '010-0000-0000'],
+                ['region', '지역', 'text', '서울, 경기 등'],
+                ['business_type', '업종', 'text', '제조업, 서비스업 등'],
+                ['notes', '메모', 'text', '특이사항'],
+              ] as [keyof typeof ceoDirectForm, string, string, string][]).map(([key, label, type, ph]) => (
+                <div key={key}>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">{label}</label>
+                  <input
+                    type={type}
+                    value={ceoDirectForm[key]}
+                    onChange={e => setCeoDirectForm(prev => ({ ...prev, [key]: e.target.value }))}
+                    placeholder={ph}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setShowCeoDirectForm(false)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">
+                취소
+              </button>
+              <button onClick={submitCeoDirect} disabled={ceoDirectSaving || (!ceoDirectForm.company.trim() && !ceoDirectForm.name.trim())}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-violet-700">
+                {ceoDirectSaving ? '등록 중...' : '✅ 직가업체 등록'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── 심사요청 전용 뷰 ── */}
       {ceoView === 'inspection' && (
