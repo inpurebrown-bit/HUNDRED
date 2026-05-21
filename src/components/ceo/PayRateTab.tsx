@@ -481,18 +481,17 @@ function PayRateSubView() {
           setTargetCount(r.target_count ?? 0)
           const saved = (r.employee_details || []).filter((e: EmployeeRow) => e.name !== TESTER)
           const baseRows = saved.length > 0 ? saved : people.map(mkRow)
-          // ★ auto-sync:
-          //   - supply_payment / direct_payment: auto > stored 면 auto (계약 취소 가능성 고려)
-          //   - direct_count: 항상 auto (DB 실제 등록 수가 정답, stored는 초기 seed일 뿐)
+          // ★ auto-sync: supply_payment/direct_payment/direct_count 모두 항상 DB 실시간값 사용
+          //   (Math.max 제거 — 직가↔공가 전환, 계약취소 등 상태변경이 즉시 반영되어야 함)
           const synced = baseRows.map((row: EmployeeRow) => {
             const key  = cleanName(row.name)
             const auto = aMap[key]
             if (!auto) return row
             return {
               ...row,
-              supply_payment: Math.max(Number(row.supply_payment), auto.supply_payment),
-              direct_count:   auto.direct_count,   // 항상 DB 실제값 사용
-              direct_payment: Math.max(Number(row.direct_payment), auto.direct_payment),
+              supply_payment: auto.supply_payment,  // 항상 DB 실시간 계산
+              direct_count:   auto.direct_count,    // 항상 DB 실시간 계산
+              direct_payment: auto.direct_payment,  // 항상 DB 실시간 계산
             }
           })
           setEmployees(synced)
@@ -512,9 +511,9 @@ function PayRateSubView() {
                 if (!auto) return row
                 return {
                   ...row,
-                  supply_payment: Math.max(Number(row.supply_payment), auto.supply_payment),
-                  direct_count:   auto.direct_count,   // 항상 DB 실제값 사용
-                  direct_payment: Math.max(Number(row.direct_payment), auto.direct_payment),
+                  supply_payment: auto.supply_payment,  // 항상 DB 실시간 계산
+                  direct_count:   auto.direct_count,    // 항상 DB 실시간 계산
+                  direct_payment: auto.direct_payment,  // 항상 DB 실시간 계산
                 }
               })
               setEmployees(synced)

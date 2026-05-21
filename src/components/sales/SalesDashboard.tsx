@@ -939,7 +939,8 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   return !isDirectFn(c) && c.status === 'contracted' && cMonth === thisMonth
                 })
                 .reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0)
-              const supPay = supPayAuto > 0 ? supPayAuto : Number(pr?.supply_payment ?? 0)
+              // 공급결제/직접결제 항상 DB 실시간값 사용 (stored 폴백 제거 — 직가↔공가 전환이 즉시 반영)
+              const supPay = supPayAuto
               // 직접수: 저장된 값 말고 customers DB에서 이번달 db010 실시간 카운트
               // 직접수: db010_month(신규) 또는 is_direct 플래그 기준 — 거절/삭제 이동 후에도 카운트 유지
               const dirCntAuto = customers.filter(c => {
@@ -954,8 +955,8 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   return isDirectFn(c) && c.status === 'contracted' && contractMonth === thisMonth
                 })
                 .reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0)
-              const dirCnt    = dirCntAuto > 0 ? dirCntAuto : Number(pr?.direct_count ?? 0)
-              const dirPay    = dirPayAuto > 0 ? dirPayAuto : Number(pr?.direct_payment ?? 0)
+              const dirCnt    = dirCntAuto  // DB 실시간
+              const dirPay    = dirPayAuto  // DB 실시간
               const target    = Number(pr?.target ?? monthlyGoal)
               const total     = supPay + dirPay
               const supRate   = supCnt > 0 ? (supPay / supCnt * 100) : null
