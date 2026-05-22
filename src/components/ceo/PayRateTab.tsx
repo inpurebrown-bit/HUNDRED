@@ -393,6 +393,8 @@ function PayRateSubView() {
   const [targetCount,   setTargetCount]  = useState(0)
   const [paymentCount,  setPaymentCount] = useState(0)  // contractWeight 기준 자동
   const [employeeCount, setEmployeeCount] = useState(0)
+  // 관리팀 이번달 매출 (수수료 + 계약)
+  const [opsRevenue, setOpsRevenue] = useState<{ fee: number; contract: number } | null>(null)
   // 인별 자동집계: 공급결제(공가) / 직접수(직가DB) / 직접결제(직가계약)
   const [autoByPerson,  setAutoByPerson] = useState<Record<string, AutoEmpData>>({})
 
@@ -404,19 +406,28 @@ function PayRateSubView() {
   useEffect(() => {
     async function load() {
       try {
-        const [payRes, custRes, userRes] = await Promise.all([
+        const [payRes, custRes, userRes, revRes] = await Promise.all([
           fetch(`/api/payrate?year_month=${month}`),
           fetch('/api/customers'),
           fetch('/api/users?role=sales'),
+          fetch('/api/revenue'),
         ])
-        const [payJson, custJson, userJson] = await Promise.all([
-          payRes.json(), custRes.json(), userRes.json()
+        const [payJson, custJson, userJson, revJson] = await Promise.all([
+          payRes.json(), custRes.json(), userRes.json(), revRes.json()
         ])
 
-        // 영업팀 사람 (TESTER 제외)
+        // 관리팀 이번달 매출 집계
+        const revThisMonth = (revJson.monthly || []).find((m: any) => m.fullMonth === month)
+        setOpsRevenue({
+          fee:      revThisMonth ? Number(revThisMonth['관리팀'] || 0) : 0,
+          contract: revThisMonth ? Number(revThisMonth['관리팀계약'] || 0) : 0,
+        })
+
+        // 영업팀 사람 (TESTER 제외) — role=sales API 기준으로만 카운팅
         const people: string[] = (userJson.users || [])
           .filter((u: any) => u.name && u.name !== TESTER)
           .map((u: any) => u.name as string)
+        const salesNameSet = new Set(people.map(cleanName))
         setEmployeeCount(people.length)
 
         // ★ contractWeight 기준 이번달 계약 집계 (TESTER 제외)
@@ -485,17 +496,21 @@ function PayRateSubView() {
           const baseRows = saved.length > 0 ? saved : people.map(mkRow)
           // ★ auto-sync: supply_payment/direct_payment/direct_count 모두 항상 DB 실시간값 사용
           //   (Math.max 제거 — 직가↔공가 전환, 계약취소 등 상태변경이 즉시 반영되어야 함)
-          const synced = baseRows.map((row: EmployeeRow) => {
+          const syncRow = (row: EmployeeRow) => {
             const key  = cleanName(row.name)
             const auto = aMap[key]
             if (!auto) return row
             return {
               ...row,
-              supply_payment: auto.supply_payment,  // 항상 DB 실시간 계산
-              direct_count:   auto.direct_count,    // 항상 DB 실시간 계산
-              direct_payment: auto.direct_payment,  // 항상 DB 실시간 계산
+              supply_payment: auto.supply_payment,
+              direct_count:   auto.direct_count,
+              direct_payment: auto.direct_payment,
             }
-          })
+          }
+          // 영업팀만 포함 (저장된 rows에 관리팀 직원 행 섞인 경우 제거)
+          const synced = baseRows
+            .filter((row: EmployeeRow) => !row.name || salesNameSet.has(cleanName(row.name)))
+            .map(syncRow)
           setEmployees(synced)
         } else {
           // DB 레코드 없으면 localStorage 폴백 시도
@@ -507,17 +522,19 @@ function PayRateSubView() {
               if (d.target_count !== undefined) setTargetCount(d.target_count)
               const lsSaved = (d.employee_details || []).filter((e: EmployeeRow) => e.name !== TESTER)
               const baseRows = lsSaved.length > 0 ? lsSaved : people.map(mkRow)
-              const synced = baseRows.map((row: EmployeeRow) => {
-                const key  = cleanName(row.name)
-                const auto = aMap[key]
-                if (!auto) return row
-                return {
-                  ...row,
-                  supply_payment: auto.supply_payment,  // 항상 DB 실시간 계산
-                  direct_count:   auto.direct_count,    // 항상 DB 실시간 계산
-                  direct_payment: auto.direct_payment,  // 항상 DB 실시간 계산
-                }
-              })
+              const synced = baseRows
+                .filter((row: EmployeeRow) => !row.name || salesNameSet.has(cleanName(row.name)))
+                .map((row: EmployeeRow) => {
+                  const key  = cleanName(row.name)
+                  const auto = aMap[key]
+                  if (!auto) return row
+                  return {
+                    ...row,
+                    supply_payment: auto.supply_payment,
+                    direct_count:   auto.direct_count,
+                    direct_payment: auto.direct_payment,
+                  }
+                })
               setEmployees(synced)
             } else {
               setEmployees(people.map(mkRow))
@@ -694,10 +711,10 @@ function PayRateSubView() {
         )}
       </div>
 
-      {/* ─── 📈 영업일 기준 ─── */}
+      {/* ─── 📈 영업일 기준 (영업팀) ─── */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-gray-800">📈 영업일 기준</h3>
+          <h3 className="text-sm font-bold text-gray-800">📈 영업일 기준 <span className="text-violet-500 font-semibold">(영업팀)</span></h3>
           <span className="text-[11px] text-gray-300">{today}</span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
@@ -725,7 +742,51 @@ function PayRateSubView() {
         </div>
       </div>
 
-      {/* ─── 👥 직원별 현황 ─── */}
+      {/* ─── 🏢 관리팀 현재 매출 ─── */}
+      {opsRevenue !== null && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+          <h3 className="text-sm font-bold text-gray-800 mb-4">🏢 관리팀 현재 매출 <span className="text-[11px] text-gray-400 font-normal">({month})</span></h3>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-violet-50 rounded-2xl px-3 py-3 text-center">
+              <p className="text-[9px] text-violet-400 font-semibold mb-1">수수료 매출</p>
+              <p className="text-xl font-black text-violet-700 leading-tight">
+                {opsRevenue.fee >= 100000000
+                  ? (opsRevenue.fee / 100000000).toFixed(1) + '억'
+                  : opsRevenue.fee >= 10000
+                    ? Math.round(opsRevenue.fee / 10000) + '만'
+                    : opsRevenue.fee.toLocaleString()}
+              </p>
+              <p className="text-[8px] text-violet-400 mt-0.5">원</p>
+            </div>
+            <div className="bg-emerald-50 rounded-2xl px-3 py-3 text-center">
+              <p className="text-[9px] text-emerald-500 font-semibold mb-1">계약 매출</p>
+              <p className="text-xl font-black text-emerald-700 leading-tight">
+                {opsRevenue.contract >= 100000000
+                  ? (opsRevenue.contract / 100000000).toFixed(1) + '억'
+                  : opsRevenue.contract >= 10000
+                    ? Math.round(opsRevenue.contract / 10000) + '만'
+                    : opsRevenue.contract.toLocaleString()}
+              </p>
+              <p className="text-[8px] text-emerald-400 mt-0.5">원</p>
+            </div>
+            <div className="bg-[#1B2A45] rounded-2xl px-3 py-3 text-center">
+              <p className="text-[9px] text-white/50 font-semibold mb-1">합계</p>
+              <p className="text-xl font-black text-white leading-tight">
+                {(() => {
+                  const total = opsRevenue.fee + opsRevenue.contract
+                  return total >= 100000000
+                    ? (total / 100000000).toFixed(1) + '억'
+                    : total >= 10000
+                      ? Math.round(total / 10000) + '만'
+                      : total.toLocaleString()
+                })()}
+              </p>
+              <p className="text-[8px] text-white/40 mt-0.5">원</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── 저장 ─── */}
       <div className="flex items-center justify-end gap-3">
         {saveMsg && (
