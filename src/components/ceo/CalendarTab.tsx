@@ -22,6 +22,28 @@ interface GcalEntry {
   label: string
 }
 
+interface MonthlyExpense {
+  day: number
+  label: string
+  amount: number | null
+}
+
+const DEFAULT_EXPENSES: MonthlyExpense[] = [
+  { day: 1,  label: '아빠한테 카드값 고지하기', amount: null },
+  { day: 10, label: '직원 월급',                amount: null },
+  { day: 11, label: '소진공 이자(기업)',          amount: -114000 },
+  { day: 16, label: '사무실 임대료 납부',         amount: -1045000 },
+  { day: 18, label: '서민금 이자(기업)',          amount: -420000 },
+  { day: 19, label: '집월세 납부',               amount: -650000 },
+  { day: 20, label: '재단 이자(신한)',            amount: -49000 },
+  { day: 22, label: '삼성카드결제',              amount: -2500000 },
+]
+
+function fmtAmt(amount: number | null): string {
+  if (amount === null || amount === undefined) return ''
+  return amount.toLocaleString('ko-KR') + '원'
+}
+
 const COLORS = [
   { key: 'blue',   bg: 'bg-blue-500',    light: 'bg-blue-100 text-blue-700',    dot: 'bg-blue-500' },
   { key: 'red',    bg: 'bg-red-500',     light: 'bg-red-100 text-red-700',      dot: 'bg-red-500' },
@@ -77,6 +99,11 @@ export default function CalendarTab() {
   ])
   const [gcalSaved, setGcalSaved] = useState(false)
 
+  const [monthlyExpenses, setMonthlyExpenses] = useState<MonthlyExpense[]>(DEFAULT_EXPENSES)
+  const [showExpenseMgr, setShowExpenseMgr] = useState(false)
+  const [expenseForm, setExpenseForm] = useState({ day: '', label: '', amount: '' })
+  const [editingExpIdx, setEditingExpIdx] = useState<number | null>(null)
+
   async function load() {
     setLoading(true)
     const res = await fetch(`/api/events?year=${year}&month=${month}`)
@@ -85,24 +112,45 @@ export default function CalendarTab() {
     setLoading(false)
   }
 
+  async function saveExpenses(expenses: MonthlyExpense[]) {
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ _key: 'monthly_expenses', expenses }),
+    })
+  }
+
   useEffect(() => {
     async function init() {
-      const res = await fetch('/api/settings')
-      const data = await res.json()
-      if (data.settings?.api_key) {
-        setApiKey(data.settings.api_key)
-        setGcalList(data.settings.calendars || [{ id: '', color: 'green', label: '회사 캘린더' }])
+      const [gcalRes, expRes] = await Promise.all([
+        fetch('/api/settings'),
+        fetch('/api/settings?key=monthly_expenses'),
+      ])
+      const gcalData = await gcalRes.json()
+      const expData = await expRes.json()
+
+      if (gcalData.settings?.api_key) {
+        setApiKey(gcalData.settings.api_key)
+        setGcalList(gcalData.settings.calendars || [{ id: '', color: 'green', label: '회사 캘린더' }])
         setGcalSaved(true)
         setAutoSyncing(true)
         await fetch('/api/events/gcal', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ calendars: data.settings.calendars, api_key: data.settings.api_key }),
+          body: JSON.stringify({ calendars: gcalData.settings.calendars, api_key: gcalData.settings.api_key }),
         })
         setAutoSyncing(false)
       }
+
+      if (expData.settings?.expenses) {
+        setMonthlyExpenses(expData.settings.expenses)
+      } else {
+        // 첫 로드 시 기본값 저장
+        saveExpenses(DEFAULT_EXPENSES)
+      }
     }
     init()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => { load() }, [year, month])
@@ -198,6 +246,8 @@ export default function CalendarTab() {
   // 선택된 날 이벤트
   const selectedEvents = events.filter(e => e.start_date <= selectedDay && e.end_date >= selectedDay)
     .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))
+  const selectedDayNum = parseInt(selectedDay.slice(8), 10)
+  const selectedExpenses = monthlyExpenses.filter(e => e.day === selectedDayNum)
 
   // 이번 달 남은 일정 (오늘 이후)
   const upcomingThisMonth = events
@@ -237,6 +287,14 @@ export default function CalendarTab() {
           )}
         </div>
         <div className="flex gap-2">
+          <button onClick={() => setShowExpenseMgr(!showExpenseMgr)}
+            className={`flex items-center gap-1.5 text-xs border px-3 py-2 rounded-lg transition-colors ${
+              showExpenseMgr
+                ? 'border-red-400/40 bg-red-400/10 text-red-300'
+                : 'border-white/20 bg-white/10 text-white/70 hover:bg-white/20'
+            }`}>
+            💸 고정 지출 관리
+          </button>
           <button onClick={() => setShowGcal(!showGcal)}
             className={`flex items-center gap-1.5 text-xs border px-3 py-2 rounded-lg transition-colors ${
               gcalSaved
@@ -316,6 +374,119 @@ export default function CalendarTab() {
               {syncing ? '동기화 중...' : '저장 및 동기화'}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* 매월 고정 지출 관리 패널 */}
+      {showExpenseMgr && (
+        <div className="bg-white rounded-xl border border-red-100 p-5 space-y-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-gray-800">💸 매월 고정 지출 관리</span>
+            <span className="text-[11px] text-gray-400">캘린더 각 날짜 하단에 빨간색으로 표시됩니다</span>
+          </div>
+
+          {/* 목록 */}
+          <div className="space-y-1.5">
+            {[...monthlyExpenses].sort((a, b) => a.day - b.day).map((exp, listIdx) => {
+              const realIdx = monthlyExpenses.findIndex(e => e === exp)
+              return editingExpIdx === realIdx ? (
+                <div key={realIdx} className="flex items-center gap-2 bg-red-50 rounded-lg p-2.5">
+                  <input
+                    type="number" min={1} max={31}
+                    value={expenseForm.day}
+                    onChange={e => setExpenseForm(p => ({ ...p, day: e.target.value }))}
+                    className="w-14 border border-red-200 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:ring-2 focus:ring-red-300"
+                    placeholder="일" />
+                  <input
+                    value={expenseForm.label}
+                    onChange={e => setExpenseForm(p => ({ ...p, label: e.target.value }))}
+                    className="flex-1 border border-red-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-red-300"
+                    placeholder="항목명" />
+                  <input
+                    type="number"
+                    value={expenseForm.amount}
+                    onChange={e => setExpenseForm(p => ({ ...p, amount: e.target.value }))}
+                    className="w-28 border border-red-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-red-300"
+                    placeholder="금액 (없으면 빈칸)" />
+                  <button
+                    onClick={() => {
+                      const d = parseInt(expenseForm.day)
+                      if (!expenseForm.label.trim() || isNaN(d) || d < 1 || d > 31) return
+                      const updated = monthlyExpenses.map((e, i) =>
+                        i === realIdx ? { day: d, label: expenseForm.label.trim(), amount: expenseForm.amount !== '' ? Number(expenseForm.amount) : null } : e
+                      )
+                      setMonthlyExpenses(updated)
+                      saveExpenses(updated)
+                      setEditingExpIdx(null)
+                    }}
+                    className="text-xs bg-red-500 text-white px-3 py-1.5 rounded-lg hover:bg-red-600">저장</button>
+                  <button
+                    onClick={() => setEditingExpIdx(null)}
+                    className="text-xs text-gray-400 hover:text-gray-600">취소</button>
+                </div>
+              ) : (
+                <div key={realIdx} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 group">
+                  <span className="text-xs font-bold text-red-500 w-8 text-center">{exp.day}일</span>
+                  <span className="flex-1 text-xs text-gray-700">{exp.label}</span>
+                  {exp.amount !== null && (
+                    <span className="text-xs font-semibold text-red-600">{fmtAmt(exp.amount)}</span>
+                  )}
+                  <button
+                    onClick={() => {
+                      setExpenseForm({ day: String(exp.day), label: exp.label, amount: exp.amount !== null ? String(exp.amount) : '' })
+                      setEditingExpIdx(realIdx)
+                    }}
+                    className="text-[10px] text-gray-400 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity px-1">수정</button>
+                  <button
+                    onClick={() => {
+                      const updated = monthlyExpenses.filter((_, i) => i !== realIdx)
+                      setMonthlyExpenses(updated)
+                      saveExpenses(updated)
+                    }}
+                    className="text-[10px] text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity px-1">✕</button>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* 추가 폼 */}
+          {editingExpIdx === null && (
+            <div className="flex items-center gap-2 border-t border-gray-100 pt-3">
+              <input
+                type="number" min={1} max={31}
+                value={editingExpIdx === null ? expenseForm.day : ''}
+                onChange={e => setExpenseForm(p => ({ ...p, day: e.target.value }))}
+                className="w-14 border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:ring-2 focus:ring-red-300"
+                placeholder="일" />
+              <input
+                value={editingExpIdx === null ? expenseForm.label : ''}
+                onChange={e => setExpenseForm(p => ({ ...p, label: e.target.value }))}
+                className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-red-300"
+                placeholder="항목명 입력" />
+              <input
+                type="number"
+                value={editingExpIdx === null ? expenseForm.amount : ''}
+                onChange={e => setExpenseForm(p => ({ ...p, amount: e.target.value }))}
+                className="w-28 border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-red-300"
+                placeholder="금액 (선택)" />
+              <button
+                onClick={() => {
+                  const d = parseInt(expenseForm.day)
+                  if (!expenseForm.label.trim() || isNaN(d) || d < 1 || d > 31) return
+                  const updated = [...monthlyExpenses, {
+                    day: d,
+                    label: expenseForm.label.trim(),
+                    amount: expenseForm.amount !== '' ? Number(expenseForm.amount) : null,
+                  }]
+                  setMonthlyExpenses(updated)
+                  saveExpenses(updated)
+                  setExpenseForm({ day: '', label: '', amount: '' })
+                }}
+                className="text-xs bg-red-100 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-200 font-semibold whitespace-nowrap">
+                + 추가
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -458,6 +629,13 @@ export default function CalendarTab() {
                       {dayEvs.length > 3 && (
                         <p className="text-[10px] text-gray-400 pl-1">+{dayEvs.length - 3}개</p>
                       )}
+                      {/* 매월 고정 지출 칩 */}
+                      {monthlyExpenses.filter(e => e.day === day).map((exp, ei) => (
+                        <div key={`exp-${ei}`}
+                          className="text-[9px] px-1.5 py-0.5 rounded bg-red-100 text-red-600 font-medium truncate leading-tight">
+                          💸 {exp.label}{exp.amount !== null ? ` ${exp.amount.toLocaleString()}` : ''}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )
@@ -482,6 +660,21 @@ export default function CalendarTab() {
                 + 추가
               </button>
             </div>
+
+            {/* 매월 고정 지출 (해당 날짜) */}
+            {selectedExpenses.length > 0 && (
+              <div className="border-b border-gray-50">
+                {selectedExpenses.map((exp, i) => (
+                  <div key={i} className="flex items-center gap-2 px-4 py-2 bg-red-50/60">
+                    <span className="w-2 h-2 rounded-full shrink-0 bg-red-400" />
+                    <span className="text-xs font-semibold text-red-700 flex-1">{exp.label}</span>
+                    {exp.amount !== null && (
+                      <span className="text-xs font-bold text-red-600">{fmtAmt(exp.amount)}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
 
             {selectedEvents.length === 0 ? (
               <div className="px-4 py-6 text-center">
