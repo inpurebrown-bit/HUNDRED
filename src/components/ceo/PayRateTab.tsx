@@ -21,7 +21,7 @@ interface AutoEmpData {
   direct_payment: number  // 직접결제 (직가 계약)
 }
 
-interface SalesEmp { name: string; sales_vat_incl: number; contracts: number }
+interface SalesEmp { name: string; sales_vat_incl: number; contracts: number; supply_count?: number }
 interface OpsEmp   { name: string; fee_vat_incl: number; contract_vat_incl: number }
 interface OtherCost {
   ad_marketing: number; db: number; rent: number
@@ -861,14 +861,36 @@ export function PnlSubView() {
   const PNL_LS_KEY = `pnl-draft-${today}`
 
   useEffect(() => {
-    fetch(`/api/pnl?date=${today}`).then(r => r.json()).then(json => {
-      if (!json.record) {
-        // DB 없으면 localStorage 폴백
+    const month = today.slice(0, 7)
+    // payrate에서 직원별 공급수(daily_supplies 합산) 가져오기
+    function buildSupplyMap(payRecord: any): Record<string, number> {
+      const map: Record<string, number> = {}
+      for (const e of (payRecord?.employee_details || [])) {
+        if (!e.name) continue
+        const cnt = Object.values(e.daily_supplies || {}).reduce((s: number, v: any) => s + Number(v || 0), 0)
+        map[cleanName(e.name)] = cnt
+      }
+      return map
+    }
+    function applySupply(emps: SalesEmp[], supplyMap: Record<string, number>): SalesEmp[] {
+      return emps.map(e => ({
+        ...e,
+        supply_count: supplyMap[cleanName(e.name)] ?? e.supply_count ?? 0,
+      }))
+    }
+
+    Promise.all([
+      fetch(`/api/pnl?date=${today}`).then(r => r.json()).catch(() => ({})),
+      fetch(`/api/payrate?year_month=${month}`).then(r => r.json()).catch(() => ({})),
+    ]).then(([pnlJson, payJson]) => {
+      const supplyMap = buildSupplyMap(payJson.record)
+
+      if (!pnlJson.record) {
         try {
           const draft = localStorage.getItem(PNL_LS_KEY)
           if (draft) {
             const d = JSON.parse(draft)
-            if (Array.isArray(d.sales_employees)) setSalesEmps(d.sales_employees)
+            if (Array.isArray(d.sales_employees)) setSalesEmps(applySupply(d.sales_employees, supplyMap))
             if (Array.isArray(d.ops_employees))   setOpsEmps(d.ops_employees)
             if (d.other_costs)                    setOtherCosts(d.other_costs)
             if (d.ceo_salary !== undefined)       setCeoSalary(d.ceo_salary)
@@ -876,23 +898,11 @@ export function PnlSubView() {
         } catch {}
         return
       }
-      const r = json.record
-      if (Array.isArray(r.sales_employees)) setSalesEmps(r.sales_employees)
+      const r = pnlJson.record
+      if (Array.isArray(r.sales_employees)) setSalesEmps(applySupply(r.sales_employees, supplyMap))
       if (Array.isArray(r.ops_employees))   setOpsEmps(r.ops_employees)
       if (r.other_costs)                    setOtherCosts(r.other_costs)
       if (r.ceo_salary !== undefined)       setCeoSalary(r.ceo_salary)
-    }).catch(() => {
-      // 네트워크 오류 시 localStorage 폴백
-      try {
-        const draft = localStorage.getItem(PNL_LS_KEY)
-        if (draft) {
-          const d = JSON.parse(draft)
-          if (Array.isArray(d.sales_employees)) setSalesEmps(d.sales_employees)
-          if (Array.isArray(d.ops_employees))   setOpsEmps(d.ops_employees)
-          if (d.other_costs)                    setOtherCosts(d.other_costs)
-          if (d.ceo_salary !== undefined)       setCeoSalary(d.ceo_salary)
-        }
-      } catch {}
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -997,16 +1007,25 @@ export function PnlSubView() {
                 const promo = calcPromo(Number(e.sales_vat_incl), e.contracts)
                 const has   = Number(e.contracts) > 0
                 return (
-                  <div key={i} className="grid grid-cols-[100px_1fr_60px_auto_auto_auto_24px] gap-1.5 items-center">
-                    <input type="text" value={e.name} onChange={ev => updSales(i, 'name', ev.target.value)} className={iCls} placeholder="직원명" />
-                    <input type="number" value={e.sales_vat_incl} onChange={ev => updSales(i, 'sales_vat_incl', ev.target.value)} className={iCls} placeholder="매출(부가세제외)" min={0} />
-                    <input type="number" value={e.contracts} onChange={ev => updSales(i, 'contracts', ev.target.value)} className={iCls} placeholder="계약수" min={0} />
-                    <span className={rCls}>{has ? `${(promo.baseRate*100).toFixed(0)}%` : '30%'}</span>
-                    <span className={rCls}>{has ? promo.bonus.toLocaleString('ko-KR') : '—'}</span>
-                    <span className="text-sm font-bold text-blue-700 text-right whitespace-nowrap">
-                      {Math.round(has ? promo.promoWage : Number(e.sales_vat_incl)*0.30).toLocaleString('ko-KR')}
-                    </span>
-                    <button onClick={() => setSalesEmps(prev => prev.filter((_, idx) => idx !== i))} className="text-gray-300 hover:text-red-400 text-xs">✕</button>
+                  <div key={i}>
+                    <div className="grid grid-cols-[100px_1fr_60px_auto_auto_auto_24px] gap-1.5 items-center">
+                      <input type="text" value={e.name} onChange={ev => updSales(i, 'name', ev.target.value)} className={iCls} placeholder="직원명" />
+                      <input type="number" value={e.sales_vat_incl} onChange={ev => updSales(i, 'sales_vat_incl', ev.target.value)} className={iCls} placeholder="매출(부가세제외)" min={0} />
+                      <input type="number" value={e.contracts} onChange={ev => updSales(i, 'contracts', ev.target.value)} className={iCls} placeholder="계약수" min={0} />
+                      <span className={rCls}>{has ? `${(promo.baseRate*100).toFixed(0)}%` : '30%'}</span>
+                      <span className={rCls}>{has ? promo.bonus.toLocaleString('ko-KR') : '—'}</span>
+                      <span className="text-sm font-bold text-blue-700 text-right whitespace-nowrap">
+                        {Math.round(has ? promo.promoWage : Number(e.sales_vat_incl)*0.30).toLocaleString('ko-KR')}
+                      </span>
+                      <button onClick={() => setSalesEmps(prev => prev.filter((_, idx) => idx !== i))} className="text-gray-300 hover:text-red-400 text-xs">✕</button>
+                    </div>
+                    {(e.supply_count !== undefined && e.supply_count > 0) && (
+                      <div className="flex items-center gap-1.5 mt-0.5 mb-1 ml-1">
+                        <span className="text-[9px] bg-sky-100 text-sky-600 rounded-full px-2 py-0.5 font-semibold">
+                          📦 공급수 {e.supply_count}개 · 결제율탭 자동반영
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )
               })}
