@@ -752,9 +752,10 @@ function PayRateSubView() {
           '중진공', '소진공(혁신)', '소진공(신취)', '소진공(재도전)',
           '기보', '신보', '재단', '서민금융(미소)',
         ]
-        // 홀딩만 대기, 나머지는 모두 진행중
+        // 홀딩만 대기, 나머지 진행중
+        // 완전 종료/환불만 제외 (관리팀 화면 기준과 동일)
         const WAIT_SET  = new Set(['홀딩'])
-        const DONE_SET  = new Set(['부결', '종료예정', '환불예정', '종료'])
+        const DONE_SET  = new Set(['종료', '완료', 'completed', '환불', 'refunded'])
 
         const activeCases = opsCases.filter(c =>
           !c.is_completed && !c.is_refund && !DONE_SET.has(c.stage ?? '')
