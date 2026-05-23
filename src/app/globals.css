@@ -56,6 +56,10 @@
 .page-bg .bg-\[#FAFAF8\]   { background: rgba(255,255,255,0.04)  !important; }
 .page-bg .bg-\[#FAF8F3\]   { background: rgba(255,255,255,0.04)  !important; }
 .page-bg .bg-\[#F8F7F4\]   { background: rgba(255,255,255,0.04)  !important; }
+.page-bg .bg-\[#F5F3EE\]   { background: rgba(255,255,255,0.06)  !important; }
+.page-bg .bg-\[#F5F3EE\]   { background: rgba(255,255,255,0.06)  !important; }
+.page-bg .bg-\[#EAE8E2\]   { background: rgba(255,255,255,0.08)  !important; }
+.page-bg .bg-\[#D5D0C8\]   { background: rgba(255,255,255,0.18)  !important; }
 
 /* Navy surfaces — keep but lighten slightly for depth */
 .page-bg .bg-\[#1B2A45\]\/8  { background: rgba(255,255,255,0.05) !important; }
@@ -149,12 +153,22 @@
 .page-bg .text-slate-400                            { color: rgba(238,233,224,0.40) !important; }
 
 /* More tint backgrounds */
-.page-bg .bg-teal-50,   .page-bg .bg-teal-100      { background: rgba(20,184,166,0.12)  !important; }
+.page-bg .bg-teal-50,   .page-bg .bg-teal-100       { background: rgba(20,184,166,0.12)  !important; }
 .page-bg .bg-cyan-50,   .page-bg .bg-cyan-100       { background: rgba(6,182,212,0.12)   !important; }
 .page-bg .bg-indigo-50, .page-bg .bg-indigo-100     { background: rgba(99,102,241,0.12)  !important; }
 .page-bg .bg-slate-50,  .page-bg .bg-slate-100      { background: rgba(255,255,255,0.05) !important; }
 .page-bg .bg-neutral-50,.page-bg .bg-neutral-100    { background: rgba(255,255,255,0.05) !important; }
 .page-bg .bg-zinc-50,   .page-bg .bg-zinc-100       { background: rgba(255,255,255,0.05) !important; }
+/* Rose (similar to red) */
+.page-bg .bg-rose-50,   .page-bg .bg-rose-100       { background: rgba(244,63,94,0.12)   !important; }
+.page-bg .bg-rose-200                               { background: rgba(244,63,94,0.20)   !important; }
+/* Border rose */
+.page-bg .border-rose-200                           { border-color: rgba(244,63,94,0.35) !important; }
+.page-bg .border-orange-200                         { border-color: rgba(251,146,60,0.35) !important; }
+/* Text rose */
+.page-bg .text-rose-800, .page-bg .text-rose-700   { color: #fda4af !important; }
+.page-bg .text-rose-600, .page-bg .text-rose-500   { color: #fb7185 !important; }
+.page-bg .text-rose-400                             { color: #f43f5e !important; }
 
 /* hover bg-color variants */
 .page-bg .hover\:bg-amber-200:hover       { background: rgba(245,158,11,0.25)  !important; }
