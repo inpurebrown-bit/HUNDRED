@@ -93,46 +93,39 @@ export default function PullToRefresh({ onRefresh, children }: Props) {
 
   return (
     <div ref={containerRef}>
-      {/* ── 당김 인디케이터 ── */}
+      {/* ── 당김 인디케이터 — 네이비 배경, 아이콘만 ── */}
       <div
-        className="flex items-center justify-center overflow-hidden"
+        className="flex items-center justify-center overflow-hidden bg-[#1B2A45]"
         style={{
           height: pullY,
-          // 손 뗄 때는 부드럽게 복원, 당기는 중에는 즉각 반응
           transition: isPulling.current ? 'none' : 'height 0.28s cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
-        <div className={`w-9 h-9 rounded-full bg-white shadow-lg border border-gray-200 flex items-center justify-center transition-opacity duration-150 ${pullY > 4 ? 'opacity-100' : 'opacity-0'}`}>
-          {refreshing ? (
-            /* 새로고침 중 — 스피너 */
+        {pullY > 4 && (
+          refreshing ? (
+            /* 새로고침 중 — 흰색 스피너 */
             <svg
-              className="w-5 h-5 text-[#1B2A45] animate-spin"
+              className="w-6 h-6 text-white animate-spin"
               viewBox="0 0 24 24" fill="none"
             >
               <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2.5"
                 strokeDasharray="31.4" strokeDashoffset="10" strokeLinecap="round" />
             </svg>
           ) : (
-            /* 당기는 중 — 화살표 (당길수록 180° 회전) */
+            /* 당기는 중 — 흰색 화살표 (당길수록 180° 회전) */
             <svg
-              className="w-5 h-5"
+              className="w-6 h-6"
               style={{
-                color: progress >= 1 ? '#1B2A45' : '#9ca3af',
+                color: progress >= 1 ? '#C5A258' : 'rgba(255,255,255,0.5)',
                 transform: `rotate(${arrowDeg}deg)`,
-                transition: 'transform 0.1s ease-out, color 0.1s ease-out',
+                transition: 'transform 0.1s ease-out, color 0.15s ease-out',
               }}
-              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+              strokeLinecap="round" strokeLinejoin="round"
             >
               <path d="M19 9l-7 7-7-7" />
             </svg>
-          )}
-        </div>
-
-        {/* 텍스트 힌트 — 아주 일찍부터 표시 */}
-        {pullY > 8 && (
-          <span className="ml-2 text-[11px] font-medium text-gray-400 select-none">
-            {refreshing ? '새로고침 중...' : progress >= 1 ? '놓으면 새로고침' : '당겨서 새로고침'}
-          </span>
+          )
         )}
       </div>
 
