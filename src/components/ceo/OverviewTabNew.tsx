@@ -790,13 +790,14 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
 // ─── 2주 일정 캘린더 ─────────────────────────────────────────
 
 const CAL_COLORS: Record<string, string> = {
-  blue: 'bg-blue-100 text-blue-700',
-  red: 'bg-red-100 text-red-600',
-  green: 'bg-emerald-100 text-emerald-700',
-  yellow: 'bg-yellow-100 text-yellow-700',
+  blue:   'bg-blue-100 text-blue-700',
+  red:    'bg-red-100 text-red-600',
+  green:  'bg-emerald-100 text-emerald-700',
+  amber:  'bg-amber-100 text-amber-700',   // CalendarTab 기본 색상 키
+  yellow: 'bg-amber-100 text-amber-700',   // 혹시 yellow로 저장된 경우 대비
   violet: 'bg-violet-100 text-violet-700',
-  pink: 'bg-pink-100 text-pink-700',
-  gray: 'bg-gray-100 text-gray-600',
+  pink:   'bg-pink-100 text-pink-700',
+  gray:   'bg-gray-100 text-gray-600',
 }
 
 function TwoWeekCalendar({

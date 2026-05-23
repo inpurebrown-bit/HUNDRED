@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useRef, useCallback, ReactNode } from 'react'
+import { useState, useRef, useEffect, ReactNode } from 'react'
 
-const TRIGGER_THRESHOLD = 70   // 이 거리 이상 당기면 새로고침 실행
-const MAX_PULL = 90            // 최대 당김 시각 거리 (px)
+const TRIGGER_THRESHOLD = 72   // 이 거리 이상 당기면 새로고침 실행
+const MAX_PULL = 96            // 최대 당김 시각 거리 (px)
 
 interface Props {
   onRefresh: () => Promise<void>
@@ -11,71 +11,98 @@ interface Props {
 }
 
 export default function PullToRefresh({ onRefresh, children }: Props) {
-  const [pullY, setPullY]         = useState(0)
+  const [pullY, setPullY]           = useState(0)
   const [refreshing, setRefreshing] = useState(false)
-  const startY    = useRef(0)
-  const isPulling = useRef(false)
-  const triggered = useRef(false)
+  const containerRef  = useRef<HTMLDivElement>(null)
+  const startY        = useRef(0)
+  const isPulling     = useRef(false)
+  const pullYRef      = useRef(0)          // state와 동기화된 ref (이벤트 핸들러용)
+  const isRefreshing  = useRef(false)      // refreshing state ref
+  const onRefreshRef  = useRef(onRefresh)  // stale closure 방지
 
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
-    // 최상단에서만 동작 (스크롤 중에는 무시)
-    if (window.scrollY > 2) return
-    startY.current  = e.touches[0].clientY
-    isPulling.current = true
-    triggered.current = false
-  }, [])
+  useEffect(() => { onRefreshRef.current = onRefresh }, [onRefresh])
 
-  const onTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!isPulling.current) return
-    const dy = e.touches[0].clientY - startY.current
-    if (dy <= 0) { setPullY(0); return }
-    // 고무줄 효과 (당길수록 저항 증가)
-    const rubber = MAX_PULL * (1 - Math.exp(-dy / (MAX_PULL * 2)))
-    setPullY(rubber)
-  }, [])
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
 
-  const onTouchEnd = useCallback(async () => {
-    if (!isPulling.current) return
-    isPulling.current = false
+    // ── touchstart: 맨 위일 때만 당기기 시작 ──
+    const onTouchStart = (e: TouchEvent) => {
+      if (window.scrollY > 1 || isRefreshing.current) return
+      startY.current    = e.touches[0].clientY
+      isPulling.current = true
+    }
 
-    if (pullY >= TRIGGER_THRESHOLD) {
-      triggered.current = true
-      setRefreshing(true)
-      setPullY(MAX_PULL) // 새로고침 중엔 고정
-      try {
-        await onRefresh()
-      } finally {
-        setRefreshing(false)
+    // ── touchmove: preventDefault로 브라우저 스크롤/바운스 차단 ──
+    const onTouchMove = (e: TouchEvent) => {
+      if (!isPulling.current) return
+      const dy = e.touches[0].clientY - startY.current
+      if (dy <= 0) {
+        if (pullYRef.current > 0) { pullYRef.current = 0; setPullY(0) }
+        return
+      }
+      // passive: false로 등록했기 때문에 preventDefault 사용 가능
+      e.preventDefault()
+      // 고무줄 효과 (당길수록 저항 증가)
+      const rubber = MAX_PULL * (1 - Math.exp(-dy / (MAX_PULL * 2.2)))
+      pullYRef.current = rubber
+      setPullY(rubber)
+    }
+
+    // ── touchend: 임계값 초과 시 새로고침 ──
+    const onTouchEnd = async () => {
+      if (!isPulling.current) return
+      isPulling.current = false
+      const py = pullYRef.current
+
+      if (py >= TRIGGER_THRESHOLD) {
+        isRefreshing.current = true
+        setRefreshing(true)
+        pullYRef.current = MAX_PULL
+        setPullY(MAX_PULL)
+        try {
+          await onRefreshRef.current()
+        } finally {
+          isRefreshing.current = false
+          setRefreshing(false)
+          pullYRef.current = 0
+          setPullY(0)
+        }
+      } else {
+        pullYRef.current = 0
         setPullY(0)
       }
-    } else {
-      // 임계값 미달 → 원위치
-      setPullY(0)
     }
-  }, [pullY, onRefresh])
 
-  // 진행률 0~1
+    // touchmove만 passive: false (preventDefault 필요), 나머지는 passive
+    el.addEventListener('touchstart',  onTouchStart, { passive: true  })
+    el.addEventListener('touchmove',   onTouchMove,  { passive: false })
+    el.addEventListener('touchend',    onTouchEnd,   { passive: true  })
+    el.addEventListener('touchcancel', onTouchEnd,   { passive: true  })
+
+    return () => {
+      el.removeEventListener('touchstart',  onTouchStart)
+      el.removeEventListener('touchmove',   onTouchMove)
+      el.removeEventListener('touchend',    onTouchEnd)
+      el.removeEventListener('touchcancel', onTouchEnd)
+    }
+  }, []) // onRefresh는 ref로 관리하므로 deps 불필요
+
   const progress = Math.min(pullY / TRIGGER_THRESHOLD, 1)
-  // 아이콘 회전 각도 (당기면 180도 회전)
   const arrowDeg = progress * 180
 
   return (
-    <div
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-      style={{ touchAction: 'pan-y' }}
-    >
+    <div ref={containerRef}>
       {/* ── 당김 인디케이터 ── */}
       <div
-        className="flex items-center justify-center overflow-hidden transition-all duration-200 ease-out"
-        style={{ height: pullY }}
+        className="flex items-center justify-center overflow-hidden"
+        style={{
+          height: pullY,
+          // 손 뗄 때는 부드럽게 복원, 당기는 중에는 즉각 반응
+          transition: isPulling.current ? 'none' : 'height 0.28s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
       >
-        <div
-          className={`w-9 h-9 rounded-full bg-white shadow-lg border border-gray-200 flex items-center justify-center transition-opacity ${
-            pullY > 8 ? 'opacity-100' : 'opacity-0'
-          }`}
-        >
+        <div className={`w-9 h-9 rounded-full bg-white shadow-lg border border-gray-200 flex items-center justify-center transition-opacity duration-150 ${pullY > 4 ? 'opacity-100' : 'opacity-0'}`}>
           {refreshing ? (
             /* 새로고침 중 — 스피너 */
             <svg
@@ -88,10 +115,11 @@ export default function PullToRefresh({ onRefresh, children }: Props) {
           ) : (
             /* 당기는 중 — 화살표 (당길수록 180° 회전) */
             <svg
-              className="w-5 h-5 transition-transform duration-100"
+              className="w-5 h-5"
               style={{
                 color: progress >= 1 ? '#1B2A45' : '#9ca3af',
                 transform: `rotate(${arrowDeg}deg)`,
+                transition: 'transform 0.1s ease-out, color 0.1s ease-out',
               }}
               viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
             >
@@ -100,8 +128,8 @@ export default function PullToRefresh({ onRefresh, children }: Props) {
           )}
         </div>
 
-        {/* 텍스트 힌트 */}
-        {pullY > 30 && (
+        {/* 텍스트 힌트 — 아주 일찍부터 표시 */}
+        {pullY > 8 && (
           <span className="ml-2 text-[11px] font-medium text-gray-400 select-none">
             {refreshing ? '새로고침 중...' : progress >= 1 ? '놓으면 새로고침' : '당겨서 새로고침'}
           </span>

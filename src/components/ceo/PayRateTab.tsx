@@ -886,11 +886,11 @@ function PayRateSubView() {
             {instStats.length > 0 && (
               <div>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">기관별 현황</p>
-                <div className="grid grid-cols-2 gap-1.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                   {instStats.map(s => (
-                    <div key={s.inst} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
-                      <span className="text-xs font-bold text-gray-700 w-20 shrink-0 truncate">{s.label}</span>
-                      <div className="flex items-center gap-1.5 flex-1">
+                    <div key={s.inst} className="flex items-center justify-between gap-2 bg-gray-50 rounded-xl px-3 py-2 min-w-0">
+                      <span className="text-xs font-bold text-gray-700 truncate min-w-0 flex-1">{s.label}</span>
+                      <div className="flex items-center gap-1 shrink-0">
                         {s.active > 0 && (
                           <span className="text-[10px] bg-blue-100 text-blue-700 rounded-full px-2 py-0.5 font-semibold whitespace-nowrap">
                             진행중 {s.active}
