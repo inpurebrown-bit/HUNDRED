@@ -259,7 +259,7 @@ function PayslipDocument({ emp, financial, yearMonth }: {
                     : '-'}
                 </td>
                 <td className={tdN + (salesCalc.awardsSum > 0 ? ' text-amber-700 font-semibold' : '')}>
-                  {salesCalc.awardsSum > 0 ? fmt(salesCalc.awardsSum) : '0'}
+                  {salesCalc.awardsSum > 0 ? fmt(salesCalc.awardsSum) : '-'}
                 </td>
               </tr>
               {(financial.allowance_details || []).map((a, i) => (
@@ -494,18 +494,20 @@ export default function PayslipTab() {
             updates[emp.id] = {
               contract_revenue: rev,
               contract_count: count,
-              performance_bonus: count >= 12 ? Math.round(rev * 0.05) : 0,
+              // ⚡ 급여·손익탭에 직접 입력한 성과급 그대로 사용 (재계산 금지)
+              performance_bonus: Number(match.performance_bonus || 0),
               promo: getPromo(count),
               awards: match.awards || [],
             }
           }
         } else {
+          // 관리팀: 프리랜서 관리대장에 team='ops'로 추가하면 자동으로 명세서 생성 가능
           const match = opsList.find((e: any) => nameMatch(emp.name, e.name || ''))
           if (match) {
             updates[emp.id] = {
-              base_salary: Number(match.base_salary || 0),
-              fee_revenue: Number(match.fee_revenue || 0),
-              puto_revenue: Number(match.puto_revenue || 0),
+              base_salary:           Number(match.base_salary || 0),
+              fee_revenue:           Number(match.fee_revenue || 0),
+              puto_revenue:          Number(match.puto_revenue || 0),
               ops_performance_bonus: Number(match.performance_bonus || 0),
             }
           }
@@ -579,9 +581,12 @@ export default function PayslipTab() {
           <div className="no-print w-56 shrink-0">
             <div className="bg-white rounded-xl border border-[#E8E2D4] overflow-hidden">
               <div className="px-4 py-3 border-b border-[#E8E2D4] flex items-center justify-between">
-                <p className="text-xs font-bold text-gray-600">직원 목록</p>
+                <p className="text-xs font-bold text-gray-600">프리랜서 관리대장</p>
                 <button onClick={addEmployee}
                   className="text-xs bg-[#1B2A45] text-white px-2 py-0.5 rounded-lg">+ 추가</button>
+              </div>
+              <div className="px-3 py-2 bg-gray-50 border-b border-[#E8E2D4] text-[10px] text-gray-400 leading-relaxed">
+                팀 선택 시 <b className="text-gray-500">영업팀·관리팀</b> 모두 지원<br/>급여·손익탭과 자동 연동
               </div>
               {employees.length === 0 ? (
                 <div className="p-6 text-center text-xs text-gray-400">
