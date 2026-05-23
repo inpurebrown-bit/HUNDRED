@@ -45,14 +45,15 @@ function fmtAmt(amount: number | null): string {
 }
 
 const COLORS = [
-  { key: 'blue',   bg: 'bg-blue-500',    light: 'bg-blue-100 text-blue-700',    dot: 'bg-blue-500' },
-  { key: 'red',    bg: 'bg-red-500',     light: 'bg-red-100 text-red-700',      dot: 'bg-red-500' },
-  { key: 'green',  bg: 'bg-emerald-500', light: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' },
-  { key: 'amber',  bg: 'bg-amber-400',   light: 'bg-amber-100 text-amber-700',  dot: 'bg-amber-400' },
-  { key: 'violet', bg: 'bg-violet-500',  light: 'bg-violet-100 text-violet-700', dot: 'bg-violet-500' },
-  { key: 'pink',   bg: 'bg-pink-500',    light: 'bg-pink-100 text-pink-700',    dot: 'bg-pink-500' },
-  { key: 'gray',   bg: 'bg-gray-400',    light: 'bg-gray-100 text-gray-700',    dot: 'bg-gray-400' },
+  { key: 'blue',   bg: 'bg-blue-500',    light: 'bg-blue-100 text-blue-800',       dot: 'bg-blue-500',    hex: '#3b82f6' },
+  { key: 'red',    bg: 'bg-red-500',     light: 'bg-red-100 text-red-800',         dot: 'bg-red-500',     hex: '#ef4444' },
+  { key: 'green',  bg: 'bg-emerald-500', light: 'bg-emerald-100 text-emerald-800', dot: 'bg-emerald-500', hex: '#10b981' },
+  { key: 'amber',  bg: 'bg-amber-400',   light: 'bg-amber-100 text-amber-800',     dot: 'bg-amber-400',   hex: '#f59e0b' },
+  { key: 'violet', bg: 'bg-violet-500',  light: 'bg-violet-100 text-violet-800',   dot: 'bg-violet-500',  hex: '#8b5cf6' },
+  { key: 'pink',   bg: 'bg-pink-500',    light: 'bg-pink-100 text-pink-800',       dot: 'bg-pink-500',    hex: '#ec4899' },
+  { key: 'gray',   bg: 'bg-gray-400',    light: 'bg-gray-100 text-gray-700',       dot: 'bg-gray-400',    hex: '#9ca3af' },
 ]
+function colorHex(c: string) { return COLORS.find(x => x.key === c)?.hex || '#3b82f6' }
 
 const KO_DAYS = ['일', '월', '화', '수', '목', '금', '토']
 const KO_MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월']
@@ -284,11 +285,31 @@ export default function CalendarTab() {
   const selectedDayNum = parseInt(selectedDay.slice(8), 10)
   const selectedExpenses = monthlyExpenses.filter(e => e.day === selectedDayNum)
 
-  // 이번 달 남은 일정 (오늘 이후)
-  const upcomingThisMonth = events
-    .filter(e => e.start_date >= todayStr)
+  // 이번 달 남은 일정 (오늘 이후) + 고정 지출 합산
+  const todayDay = parseInt(todayStr.slice(8), 10)
+  const todayMonthStr = todayStr.slice(0, 7)   // 'YYYY-MM'
+  const curMonthStr = `${year}-${String(month).padStart(2,'0')}`
+  // 고정 지출을 가짜 이벤트로 변환 (이번 보기 달이 오늘 달과 같을 때만 upcoming으로)
+  const expenseEvents: CalEvent[] = monthlyExpenses
+    .filter(exp => curMonthStr === todayMonthStr ? exp.day >= todayDay : true)
+    .map(exp => ({
+      id: `__exp__${exp.day}`,
+      title: `${exp.label}${exp.amount !== null ? ` (${exp.amount.toLocaleString()}원)` : ''}`,
+      start_date: toDateStr(year, month, Math.min(exp.day, new Date(year, month, 0).getDate())),
+      end_date:   toDateStr(year, month, Math.min(exp.day, new Date(year, month, 0).getDate())),
+      start_time: null, end_time: null,
+      description: '',
+      color: 'red',
+      is_allday: true,
+      source: 'local' as const,
+    }))
+
+  const upcomingThisMonth = [
+    ...events.filter(e => e.start_date >= todayStr),
+    ...expenseEvents.filter(e => e.start_date >= todayStr),
+  ]
     .sort((a, b) => a.start_date.localeCompare(b.start_date))
-    .slice(0, 6)
+    .slice(0, 8)
 
   function openAddForm(day: string) {
     setForm(f => ({ ...f, title: '', start_date: day, end_date: day, start_time: '', end_time: '', is_allday: true, description: '' }))
@@ -631,54 +652,64 @@ export default function CalendarTab() {
           ) : (
             <div className="grid grid-cols-7">
               {cells.map((day, idx) => {
+                const dow = idx % 7
+                const isSunday = dow === 0
+                const isSaturday = dow === 6
                 if (!day) return (
-                  <div key={idx} className="min-h-[88px] border-b border-r border-gray-50 bg-gray-50/20" />
+                  <div key={idx} className={`min-h-[88px] border-b border-r border-gray-100 ${
+                    isSunday ? 'bg-red-50/40' : isSaturday ? 'bg-blue-50/40' : 'bg-gray-50/20'
+                  }`} />
                 )
                 const d = toDateStr(year, month, day)
                 const dayEvs = eventsForDay(day)
                 const isToday = d === todayStr
                 const isSelected = d === selectedDay
-                const dow = idx % 7
+                const dayExpenses = monthlyExpenses.filter(e => e.day === day)
                 return (
                   <div key={idx}
                     onClick={() => setSelectedDay(d)}
-                    className={`min-h-[88px] border-b border-r border-gray-50 p-1.5 cursor-pointer transition-colors ${
-                      isSelected ? 'bg-blue-50/60' : 'hover:bg-gray-50/60'
+                    className={`min-h-[88px] border-b border-r border-gray-100 p-1.5 cursor-pointer transition-colors ${
+                      isSelected
+                        ? 'bg-[#1B2A45]/8 ring-1 ring-inset ring-[#1B2A45]/20'
+                        : isSunday  ? 'bg-red-50/40 hover:bg-red-50/70'
+                        : isSaturday ? 'bg-blue-50/40 hover:bg-blue-50/70'
+                        : 'hover:bg-gray-50/60'
                     }`}>
                     {/* 날짜 숫자 */}
                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold mb-1 ${
                       isToday
                         ? 'bg-[#1B2A45] text-white'
                         : isSelected
-                          ? 'bg-blue-100 text-blue-700'
-                          : dow === 5 ? 'text-blue-500'
-                          : dow === 6 ? 'text-red-500'
+                          ? 'bg-[#1B2A45]/15 text-[#1B2A45]'
+                          : isSunday   ? 'text-red-500'
+                          : isSaturday ? 'text-blue-500'
                           : 'text-gray-700'
                     }`}>{day}</div>
 
                     {/* 이벤트 칩 */}
                     <div className="space-y-0.5">
-                      {dayEvs.slice(0, 3).map(ev => (
+                      {dayEvs.slice(0, 2).map(ev => (
                         <div key={ev.id}
                           onClick={e => { e.stopPropagation(); setDetailEvent(ev) }}
-                          className={`text-[10px] px-1.5 py-0.5 rounded font-medium truncate cursor-pointer hover:opacity-80 ${colorLight(ev.color)}`}>
+                          className="text-[10px] px-1 py-0.5 rounded font-medium truncate cursor-pointer hover:opacity-80 bg-white border-l-[3px]"
+                          style={{ borderLeftColor: colorHex(ev.color), color: colorHex(ev.color) }}>
                           {!ev.is_allday && ev.start_time && (
-                            <span className="opacity-50 mr-0.5">{ev.start_time.slice(0, 5)}</span>
+                            <span className="opacity-60 mr-0.5">{ev.start_time.slice(0, 5)}</span>
                           )}
-                          {ev.source === 'google' && <span className="opacity-40 mr-0.5">G</span>}
+                          {ev.source === 'google' && <span className="opacity-40 mr-0.5 text-[8px]">G</span>}
                           {ev.title}
                         </div>
                       ))}
-                      {dayEvs.length > 3 && (
-                        <p className="text-[10px] text-gray-400 pl-1">+{dayEvs.length - 3}개</p>
-                      )}
                       {/* 매월 고정 지출 칩 */}
-                      {monthlyExpenses.filter(e => e.day === day).map((exp, ei) => (
+                      {dayExpenses.map((exp, ei) => (
                         <div key={`exp-${ei}`}
-                          className="text-[9px] px-1.5 py-0.5 rounded bg-red-100 text-red-600 font-medium truncate leading-tight">
-                          💸 {exp.label}{exp.amount !== null ? ` ${exp.amount.toLocaleString()}` : ''}
+                          className="text-[9px] px-1 py-0.5 rounded font-semibold truncate leading-tight bg-white border-l-[3px] border-red-400 text-red-600">
+                          💸 {exp.label}{exp.amount !== null ? ` ${Math.abs(exp.amount).toLocaleString()}` : ''}
                         </div>
                       ))}
+                      {dayEvs.length > 2 && (
+                        <p className="text-[9px] text-gray-400 pl-0.5">+{dayEvs.length - 2}개 더</p>
+                      )}
                     </div>
                   </div>
                 )
@@ -734,17 +765,17 @@ export default function CalendarTab() {
                     onClick={() => setDetailEvent(ev)}
                     className="w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors group">
                     <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${colorBg(ev.color)}`} />
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: colorHex(ev.color) }} />
                       <span className="text-xs font-semibold text-gray-800 flex-1 truncate">{ev.title}</span>
                       {ev.source === 'google' && <span className="text-[10px] text-gray-300">G</span>}
                     </div>
                     {!ev.is_allday && ev.start_time && (
-                      <p className="text-[10px] text-gray-400 mt-0.5 pl-4">
+                      <p className="text-[10px] text-gray-400 mt-0.5 pl-4.5">
                         ⏰ {ev.start_time.slice(0, 5)}{ev.end_time && ` ~ ${ev.end_time.slice(0, 5)}`}
                       </p>
                     )}
                     {ev.description && (
-                      <p className="text-[10px] text-gray-400 mt-0.5 pl-4 truncate">{ev.description}</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5 pl-4.5 truncate">{ev.description}</p>
                     )}
                   </button>
                 ))}
@@ -759,21 +790,29 @@ export default function CalendarTab() {
                 <p className="text-xs font-bold text-gray-500">📅 다가오는 일정</p>
               </div>
               <div className="divide-y divide-gray-50">
-                {upcomingThisMonth.map(ev => (
-                  <button key={ev.id}
-                    onClick={() => { setSelectedDay(ev.start_date); setDetailEvent(ev) }}
-                    className="w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${colorBg(ev.color)}`} />
-                      <span className="text-xs font-medium text-gray-800 flex-1 truncate">{ev.title}</span>
-                    </div>
-                    <p className="text-[10px] text-gray-400 mt-0.5 pl-4">
-                      {ev.start_date.slice(5).replace('-', '/')} ({getDow(ev.start_date)})
-                      {!ev.is_allday && ev.start_time && ` ${ev.start_time.slice(0, 5)}`}
-                      {ev.source === 'google' && ' 🗓'}
-                    </p>
-                  </button>
-                ))}
+                {upcomingThisMonth.map(ev => {
+                  const isExpense = ev.id.startsWith('__exp__')
+                  return (
+                    <button key={ev.id}
+                      onClick={() => { setSelectedDay(ev.start_date); if (!isExpense) setDetailEvent(ev) }}
+                      className="w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                      <div className="flex items-center gap-2">
+                        {isExpense
+                          ? <span className="text-[10px] text-red-500 shrink-0">💸</span>
+                          : <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colorHex(ev.color) }} />
+                        }
+                        <span className={`text-xs font-medium flex-1 truncate ${isExpense ? 'text-red-700' : 'text-gray-800'}`}>
+                          {ev.title}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-gray-400 mt-0.5 pl-4">
+                        {ev.start_date.slice(5).replace('-', '/')} ({getDow(ev.start_date)})
+                        {!ev.is_allday && ev.start_time && ` ${ev.start_time.slice(0, 5)}`}
+                        {ev.source === 'google' && !isExpense && ' 🗓'}
+                      </p>
+                    </button>
+                  )
+                })}
               </div>
             </div>
           )}
@@ -784,11 +823,11 @@ export default function CalendarTab() {
               <p className="text-xs font-bold text-gray-400 mb-2">연동된 캘린더</p>
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <span className="w-2 h-2 rounded-full bg-blue-500" />직접 추가
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#3b82f6' }} />직접 추가
                 </div>
                 {gcalList.filter(c => c.id).map((c, i) => (
                   <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
-                    <span className={`w-2 h-2 rounded-full ${colorBg(c.color)}`} />{c.label}
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: colorHex(c.color) }} />{c.label}
                   </div>
                 ))}
               </div>
@@ -804,7 +843,7 @@ export default function CalendarTab() {
           <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-2">
-                <span className={`w-3 h-3 rounded-full ${colorBg(detailEvent.color)}`} />
+                <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: colorHex(detailEvent.color) }} />
                 <h3 className="font-bold text-gray-900 text-base">{detailEvent.title}</h3>
               </div>
               <button onClick={() => setDetailEvent(null)} className="text-gray-400 hover:text-gray-700 text-lg">✕</button>
