@@ -159,46 +159,48 @@ function EmployeeTable({ rows, loading }: { rows: EmployeeRow[]; loading: boolea
     return <p className="text-sm text-[#1B2A45]/40 text-center py-4">직원 데이터 없음</p>
   }
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="bg-[#1B2A45]/5">
-            {['담당자', '목표', '결제수', '예상마감', '일필요수'].map(h => (
-              <th key={h} className="text-left py-2.5 px-3 text-xs text-[#1B2A45]/50 font-semibold whitespace-nowrap">
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={i} className="border-b border-[#E8E2D4]/60 hover:bg-[#FAF8F3] transition-colors">
-              <td className="py-3 px-3 font-semibold text-[#1B2A45] whitespace-nowrap">{row.name}</td>
-              <td className="py-3 px-3 text-[#1B2A45]/70">
-                {row.goal === null ? (
-                  <span className="text-[10px] text-[#C5A258] bg-[#C5A258]/10 px-2 py-0.5 rounded-full">미설정</span>
-                ) : row.goal + '건'}
-              </td>
-              <td className="py-3 px-3">
-                <span className="font-black text-[#1B2A45] text-base">{row.contracted % 1 === 0 ? row.contracted : row.contracted.toFixed(1)}</span>
-                <span className="text-xs text-[#1B2A45]/40 ml-0.5">건</span>
-              </td>
-              <td className="py-3 px-3 text-[#1B2A45]/70">
-                {row.projected !== null ? (row.projected % 1 === 0 ? row.projected : row.projected.toFixed(1)) + '건' : '-'}
-              </td>
-              <td className="py-3 px-3">
-                {row.dailyNeeded !== null ? (
-                  <span className="text-xs font-bold text-[#C5A258] bg-[#C5A258]/10 px-2 py-0.5 rounded-full">
-                    {row.dailyNeeded}건/일
-                  </span>
-                ) : (
-                  <span className="text-[#1B2A45]/30 text-xs">—</span>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="space-y-2">
+      {rows.map((row, i) => (
+        <div key={i} className="bg-[#1B2A45]/[0.04] rounded-xl p-3">
+          {/* 이름 + 일필요수 */}
+          <div className="flex items-center justify-between mb-2.5">
+            <span className="font-bold text-[#1B2A45] text-sm">{row.name}</span>
+            {row.dailyNeeded !== null ? (
+              <span className="text-xs font-bold text-[#C5A258] bg-[#C5A258]/10 px-2.5 py-0.5 rounded-full whitespace-nowrap">
+                {row.dailyNeeded}건/일
+              </span>
+            ) : (
+              <span className="text-[#1B2A45]/30 text-xs">—</span>
+            )}
+          </div>
+          {/* 목표 · 결제수 · 예상마감 */}
+          <div className="grid grid-cols-3 gap-1 text-center">
+            <div className="bg-white/60 rounded-lg py-1.5 px-1">
+              <p className="text-[9px] text-[#1B2A45]/40 mb-0.5 font-medium">목표</p>
+              <p className="text-xs font-semibold text-[#1B2A45]/70">
+                {row.goal === null
+                  ? <span className="text-[9px] text-[#C5A258]">미설정</span>
+                  : row.goal + '건'}
+              </p>
+            </div>
+            <div className="bg-white/60 rounded-lg py-1.5 px-1">
+              <p className="text-[9px] text-[#1B2A45]/40 mb-0.5 font-medium">결제수</p>
+              <p className="text-sm font-black text-[#1B2A45] leading-none">
+                {row.contracted % 1 === 0 ? row.contracted : row.contracted.toFixed(1)}
+                <span className="text-[9px] font-normal text-[#1B2A45]/40 ml-0.5">건</span>
+              </p>
+            </div>
+            <div className="bg-white/60 rounded-lg py-1.5 px-1">
+              <p className="text-[9px] text-[#1B2A45]/40 mb-0.5 font-medium">예상마감</p>
+              <p className="text-xs font-semibold text-[#1B2A45]/70">
+                {row.projected !== null
+                  ? (row.projected % 1 === 0 ? row.projected : row.projected.toFixed(1)) + '건'
+                  : '-'}
+              </p>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -273,26 +275,36 @@ function MonthSection({
             <div className="md:shrink-0 md:w-64 w-full">
               <p className="text-[10px] font-bold text-emerald-700 bg-emerald-50 inline-block px-2 py-0.5 rounded mb-2">관리팀</p>
               {opsUserRows.length > 0 ? (
-                <table className="text-xs w-full">
-                  <thead>
-                    <tr className="border-b border-[#E8E2D4]">
-                      <th className="text-left pb-2 text-[11px] font-semibold text-[#1B2A45]/40 w-24">담당자</th>
-                      <th className="text-right pb-2 text-[11px] font-semibold text-[#1B2A45]/40">수수료</th>
-                      <th className="text-right pb-2 text-[11px] font-semibold text-[#1B2A45]/40">계약</th>
-                      <th className="text-right pb-2 text-[11px] font-semibold text-[#1B2A45]/40 w-12">건</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {opsUserRows.map(r => (
-                      <tr key={r.name} className="border-b border-[#E8E2D4]/40 last:border-0">
-                        <td className="py-2 font-semibold text-[#1B2A45]/80 truncate max-w-[6rem]">{r.name}</td>
-                        <td className="py-2 text-right font-black text-emerald-600 whitespace-nowrap">{r.feeAmount > 0 ? fmtKrw(r.feeAmount) : '-'}</td>
-                        <td className="py-2 text-right font-black text-sky-600 whitespace-nowrap">{r.contractAmount > 0 ? fmtKrw(r.contractAmount) : '-'}</td>
-                        <td className="py-2 text-right text-gray-500 whitespace-nowrap">{r.contractCount > 0 ? r.contractCount + '건' : '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="space-y-2">
+                  {opsUserRows.map(r => (
+                    <div key={r.name} className="bg-emerald-50/60 rounded-xl p-3">
+                      {/* 이름 + 건수 */}
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-bold text-[#1B2A45]/80 text-sm">{r.name}</span>
+                        {r.contractCount > 0 && (
+                          <span className="text-[10px] text-gray-500 bg-white/70 px-2 py-0.5 rounded-full">
+                            {r.contractCount}건
+                          </span>
+                        )}
+                      </div>
+                      {/* 수수료 + 계약 */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-white/60 rounded-lg py-1.5 px-2">
+                          <p className="text-[9px] text-[#1B2A45]/40 mb-0.5 font-medium">수수료</p>
+                          <p className="text-sm font-black text-emerald-600 leading-none">
+                            {r.feeAmount > 0 ? fmtKrw(r.feeAmount) : '-'}
+                          </p>
+                        </div>
+                        <div className="bg-white/60 rounded-lg py-1.5 px-2">
+                          <p className="text-[9px] text-[#1B2A45]/40 mb-0.5 font-medium">계약매출</p>
+                          <p className="text-sm font-black text-sky-600 leading-none">
+                            {r.contractAmount > 0 ? fmtKrw(r.contractAmount) : '-'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : (
                 <p className="text-[12px] text-[#1B2A45]/30 py-4">매출 없음</p>
               )}
