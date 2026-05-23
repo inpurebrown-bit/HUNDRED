@@ -752,21 +752,36 @@ function PayRateSubView() {
           '중진공', '소진공(혁신)', '소진공(신취)', '소진공(재도전)',
           '기보', '신보', '재단', '서민금융(미소)',
         ]
-        // 홀딩만 대기, 나머지 진행중
-        // 완전 종료/환불만 제외 (관리팀 화면 기준과 동일)
-        const WAIT_SET  = new Set(['홀딩'])
-        const DONE_SET  = new Set(['종료', '완료', 'completed', '환불', 'refunded'])
+        // ── OpsCeoTab과 동일한 필터링 로직 ──
+        const REFUND_KEYS   = new Set(['환불', 'refunded'])
+        const DONE_KEYS     = new Set(['종료', '완료', 'completed'])
+        const PENDING_R     = new Set(['환불예정'])
+        const PENDING_D     = new Set(['종료예정'])
 
-        const activeCases = opsCases.filter(c =>
-          !c.is_completed && !c.is_refund && !DONE_SET.has(c.stage ?? '')
+        const isHolding  = (c: any) => !!(c.details?.is_holding)
+        const isHandling = (c: any) => !!(
+          c.details?.handling_no_contact || c.details?.handling_no_fit || c.details?.handling_mindless
         )
 
-        // 기관별 집계
+        // 전체 활성 케이스 (종료/환불/완료 제외)
+        const activeCases = opsCases.filter(c =>
+          !c.is_completed && !c.is_refund &&
+          !REFUND_KEYS.has(c.stage ?? '') && !DONE_KEYS.has(c.stage ?? '')
+        )
+
+        // 기관별 카드에 표시되는 regularCases (OpsCeoTab의 기관 그룹과 동일)
+        const regularCases = activeCases.filter(c =>
+          !PENDING_R.has(c.stage ?? '') && !PENDING_D.has(c.stage ?? '') &&
+          !isHolding(c) && !isHandling(c)
+        )
+
+        // 기관별 집계 (regularCases 기준 — 실제 ops 화면 카드 수와 일치)
         const instStats = INST_LIST.map(inst => {
-          const matched = activeCases.filter(c =>
+          const matched = regularCases.filter(c =>
             (c.institution || '').split(',').map((s: string) => s.trim()).includes(inst)
           )
-          const waiting = matched.filter(c => WAIT_SET.has(c.stage ?? ''))
+          // stage가 '홀딩'인 케이스는 대기로 분류
+          const waiting = matched.filter(c => (c.stage ?? '') === '홀딩')
           return {
             inst,
             label: inst === '서민금융(미소)' ? '미소' : inst,
@@ -776,7 +791,7 @@ function PayRateSubView() {
           }
         }).filter(s => s.total > 0)
 
-        // 단계별 업체 목록
+        // 단계별 업체 목록 (activeCases 전체 기준)
         const stageGroups = [
           {
             label: '반려보정',
