@@ -19,6 +19,7 @@ import PinManageTab from './PinManageTab'
 import MyProfileTab from '@/components/MyProfileTab'
 import DbManageTab from './DbManageTab'
 import PersonalFinanceTab from './PersonalFinanceTab'
+import PullToRefresh from '@/components/ui/PullToRefresh'
 
 // ── 공통 서브탭 바 컴포넌트 ────────────────────────────────────
 function SubTabBar<T extends string>({ tabs, active, onChange }: {
@@ -243,6 +244,7 @@ export default function CeoDashboard() {
   ]
 
   return (
+    <PullToRefresh onRefresh={async () => { window.location.reload() }}>
     <div className="min-h-screen page-bg">
       {/* ── 헤더 ── */}
       <header className="bg-[#1B2A45] px-4 md:px-6 py-3 flex items-center justify-between sticky top-0 z-30 shadow-md">
@@ -2373,5 +2375,6 @@ function NoticesTab() {
         )}
       </div>
     </div>
+    </PullToRefresh>
   )
 }

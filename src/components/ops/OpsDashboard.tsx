@@ -5,6 +5,7 @@ import { signOut, useSession } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
 import MyProfileTab from '@/components/MyProfileTab'
+import PullToRefresh from '@/components/ui/PullToRefresh'
 
 // ── KST Utils ──────────────────────────────────────────────────────────
 function nowKST() {
@@ -3665,6 +3666,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
   }
 
   return (
+    <PullToRefresh onRefresh={loadCases}>
     <div className="min-h-screen page-bg">
       {/* Header */}
       <header className="bg-[#1B2A45] px-4 md:px-6 py-3 flex items-center justify-between sticky top-0 z-30 shadow-md">
@@ -4051,5 +4053,6 @@ export default function OpsDashboard({ userId, userName }: Props) {
         )
       })}
     </div>
+    </PullToRefresh>
   )
 }

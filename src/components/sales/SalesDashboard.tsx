@@ -9,6 +9,7 @@ import MyProfileTab from '@/components/MyProfileTab'
 import CustomerCard, { Customer, CustomerDetails, CardTabType } from './CustomerCard'
 import InCallForm, { InCallData } from './InCallForm'
 import InCallTableView from './InCallTableView'
+import PullToRefresh from '@/components/ui/PullToRefresh'
 import {
   getBusinessDaysInMonth,
   getElapsedBusinessDays,
@@ -722,6 +723,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
 
   // ── Render ────────────────────────────────────────────────────────
   return (
+    <PullToRefresh onRefresh={loadAll}>
     <div className="min-h-screen page-bg">
       {/* ── 자금팀 전송 담당자 선택 모달 ── */}
       {opsTransferModal.customer && (
@@ -1658,5 +1660,6 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         </div>
       )}
     </div>
+    </PullToRefresh>
   )
 }
