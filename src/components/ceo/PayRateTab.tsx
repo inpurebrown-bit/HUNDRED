@@ -801,25 +801,38 @@ function PayRateSubView() {
           }
         }).filter(s => s.total > 0)
 
-        // 단계별 업체 목록 (activeCases 전체 기준)
+        // 단계별 업체 목록
+        // direct_stage / indirect_stage / stage 세 곳 중 하나라도 해당하면 포함
+        const hasStageAny = (c: any, stageSet: string[]) => {
+          const s = new Set(stageSet)
+          return s.has(c.details?.direct_stage ?? '') ||
+                 s.has(c.details?.indirect_stage ?? '') ||
+                 s.has(c.stage ?? '')
+        }
+        // 업체명 우선순위: details.company > customers.name > customer_name
+        const companyName = (c: any) =>
+          c.customers?.details?.company ||
+          c.customers?.name ||
+          c.customer_name || '-'
+
         const stageGroups = [
           {
             label: '반려보정',
             color: 'bg-orange-100 text-orange-700 border-orange-200',
             dot: 'bg-orange-500',
-            cases: activeCases.filter(c => (c.stage ?? '') === '반려보정'),
+            cases: activeCases.filter(c => hasStageAny(c, ['반려보정'])),
           },
           {
             label: '실사대기',
             color: 'bg-amber-100 text-amber-700 border-amber-200',
             dot: 'bg-amber-500',
-            cases: activeCases.filter(c => (c.stage ?? '') === '실사대기'),
+            cases: activeCases.filter(c => hasStageAny(c, ['실사대기'])),
           },
           {
             label: '자금승인·입금대기',
             color: 'bg-emerald-100 text-emerald-700 border-emerald-200',
             dot: 'bg-emerald-500',
-            cases: activeCases.filter(c => ['승인대기', '승인', '입금전'].includes(c.stage ?? '')),
+            cases: activeCases.filter(c => hasStageAny(c, ['승인대기', '승인', '입금전'])),
           },
         ].filter(g => g.cases.length > 0)
 
@@ -907,7 +920,7 @@ function PayRateSubView() {
                         <span className="text-[10px] font-bold mr-2">{g.label}</span>
                         <span className="text-[10px] opacity-60">({g.cases.length}건)</span>
                         <p className="text-xs font-medium mt-0.5 leading-relaxed">
-                          {g.cases.map(c => c.customer_name || c.customers?.name || '-').join(' · ')}
+                          {g.cases.map(c => companyName(c)).join(' · ')}
                         </p>
                       </div>
                     </div>
