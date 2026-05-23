@@ -20,26 +20,45 @@ import MyProfileTab from '@/components/MyProfileTab'
 import DbManageTab from './DbManageTab'
 import PersonalFinanceTab from './PersonalFinanceTab'
 
+// ── 공통 서브탭 바 컴포넌트 ────────────────────────────────────
+function SubTabBar<T extends string>({ tabs, active, onChange }: {
+  tabs: { key: T; label: string }[]
+  active: T
+  onChange: (key: T) => void
+}) {
+  return (
+    <div className="flex border-b border-gray-200 mb-6 overflow-x-auto print-hide">
+      {tabs.map(t => (
+        <button key={t.key} onClick={() => onChange(t.key)}
+          className={`relative px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors shrink-0 ${
+            active === t.key
+              ? 'text-[#1B2A45] font-semibold'
+              : 'text-[#1B2A45]/45 hover:text-[#1B2A45]/75'
+          }`}>
+          {t.label}
+          {active === t.key && (
+            <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-[#C5A258] rounded-full" />
+          )}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 // 손익·급여 통합 탭
 function AnalyticsTab() {
   const [sub, setSub] = useState<'revenue' | 'payroll' | 'payslip' | 'personal'>('revenue')
   return (
     <div>
-      <div className="flex gap-2 mb-5 flex-wrap">
-        {([
-          { key: 'revenue',  label: '💰 매출 관리' },
-          { key: 'payroll',  label: '💼 급여·손익' },
-          { key: 'payslip',  label: '📋 급여명세서' },
-          { key: 'personal', label: '🏦 개인재무' },
-        ] as const).map(t => (
-          <button key={t.key} onClick={() => setSub(t.key)}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors border ${
-              sub === t.key ? 'bg-[#1B2A45] text-white border-[#1B2A45]' : 'bg-white text-[#1B2A45]/60 border-[#E8E2D4] hover:border-[#1B2A45]/30'
-            }`}>
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <SubTabBar
+        tabs={[
+          { key: 'revenue'  as const, label: '매출 관리' },
+          { key: 'payroll'  as const, label: '급여·손익' },
+          { key: 'payslip'  as const, label: '급여명세서' },
+          { key: 'personal' as const, label: '개인재무' },
+        ]}
+        active={sub} onChange={setSub}
+      />
       {sub === 'revenue'  && <RevenueTab />}
       {sub === 'payroll'  && <PayrollTab />}
       {sub === 'payslip'  && <PayslipTab />}
@@ -53,44 +72,32 @@ function MinutesReportsTab() {
   const [sub, setSub] = useState<'minutes' | 'reports'>('reports')
   return (
     <div>
-      <div className="flex gap-2 mb-5 print-hide">
-        {([
-          { key: 'reports', label: '📝 보고함' },
-          { key: 'minutes', label: '📒 회의록' },
-        ] as const).map(t => (
-          <button key={t.key} onClick={() => setSub(t.key)}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors border ${
-              sub === t.key ? 'bg-[#1B2A45] text-white border-[#1B2A45]' : 'bg-white text-[#1B2A45]/60 border-[#E8E2D4] hover:border-[#1B2A45]/30'
-            }`}>
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <SubTabBar
+        tabs={[
+          { key: 'reports' as const, label: '보고함' },
+          { key: 'minutes' as const, label: '회의록' },
+        ]}
+        active={sub} onChange={setSub}
+      />
       {sub === 'reports' && <ReportsTab isCeo={true} />}
       {sub === 'minutes' && <MinutesTab />}
     </div>
   )
 }
 
-// 직원관리 통합 탭 (프리랜서 + 직원관리 + 사원정보)
+// 직원관리 통합 탭
 function StaffManageTab() {
   const [sub, setSub] = useState<'employees' | 'freelancer' | 'profile'>('employees')
   return (
     <div>
-      <div className="flex gap-2 mb-5 flex-wrap">
-        {([
-          { key: 'employees', label: '👤 직원 관리' },
-          { key: 'freelancer', label: '📋 프리랜서 관리대장' },
-          { key: 'profile', label: '🪪 사원정보' },
-        ] as const).map(t => (
-          <button key={t.key} onClick={() => setSub(t.key)}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors border ${
-              sub === t.key ? 'bg-[#1B2A45] text-white border-[#1B2A45]' : 'bg-white text-[#1B2A45]/60 border-[#E8E2D4] hover:border-[#1B2A45]/30'
-            }`}>
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <SubTabBar
+        tabs={[
+          { key: 'employees'  as const, label: '직원 관리' },
+          { key: 'freelancer' as const, label: '프리랜서 관리대장' },
+          { key: 'profile'    as const, label: '사원정보' },
+        ]}
+        active={sub} onChange={setSub}
+      />
       {sub === 'employees' && <EmployeeManageSection />}
       {sub === 'freelancer' && <FreelancerTab />}
       {sub === 'profile' && <div className="space-y-8"><MyProfileTab /><PinManageTab /></div>}
@@ -223,26 +230,26 @@ export default function CeoDashboard() {
   }
 
   const tabs = [
-    { key: 'overview',      label: '📊 전체 현황' },
-    { key: 'assign',        label: '🔀 계약 배정' },
-    { key: 'sales',         label: '👥 영업팀' },
-    { key: 'ops',           label: '⚙️ 관리팀' },
-    { key: 'analytics',     label: '💰 손익·급여' },
-    { key: 'staffmanage',   label: '🧑‍💼 직원관리' },
-    { key: 'minutesreports',label: '📒 회의록·보고함' },
-    { key: 'calendar',      label: '📅 일정관리' },
-    { key: 'ailogs',        label: '🔍 AI 질문 로그' },
-    { key: 'trash',         label: deleteReqCount > 0 ? `🗑 DB 쓰레기통 (요청 ${deleteReqCount})` : '🗑 DB 쓰레기통' },
+    { key: 'overview',       label: '전체 현황' },
+    { key: 'assign',         label: '계약 배정' },
+    { key: 'sales',          label: '영업팀' },
+    { key: 'ops',            label: '관리팀' },
+    { key: 'analytics',      label: '손익·급여' },
+    { key: 'staffmanage',    label: '직원관리' },
+    { key: 'minutesreports', label: '회의록·보고' },
+    { key: 'calendar',       label: '일정관리' },
+    { key: 'ailogs',         label: 'AI 로그' },
+    { key: 'trash',          label: deleteReqCount > 0 ? `DB 쓰레기통 (${deleteReqCount})` : 'DB 쓰레기통' },
   ]
 
   return (
     <div className="min-h-screen bg-[#FAF8F3]">
       {/* ── 헤더 ── */}
-      <header className="bg-[#1B2A45] px-4 md:px-6 py-3 flex items-center justify-between sticky top-0 z-30">
+      <header className="bg-[#1B2A45] px-4 md:px-6 py-3 flex items-center justify-between sticky top-0 z-30 shadow-md">
         <Link href="/" className="relative h-8 w-24 shrink-0 block">
           <Image src="/images/logo.png" alt="HUNDRED" fill className="object-contain object-left brightness-0 invert" unoptimized />
         </Link>
-        <span className="text-white/60 text-xs font-medium hidden md:block">
+        <span className="text-white/50 text-xs font-medium hidden md:block">
           {tabs.find(t => t.key === activeTab)?.label ?? '대표 대시보드'}
         </span>
         <div className="flex items-center gap-2 relative">
@@ -287,18 +294,18 @@ export default function CeoDashboard() {
               </div>
             )}
           </div>
-          {/* 전체 현황으로 돌아가기 */}
+          {/* 홈 버튼 */}
           <button
             onClick={() => setActiveTab('overview')}
-            className="text-white/50 hover:text-white text-[10px] px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors whitespace-nowrap hidden md:block">
-            🏠 홈
+            className="text-white/50 hover:text-white text-[11px] px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors whitespace-nowrap hidden md:block font-medium">
+            홈
           </button>
           {/* 메모장 버튼 */}
           <button
             onClick={() => setNotepadOpen(v => !v)}
-            className={`text-[11px] px-2 py-1.5 rounded-lg transition-colors whitespace-nowrap ${notepadOpen ? 'bg-amber-400/80 text-white' : 'text-white/50 hover:text-white hover:bg-white/10'}`}
+            className={`text-[11px] px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap font-medium ${notepadOpen ? 'bg-[#C5A258]/80 text-white' : 'text-white/50 hover:text-white hover:bg-white/10'}`}
             title="메모장">
-            📝
+            메모
           </button>
           <button
             onClick={() => setMenuOpen(!menuOpen)}
@@ -329,7 +336,7 @@ export default function CeoDashboard() {
                       onClick={() => { handleInstall(); setMenuOpen(false) }}
                       className="mt-2 w-full flex items-center justify-center gap-1.5 text-xs border border-[#1B2A45]/20 hover:border-[#C5A258]/60 text-[#1B2A45]/60 hover:text-[#C5A258] font-semibold px-3 py-1.5 rounded-lg transition-colors"
                     >
-                      📲 앱 설치
+                      앱 설치
                     </button>
                   )}
                 </div>
@@ -354,7 +361,24 @@ export default function CeoDashboard() {
         </div>
       </header>
 
-      <div className="px-4 md:px-6 pt-6">
+      {/* ── 데스크탑 탭바 ── */}
+      <div className="hidden md:flex bg-white border-b border-gray-200 sticky top-[52px] z-20 px-6 overflow-x-auto shadow-sm">
+        {tabs.map(tab => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key as any)}
+            className={`relative px-4 py-3 text-sm whitespace-nowrap shrink-0 transition-colors font-medium ${
+              activeTab === tab.key
+                ? 'text-[#1B2A45]'
+                : 'text-[#1B2A45]/45 hover:text-[#1B2A45]/75'
+            }`}>
+            {tab.label}
+            {activeTab === tab.key && (
+              <span className="absolute bottom-0 left-2 right-2 h-[2px] bg-[#C5A258] rounded-full" />
+            )}
+          </button>
+        ))}
+      </div>
+
+      <div className="px-4 md:px-6 pt-5 pb-10">
 
         {activeTab === 'overview'       && <OverviewTabNew onNavigate={(tab, subView) => {
           setActiveTab(tab as any)

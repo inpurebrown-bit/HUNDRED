@@ -242,15 +242,15 @@ const INCALL_CLOSING_RESULTS = [
 type OpsTab = 'dashboard' | 'active' | 'refund' | 'completed' | 'newdb' | 'ops_contract' | 'report' | 'revenue' | 'profile'
 
 const opsTabs: { key: OpsTab; label: string }[] = [
-  { key: 'dashboard',    label: '📊 대시보드' },
-  { key: 'active',       label: '🔄 진행중업체' },
-  { key: 'refund',       label: '💸 환불업체' },
-  { key: 'completed',    label: '✅ 종료업체' },
-  { key: 'newdb',        label: '🆕 신규DB' },
-  { key: 'ops_contract', label: '📝 관리팀계약' },
-  { key: 'report',       label: '📋 관리팀보고' },
-  { key: 'revenue',      label: '💰 매출 현황' },
-  { key: 'profile',      label: '👤 사원정보' },
+  { key: 'dashboard',    label: '대시보드' },
+  { key: 'active',       label: '진행중업체' },
+  { key: 'refund',       label: '환불업체' },
+  { key: 'completed',    label: '종료업체' },
+  { key: 'newdb',        label: '신규DB' },
+  { key: 'ops_contract', label: '관리팀계약' },
+  { key: 'report',       label: '관리팀보고' },
+  { key: 'revenue',      label: '매출 현황' },
+  { key: 'profile',      label: '사원정보' },
 ]
 
 // ── Detail Tab Types: 진행현황 우선, 타임라인 진행현황 하단에 통합 ──────────
@@ -3651,15 +3651,14 @@ export default function OpsDashboard({ userId, userName }: Props) {
   return (
     <div className="min-h-screen bg-[#FAF8F3]">
       {/* Header */}
-      <header className="bg-[#1B2A45] px-4 md:px-6 py-3 flex items-center justify-between sticky top-0 z-30">
+      <header className="bg-[#1B2A45] px-4 md:px-6 py-3 flex items-center justify-between sticky top-0 z-30 shadow-md">
         <Link href="/" className="relative h-8 w-24 shrink-0 block">
           <Image src="/images/logo.png" alt="HUNDRED" fill className="object-contain object-left brightness-0 invert" unoptimized />
         </Link>
-        <span className="text-white/60 text-xs font-medium hidden md:block">
+        <span className="text-white/50 text-xs font-medium hidden md:block">
           {opsTabs.find(t => t.key === activeTab)?.label ?? '관리팀 대시보드'}
         </span>
         <div className="flex items-center gap-2 relative">
-          {/* 검색 — 항상 표시 */}
           <div className="relative">
             <input
               type="text"
@@ -3673,18 +3672,15 @@ export default function OpsDashboard({ userId, userName }: Props) {
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-white/50 hover:text-white text-xs">✕</button>
             )}
           </div>
-          {/* 메모장 버튼 */}
           <button
             onClick={() => setNotepadOpen(v => !v)}
-            className={`text-[11px] px-2 py-1.5 rounded-lg transition-colors whitespace-nowrap ${notepadOpen ? 'bg-amber-400/80 text-white' : 'text-white/50 hover:text-white hover:bg-white/10'}`}
-            title="오늘 할일 메모장">
-            📝
+            className={`text-[11px] px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap font-medium ${notepadOpen ? 'bg-[#C5A258]/80 text-white' : 'text-white/50 hover:text-white hover:bg-white/10'}`}>
+            메모
           </button>
           <button onClick={() => setActiveTab('dashboard')}
-            className="text-white/50 hover:text-white text-[10px] px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors whitespace-nowrap hidden md:block">
-            🏠 홈
+            className="text-white/50 hover:text-white text-[11px] px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors whitespace-nowrap hidden md:block font-medium">
+            홈
           </button>
-          {/* 메뉴 */}
           <button onClick={() => setMenuOpen(!menuOpen)} aria-label="메뉴"
             className={`flex flex-col gap-[5px] p-2 rounded-lg transition-colors ${menuOpen ? 'bg-white/20' : 'hover:bg-white/10'}`}>
             <span className={`block w-5 h-0.5 bg-white/80 transition-all origin-center ${menuOpen ? 'rotate-45 translate-y-[7px]' : ''}`} />
@@ -3705,7 +3701,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
                   {installable && (
                     <button onClick={() => { handleInstall(); setMenuOpen(false) }}
                       className="mt-2 w-full flex items-center justify-center gap-1.5 text-xs border border-[#1B2A45]/20 hover:border-[#C5A258]/60 text-[#1B2A45]/60 hover:text-[#C5A258] font-semibold px-3 py-1.5 rounded-lg transition-colors">
-                      📲 앱 설치
+                      앱 설치
                     </button>
                   )}
                 </div>
@@ -3733,6 +3729,26 @@ export default function OpsDashboard({ userId, userName }: Props) {
           )}
         </div>
       </header>
+
+      {/* 데스크탑 탭바 */}
+      <div className="hidden md:flex bg-white border-b border-gray-200 sticky top-[52px] z-20 px-6 overflow-x-auto shadow-sm">
+        {opsTabs.map(tab => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+            className={`relative px-4 py-3 text-sm whitespace-nowrap shrink-0 transition-colors font-medium flex items-center gap-1.5 ${
+              activeTab === tab.key ? 'text-[#1B2A45]' : 'text-[#1B2A45]/45 hover:text-[#1B2A45]/75'
+            }`}>
+            {tab.label}
+            {tabCounts[tab.key] !== null && tabCounts[tab.key]! > 0 && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+                activeTab === tab.key ? 'bg-[#1B2A45] text-white' : 'bg-gray-100 text-gray-500'
+              }`}>{tabCounts[tab.key]}</span>
+            )}
+            {activeTab === tab.key && (
+              <span className="absolute bottom-0 left-2 right-2 h-[2px] bg-[#C5A258] rounded-full" />
+            )}
+          </button>
+        ))}
+      </div>
 
       {/* 콘텐츠 */}
       <div className="px-4 md:px-6 py-6 max-w-6xl mx-auto">

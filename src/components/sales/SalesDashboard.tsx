@@ -709,15 +709,15 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
 
   // ── Tabs ──────────────────────────────────────────────────────────
   const tabs: { key: SalesTab; label: string; count?: number }[] = [
-    { key: 'board',      label: '🏠 메인보드' },
-    { key: 'db010',      label: '🏷️ 직가DB',      count: db010List.length },
-    { key: 'customers',  label: '📋 공가DB',       count: activeCustomers.length },
-    { key: 'contracted', label: '✅ 계약 업체',   count: contractedCustomers.length },
-    { key: 'emotional',  label: '💬 감성톡(거절업체)',      count: emotionalCustomers.length },
-    { key: 'trash',      label: '🗑 자체거절',    count: trashCustomers.length },
-    { key: 'revenue',    label: '💰 매출',        count: revenueCustomers.length },
-    { key: 'report',     label: '📝 보고' },
-    { key: 'profile',    label: '👤 사원정보' },
+    { key: 'board',      label: '메인보드' },
+    { key: 'db010',      label: '직가DB',      count: db010List.length },
+    { key: 'customers',  label: '공가DB',       count: activeCustomers.length },
+    { key: 'contracted', label: '계약 업체',   count: contractedCustomers.length },
+    { key: 'emotional',  label: '감성톡',      count: emotionalCustomers.length },
+    { key: 'trash',      label: '자체거절',    count: trashCustomers.length },
+    { key: 'revenue',    label: '매출',        count: revenueCustomers.length },
+    { key: 'report',     label: '보고' },
+    { key: 'profile',    label: '사원정보' },
   ]
 
   // ── Render ────────────────────────────────────────────────────────
@@ -801,7 +801,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
       )}
 
       {/* Header */}
-      <header className="bg-gradient-to-r from-[#1B2A45] to-sky-700 px-4 md:px-6 py-3 flex items-center justify-between sticky top-0 z-30">
+      <header className="bg-[#1B2A45] px-4 md:px-6 py-3 flex items-center justify-between sticky top-0 z-30 shadow-md">
         <Link href="/" className="relative h-8 w-24 shrink-0 block">
           <Image src="/images/logo.png" alt="HUNDRED" fill className="object-contain object-left brightness-0 invert" unoptimized />
         </Link>
@@ -857,15 +857,15 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
           {/* 메모장 버튼 */}
           <button
             onClick={() => setNotepadOpen(v => !v)}
-            className={`text-[11px] px-2 py-1.5 rounded-lg transition-colors whitespace-nowrap ${notepadOpen ? 'bg-amber-400/80 text-white' : 'text-white/50 hover:text-white hover:bg-white/10'}`}
-            title="오늘 할일 메모장">
-            📝
+            className={`text-[11px] px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap font-medium ${notepadOpen ? 'bg-[#C5A258]/80 text-white' : 'text-white/50 hover:text-white hover:bg-white/10'}`}
+            title="메모장">
+            메모
           </button>
-          {/* 대시보드로 돌아가기 */}
+          {/* 홈으로 */}
           <button
             onClick={() => setActiveTab('board')}
-            className="text-white/50 hover:text-white text-[10px] px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors whitespace-nowrap hidden md:block">
-            🏠 홈
+            className="text-white/50 hover:text-white text-[11px] px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors whitespace-nowrap hidden md:block font-medium">
+            홈
           </button>
           <button onClick={() => setMenuOpen(!menuOpen)} aria-label="메뉴"
             className={`flex flex-col gap-[5px] p-2 rounded-lg transition-colors ${menuOpen ? 'bg-white/20' : 'hover:bg-white/10'}`}>
@@ -892,7 +892,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                       onClick={() => { handleInstall(); setMenuOpen(false) }}
                       className="mt-2 w-full flex items-center justify-center gap-1.5 text-xs border border-[#1B2A45]/20 hover:border-[#C5A258]/60 text-[#1B2A45]/60 hover:text-[#C5A258] font-semibold px-3 py-1.5 rounded-lg transition-colors"
                     >
-                      📲 앱 설치
+                      앱 설치
                     </button>
                   )}
                 </div>
@@ -918,6 +918,26 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
           )}
         </div>
       </header>
+
+      {/* ── 데스크탑 탭바 ── */}
+      <div className="hidden md:flex bg-white border-b border-gray-200 sticky top-[52px] z-20 px-6 overflow-x-auto shadow-sm">
+        {tabs.map(tab => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+            className={`relative px-4 py-3 text-sm whitespace-nowrap shrink-0 transition-colors font-medium flex items-center gap-1.5 ${
+              activeTab === tab.key ? 'text-[#1B2A45]' : 'text-[#1B2A45]/45 hover:text-[#1B2A45]/75'
+            }`}>
+            {tab.label}
+            {tab.count !== undefined && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+                activeTab === tab.key ? 'bg-[#1B2A45] text-white' : 'bg-gray-100 text-gray-500'
+              }`}>{tab.count}</span>
+            )}
+            {activeTab === tab.key && (
+              <span className="absolute bottom-0 left-2 right-2 h-[2px] bg-[#C5A258] rounded-full" />
+            )}
+          </button>
+        ))}
+      </div>
 
       <div className="px-4 md:px-6 py-5 max-w-5xl mx-auto">
 

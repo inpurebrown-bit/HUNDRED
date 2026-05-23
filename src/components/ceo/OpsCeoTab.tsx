@@ -719,12 +719,12 @@ export default function OpsCeoTab() {
   })
 
   const MENU = [
-    { key: 'active' as OpsView,        label: '🔄 진행중업체', count: activeCases.length },
-    { key: 'refund' as OpsView,        label: '💸 환불업체',   count: refundCases.length },
-    { key: 'completed' as OpsView,     label: '✅ 종료업체',   count: completedCases.length },
+    { key: 'active' as OpsView,        label: '진행중업체', count: activeCases.length },
+    { key: 'refund' as OpsView,        label: '환불업체',   count: refundCases.length },
+    { key: 'completed' as OpsView,     label: '종료업체',   count: completedCases.length },
     { key: 'newdb' as OpsView,         label: '🗄️ 뿌토DB',    count: newdbCases.length },
-    { key: 'puto_contract' as OpsView, label: '📋 계약업체',   count: putoContractCases.length },
-    { key: 'revenue' as OpsView,       label: '💰 매출현황',   count: null },
+    { key: 'puto_contract' as OpsView, label: '계약업체',   count: putoContractCases.length },
+    { key: 'revenue' as OpsView,       label: '매출현황',   count: null },
   ] as const
 
   const viewCases = view === 'refund' ? refundCases : view === 'completed' ? completedCases : view === 'newdb' ? newdbCases : activeCases
@@ -734,14 +734,14 @@ export default function OpsCeoTab() {
       {/* 헤더 */}
       <div className="bg-[#1B2A45] rounded-xl px-5 py-4">
         <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
-          <h2 className="font-bold text-white text-base">⚙️ 자금팀 현황</h2>
+          <h2 className="font-bold text-white text-base">자금팀 현황</h2>
           <div className="flex items-center gap-2">
             <input value={search} onChange={e => setSearch(e.target.value)}
               placeholder="업체·담당자·기관 검색..."
               className="bg-white/10 text-white placeholder-white/40 text-xs px-3 py-1.5 rounded-lg border border-white/20 focus:outline-none focus:bg-white/20 w-36" />
             <button onClick={load}
               className="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition-colors">
-              🔄 새로고침
+              새로고침
             </button>
           </div>
         </div>
