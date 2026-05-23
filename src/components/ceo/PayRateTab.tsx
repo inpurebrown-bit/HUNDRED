@@ -746,65 +746,21 @@ function PayRateSubView() {
         </div>
       </div>
 
-      {/* ─── 🏢 관리팀 현재 매출 ─── */}
-      {opsRevenue !== null && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-          <h3 className="text-sm font-bold text-gray-800 mb-4">🏢 관리팀 현재 매출 <span className="text-[11px] text-gray-400 font-normal">({month})</span></h3>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="bg-violet-50 rounded-2xl px-3 py-3 text-center">
-              <p className="text-[9px] text-violet-400 font-semibold mb-1">수수료 매출</p>
-              <p className="text-xl font-black text-violet-700 leading-tight">
-                {opsRevenue.fee >= 100000000
-                  ? (opsRevenue.fee / 100000000).toFixed(1) + '억'
-                  : opsRevenue.fee >= 10000
-                    ? Math.round(opsRevenue.fee / 10000) + '만'
-                    : opsRevenue.fee.toLocaleString()}
-              </p>
-              <p className="text-[8px] text-violet-400 mt-0.5">원</p>
-            </div>
-            <div className="bg-emerald-50 rounded-2xl px-3 py-3 text-center">
-              <p className="text-[9px] text-emerald-500 font-semibold mb-1">계약 매출</p>
-              <p className="text-xl font-black text-emerald-700 leading-tight">
-                {opsRevenue.contract >= 100000000
-                  ? (opsRevenue.contract / 100000000).toFixed(1) + '억'
-                  : opsRevenue.contract >= 10000
-                    ? Math.round(opsRevenue.contract / 10000) + '만'
-                    : opsRevenue.contract.toLocaleString()}
-              </p>
-              <p className="text-[8px] text-emerald-400 mt-0.5">원</p>
-            </div>
-            <div className="bg-[#1B2A45] rounded-2xl px-3 py-3 text-center">
-              <p className="text-[9px] text-white/50 font-semibold mb-1">합계</p>
-              <p className="text-xl font-black text-white leading-tight">
-                {(() => {
-                  const total = opsRevenue.fee + opsRevenue.contract
-                  return total >= 100000000
-                    ? (total / 100000000).toFixed(1) + '억'
-                    : total >= 10000
-                      ? Math.round(total / 10000) + '만'
-                      : total.toLocaleString()
-                })()}
-              </p>
-              <p className="text-[8px] text-white/40 mt-0.5">원</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ─── 🏢 관리팀 진행 현황 요약 ─── */}
-      {opsCases.length > 0 && (() => {
+      {/* ─── 🏢 관리팀 매출 + 진행 현황 (통합) ─── */}
+      {(opsRevenue !== null || opsCases.length > 0) && (() => {
         const INST_LIST = [
           '중진공', '소진공(혁신)', '소진공(신취)', '소진공(재도전)',
           '기보', '신보', '재단', '서민금융(미소)',
         ]
-        const WAIT_SET  = new Set(['서류받는중', '접수전', '홀딩'])
+        // 홀딩만 대기, 나머지는 모두 진행중
+        const WAIT_SET  = new Set(['홀딩'])
         const DONE_SET  = new Set(['부결', '종료예정', '환불예정', '종료'])
 
         const activeCases = opsCases.filter(c =>
           !c.is_completed && !c.is_refund && !DONE_SET.has(c.stage ?? '')
         )
 
-        // 기관별 집계 (한 케이스에 여러 기관 가능)
+        // 기관별 집계
         const instStats = INST_LIST.map(inst => {
           const matched = activeCases.filter(c =>
             (c.institution || '').split(',').map((s: string) => s.trim()).includes(inst)
@@ -843,9 +799,51 @@ function PayRateSubView() {
 
         return (
           <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-gray-800">📋 관리팀 진행 현황</h3>
+            <h3 className="text-sm font-bold text-gray-800">🏢 관리팀 현재 매출 &amp; 진행 현황 <span className="text-[11px] text-gray-400 font-normal">({month})</span></h3>
 
-            {/* 기관별 */}
+            {/* 매출 요약 */}
+            {opsRevenue !== null && (
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-violet-50 rounded-2xl px-3 py-3 text-center">
+                  <p className="text-[9px] text-violet-400 font-semibold mb-1">수수료 매출</p>
+                  <p className="text-xl font-black text-violet-700 leading-tight">
+                    {opsRevenue.fee >= 100000000
+                      ? (opsRevenue.fee / 100000000).toFixed(1) + '억'
+                      : opsRevenue.fee >= 10000
+                        ? Math.round(opsRevenue.fee / 10000) + '만'
+                        : opsRevenue.fee.toLocaleString()}
+                  </p>
+                  <p className="text-[8px] text-violet-400 mt-0.5">원</p>
+                </div>
+                <div className="bg-emerald-50 rounded-2xl px-3 py-3 text-center">
+                  <p className="text-[9px] text-emerald-500 font-semibold mb-1">계약 매출</p>
+                  <p className="text-xl font-black text-emerald-700 leading-tight">
+                    {opsRevenue.contract >= 100000000
+                      ? (opsRevenue.contract / 100000000).toFixed(1) + '억'
+                      : opsRevenue.contract >= 10000
+                        ? Math.round(opsRevenue.contract / 10000) + '만'
+                        : opsRevenue.contract.toLocaleString()}
+                  </p>
+                  <p className="text-[8px] text-emerald-400 mt-0.5">원</p>
+                </div>
+                <div className="bg-[#1B2A45] rounded-2xl px-3 py-3 text-center">
+                  <p className="text-[9px] text-white/50 font-semibold mb-1">합계</p>
+                  <p className="text-xl font-black text-white leading-tight">
+                    {(() => {
+                      const total = opsRevenue.fee + opsRevenue.contract
+                      return total >= 100000000
+                        ? (total / 100000000).toFixed(1) + '억'
+                        : total >= 10000
+                          ? Math.round(total / 10000) + '만'
+                          : total.toLocaleString()
+                    })()}
+                  </p>
+                  <p className="text-[8px] text-white/40 mt-0.5">원</p>
+                </div>
+              </div>
+            )}
+
+            {/* 기관별 현황 */}
             {instStats.length > 0 && (
               <div>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">기관별 현황</p>
@@ -883,7 +881,7 @@ function PayRateSubView() {
                         <span className="text-[10px] font-bold mr-2">{g.label}</span>
                         <span className="text-[10px] opacity-60">({g.cases.length}건)</span>
                         <p className="text-xs font-medium mt-0.5 leading-relaxed">
-                          {g.cases.map(c => c.customer_name || '-').join(' · ')}
+                          {g.cases.map(c => c.customer_name || c.customers?.name || '-').join(' · ')}
                         </p>
                       </div>
                     </div>
@@ -892,7 +890,7 @@ function PayRateSubView() {
               </div>
             )}
 
-            {instStats.length === 0 && stageGroups.length === 0 && (
+            {instStats.length === 0 && stageGroups.length === 0 && opsCases.length === 0 && (
               <p className="text-xs text-gray-400 text-center py-2">진행 중인 케이스 없음</p>
             )}
           </div>
