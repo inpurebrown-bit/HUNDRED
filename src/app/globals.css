@@ -1,394 +1,167 @@
 @import "tailwindcss";
 
-/* ══════════════════════════════════════════════════════════════
-   HUNDRED CONSULTANCY — PREMIUM DARK DESIGN SYSTEM
-   ══════════════════════════════════════════════════════════════ */
-
-/* ── 1. CSS Variables ── */
 :root {
-  --d-bg:             #0D1B2E;
-  --d-surface:        rgba(255,255,255,0.058);
-  --d-surface-2:      rgba(255,255,255,0.09);
-  --d-surface-hover:  rgba(255,255,255,0.10);
-  --d-border:         rgba(255,255,255,0.10);
-  --d-border-strong:  rgba(255,255,255,0.18);
-  --d-text-1:         #EEE9E0;
-  --d-text-2:         rgba(238,233,224,0.65);
-  --d-text-3:         rgba(238,233,224,0.38);
-  --d-text-4:         rgba(238,233,224,0.22);
-  --gold:             #C5A258;
-  --gold-dim:         rgba(197,162,88,0.18);
-  --gold-glow:        rgba(197,162,88,0.30);
-  --navy:             #1B2A45;
-  --emerald:          #10b981;
-  --emerald-dim:      rgba(16,185,129,0.14);
+  --background: #ffffff;
+  --foreground: #171717;
 }
 
 @theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-/* ── 2. Page background — deep navy gradient ── */
-.page-bg {
-  background:
-    radial-gradient(ellipse 80% 50% at 15% -10%, rgba(27,42,69,0.55) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 85% 90%,  rgba(197,162,88,0.06) 0%, transparent 55%),
-    linear-gradient(160deg, #0a1628 0%, #0D1B2E 55%, #091221 100%);
-  min-height: 100vh;
-  color: var(--d-text-1);
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
 }
 
-/* ══════════════════════════════════════════════════════════════
-   3. CONTEXT OVERRIDES — everything inside .page-bg
-   ══════════════════════════════════════════════════════════════ */
-
-/* ── Backgrounds ── */
-.page-bg .bg-white          { background: var(--d-surface)   !important; }
-.page-bg .bg-white\/60      { background: rgba(255,255,255,0.06) !important; }
-.page-bg .bg-white\/70      { background: rgba(255,255,255,0.07) !important; }
-.page-bg .bg-gray-50        { background: rgba(255,255,255,0.035) !important; }
-.page-bg .bg-gray-50\/50    { background: rgba(255,255,255,0.03)  !important; }
-.page-bg .bg-gray-50\/20    { background: rgba(255,255,255,0.02)  !important; }
-.page-bg .bg-gray-50\/60    { background: rgba(255,255,255,0.035) !important; }
-.page-bg .bg-gray-100       { background: rgba(255,255,255,0.07)  !important; }
-.page-bg .bg-gray-200       { background: rgba(255,255,255,0.10)  !important; }
-.page-bg .bg-\[#FAFAF8\]   { background: rgba(255,255,255,0.04)  !important; }
-.page-bg .bg-\[#FAF8F3\]      { background: rgba(255,255,255,0.04)  !important; }
-.page-bg .bg-\[#FAF8F3\]\/50  { background: rgba(255,255,255,0.04)  !important; }
-.page-bg .bg-\[#FAF8F3\]\/80  { background: rgba(255,255,255,0.05)  !important; }
-.page-bg .bg-\[#FAF8F3\]\/60  { background: rgba(255,255,255,0.04)  !important; }
-.page-bg .bg-\[#F8F7F4\]      { background: rgba(255,255,255,0.04)  !important; }
-.page-bg .bg-\[#F5F3EE\]      { background: rgba(255,255,255,0.06)  !important; }
-.page-bg .bg-\[#EAE8E2\]      { background: rgba(255,255,255,0.08)  !important; }
-.page-bg .bg-\[#D5D0C8\]      { background: rgba(255,255,255,0.18)  !important; }
-.page-bg .bg-\[#E8E2D4\]      { background: rgba(255,255,255,0.09)  !important; }
-.page-bg .bg-\[#F0EDE6\]      { background: rgba(255,255,255,0.07)  !important; }
-.page-bg .bg-\[#F8F6F1\]      { background: rgba(255,255,255,0.05)  !important; }
-
-/* Navy surfaces — convert low-opacity navy to subtle white tint */
-.page-bg .bg-\[#1B2A45\]\/8   { background: rgba(255,255,255,0.05) !important; }
-.page-bg .bg-\[#1B2A45\]\/5   { background: rgba(255,255,255,0.04) !important; }
-.page-bg .bg-\[#1B2A45\]\/10  { background: rgba(255,255,255,0.06) !important; }
-.page-bg .bg-\[#1B2A45\]\/15  { background: rgba(255,255,255,0.07) !important; }
-.page-bg .bg-\[#1B2A45\]\/\[0\.04\] { background: rgba(255,255,255,0.04) !important; }
-
-/* hover navy tints → subtle white */
-.page-bg .hover\:bg-\[#1B2A45\]\/10:hover { background: rgba(255,255,255,0.07) !important; }
-.page-bg .hover\:bg-\[#1B2A45\]\/5:hover  { background: rgba(255,255,255,0.05) !important; }
-
-/* Colored tint backgrounds → dark-adapted versions */
-.page-bg .bg-blue-50,   .page-bg .bg-blue-50\/60   { background: rgba(59,130,246,0.14)  !important; }
-.page-bg .bg-blue-100                               { background: rgba(59,130,246,0.18)  !important; }
-.page-bg .bg-emerald-50,.page-bg .bg-emerald-50\/60 { background: rgba(16,185,129,0.12) !important; }
-.page-bg .bg-emerald-100                            { background: rgba(16,185,129,0.16)  !important; }
-.page-bg .bg-red-50,
-.page-bg .bg-red-50\/60,
-.page-bg .bg-red-50\/50,
-.page-bg .bg-red-50\/80                             { background: rgba(239,68,68,0.12)  !important; }
-.page-bg .bg-red-50\/40                             { background: rgba(239,68,68,0.08)  !important; }
-.page-bg .bg-red-100                                { background: rgba(239,68,68,0.18)  !important; }
-.page-bg .bg-amber-50,  .page-bg .bg-amber-100      { background: rgba(245,158,11,0.12) !important; }
-.page-bg .bg-orange-50                              { background: rgba(251,146,60,0.12)  !important; }
-.page-bg .bg-violet-50, .page-bg .bg-violet-100     { background: rgba(139,92,246,0.14) !important; }
-.page-bg .bg-pink-50,   .page-bg .bg-pink-100       { background: rgba(236,72,153,0.12) !important; }
-.page-bg .bg-yellow-50, .page-bg .bg-yellow-100     { background: rgba(234,179,8,0.12)  !important; }
-.page-bg .bg-sky-50,
-.page-bg .bg-sky-50\/50,
-.page-bg .bg-sky-50\/60,
-.page-bg .bg-sky-50\/80                             { background: rgba(14,165,233,0.12)  !important; }
-.page-bg .bg-blue-50\/50,
-.page-bg .bg-blue-50\/60,
-.page-bg .bg-blue-50\/80                            { background: rgba(59,130,246,0.12)  !important; }
-.page-bg .bg-indigo-50                              { background: rgba(99,102,241,0.12)  !important; }
-.page-bg .bg-emerald-50\/60,
-.page-bg .bg-emerald-50\/50                         { background: rgba(16,185,129,0.10)  !important; }
-
-/* ── Text colors ── */
-.page-bg .text-gray-900,
-.page-bg .text-gray-800     { color: rgba(238,233,224,0.95) !important; }
-.page-bg .text-gray-700     { color: rgba(238,233,224,0.80) !important; }
-.page-bg .text-gray-600     { color: rgba(238,233,224,0.65) !important; }
-.page-bg .text-gray-500     { color: rgba(238,233,224,0.50) !important; }
-.page-bg .text-gray-400     { color: rgba(238,233,224,0.40) !important; }
-.page-bg .text-gray-300     { color: rgba(238,233,224,0.30) !important; }
-
-/* Navy text → white */
-.page-bg .text-\[#1B2A45\]        { color: var(--d-text-1) !important; }
-.page-bg .text-\[#1B2A45\]\/90    { color: rgba(238,233,224,0.90) !important; }
-.page-bg .text-\[#1B2A45\]\/80    { color: rgba(238,233,224,0.80) !important; }
-.page-bg .text-\[#1B2A45\]\/75    { color: rgba(238,233,224,0.75) !important; }
-.page-bg .text-\[#1B2A45\]\/70    { color: rgba(238,233,224,0.70) !important; }
-.page-bg .text-\[#1B2A45\]\/65    { color: rgba(238,233,224,0.65) !important; }
-.page-bg .text-\[#1B2A45\]\/60    { color: rgba(238,233,224,0.60) !important; }
-.page-bg .text-\[#1B2A45\]\/55    { color: rgba(238,233,224,0.55) !important; }
-.page-bg .text-\[#1B2A45\]\/50    { color: rgba(238,233,224,0.50) !important; }
-.page-bg .text-\[#1B2A45\]\/45    { color: rgba(238,233,224,0.45) !important; }
-.page-bg .text-\[#1B2A45\]\/40    { color: rgba(238,233,224,0.40) !important; }
-.page-bg .text-\[#1B2A45\]\/35    { color: rgba(238,233,224,0.35) !important; }
-.page-bg .text-\[#1B2A45\]\/30    { color: rgba(238,233,224,0.30) !important; }
-.page-bg .text-\[#1B2A45\]\/25    { color: rgba(238,233,224,0.25) !important; }
-.page-bg .text-\[#1B2A45\]\/20    { color: rgba(238,233,224,0.20) !important; }
-
-/* Colored text → brightened for dark bg */
-.page-bg .text-blue-900, .page-bg .text-blue-800,
-.page-bg .text-blue-700                             { color: #93c5fd !important; }
-.page-bg .text-blue-600                             { color: #60a5fa !important; }
-.page-bg .text-blue-500, .page-bg .text-blue-400   { color: #60a5fa !important; }
-.page-bg .text-emerald-900, .page-bg .text-emerald-800,
-.page-bg .text-emerald-700                          { color: #6ee7b7 !important; }
-.page-bg .text-emerald-600                          { color: #34d399 !important; }
-.page-bg .text-emerald-500                          { color: #10d49e !important; }
-.page-bg .text-red-900, .page-bg .text-red-800,
-.page-bg .text-red-700                              { color: #fca5a5 !important; }
-.page-bg .text-red-600                              { color: #f87171 !important; }
-.page-bg .text-red-500, .page-bg .text-red-400     { color: #f87171 !important; }
-.page-bg .text-amber-900, .page-bg .text-amber-800,
-.page-bg .text-amber-700                            { color: #fcd34d !important; }
-.page-bg .text-amber-600, .page-bg .text-amber-500  { color: #fbbf24 !important; }
-.page-bg .text-amber-400                            { color: #f59e0b !important; }
-.page-bg .text-orange-700, .page-bg .text-orange-800 { color: #fdba74 !important; }
-.page-bg .text-orange-500, .page-bg .text-orange-400 { color: #fb923c !important; }
-.page-bg .text-orange-600                           { color: #f97316 !important; }
-.page-bg .text-violet-900, .page-bg .text-violet-800,
-.page-bg .text-violet-700                           { color: #c4b5fd !important; }
-.page-bg .text-violet-600, .page-bg .text-violet-500 { color: #a78bfa !important; }
-.page-bg .text-pink-700,  .page-bg .text-pink-800  { color: #f9a8d4 !important; }
-.page-bg .text-pink-600,  .page-bg .text-pink-500  { color: #f472b6 !important; }
-.page-bg .text-sky-800, .page-bg .text-sky-700     { color: #7dd3fc !important; }
-.page-bg .text-sky-600, .page-bg .text-sky-500     { color: #38bdf8 !important; }
-.page-bg .text-cyan-600,  .page-bg .text-cyan-700  { color: #67e8f9 !important; }
-.page-bg .text-teal-600,  .page-bg .text-teal-700  { color: #2dd4bf !important; }
-.page-bg .text-teal-500,  .page-bg .text-teal-400  { color: #14b8a6 !important; }
-.page-bg .text-indigo-700, .page-bg .text-indigo-800 { color: #a5b4fc !important; }
-.page-bg .text-slate-500, .page-bg .text-slate-600 { color: rgba(238,233,224,0.50) !important; }
-.page-bg .text-slate-400                            { color: rgba(238,233,224,0.40) !important; }
-
-/* More tint backgrounds */
-.page-bg .bg-teal-50,   .page-bg .bg-teal-100       { background: rgba(20,184,166,0.12)  !important; }
-.page-bg .bg-cyan-50,   .page-bg .bg-cyan-100       { background: rgba(6,182,212,0.12)   !important; }
-.page-bg .bg-indigo-50, .page-bg .bg-indigo-100     { background: rgba(99,102,241,0.12)  !important; }
-.page-bg .bg-slate-50,  .page-bg .bg-slate-100      { background: rgba(255,255,255,0.05) !important; }
-.page-bg .bg-neutral-50,.page-bg .bg-neutral-100    { background: rgba(255,255,255,0.05) !important; }
-.page-bg .bg-zinc-50,   .page-bg .bg-zinc-100       { background: rgba(255,255,255,0.05) !important; }
-/* Rose (similar to red) */
-.page-bg .bg-rose-50,   .page-bg .bg-rose-100       { background: rgba(244,63,94,0.12)   !important; }
-.page-bg .bg-rose-200                               { background: rgba(244,63,94,0.20)   !important; }
-/* Border rose */
-.page-bg .border-rose-200                           { border-color: rgba(244,63,94,0.35) !important; }
-.page-bg .border-orange-200                         { border-color: rgba(251,146,60,0.35) !important; }
-/* Text rose */
-.page-bg .text-rose-800, .page-bg .text-rose-700   { color: #fda4af !important; }
-.page-bg .text-rose-600, .page-bg .text-rose-500   { color: #fb7185 !important; }
-.page-bg .text-rose-400                             { color: #f43f5e !important; }
-
-/* hover bg-color variants */
-.page-bg .hover\:bg-amber-200:hover       { background: rgba(245,158,11,0.25)  !important; }
-.page-bg .hover\:bg-blue-100:hover        { background: rgba(59,130,246,0.20)  !important; }
-.page-bg .hover\:bg-emerald-100:hover     { background: rgba(16,185,129,0.20)  !important; }
-.page-bg .hover\:bg-red-100:hover         { background: rgba(239,68,68,0.20)   !important; }
-.page-bg .hover\:border-gray-400:hover    { border-color: rgba(255,255,255,0.30) !important; }
-.page-bg .hover\:border-\[#1B2A45\]\/30:hover { border-color: rgba(255,255,255,0.20) !important; }
-.page-bg .hover\:border-\[#C5A258\]\/60:hover  { border-color: rgba(197,162,88,0.60) !important; }
-/* Calendar cell hover variants */
-.page-bg .hover\:bg-red-50\/80:hover      { background: rgba(239,68,68,0.16)   !important; }
-.page-bg .hover\:bg-blue-50\/80:hover     { background: rgba(59,130,246,0.16)  !important; }
-.page-bg .hover\:bg-sky-50\/80:hover      { background: rgba(14,165,233,0.16)  !important; }
-.page-bg .hover\:bg-emerald-50\/80:hover  { background: rgba(16,185,129,0.16)  !important; }
-
-/* ── Borders ── */
-.page-bg .border-gray-50    { border-color: rgba(255,255,255,0.05) !important; }
-.page-bg .border-gray-100   { border-color: rgba(255,255,255,0.07) !important; }
-.page-bg .border-gray-200   { border-color: rgba(255,255,255,0.10) !important; }
-.page-bg .border-gray-300   { border-color: rgba(255,255,255,0.15) !important; }
-.page-bg .border-\[#E8E2D4\]{ border-color: rgba(255,255,255,0.09) !important; }
-.page-bg .border-\[#E8E2D4\]\/60  { border-color: rgba(255,255,255,0.07) !important; }
-.page-bg .border-blue-100   { border-color: rgba(59,130,246,0.30)  !important; }
-.page-bg .border-blue-200   { border-color: rgba(59,130,246,0.40)  !important; }
-.page-bg .border-emerald-100{ border-color: rgba(16,185,129,0.30)  !important; }
-.page-bg .border-red-100    { border-color: rgba(239,68,68,0.30)   !important; }
-.page-bg .border-red-200    { border-color: rgba(239,68,68,0.40)   !important; }
-.page-bg .border-amber-100  { border-color: rgba(245,158,11,0.30)  !important; }
-.page-bg .border-amber-200  { border-color: rgba(245,158,11,0.40)  !important; }
-.page-bg .border-orange-100 { border-color: rgba(251,146,60,0.30)  !important; }
-.page-bg .border-violet-100 { border-color: rgba(139,92,246,0.30)  !important; }
-/* Navy borders → light on dark bg */
-.page-bg .border-\[#1B2A45\]\/10 { border-color: rgba(255,255,255,0.08) !important; }
-.page-bg .border-\[#1B2A45\]\/15 { border-color: rgba(255,255,255,0.10) !important; }
-.page-bg .border-\[#1B2A45\]\/20 { border-color: rgba(255,255,255,0.12) !important; }
-.page-bg .border-\[#1B2A45\]\/30 { border-color: rgba(255,255,255,0.16) !important; }
-.page-bg .border-\[#1B2A45\]\/40 { border-color: rgba(255,255,255,0.20) !important; }
-.page-bg .border-\[#1B2A45\]\/50 { border-color: rgba(255,255,255,0.25) !important; }
-
-/* Dividers */
-.page-bg .divide-gray-50 > :not([hidden]) ~ :not([hidden]),
-.page-bg .divide-gray-100 > :not([hidden]) ~ :not([hidden]) {
-  border-color: rgba(255,255,255,0.06) !important;
-}
-.page-bg .divide-\[#E8E2D4\] > :not([hidden]) ~ :not([hidden]) {
-  border-color: rgba(255,255,255,0.07) !important;
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
 }
 
-/* ── Hover states ── */
-.page-bg .hover\:bg-gray-50:hover    { background: rgba(255,255,255,0.05) !important; }
-.page-bg .hover\:bg-gray-100:hover   { background: rgba(255,255,255,0.08) !important; }
-.page-bg .hover\:bg-\[#FAF8F3\]:hover,
-.page-bg .hover\:bg-\[#FAFAF8\]:hover { background: rgba(255,255,255,0.05) !important; }
-.page-bg .hover\:bg-red-50\/70:hover  { background: rgba(239,68,68,0.14)  !important; }
-.page-bg .hover\:bg-blue-50\/70:hover { background: rgba(59,130,246,0.16)  !important; }
-.page-bg .hover\:bg-white\/90:hover  { background: rgba(255,255,255,0.18) !important; }
-.page-bg .hover\:bg-white\/80:hover  { background: rgba(255,255,255,0.15) !important; }
-.page-bg .hover\:bg-gray-200:hover   { background: rgba(255,255,255,0.12) !important; }
-.page-bg .hover\:bg-gray-300:hover   { background: rgba(255,255,255,0.18) !important; }
-
-/* ── Card depth — glass morphism ── */
-.page-bg .rounded-xl.bg-white,
-.page-bg .rounded-2xl.bg-white,
-.page-bg section.bg-white {
-  backdrop-filter:         blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  box-shadow:
-    0 0 0 1px rgba(255,255,255,0.10),
-    0 4px 24px rgba(0,0,0,0.35),
-    0 1px 0 rgba(255,255,255,0.07) inset !important;
+/* ── 입력 필드 텍스트 항상 검정색 ── */
+input,
+input[type="text"],
+input[type="number"],
+input[type="tel"],
+input[type="email"],
+input[type="date"],
+input[type="month"],
+input[type="password"],
+textarea,
+select {
+  color: #111 !important;
+  -webkit-text-fill-color: #111 !important;
 }
 
-/* ── Input / textarea / select in dark ── */
-.page-bg input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
-.page-bg textarea,
-.page-bg select {
-  background:              rgba(255,255,255,0.07) !important;
-  border-color:            rgba(255,255,255,0.15) !important;
-  color:                   #EEE9E0 !important;
-  -webkit-text-fill-color: #EEE9E0 !important;
-  box-shadow:              0 1px 4px rgba(0,0,0,0.25) inset !important;
-}
-.page-bg input::placeholder,
-.page-bg textarea::placeholder {
-  color:                   rgba(238,233,224,0.35) !important;
-  -webkit-text-fill-color: rgba(238,233,224,0.35) !important;
-}
-.page-bg input:-webkit-autofill,
-.page-bg input:-webkit-autofill:hover,
-.page-bg input:-webkit-autofill:focus {
-  -webkit-box-shadow:      0 0 0 30px #1a2d48 inset !important;
-  -webkit-text-fill-color: #EEE9E0 !important;
-}
-.page-bg input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
-.page-bg textarea:focus,
-.page-bg select:focus {
-  border-color:  rgba(197,162,88,0.55) !important;
-  box-shadow:
-    0 1px 4px rgba(0,0,0,0.25) inset,
-    0 0 0 3px rgba(197,162,88,0.18) !important;
+input::placeholder,
+textarea::placeholder {
+  color: #aaa !important;
+  -webkit-text-fill-color: #aaa !important;
 }
 
-/* ── Skeleton loader in dark ── */
-.page-bg .animate-pulse > * { background: rgba(255,255,255,0.08) !important; }
-/* Skeleton bg-[#E8E2D4] → dark shimmer */
-.page-bg .bg-\[#E8E2D4\]  { background: rgba(255,255,255,0.09) !important; }
-.page-bg .border-\[#D5D0C8\] { border-color: rgba(255,255,255,0.12) !important; }
-
-/* ── Scrollbar — dark ── */
-.page-bg *::-webkit-scrollbar        { width: 4px; height: 4px; }
-.page-bg *::-webkit-scrollbar-track  { background: rgba(255,255,255,0.04); border-radius: 99px; }
-.page-bg *::-webkit-scrollbar-thumb  { background: rgba(255,255,255,0.18); border-radius: 99px; }
-.page-bg *::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.30); }
-
-/* ── Tooltip / dropdown shadows in dark ── */
-.page-bg [class*="shadow"] {
-  box-shadow: 0 4px 20px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.06) inset !important;
-}
-/* Reset for elements that should keep their own shadow */
-.page-bg .shadow-none { box-shadow: none !important; }
-
-/* ══════════════════════════════════════════════════════════════
-   4. HEADER — premium glow
-   ══════════════════════════════════════════════════════════════ */
-header.bg-\[#1B2A45\] {
-  background: linear-gradient(180deg, #1e3558 0%, #16263d 100%) !important;
-  border-bottom: 1px solid rgba(197,162,88,0.20) !important;
-  box-shadow:
-    0 1px 0 rgba(197,162,88,0.12),
-    0 4px 20px rgba(0,0,0,0.40) !important;
+/* 자동완성 배경색 방지 */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+  -webkit-text-fill-color: #111 !important;
 }
 
-/* ══════════════════════════════════════════════════════════════
-   5. CARD UTILITY CLASSES — updated for dark
-   ══════════════════════════════════════════════════════════════ */
+@media print {
+  @page {
+    margin: 8mm 10mm;
+    size: A4 portrait;
+  }
 
-/* Glass card base */
-.glass {
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.11);
+  /* 스크롤/overflow 클리핑 방지 — 인쇄 시 모든 내용 표시 */
+  * {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  /* 화면 전용 UI 숨기기 */
+  .print-hide {
+    display: none !important;
+  }
+
+  /* 헤더·내비 전체 숨기기 */
+  header, nav {
+    display: none !important;
+  }
+}
+
+/* ── PIN shake 애니메이션 ── */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+
+/* ══════════════════════════════════════════════
+   입체감 디자인 시스템
+   ══════════════════════════════════════════════ */
+
+/* 기본 카드 — 흰 배경, 입체 그림자 */
+.card {
+  background: #ffffff;
   border-radius: 16px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(27, 42, 69, 0.07);
   box-shadow:
-    0 4px 24px rgba(0,0,0,0.35),
-    0 1px 0 rgba(255,255,255,0.08) inset;
+    0 1px 2px rgba(0,0,0,0.04),
+    0 4px 12px rgba(0,0,0,0.06),
+    0 0 0 1px rgba(255,255,255,0.8) inset;
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
 }
-.glass:hover {
-  background: rgba(255,255,255,0.09);
-  border-color: rgba(255,255,255,0.16);
+.card:hover {
   box-shadow:
-    0 6px 30px rgba(0,0,0,0.40),
-    0 1px 0 rgba(255,255,255,0.10) inset;
-}
-
-/* Gold accent glow card */
-.glass-gold {
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(197,162,88,0.30);
-  border-radius: 16px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow:
-    0 0 20px rgba(197,162,88,0.12),
-    0 4px 24px rgba(0,0,0,0.35),
-    0 1px 0 rgba(255,255,255,0.08) inset;
+    0 2px 4px rgba(0,0,0,0.05),
+    0 8px 20px rgba(0,0,0,0.09),
+    0 0 0 1px rgba(255,255,255,0.8) inset;
+  transform: translateY(-1px);
 }
 
-/* Navy surface card */
+/* 네이비 카드 — 어두운 배경 */
 .card-navy {
   background: linear-gradient(145deg, #1e3154 0%, #1B2A45 60%, #162338 100%);
   border-radius: 16px;
-  border: 1px solid rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.08);
   box-shadow:
-    0 4px 20px rgba(0,0,0,0.35),
+    0 2px 4px rgba(0,0,0,0.2),
+    0 8px 24px rgba(0,0,0,0.25),
     0 1px 0 rgba(255,255,255,0.08) inset;
 }
 
-/* Stat card with gold glow */
+/* 골드 강조 카드 */
+.card-gold {
+  background: linear-gradient(145deg, #d4a84b 0%, #C5A258 50%, #b8913f 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.15);
+  box-shadow:
+    0 2px 4px rgba(197,162,88,0.25),
+    0 8px 20px rgba(197,162,88,0.2),
+    0 1px 0 rgba(255,255,255,0.2) inset;
+}
+
+/* 통계 숫자 카드 (밝은 배경 색상 카드) */
 .stat-card {
   border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.9);
   box-shadow:
-    0 2px 12px rgba(0,0,0,0.30),
-    0 1px 0 rgba(255,255,255,0.08) inset;
+    0 1px 3px rgba(0,0,0,0.05),
+    0 4px 10px rgba(0,0,0,0.06),
+    0 0 0 1px rgba(255,255,255,0.6) inset;
 }
 
-/* Section bar */
+/* 섹션 타이틀 언더바 */
 .section-bar {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   font-weight: 700;
-  color: var(--d-text-1);
+  color: #1B2A45;
   font-size: 14px;
   padding-bottom: 10px;
-  border-bottom: 2px solid var(--gold);
+  border-bottom: 2px solid #C5A258;
   margin-bottom: 16px;
 }
 
-/* ── Buttons ── */
+/* 입체 버튼 */
 .btn-primary {
   background: linear-gradient(180deg, #243659 0%, #1B2A45 100%);
   color: white;
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.08);
   box-shadow:
-    0 1px 4px rgba(0,0,0,0.30),
-    0 4px 10px rgba(0,0,0,0.20),
-    0 1px 0 rgba(255,255,255,0.08) inset;
+    0 1px 3px rgba(0,0,0,0.2),
+    0 4px 8px rgba(0,0,0,0.15),
+    0 1px 0 rgba(255,255,255,0.07) inset;
   border-radius: 12px;
   padding: 10px 20px;
   font-size: 14px;
@@ -399,37 +172,40 @@ header.bg-\[#1B2A45\] {
 .btn-primary:hover {
   background: linear-gradient(180deg, #2d4470 0%, #243659 100%);
   box-shadow:
-    0 2px 6px rgba(0,0,0,0.35),
-    0 6px 16px rgba(0,0,0,0.25),
-    0 1px 0 rgba(255,255,255,0.10) inset;
+    0 2px 4px rgba(0,0,0,0.25),
+    0 6px 14px rgba(0,0,0,0.2),
+    0 1px 0 rgba(255,255,255,0.1) inset;
   transform: translateY(-1px);
 }
-.btn-primary:active { transform: translateY(0); }
+.btn-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
 
 .btn-gold {
   background: linear-gradient(180deg, #d4a84b 0%, #C5A258 100%);
-  color: #1B2A45;
-  border: 1px solid rgba(255,255,255,0.20);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.15);
   box-shadow:
-    0 1px 4px rgba(197,162,88,0.35),
-    0 4px 12px rgba(197,162,88,0.25),
-    0 1px 0 rgba(255,255,255,0.25) inset;
+    0 1px 3px rgba(197,162,88,0.3),
+    0 4px 10px rgba(197,162,88,0.2),
+    0 1px 0 rgba(255,255,255,0.2) inset;
   border-radius: 12px;
   padding: 10px 20px;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 .btn-gold:hover {
   box-shadow:
-    0 2px 6px rgba(197,162,88,0.45),
-    0 8px 20px rgba(197,162,88,0.30),
-    0 1px 0 rgba(255,255,255,0.28) inset;
+    0 2px 5px rgba(197,162,88,0.4),
+    0 6px 16px rgba(197,162,88,0.3),
+    0 1px 0 rgba(255,255,255,0.25) inset;
   transform: translateY(-1px);
 }
 
-/* Badge */
+/* 배지/태그 입체감 */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -437,322 +213,71 @@ header.bg-\[#1B2A45\] {
   padding: 2px 10px;
   font-size: 11px;
   font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 0 rgba(255,255,255,0.4) inset;
 }
 
-/* ── Navy button overrides ── */
+/* ── 흰 카드 공통 — 자동 입체감 ── */
+/* rounded-2xl 또는 rounded-xl + bg-white 조합에 자동 적용 */
+.rounded-2xl.bg-white,
+.rounded-xl.bg-white {
+  box-shadow:
+    0 1px 2px rgba(0,0,0,0.04),
+    0 3px 10px rgba(0,0,0,0.06),
+    0 0 0 1px rgba(255,255,255,0.7) inset !important;
+  border-color: rgba(27,42,69,0.08) !important;
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+/* 입력 필드 입체감 */
+input:not([type="checkbox"]):not([type="radio"]),
+textarea,
+select {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06) inset, 0 1px 0 rgba(255,255,255,0.8);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+input:not([type="checkbox"]):not([type="radio"]):focus,
+textarea:focus,
+select:focus {
+  box-shadow:
+    0 1px 3px rgba(0,0,0,0.08) inset,
+    0 0 0 3px rgba(197,162,88,0.15);
+  outline: none;
+}
+
+/* 페이지 배경 */
+.page-bg {
+  background: linear-gradient(160deg, #f7f5f0 0%, #FAF8F3 50%, #f5f3ee 100%);
+  min-height: 100vh;
+}
+
+/* 네이비 배경 카드 — 자동 그라디언트 */
+.bg-\[#1B2A45\] {
+  background: linear-gradient(145deg, #1e3154 0%, #1B2A45 60%, #162338 100%) !important;
+}
+
+/* 헤더 */
+header.bg-\[#1B2A45\] {
+  background: linear-gradient(180deg, #1e3154 0%, #1B2A45 100%) !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2) !important;
+}
+
+/* 데스크탑 탭바 */
+.tabbar-shadow {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+/* 버튼 입체감 — 네이비 */
 button.bg-\[#1B2A45\] {
   background: linear-gradient(180deg, #243659 0%, #1B2A45 100%) !important;
-  border: 1px solid rgba(255,255,255,0.10) !important;
-  box-shadow:
-    0 1px 4px rgba(0,0,0,0.30),
-    0 4px 10px rgba(0,0,0,0.20),
-    0 1px 0 rgba(255,255,255,0.08) inset !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2), 0 3px 8px rgba(0,0,0,0.15), 0 1px 0 rgba(255,255,255,0.07) inset !important;
   transition: all 0.15s ease !important;
 }
 button.bg-\[#1B2A45\]:hover:not(:disabled) {
   background: linear-gradient(180deg, #2d4470 0%, #243659 100%) !important;
-  box-shadow:
-    0 2px 6px rgba(0,0,0,0.35),
-    0 6px 16px rgba(0,0,0,0.25),
-    0 1px 0 rgba(255,255,255,0.10) inset !important;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.25), 0 5px 14px rgba(0,0,0,0.2), 0 1px 0 rgba(255,255,255,0.1) inset !important;
   transform: translateY(-1px) !important;
 }
 button.bg-\[#1B2A45\]:active:not(:disabled) {
   transform: translateY(0) !important;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.30) !important;
-}
-
-/* ══════════════════════════════════════════════════════════════
-   6. FIXED / OVERLAY PANELS (detail slides, modals)
-   ══════════════════════════════════════════════════════════════ */
-
-/* 슬라이딩 패널 배경 */
-.fixed.bg-\[#FAFAF8\],
-.fixed.bg-white {
-  background: #111e32 !important;
-  border-left: 1px solid rgba(255,255,255,0.10) !important;
-}
-
-/* 패널 내부 헤더 (sticky top-0) */
-.fixed .bg-white.sticky,
-.fixed .sticky.bg-white {
-  background: #131f33 !important;
-  border-bottom-color: rgba(255,255,255,0.09) !important;
-}
-.fixed .bg-\[#FAFAF8\] {
-  background: #111e32 !important;
-}
-
-/* Overlay backdrop */
-.bg-black\/40  { background: rgba(0,0,0,0.65) !important; }
-.bg-black\/50  { background: rgba(0,0,0,0.70) !important; }
-.bg-black\/60  { background: rgba(0,0,0,0.75) !important; }
-
-/* ══════════════════════════════════════════════════════════════
-   7. TAB NAVIGATION
-   ══════════════════════════════════════════════════════════════ */
-
-/* 좌측 세로 탭바 */
-.page-bg nav,
-.page-bg aside {
-  background: rgba(255,255,255,0.04) !important;
-  border-right-color: rgba(255,255,255,0.09) !important;
-}
-
-/* Active tab gold underline — stays */
-/* Tab bar border */
-.page-bg .border-b.border-gray-200 {
-  border-color: rgba(255,255,255,0.09) !important;
-}
-
-/* Desktop sticky tab bar — premium dark glass */
-.page-bg .hidden.md\:flex.bg-white.border-b.sticky {
-  background: rgba(13,27,46,0.88) !important;
-  backdrop-filter: blur(16px) !important;
-  -webkit-backdrop-filter: blur(16px) !important;
-  border-bottom: 1px solid rgba(255,255,255,0.08) !important;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.06), 0 2px 12px rgba(0,0,0,0.30) !important;
-}
-
-/* ══════════════════════════════════════════════════════════════
-   8. CHART / RECHARTS
-   ══════════════════════════════════════════════════════════════ */
-.page-bg .recharts-text    { fill: rgba(238,233,224,0.55) !important; }
-.page-bg .recharts-cartesian-axis-line,
-.page-bg .recharts-cartesian-grid line { stroke: rgba(255,255,255,0.08) !important; }
-
-/* ══════════════════════════════════════════════════════════════
-   9. KEEP — Non-page-bg elements (login, etc.)
-   ══════════════════════════════════════════════════════════════ */
-body {
-  background: #0D1B2E;
-  color: #EEE9E0;
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-/* ── login 페이지는 자체 inline 스타일 사용 (no override needed) ── */
-
-/* 홈페이지(라이트 배경) 인풋 — 원래 색상 유지 */
-.home-page input,
-.home-page textarea,
-.home-page select {
-  color: #1B2A45 !important;
-  -webkit-text-fill-color: #1B2A45 !important;
-  background: inherit !important;
-  border-color: inherit !important;
-}
-.home-page input::placeholder,
-.home-page textarea::placeholder {
-  color: rgba(27,42,69,0.40) !important;
-  -webkit-text-fill-color: rgba(27,42,69,0.40) !important;
-}
-
-/* ══════════════════════════════════════════════════════════════
-   10. ANIMATIONS & TRANSITIONS
-   ══════════════════════════════════════════════════════════════ */
-
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  20%, 60%  { transform: translateX(-8px); }
-  40%, 80%  { transform: translateX(8px); }
-}
-
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes gold-pulse {
-  0%, 100% { box-shadow: 0 0 10px rgba(197,162,88,0.15); }
-  50%       { box-shadow: 0 0 24px rgba(197,162,88,0.35); }
-}
-
-.animate-fade-in-up { animation: fadeInUp 0.4s ease both; }
-.animate-gold-pulse  { animation: gold-pulse 3s ease-in-out infinite; }
-
-/* ══════════════════════════════════════════════════════════════
-   11. PRINT
-   ══════════════════════════════════════════════════════════════ */
-@media print {
-  @page { margin: 8mm 10mm; size: A4 portrait; }
-  * { overflow: visible !important; max-height: none !important; }
-  .print-hide { display: none !important; }
-  header, nav { display: none !important; }
-  body, .page-bg {
-    background: white !important;
-    color: #111 !important;
-  }
-  .page-bg .text-\[#1B2A45\] { color: #1B2A45 !important; }
-}
-
-/* ══════════════════════════════════════════════════════════════
-   12. MISC OVERRIDES
-   ══════════════════════════════════════════════════════════════ */
-
-/* Emerald-700 header (ops tab etc.) */
-.page-bg .bg-emerald-700 {
-  background: linear-gradient(145deg, #059669 0%, #047857 100%) !important;
-  border: 1px solid rgba(255,255,255,0.12) !important;
-  box-shadow:
-    0 1px 0 rgba(255,255,255,0.12) inset,
-    0 2px 8px rgba(16,185,129,0.30) !important;
-}
-
-/* Navy stat chips → enhanced gradient */
-.page-bg .bg-\[#1B2A45\].rounded-xl {
-  background: linear-gradient(145deg, #243659 0%, #1B2A45 70%, #162338 100%) !important;
-  border: 1px solid rgba(255,255,255,0.11) !important;
-  box-shadow:
-    0 1px 0 rgba(255,255,255,0.09) inset,
-    0 2px 10px rgba(0,0,0,0.40) !important;
-}
-
-/* Gold bg */
-.page-bg .bg-\[#C5A258\] {
-  background: linear-gradient(145deg, #d4a84b 0%, #C5A258 100%) !important;
-  box-shadow:
-    0 1px 0 rgba(255,255,255,0.20) inset,
-    0 2px 8px rgba(197,162,88,0.30) !important;
-}
-
-/* Ring focus */
-.page-bg *:focus-visible {
-  outline: 2px solid rgba(197,162,88,0.60) !important;
-  outline-offset: 2px !important;
-}
-
-/* Rounded-2xl/xl white cards — glass morphism */
-.page-bg .rounded-2xl.bg-white,
-.page-bg .rounded-xl.bg-white {
-  backdrop-filter: blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  box-shadow:
-    0 0 0 1px rgba(255,255,255,0.10),
-    0 4px 24px rgba(0,0,0,0.35),
-    0 1px 0 rgba(255,255,255,0.07) inset !important;
-  transition: box-shadow 0.18s ease !important;
-}
-.page-bg .rounded-2xl.bg-white:hover,
-.page-bg .rounded-xl.bg-white:hover {
-  box-shadow:
-    0 0 0 1px rgba(255,255,255,0.15),
-    0 6px 30px rgba(0,0,0,0.40),
-    0 1px 0 rgba(255,255,255,0.09) inset !important;
-}
-
-/* Section headers with border-b */
-.page-bg section.bg-white > div:first-child,
-.page-bg .rounded-2xl.bg-white > div.border-b:first-child {
-  border-bottom-color: rgba(255,255,255,0.08) !important;
-}
-
-/* ── Premium kanban card hover ── */
-.page-bg .rounded-xl.bg-white.cursor-pointer:hover,
-.page-bg .rounded-xl.bg-white.hover\:shadow-md:hover {
-  box-shadow:
-    0 0 0 1px rgba(197,162,88,0.20),
-    0 8px 30px rgba(0,0,0,0.45),
-    0 1px 0 rgba(255,255,255,0.09) inset !important;
-  transform: translateY(-1px) !important;
-  transition: all 0.15s ease !important;
-}
-
-/* ══════════════════════════════════════════════════════════════
-   13. PREMIUM DIMENSIONAL ELEMENTS
-   ══════════════════════════════════════════════════════════════ */
-
-/* Main content area sections */
-.page-bg .space-y-5 > * { animation: fadeInUp 0.35s ease both; }
-.page-bg .space-y-4 > * { animation: fadeInUp 0.30s ease both; }
-
-/* Numbered stagger for visible fade-in */
-.page-bg .space-y-5 > *:nth-child(2) { animation-delay: 0.04s; }
-.page-bg .space-y-5 > *:nth-child(3) { animation-delay: 0.08s; }
-.page-bg .space-y-5 > *:nth-child(4) { animation-delay: 0.12s; }
-.page-bg .space-y-5 > *:nth-child(5) { animation-delay: 0.16s; }
-
-/* Section header labels enhanced */
-.page-bg section.bg-white > :first-child {
-  background: linear-gradient(to right, rgba(255,255,255,0.04), transparent) !important;
-}
-
-/* Pipeline column headers in ops board */
-.page-bg .bg-gray-50.rounded-xl {
-  background: rgba(255,255,255,0.04) !important;
-  border: 1px solid rgba(255,255,255,0.08) !important;
-}
-
-/* ── Amber tint backgrounds ── */
-.page-bg .bg-amber-50 {
-  background: rgba(245,158,11,0.10) !important;
-}
-/* Important notice rows: subtle amber left accent */
-.page-bg div.bg-amber-50:not(.rounded-2xl):not(.rounded-xl) {
-  border-left: 2px solid rgba(245,158,11,0.35) !important;
-}
-
-/* ── Floating notepad in dark — specific override ── */
-.page-bg .bg-amber-50.border.border-amber-200.rounded-2xl {
-  background: rgba(18,28,48,0.95) !important;
-  border: 1px solid rgba(197,162,88,0.25) !important;
-  backdrop-filter: blur(24px) !important;
-  -webkit-backdrop-filter: blur(24px) !important;
-  box-shadow:
-    0 0 0 1px rgba(197,162,88,0.12),
-    0 20px 60px rgba(0,0,0,0.60),
-    0 1px 0 rgba(255,255,255,0.06) inset !important;
-  border-left: 1px solid rgba(197,162,88,0.25) !important;
-}
-
-/* ── Progress bars in dark ── */
-.page-bg .bg-gray-200 > div {
-  background: linear-gradient(90deg, #C5A258 0%, #d4a84b 100%) !important;
-}
-
-/* ── Green progress bars ── */
-.page-bg .bg-emerald-500 {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
-  box-shadow: 0 0 8px rgba(16,185,129,0.40) !important;
-}
-
-/* ── Notepad header amber ── */
-.page-bg .bg-amber-400.rounded-t-2xl {
-  background: linear-gradient(135deg, #C5A258 0%, #a88640 100%) !important;
-}
-
-/* ── Mobile-friendly padded sections ── */
-@media (max-width: 768px) {
-  .page-bg .px-4.md\:px-6.py-5 { padding-bottom: 80px; }
-  .page-bg .px-4.md\:px-6.pt-5 { padding-bottom: 80px; }
-}
-
-/* ── Tooltip / popover shadow boost ── */
-.page-bg .z-50.bg-white {
-  box-shadow:
-    0 0 0 1px rgba(255,255,255,0.12),
-    0 8px 40px rgba(0,0,0,0.55),
-    0 1px 0 rgba(255,255,255,0.08) inset !important;
-}
-
-/* ── Select dropdown option (browser-native, can't style much) ── */
-.page-bg select option {
-  background: #1B2A45;
-  color: #EEE9E0;
-}
-
-/* ── Table in dark ── */
-.page-bg table { border-collapse: separate; border-spacing: 0; }
-.page-bg thead th {
-  background: rgba(255,255,255,0.04) !important;
-  color: rgba(238,233,224,0.55) !important;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-.page-bg tbody tr:nth-child(even) td {
-  background: rgba(255,255,255,0.02) !important;
-}
-.page-bg tbody tr:hover td {
-  background: rgba(255,255,255,0.05) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
 }
