@@ -395,6 +395,8 @@ function PayRateSubView() {
   const [employeeCount, setEmployeeCount] = useState(0)
   // 관리팀 이번달 매출 (수수료 + 계약)
   const [opsRevenue, setOpsRevenue] = useState<{ fee: number; contract: number } | null>(null)
+  // 관리팀 진행 케이스 요약
+  const [opsCases,   setOpsCases]   = useState<any[]>([])
   // 인별 자동집계: 공급결제(공가) / 직접수(직가DB) / 직접결제(직가계약)
   const [autoByPerson,  setAutoByPerson] = useState<Record<string, AutoEmpData>>({})
 
@@ -406,15 +408,17 @@ function PayRateSubView() {
   useEffect(() => {
     async function load() {
       try {
-        const [payRes, custRes, userRes, revRes] = await Promise.all([
+        const [payRes, custRes, userRes, revRes, casesRes] = await Promise.all([
           fetch(`/api/payrate?year_month=${month}`),
           fetch('/api/customers'),
           fetch('/api/users?role=sales'),
           fetch('/api/revenue'),
+          fetch('/api/ops-cases'),
         ])
-        const [payJson, custJson, userJson, revJson] = await Promise.all([
-          payRes.json(), custRes.json(), userRes.json(), revRes.json()
+        const [payJson, custJson, userJson, revJson, casesJson] = await Promise.all([
+          payRes.json(), custRes.json(), userRes.json(), revRes.json(), casesRes.json()
         ])
+        setOpsCases(casesJson.cases || [])
 
         // 관리팀 이번달 매출 집계
         const revThisMonth = (revJson.monthly || []).find((m: any) => m.fullMonth === month)
@@ -786,6 +790,114 @@ function PayRateSubView() {
           </div>
         </div>
       )}
+
+      {/* ─── 🏢 관리팀 진행 현황 요약 ─── */}
+      {opsCases.length > 0 && (() => {
+        const INST_LIST = [
+          '중진공', '소진공(혁신)', '소진공(신취)', '소진공(재도전)',
+          '기보', '신보', '재단', '서민금융(미소)',
+        ]
+        const WAIT_SET  = new Set(['서류받는중', '접수전', '홀딩'])
+        const DONE_SET  = new Set(['부결', '종료예정', '환불예정', '종료'])
+
+        const activeCases = opsCases.filter(c =>
+          !c.is_completed && !c.is_refund && !DONE_SET.has(c.stage ?? '')
+        )
+
+        // 기관별 집계 (한 케이스에 여러 기관 가능)
+        const instStats = INST_LIST.map(inst => {
+          const matched = activeCases.filter(c =>
+            (c.institution || '').split(',').map((s: string) => s.trim()).includes(inst)
+          )
+          const waiting = matched.filter(c => WAIT_SET.has(c.stage ?? ''))
+          return {
+            inst,
+            label: inst === '서민금융(미소)' ? '미소' : inst,
+            active: matched.length - waiting.length,
+            waiting: waiting.length,
+            total: matched.length,
+          }
+        }).filter(s => s.total > 0)
+
+        // 단계별 업체 목록
+        const stageGroups = [
+          {
+            label: '반려보정',
+            color: 'bg-orange-100 text-orange-700 border-orange-200',
+            dot: 'bg-orange-500',
+            cases: activeCases.filter(c => (c.stage ?? '') === '반려보정'),
+          },
+          {
+            label: '실사대기',
+            color: 'bg-amber-100 text-amber-700 border-amber-200',
+            dot: 'bg-amber-500',
+            cases: activeCases.filter(c => (c.stage ?? '') === '실사대기'),
+          },
+          {
+            label: '자금승인·입금대기',
+            color: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+            dot: 'bg-emerald-500',
+            cases: activeCases.filter(c => ['승인대기', '승인', '입금전'].includes(c.stage ?? '')),
+          },
+        ].filter(g => g.cases.length > 0)
+
+        return (
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-4">
+            <h3 className="text-sm font-bold text-gray-800">📋 관리팀 진행 현황</h3>
+
+            {/* 기관별 */}
+            {instStats.length > 0 && (
+              <div>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">기관별 현황</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {instStats.map(s => (
+                    <div key={s.inst} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
+                      <span className="text-xs font-bold text-gray-700 w-20 shrink-0 truncate">{s.label}</span>
+                      <div className="flex items-center gap-1.5 flex-1">
+                        {s.active > 0 && (
+                          <span className="text-[10px] bg-blue-100 text-blue-700 rounded-full px-2 py-0.5 font-semibold whitespace-nowrap">
+                            진행중 {s.active}
+                          </span>
+                        )}
+                        {s.waiting > 0 && (
+                          <span className="text-[10px] bg-gray-200 text-gray-600 rounded-full px-2 py-0.5 font-semibold whitespace-nowrap">
+                            대기 {s.waiting}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 단계별 업체 */}
+            {stageGroups.length > 0 && (
+              <div>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">단계별 업체</p>
+                <div className="space-y-2">
+                  {stageGroups.map(g => (
+                    <div key={g.label} className={`flex items-start gap-2 border rounded-xl px-3 py-2 ${g.color}`}>
+                      <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${g.dot}`} />
+                      <div className="min-w-0">
+                        <span className="text-[10px] font-bold mr-2">{g.label}</span>
+                        <span className="text-[10px] opacity-60">({g.cases.length}건)</span>
+                        <p className="text-xs font-medium mt-0.5 leading-relaxed">
+                          {g.cases.map(c => c.customer_name || '-').join(' · ')}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {instStats.length === 0 && stageGroups.length === 0 && (
+              <p className="text-xs text-gray-400 text-center py-2">진행 중인 케이스 없음</p>
+            )}
+          </div>
+        )
+      })()}
 
       {/* ─── 저장 ─── */}
       <div className="flex items-center justify-end gap-3">
