@@ -648,10 +648,26 @@ select:not(.page-bg select) {
   border: 1px solid rgba(255,255,255,0.08) !important;
 }
 
-/* ── Amber tint backgrounds (important notices, etc.) ── */
+/* ── Amber tint backgrounds ── */
 .page-bg .bg-amber-50 {
   background: rgba(245,158,11,0.10) !important;
-  border-left: 2px solid rgba(245,158,11,0.40) !important;
+}
+/* Important notice rows: subtle amber left accent */
+.page-bg div.bg-amber-50:not(.rounded-2xl):not(.rounded-xl) {
+  border-left: 2px solid rgba(245,158,11,0.35) !important;
+}
+
+/* ── Floating notepad in dark — specific override ── */
+.page-bg .bg-amber-50.border.border-amber-200.rounded-2xl {
+  background: rgba(18,28,48,0.95) !important;
+  border: 1px solid rgba(197,162,88,0.25) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  box-shadow:
+    0 0 0 1px rgba(197,162,88,0.12),
+    0 20px 60px rgba(0,0,0,0.60),
+    0 1px 0 rgba(255,255,255,0.06) inset !important;
+  border-left: 1px solid rgba(197,162,88,0.25) !important;
 }
 
 /* ── Progress bars in dark ── */
@@ -665,13 +681,7 @@ select:not(.page-bg select) {
   box-shadow: 0 0 8px rgba(16,185,129,0.40) !important;
 }
 
-/* ── Floating notepad in dark ── */
-.page-bg .bg-amber-50.border.border-amber-200.rounded-2xl {
-  background: rgba(30,40,60,0.92) !important;
-  border-color: rgba(197,162,88,0.25) !important;
-  backdrop-filter: blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-}
+/* ── Notepad header amber ── */
 .page-bg .bg-amber-400.rounded-t-2xl {
   background: linear-gradient(135deg, #C5A258 0%, #a88640 100%) !important;
 }
