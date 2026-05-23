@@ -67,16 +67,27 @@
 .page-bg .bg-blue-100                               { background: rgba(59,130,246,0.18)  !important; }
 .page-bg .bg-emerald-50,.page-bg .bg-emerald-50\/60 { background: rgba(16,185,129,0.12) !important; }
 .page-bg .bg-emerald-100                            { background: rgba(16,185,129,0.16)  !important; }
-.page-bg .bg-red-50,    .page-bg .bg-red-50\/60     { background: rgba(239,68,68,0.12)  !important; }
+.page-bg .bg-red-50,
+.page-bg .bg-red-50\/60,
+.page-bg .bg-red-50\/50,
+.page-bg .bg-red-50\/80                             { background: rgba(239,68,68,0.12)  !important; }
 .page-bg .bg-red-50\/40                             { background: rgba(239,68,68,0.08)  !important; }
 .page-bg .bg-red-100                                { background: rgba(239,68,68,0.18)  !important; }
-.page-bg .bg-amber-50,  .page-bg .bg-amber-100      { background: rgba(245,158,11,0.14) !important; }
+.page-bg .bg-amber-50,  .page-bg .bg-amber-100      { background: rgba(245,158,11,0.12) !important; }
 .page-bg .bg-orange-50                              { background: rgba(251,146,60,0.12)  !important; }
 .page-bg .bg-violet-50, .page-bg .bg-violet-100     { background: rgba(139,92,246,0.14) !important; }
 .page-bg .bg-pink-50,   .page-bg .bg-pink-100       { background: rgba(236,72,153,0.12) !important; }
 .page-bg .bg-yellow-50, .page-bg .bg-yellow-100     { background: rgba(234,179,8,0.12)  !important; }
-.page-bg .bg-sky-50                                 { background: rgba(14,165,233,0.12)  !important; }
+.page-bg .bg-sky-50,
+.page-bg .bg-sky-50\/50,
+.page-bg .bg-sky-50\/60,
+.page-bg .bg-sky-50\/80                             { background: rgba(14,165,233,0.12)  !important; }
+.page-bg .bg-blue-50\/50,
+.page-bg .bg-blue-50\/60,
+.page-bg .bg-blue-50\/80                            { background: rgba(59,130,246,0.12)  !important; }
 .page-bg .bg-indigo-50                              { background: rgba(99,102,241,0.12)  !important; }
+.page-bg .bg-emerald-50\/60,
+.page-bg .bg-emerald-50\/50                         { background: rgba(16,185,129,0.10)  !important; }
 
 /* ── Text colors ── */
 .page-bg .text-gray-900,
@@ -146,11 +157,16 @@
 .page-bg .bg-zinc-50,   .page-bg .bg-zinc-100       { background: rgba(255,255,255,0.05) !important; }
 
 /* hover bg-color variants */
-.page-bg .hover\:bg-amber-200:hover  { background: rgba(245,158,11,0.25)  !important; }
-.page-bg .hover\:bg-blue-100:hover   { background: rgba(59,130,246,0.20)  !important; }
-.page-bg .hover\:bg-emerald-100:hover{ background: rgba(16,185,129,0.20)  !important; }
-.page-bg .hover\:bg-red-100:hover    { background: rgba(239,68,68,0.20)   !important; }
-.page-bg .hover\:border-gray-400:hover { border-color: rgba(255,255,255,0.30) !important; }
+.page-bg .hover\:bg-amber-200:hover       { background: rgba(245,158,11,0.25)  !important; }
+.page-bg .hover\:bg-blue-100:hover        { background: rgba(59,130,246,0.20)  !important; }
+.page-bg .hover\:bg-emerald-100:hover     { background: rgba(16,185,129,0.20)  !important; }
+.page-bg .hover\:bg-red-100:hover         { background: rgba(239,68,68,0.20)   !important; }
+.page-bg .hover\:border-gray-400:hover    { border-color: rgba(255,255,255,0.30) !important; }
+/* Calendar cell hover variants */
+.page-bg .hover\:bg-red-50\/80:hover      { background: rgba(239,68,68,0.16)   !important; }
+.page-bg .hover\:bg-blue-50\/80:hover     { background: rgba(59,130,246,0.16)  !important; }
+.page-bg .hover\:bg-sky-50\/80:hover      { background: rgba(14,165,233,0.16)  !important; }
+.page-bg .hover\:bg-emerald-50\/80:hover  { background: rgba(16,185,129,0.16)  !important; }
 
 /* ── Borders ── */
 .page-bg .border-gray-50    { border-color: rgba(255,255,255,0.05) !important; }
