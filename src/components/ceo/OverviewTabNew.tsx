@@ -226,13 +226,13 @@ function fmtKrw(n: number): string {
 
 function rateGrade(rate: number | null, top: number) {
   if (rate === null || rate === undefined) return { label: '—', cls: 'text-gray-400' }
-  if (rate >= top)        return { label: '🔥 최상', cls: 'text-blue-600 font-bold' }
-  if (rate >= top - 5)    return { label: '✨ 우수', cls: 'text-cyan-600 font-bold' }
-  if (rate >= top - 10)   return { label: '✅ 양호', cls: 'text-emerald-600 font-bold' }
-  if (rate >= top - 15)   return { label: '📊 보통', cls: 'text-amber-500 font-bold' }
-  if (rate >= top - 20)   return { label: '⚠️ 미흡', cls: 'text-orange-400 font-bold' }
-  if (rate >= top - 25)   return { label: '⚡ 부진', cls: 'text-orange-600 font-bold' }
-  return                         { label: '🚨 위험', cls: 'text-red-500 font-bold' }
+  if (rate >= top)        return { label: '최상', cls: 'text-blue-600 font-bold' }
+  if (rate >= top - 5)    return { label: '우수', cls: 'text-cyan-600 font-bold' }
+  if (rate >= top - 10)   return { label: '양호', cls: 'text-emerald-600 font-bold' }
+  if (rate >= top - 15)   return { label: '보통', cls: 'text-amber-500 font-bold' }
+  if (rate >= top - 20)   return { label: '미흡', cls: 'text-orange-400 font-bold' }
+  if (rate >= top - 25)   return { label: '부진', cls: 'text-orange-600 font-bold' }
+  return                         { label: '위험', cls: 'text-red-500 font-bold' }
 }
 
 function MonthSection({
@@ -260,16 +260,17 @@ function MonthSection({
       <div className="px-5 py-4 border-b border-[#E8E2D4]/60">
         <p className="text-[11px] font-bold text-[#1B2A45]/40 uppercase tracking-widest mb-3">직원별 현황</p>
         {loading ? <Skeleton className="h-32 w-full" /> : (
-          <div className="flex gap-5">
+          <div className="flex flex-col md:flex-row gap-4 md:gap-5">
             {/* 영업팀 */}
             <div className="flex-1 min-w-0">
               <p className="text-[10px] font-bold text-[#1B2A45] bg-[#1B2A45]/8 inline-block px-2 py-0.5 rounded mb-2">영업팀</p>
               <EmployeeTable rows={employeeRows} loading={loading} />
             </div>
             {/* 구분선 */}
-            <div className="w-px bg-[#E8E2D4] self-stretch shrink-0" />
+            <div className="hidden md:block w-px bg-[#E8E2D4] self-stretch shrink-0" />
+            <div className="block md:hidden h-px bg-[#E8E2D4] w-full" />
             {/* 관리팀 */}
-            <div className="shrink-0 w-64">
+            <div className="md:shrink-0 md:w-64 w-full">
               <p className="text-[10px] font-bold text-emerald-700 bg-emerald-50 inline-block px-2 py-0.5 rounded mb-2">관리팀</p>
               {opsUserRows.length > 0 ? (
                 <table className="text-xs w-full">
@@ -691,39 +692,39 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
   return (
     <div className="space-y-5 pb-10">
 
-      {/* ══ 퀵 액션 컴팩트 한 줄 ══ */}
+      {/* ══ 퀵 액션 + 매출 요약 ══ */}
       <div className="flex flex-wrap items-center gap-2">
-        {/* 퀵액션 4개 */}
         {[
-          { icon: '📝', label: '오늘 보고', count: todayReports.length, nav: () => onNavigate?.('minutesreports'), cls: 'border-[#E8E2D4] hover:bg-[#1B2A45] hover:border-[#1B2A45] hover:text-white', valCls: 'text-[#1B2A45] group-hover:text-white' },
-          { icon: '📅', label: '오늘 일정', count: todayEvents.length, nav: () => onNavigate?.('calendar'), cls: 'border-[#E8E2D4] hover:bg-[#1B2A45] hover:border-[#1B2A45]', valCls: 'text-[#1B2A45] group-hover:text-white' },
-          { icon: '🔍', label: '심사요청', count: allCustomers.filter((c: any) => c.details?.inspection_status === 'pending').length, nav: () => onNavigate?.('sales', 'inspection'), cls: 'border-amber-200 hover:bg-amber-500 hover:border-amber-500', valCls: 'text-amber-600 group-hover:text-white' },
-          { icon: '🔧', label: 'A/S요청', count: allCustomers.filter((c: any) => c.details?.as_requested === true && !c.details?.as_resolved).length, nav: () => onNavigate?.('sales', 'as'), cls: 'border-orange-200 hover:bg-orange-500 hover:border-orange-500', valCls: 'text-orange-500 group-hover:text-white' },
+          { label: '오늘 보고', count: todayReports.length,   nav: () => onNavigate?.('minutesreports'), base: 'border-[#E8E2D4] text-[#1B2A45]',   num: 'text-[#1B2A45]',    hover: 'hover:bg-[#1B2A45] hover:border-[#1B2A45] hover:text-white' },
+          { label: '오늘 일정', count: todayEvents.length,    nav: () => onNavigate?.('calendar'),       base: 'border-[#E8E2D4] text-[#1B2A45]',   num: 'text-[#1B2A45]',    hover: 'hover:bg-[#1B2A45] hover:border-[#1B2A45] hover:text-white' },
+          { label: '심사요청',  count: allCustomers.filter((c: any) => c.details?.inspection_status === 'pending').length, nav: () => onNavigate?.('sales', 'inspection'), base: 'border-amber-200 text-amber-700', num: 'text-amber-600', hover: 'hover:bg-amber-500 hover:border-amber-500 hover:text-white' },
+          { label: 'A/S요청',   count: allCustomers.filter((c: any) => c.details?.as_requested === true && !c.details?.as_resolved).length, nav: () => onNavigate?.('sales', 'as'), base: 'border-orange-200 text-orange-700', num: 'text-orange-500', hover: 'hover:bg-orange-500 hover:border-orange-500 hover:text-white' },
         ].map(item => (
           <button key={item.label} onClick={item.nav}
-            className={`group flex items-center gap-2 bg-white border rounded-lg px-3 py-2 transition-all duration-150 hover:shadow-sm ${item.cls}`}>
-            <span className="text-sm">{item.icon}</span>
-            <span className="text-[11px] text-gray-400 group-hover:text-white/70">{item.label}</span>
+            className={`group flex items-center gap-2 bg-white border rounded-xl px-3 py-2 transition-all duration-150 ${item.base} ${item.hover}`}>
+            <span className="text-[11px] font-medium group-hover:text-white/80">{item.label}</span>
             {loading ? <Skeleton className="h-4 w-6" /> : (
-              <span className={`text-sm font-black ${item.valCls}`}>{item.count}<span className="text-[10px] font-medium ml-0.5">건</span></span>
+              <span className={`text-sm font-black group-hover:text-white ${item.num}`}>
+                {item.count}<span className="text-[10px] font-medium ml-0.5">건</span>
+              </span>
             )}
           </button>
         ))}
 
         <div className="flex-1" />
 
-        {/* 매출 미니 칩 */}
+        {/* 이달 매출 요약 칩 */}
         <div className="flex items-center gap-2">
-          <div className="bg-[#1B2A45] rounded-lg px-3 py-2 flex items-center gap-2">
-            <span className="text-[10px] text-white/50">영업팀</span>
+          <div className="bg-[#1B2A45] rounded-xl px-3 py-2 flex items-center gap-2">
+            <span className="text-[10px] text-white/50 font-medium">영업</span>
             {loading ? <Skeleton className="h-4 w-12 bg-white/20" /> : (
               <span className="text-sm font-black text-white">
                 {(() => { const r = thisMonthSalesRaw; return r >= 10000 ? (r/10000).toFixed(0)+'만' : r > 0 ? r.toLocaleString() : '-' })()}
               </span>
             )}
           </div>
-          <div className="bg-emerald-700 rounded-lg px-3 py-2 flex items-center gap-2">
-            <span className="text-[10px] text-white/50">관리팀</span>
+          <div className="bg-emerald-700 rounded-xl px-3 py-2 flex items-center gap-2">
+            <span className="text-[10px] text-white/50 font-medium">관리</span>
             {loading ? <Skeleton className="h-4 w-12 bg-white/20" /> : (
               <span className="text-sm font-black text-white">{thisMonthOpsDisplay}</span>
             )}

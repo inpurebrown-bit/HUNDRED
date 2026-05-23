@@ -3649,7 +3649,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF8F3]">
+    <div className="min-h-screen page-bg">
       {/* Header */}
       <header className="bg-[#1B2A45] px-4 md:px-6 py-3 flex items-center justify-between sticky top-0 z-30 shadow-md">
         <Link href="/" className="relative h-8 w-24 shrink-0 block">
@@ -3760,10 +3760,10 @@ export default function OpsDashboard({ userId, userName }: Props) {
           ) : (
             <div className="max-w-5xl mx-auto">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="font-bold text-[#1B2A45] text-base">📊 관리팀 대시보드</h2>
+                <h2 className="font-bold text-[#1B2A45] text-base">관리팀 대시보드</h2>
                 <button onClick={loadCases}
                   className="text-xs bg-white border border-[#E8E2D4] text-[#1B2A45]/60 px-3 py-1.5 rounded-lg hover:border-[#1B2A45]/30 transition-colors">
-                  🔄 새로고침
+                  새로고침
                 </button>
               </div>
               <DashboardOverview cases={cases} />
@@ -3774,7 +3774,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
               {/* 공지사항 */}
               {notices.length > 0 && (
                 <div className="space-y-2 mt-4">
-                  <h3 className="text-sm font-bold text-gray-700">📢 공지사항</h3>
+                  <h3 className="text-sm font-bold text-gray-700">공지사항</h3>
                   {notices.map(n => (
                     <div key={n.id} className="bg-white border border-[#E8E2D4] rounded-xl px-5 py-4">
                       <p className="font-semibold text-[#1B2A45] text-sm">{n.title}</p>

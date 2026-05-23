@@ -243,7 +243,7 @@ export default function CeoDashboard() {
   ]
 
   return (
-    <div className="min-h-screen bg-[#FAF8F3]">
+    <div className="min-h-screen page-bg">
       {/* ── 헤더 ── */}
       <header className="bg-[#1B2A45] px-4 md:px-6 py-3 flex items-center justify-between sticky top-0 z-30 shadow-md">
         <Link href="/" className="relative h-8 w-24 shrink-0 block">

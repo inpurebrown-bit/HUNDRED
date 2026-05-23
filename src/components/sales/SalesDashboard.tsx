@@ -722,7 +722,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
 
   // ── Render ────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#FAF8F3]">
+    <div className="min-h-screen page-bg">
       {/* ── 자금팀 전송 담당자 선택 모달 ── */}
       {opsTransferModal.customer && (
         <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4"
