@@ -68,8 +68,13 @@ interface Report {
 
 interface CalEvent {
   id: string
+  title?: string
   start_date?: string
+  end_date?: string
   date?: string
+  color?: string
+  start_time?: string
+  is_allday?: boolean
 }
 
 interface SalesGoal {
@@ -686,100 +691,48 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
   return (
     <div className="space-y-5 pb-10">
 
-      {/* ══ 퀵 액션 + 매출 카드 통합 행 ══ */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        {/* 좌측: 4개 퀵액션 카드 (2×2) */}
-        <div className="grid grid-cols-2 gap-2 flex-1">
-          {/* 오늘 보고 */}
-          <button
-            onClick={() => onNavigate?.('minutesreports')}
-            className="group bg-white hover:bg-[#1B2A45] border border-[#E8E2D4] hover:border-[#1B2A45] rounded-xl p-3 text-left transition-all duration-200 hover:shadow-md"
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-base">📝</span>
-              {!loading && <span className="text-[9px] bg-[#1B2A45]/8 group-hover:bg-white/20 text-[#1B2A45]/40 group-hover:text-white/60 px-1.5 py-0.5 rounded-full">→</span>}
-            </div>
-            <p className="text-[10px] text-[#1B2A45]/50 group-hover:text-white/50">오늘 보고</p>
-            {loading ? <Skeleton className="h-6 w-10 mt-0.5" /> : (
-              <p className="text-xl font-black text-[#1B2A45] group-hover:text-white mt-0.5">{todayReports.length}<span className="text-xs font-medium ml-0.5">건</span></p>
+      {/* ══ 퀵 액션 컴팩트 한 줄 ══ */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* 퀵액션 4개 */}
+        {[
+          { icon: '📝', label: '오늘 보고', count: todayReports.length, nav: () => onNavigate?.('minutesreports'), cls: 'border-[#E8E2D4] hover:bg-[#1B2A45] hover:border-[#1B2A45] hover:text-white', valCls: 'text-[#1B2A45] group-hover:text-white' },
+          { icon: '📅', label: '오늘 일정', count: todayEvents.length, nav: () => onNavigate?.('calendar'), cls: 'border-[#E8E2D4] hover:bg-[#1B2A45] hover:border-[#1B2A45]', valCls: 'text-[#1B2A45] group-hover:text-white' },
+          { icon: '🔍', label: '심사요청', count: allCustomers.filter((c: any) => c.details?.inspection_status === 'pending').length, nav: () => onNavigate?.('sales', 'inspection'), cls: 'border-amber-200 hover:bg-amber-500 hover:border-amber-500', valCls: 'text-amber-600 group-hover:text-white' },
+          { icon: '🔧', label: 'A/S요청', count: allCustomers.filter((c: any) => c.details?.as_requested === true && !c.details?.as_resolved).length, nav: () => onNavigate?.('sales', 'as'), cls: 'border-orange-200 hover:bg-orange-500 hover:border-orange-500', valCls: 'text-orange-500 group-hover:text-white' },
+        ].map(item => (
+          <button key={item.label} onClick={item.nav}
+            className={`group flex items-center gap-2 bg-white border rounded-lg px-3 py-2 transition-all duration-150 hover:shadow-sm ${item.cls}`}>
+            <span className="text-sm">{item.icon}</span>
+            <span className="text-[11px] text-gray-400 group-hover:text-white/70">{item.label}</span>
+            {loading ? <Skeleton className="h-4 w-6" /> : (
+              <span className={`text-sm font-black ${item.valCls}`}>{item.count}<span className="text-[10px] font-medium ml-0.5">건</span></span>
             )}
           </button>
+        ))}
 
-          {/* 오늘 일정 */}
-          <button
-            onClick={() => onNavigate?.('calendar')}
-            className="group bg-white hover:bg-[#1B2A45] border border-[#E8E2D4] hover:border-[#1B2A45] rounded-xl p-3 text-left transition-all duration-200 hover:shadow-md"
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-base">📅</span>
-              {!loading && <span className="text-[9px] bg-[#1B2A45]/8 group-hover:bg-white/20 text-[#1B2A45]/40 group-hover:text-white/60 px-1.5 py-0.5 rounded-full">→</span>}
-            </div>
-            <p className="text-[10px] text-[#1B2A45]/50 group-hover:text-white/50">오늘 일정</p>
-            {loading ? <Skeleton className="h-6 w-10 mt-0.5" /> : (
-              <p className="text-xl font-black text-[#1B2A45] group-hover:text-white mt-0.5">{todayEvents.length}<span className="text-xs font-medium ml-0.5">건</span></p>
-            )}
-          </button>
+        <div className="flex-1" />
 
-          {/* 심사요청 */}
-          <button
-            onClick={() => onNavigate?.('sales', 'inspection')}
-            className="group bg-white hover:bg-amber-500 border border-amber-200 hover:border-amber-500 rounded-xl p-3 text-left transition-all duration-200 hover:shadow-md"
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-base">🔍</span>
-              {!loading && <span className="text-[9px] bg-amber-50 group-hover:bg-white/20 text-amber-500 group-hover:text-white/60 px-1.5 py-0.5 rounded-full">→</span>}
-            </div>
-            <p className="text-[10px] text-amber-600 group-hover:text-white/70">심사요청</p>
-            {loading ? <Skeleton className="h-6 w-10 mt-0.5" /> : (
-              <p className="text-xl font-black text-amber-600 group-hover:text-white mt-0.5">
-                {allCustomers.filter((c: any) => c.details?.inspection_status === 'pending').length}
-                <span className="text-xs font-medium ml-0.5">건</span>
-              </p>
+        {/* 매출 미니 칩 */}
+        <div className="flex items-center gap-2">
+          <div className="bg-[#1B2A45] rounded-lg px-3 py-2 flex items-center gap-2">
+            <span className="text-[10px] text-white/50">영업팀</span>
+            {loading ? <Skeleton className="h-4 w-12 bg-white/20" /> : (
+              <span className="text-sm font-black text-white">
+                {(() => { const r = thisMonthSalesRaw; return r >= 10000 ? (r/10000).toFixed(0)+'만' : r > 0 ? r.toLocaleString() : '-' })()}
+              </span>
             )}
-          </button>
-
-          {/* A/S요청 */}
-          <button
-            onClick={() => onNavigate?.('sales', 'as')}
-            className="group bg-white hover:bg-orange-500 border border-orange-200 hover:border-orange-500 rounded-xl p-3 text-left transition-all duration-200 hover:shadow-md"
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-base">🔧</span>
-              {!loading && <span className="text-[9px] bg-orange-50 group-hover:bg-white/20 text-orange-400 group-hover:text-white/60 px-1.5 py-0.5 rounded-full">→</span>}
-            </div>
-            <p className="text-[10px] text-orange-500 group-hover:text-white/70">A/S요청</p>
-            {loading ? <Skeleton className="h-6 w-10 mt-0.5" /> : (
-              <p className="text-xl font-black text-orange-500 group-hover:text-white mt-0.5">
-                {allCustomers.filter((c: any) => (c as any).details?.as_requested === true && !(c as any).details?.as_resolved).length}
-                <span className="text-xs font-medium ml-0.5">건</span>
-              </p>
-            )}
-          </button>
-        </div>
-
-        {/* 우측: 영업팀·관리팀 매출 카드 (세로 스택) */}
-        <div className="flex sm:flex-col gap-2 sm:w-40 sm:self-stretch">
-          <div className="flex-1 bg-gradient-to-br from-[#1B2A45] to-[#2a3d5c] rounded-xl p-3 text-white flex flex-col justify-center">
-            <p className="text-[10px] text-white/50 mb-1">영업팀 이달 매출</p>
-            {loading ? <Skeleton className="h-6 w-20 bg-white/20" /> : (
-              <p className="text-xl font-black leading-tight">{
-                (() => {
-                  const r = thisMonthSalesRaw
-                  return r >= 10000 ? (r / 10000).toFixed(0) + '만원' : r > 0 ? r.toLocaleString() + '원' : '-'
-                })()
-              }</p>
-            )}
-            <p className="text-[9px] text-white/30 mt-0.5">계약 기준</p>
           </div>
-          <div className="flex-1 bg-gradient-to-br from-emerald-700 to-emerald-600 rounded-xl p-3 text-white flex flex-col justify-center">
-            <p className="text-[10px] text-white/50 mb-1">관리팀 이달 매출</p>
-            {loading ? <Skeleton className="h-6 w-20 bg-white/20" /> : (
-              <p className="text-xl font-black leading-tight">{thisMonthOpsDisplay}</p>
+          <div className="bg-emerald-700 rounded-lg px-3 py-2 flex items-center gap-2">
+            <span className="text-[10px] text-white/50">관리팀</span>
+            {loading ? <Skeleton className="h-4 w-12 bg-white/20" /> : (
+              <span className="text-sm font-black text-white">{thisMonthOpsDisplay}</span>
             )}
-            <p className="text-[9px] text-white/30 mt-0.5">진행 기준</p>
           </div>
         </div>
       </div>
+
+      {/* ══ 2주 일정 캘린더 ══ */}
+      <TwoWeekCalendar events={events} onNavigate={onNavigate} />
 
       {/* ══ 결제율 대시보드 ══ */}
       <div ref={chartRef}>
@@ -818,6 +771,116 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
       {/* ══ 공지사항 ══ */}
       <NoticeSection />
 
+    </div>
+  )
+}
+
+// ─── 2주 일정 캘린더 ─────────────────────────────────────────
+
+const CAL_COLORS: Record<string, string> = {
+  blue: 'bg-blue-100 text-blue-700',
+  red: 'bg-red-100 text-red-600',
+  green: 'bg-emerald-100 text-emerald-700',
+  yellow: 'bg-yellow-100 text-yellow-700',
+  violet: 'bg-violet-100 text-violet-700',
+  pink: 'bg-pink-100 text-pink-700',
+  gray: 'bg-gray-100 text-gray-600',
+}
+
+function TwoWeekCalendar({ events, onNavigate }: { events: CalEvent[]; onNavigate?: (...a: any[]) => void }) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  // 이번 주 일요일 기준으로 14일
+  const weekStart = new Date(today)
+  weekStart.setDate(today.getDate() - today.getDay())  // 이번 주 일요일
+
+  const days: Date[] = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(weekStart)
+    d.setDate(weekStart.getDate() + i)
+    return d
+  })
+
+  const KO = ['일', '월', '화', '수', '목', '금', '토']
+  const toStr = (d: Date) => d.toISOString().slice(0, 10)
+  const todayStr = toStr(today)
+
+  function eventsOn(d: Date) {
+    const ds = toStr(d)
+    return events.filter(e => {
+      const s = e.start_date ?? e.date ?? ''
+      const en = e.end_date ?? s
+      return s <= ds && en >= ds
+    })
+  }
+
+  const week1 = days.slice(0, 7)
+  const week2 = days.slice(7, 14)
+
+  const renderWeek = (week: Date[], weekLabel: string) => (
+    <div>
+      <p className="text-[10px] font-bold text-[#1B2A45]/40 uppercase tracking-widest mb-2">{weekLabel}</p>
+      <div className="grid grid-cols-7 gap-1">
+        {week.map(d => {
+          const ds = toStr(d)
+          const isToday = ds === todayStr
+          const isPast  = d < today && !isToday
+          const dow     = d.getDay()
+          const evs     = eventsOn(d)
+          return (
+            <button key={ds}
+              onClick={() => onNavigate?.('calendar')}
+              className={`rounded-lg p-1.5 text-left transition-colors min-h-[56px] border ${
+                isToday ? 'border-[#1B2A45] bg-[#1B2A45]/5' : 'border-transparent hover:border-[#E8E2D4] hover:bg-gray-50'
+              }`}
+            >
+              <div className={`text-xs font-bold mb-1 ${
+                isToday ? 'text-[#1B2A45]' :
+                isPast  ? 'text-gray-300' :
+                dow === 0 ? 'text-red-400' :
+                dow === 6 ? 'text-blue-400' : 'text-gray-600'
+              }`}>
+                {isToday ? (
+                  <span className="inline-flex items-center justify-center w-5 h-5 bg-[#1B2A45] text-white rounded-full text-[10px] font-black">
+                    {d.getDate()}
+                  </span>
+                ) : d.getDate()}
+              </div>
+              <div className="space-y-0.5">
+                {evs.slice(0, 2).map(ev => (
+                  <div key={ev.id}
+                    className={`text-[9px] px-1 py-0.5 rounded truncate leading-tight font-medium ${CAL_COLORS[ev.color ?? 'blue'] ?? 'bg-blue-100 text-blue-700'}`}>
+                    {ev.start_time && !ev.is_allday && (
+                      <span className="opacity-60 mr-0.5">{ev.start_time.slice(0,5)}</span>
+                    )}
+                    {ev.title}
+                  </div>
+                ))}
+                {evs.length > 2 && (
+                  <div className="text-[9px] text-gray-400 pl-0.5">+{evs.length - 2}</div>
+                )}
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="bg-white rounded-xl border border-[#E8E2D4] overflow-hidden">
+      {/* 요일 헤더 */}
+      <div className="grid grid-cols-7 border-b border-[#E8E2D4] bg-gray-50/50 px-3 pt-3">
+        {KO.map((d, i) => (
+          <div key={d} className={`text-center text-[11px] font-bold pb-2 ${
+            i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-gray-400'
+          }`}>{d}</div>
+        ))}
+      </div>
+      <div className="p-3 space-y-3">
+        {renderWeek(week1, '이번 주')}
+        {renderWeek(week2, '다음 주')}
+      </div>
     </div>
   )
 }

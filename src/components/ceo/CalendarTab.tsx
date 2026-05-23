@@ -54,7 +54,7 @@ const COLORS = [
   { key: 'gray',   bg: 'bg-gray-400',    light: 'bg-gray-100 text-gray-700',    dot: 'bg-gray-400' },
 ]
 
-const KO_DAYS = ['월', '화', '수', '목', '금', '토', '일']
+const KO_DAYS = ['일', '월', '화', '수', '목', '금', '토']
 const KO_MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월']
 
 function colorBg(c: string) { return COLORS.find(x => x.key === c)?.bg || 'bg-blue-500' }
@@ -156,7 +156,15 @@ export default function CalendarTab() {
   useEffect(() => { load() }, [year, month])
   useEffect(() => { if (!autoSyncing) load() }, [autoSyncing])
 
-  // 오늘 일정 있으면 브라우저 알림 (최초 1회, localStorage로 중복 방지)
+  // ── 브라우저 알림 권한 요청 (최초 1회) ──────────────────
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return
+    if (Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+  }, [])
+
+  // ── 오늘 일정 요약 알림 (오늘 날짜 최초 1회) ─────────────
   useEffect(() => {
     const todayEvents = events.filter(e => e.start_date <= todayStr && e.end_date >= todayStr)
     if (todayEvents.length === 0) return
@@ -168,12 +176,39 @@ export default function CalendarTab() {
           const t = e.start_time ? e.start_time.slice(0, 5) + ' ' : ''
           return t + e.title
         }).join(' · ')
-        new Notification(`📅 오늘 일정 ${todayEvents.length}건`, {
-          body: titles,
-          tag: 'calendar-today',
-        })
+        new Notification(`📅 오늘 일정 ${todayEvents.length}건`, { body: titles, tag: 'calendar-today' })
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events])
+
+  // ── 이벤트 시작 시간 알림 (1분마다 체크) ────────────────
+  useEffect(() => {
+    if (!events.length) return
+    const interval = setInterval(() => {
+      if (typeof window === 'undefined' || !('Notification' in window)) return
+      if (Notification.permission !== 'granted') return
+      const now = new Date()
+      const ds  = now.toISOString().slice(0, 10)
+      const hh  = String(now.getHours()).padStart(2, '0')
+      const mm  = String(now.getMinutes()).padStart(2, '0')
+      const nowTime = `${hh}:${mm}`
+      events.filter(e =>
+        e.start_date === ds &&
+        !e.is_allday &&
+        e.start_time?.slice(0, 5) === nowTime
+      ).forEach(ev => {
+        const key = `cal-notif-ev-${ev.id}-${nowTime}`
+        if (!localStorage.getItem(key)) {
+          localStorage.setItem(key, '1')
+          new Notification(`⏰ 지금 시작: ${ev.title}`, {
+            body: ev.description || nowTime,
+            tag: `ev-${ev.id}`,
+          })
+        }
+      })
+    }, 60_000)
+    return () => clearInterval(interval)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events])
 
@@ -226,8 +261,8 @@ export default function CalendarTab() {
     setSyncing(false)
   }
 
-  // ── 캘린더 계산 (월요일 시작) ──────────────────────────
-  const firstDow = (new Date(year, month - 1, 1).getDay() + 6) % 7
+  // ── 캘린더 계산 (일요일 시작) ──────────────────────────
+  const firstDow = new Date(year, month - 1, 1).getDay()  // 일=0
   const totalDays = new Date(year, month, 0).getDate()
   const cells: (number | null)[] = [
     ...Array(firstDow).fill(null),
@@ -287,6 +322,14 @@ export default function CalendarTab() {
           )}
         </div>
         <div className="flex gap-2">
+          {/* 알림 권한 버튼 — 미허용 시에만 표시 */}
+          {typeof window !== 'undefined' && 'Notification' in window && Notification.permission !== 'granted' && (
+            <button
+              onClick={() => Notification.requestPermission()}
+              className="flex items-center gap-1.5 text-xs border border-yellow-400/40 bg-yellow-400/10 text-yellow-300 px-3 py-2 rounded-lg hover:bg-yellow-400/20 transition-colors">
+              🔔 알림 켜기
+            </button>
+          )}
           <button onClick={() => setShowExpenseMgr(!showExpenseMgr)}
             className={`flex items-center gap-1.5 text-xs border px-3 py-2 rounded-lg transition-colors ${
               showExpenseMgr
@@ -578,7 +621,7 @@ export default function CalendarTab() {
           <div className="grid grid-cols-7 border-b border-[#E8E2D4] bg-gray-50/50">
             {KO_DAYS.map((d, i) => (
               <div key={d} className={`py-2.5 text-center text-xs font-bold ${
-                i === 5 ? 'text-blue-500' : i === 6 ? 'text-red-500' : 'text-gray-400'
+                i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-gray-400'
               }`}>{d}</div>
             ))}
           </div>
