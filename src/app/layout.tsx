@@ -55,8 +55,8 @@ export const metadata: Metadata = {
     'apple-mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-status-bar-style': 'default',
     'apple-mobile-web-app-title': 'Hundred Consulting',
-    'msapplication-TileColor': '#FAF8F3',
-    'theme-color': '#FAF8F3',
+    'msapplication-TileColor': '#0D1B2E',
+    'theme-color': '#0D1B2E',
   },
 }
 
