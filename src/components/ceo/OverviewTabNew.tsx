@@ -365,6 +365,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
   const [assignContracts, setAssignContracts] = useState<Contract[]>([])
   const [reports, setReports] = useState<Report[]>([])
   const [events, setEvents] = useState<CalEvent[]>([])
+  const [monthlyExpenses, setMonthlyExpenses] = useState<{ day: number; label: string; amount: number | null }[]>([])
   const [allContracts, setAllContracts] = useState<Contract[]>([])
   const [allCustomers, setAllCustomers] = useState<any[]>([])  // customers 테이블에서 직접
   const [opsCases, setOpsCases] = useState<OpsCase[]>([])
@@ -382,7 +383,8 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
   const thisYear = now.getFullYear()
   const thisMonth = now.getMonth() + 1
   const thisMonthStr = `${thisYear}-${String(thisMonth).padStart(2, '0')}`
-  const todayStr = now.toISOString().slice(0, 10)
+  // 타임존 안전 오늘 날짜 문자열 (한국 등 UTC+N에서 toISOString()이 전날 반환하는 버그 방지)
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
 
   const lastMonthDate = new Date(thisYear, thisMonth - 2, 1)
   const lastYear = lastMonthDate.getFullYear()
@@ -393,6 +395,10 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
     async function load() {
       setLoading(true)
       try {
+        // ① 구글 캘린더 자동 동기화 (저장된 설정으로 백그라운드 갱신)
+        //    이벤트 로드 전에 먼저 동기화해서 최신 데이터 보장
+        await fetch('/api/events/gcal').catch(() => null)
+
         const [
           revRes,
           assignRes,
@@ -405,6 +411,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           lastGoalsRes,
           supplyRes,
           payRateRes,
+          expensesRes,
         ] = await Promise.all([
           fetch('/api/revenue').catch(() => null),
           fetch('/api/assign').catch(() => null),
@@ -417,6 +424,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           fetch(`/api/sales-goals?year_month=${lastMonthStr}`).catch(() => null),
           fetch('/api/supply-config').catch(() => null),
           fetch(`/api/payrate?year_month=${thisMonthStr}`).catch(() => null),
+          fetch('/api/settings?key=monthly_expenses').catch(() => null),
         ])
 
         const [
@@ -431,6 +439,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           lastGoalsData,
           supplyData,
           payRateData,
+          expensesData,
         ] = await Promise.all([
           revRes?.json().catch(() => ({})) ?? {},
           assignRes?.json().catch(() => ({})) ?? {},
@@ -443,6 +452,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           lastGoalsRes?.json().catch(() => ({})) ?? {},
           supplyRes?.json().catch(() => ({})) ?? {},
           payRateRes?.json().catch(() => ({})) ?? {},
+          expensesRes?.json().catch(() => ({})) ?? {},
         ])
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -451,6 +461,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
         setAssignContracts(a(assignData).contracts ?? [])
         setReports(a(reportsData).reports ?? [])
         setEvents(a(eventsData).events ?? [])
+        setMonthlyExpenses(a(expensesData).settings?.expenses ?? [])
         setAllContracts(a(contractsData).contracts ?? [])
         setAllCustomers(a(customersData).customers ?? [])
         setOpsCases(a(opsData).cases ?? [])
@@ -733,7 +744,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
       </div>
 
       {/* ══ 2주 일정 캘린더 ══ */}
-      <TwoWeekCalendar events={events} onNavigate={onNavigate} />
+      <TwoWeekCalendar events={events} monthlyExpenses={monthlyExpenses} onNavigate={onNavigate} />
 
       {/* ══ 결제율 대시보드 ══ */}
       <div ref={chartRef}>
@@ -788,7 +799,15 @@ const CAL_COLORS: Record<string, string> = {
   gray: 'bg-gray-100 text-gray-600',
 }
 
-function TwoWeekCalendar({ events, onNavigate }: { events: CalEvent[]; onNavigate?: (...a: any[]) => void }) {
+function TwoWeekCalendar({
+  events,
+  monthlyExpenses = [],
+  onNavigate,
+}: {
+  events: CalEvent[]
+  monthlyExpenses?: { day: number; label: string; amount: number | null }[]
+  onNavigate?: (...a: any[]) => void
+}) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
@@ -803,12 +822,36 @@ function TwoWeekCalendar({ events, onNavigate }: { events: CalEvent[]; onNavigat
   })
 
   const KO = ['일', '월', '화', '수', '목', '금', '토']
-  const toStr = (d: Date) => d.toISOString().slice(0, 10)
+
+  // ★ 타임존 안전: UTC 변환 없이 로컬 날짜 문자열 생성
+  const toStr = (d: Date) => {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${dd}`
+  }
   const todayStr = toStr(today)
+
+  // 지출 이벤트를 CalEvent 형태로 변환 (이번 주 ~ 다음 주 기간)
+  const expenseEvents: CalEvent[] = days.flatMap(d => {
+    const dayNum = d.getDate()
+    return monthlyExpenses
+      .filter(exp => exp.day === dayNum)
+      .map(exp => ({
+        id: `__exp__${toStr(d)}_${exp.day}`,
+        title: `💸 ${exp.label}${exp.amount !== null ? ` (${Math.abs(exp.amount).toLocaleString()}원)` : ''}`,
+        start_date: toStr(d),
+        end_date: toStr(d),
+        color: 'red',
+        is_allday: true,
+      }))
+  })
+
+  const allEvents = [...events, ...expenseEvents]
 
   function eventsOn(d: Date) {
     const ds = toStr(d)
-    return events.filter(e => {
+    return allEvents.filter(e => {
       const s = e.start_date ?? e.date ?? ''
       const en = e.end_date ?? s
       return s <= ds && en >= ds
@@ -827,19 +870,27 @@ function TwoWeekCalendar({ events, onNavigate }: { events: CalEvent[]; onNavigat
           const isToday = ds === todayStr
           const isPast  = d < today && !isToday
           const dow     = d.getDay()
+          const isSun   = dow === 0
+          const isSat   = dow === 6
           const evs     = eventsOn(d)
           return (
             <button key={ds}
               onClick={() => onNavigate?.('calendar')}
               className={`rounded-lg p-1.5 text-left transition-colors min-h-[56px] border ${
-                isToday ? 'border-[#1B2A45] bg-[#1B2A45]/5' : 'border-transparent hover:border-[#E8E2D4] hover:bg-gray-50'
+                isToday
+                  ? 'border-[#1B2A45] bg-[#1B2A45]/5'
+                  : isSun
+                  ? 'border-transparent bg-red-50/50 hover:bg-red-50/80'
+                  : isSat
+                  ? 'border-transparent bg-blue-50/50 hover:bg-blue-50/80'
+                  : 'border-transparent hover:border-[#E8E2D4] hover:bg-gray-50'
               }`}
             >
               <div className={`text-xs font-bold mb-1 ${
                 isToday ? 'text-[#1B2A45]' :
                 isPast  ? 'text-gray-300' :
-                dow === 0 ? 'text-red-400' :
-                dow === 6 ? 'text-blue-400' : 'text-gray-600'
+                isSun   ? 'text-red-400' :
+                isSat   ? 'text-blue-400' : 'text-gray-600'
               }`}>
                 {isToday ? (
                   <span className="inline-flex items-center justify-center w-5 h-5 bg-[#1B2A45] text-white rounded-full text-[10px] font-black">

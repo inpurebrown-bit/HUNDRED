@@ -489,6 +489,7 @@ export default function CeoDashboard() {
         </div>
       )}
     </div>
+    </PullToRefresh>
   )
 }
 
@@ -2375,6 +2376,5 @@ function NoticesTab() {
         )}
       </div>
     </div>
-    </PullToRefresh>
   )
 }

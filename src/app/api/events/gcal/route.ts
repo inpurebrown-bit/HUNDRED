@@ -3,20 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
-// Google Calendar 동기화 — 여러 캘린더 지원
-export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
-
-  const user = session.user as any
-  if (user.role !== 'ceo') return NextResponse.json({ error: '권한 없음' }, { status: 403 })
-
-  const { calendars, api_key } = await req.json()
-  // calendars: [{ id: string, color: string, label: string }]
-  if (!calendars || !api_key) {
-    return NextResponse.json({ error: 'calendars와 api_key가 필요합니다' }, { status: 400 })
-  }
-
+// 공통 동기화 로직
+async function syncCalendars(calendars: { id: string; color: string; label: string }[], api_key: string) {
   const now = new Date()
   const timeMin = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
   const timeMax = new Date(now.getFullYear(), now.getMonth() + 4, 0).toISOString()
@@ -44,12 +32,22 @@ export async function POST(req: NextRequest) {
     if (items.length > 0) {
       const toInsert = items.map((item: any) => {
         const isAllDay = !!item.start?.date
+        // Google Calendar 종일 이벤트의 end_date는 exclusive (다음날) → 하루 빼기
+        // UTC 변환 없이 날짜 문자열 직접 처리
+        let endDate: string
+        if (item.end?.date) {
+          // 종일 이벤트: "2026-05-18" 형태, exclusive → -1일
+          const [y, m, d] = item.end.date.split('-').map(Number)
+          const dt = new Date(y, m - 1, d - 1)  // 로컬 날짜 연산
+          endDate = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`
+        } else {
+          // 시간 지정 이벤트: dateTime에서 날짜 부분만
+          endDate = item.end?.dateTime?.slice(0, 10) || item.start?.dateTime?.slice(0, 10) || ''
+        }
         return {
           title: item.summary || '(제목 없음)',
           start_date: item.start?.date || item.start?.dateTime?.slice(0, 10),
-          end_date: item.end?.date
-            ? new Date(new Date(item.end.date).getTime() - 86400000).toISOString().slice(0, 10)
-            : item.end?.dateTime?.slice(0, 10),
+          end_date: endDate,
           start_time: isAllDay ? null : item.start?.dateTime?.slice(11, 16),
           end_time: isAllDay ? null : item.end?.dateTime?.slice(11, 16),
           description: item.description || '',
@@ -61,11 +59,9 @@ export async function POST(req: NextRequest) {
           created_by: cal.label || 'Google Calendar',
         }
       })
-      // gcal_label 컬럼이 없을 경우 대비: 먼저 시도하고 실패하면 컬럼 없이 재시도
       const { error: insertErr } = await supabaseAdmin.from('events').insert(toInsert)
       if (insertErr) {
         if (insertErr.message?.includes('gcal_label')) {
-          // gcal_label 컬럼 없음 → 해당 필드 제외하고 재삽입
           const fallback = toInsert.map(({ gcal_label: _gl, ...rest }: { gcal_label: string; [key: string]: unknown }) => rest)
           await supabaseAdmin.from('events').insert(fallback)
         } else {
@@ -77,8 +73,45 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  return { synced: totalSynced, errors }
+}
+
+// GET: 저장된 설정으로 자동 동기화 (페이지 로드 시 자동 호출)
+export async function GET(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+  const user = session.user as any
+  if (user.role !== 'ceo') return NextResponse.json({ error: '권한 없음' }, { status: 403 })
+
+  // 저장된 구글 캘린더 설정 읽기
+  const { data } = await supabaseAdmin.from('settings').select('*').eq('key', 'gcal').single()
+  if (!data?.value?.api_key || !data?.value?.calendars?.length) {
+    return NextResponse.json({ synced: 0, message: '구글 캘린더 미설정' })
+  }
+
+  const { api_key, calendars } = data.value
+  const result = await syncCalendars(calendars, api_key)
+
+  return NextResponse.json({ synced: result.synced, errors: result.errors.length > 0 ? result.errors : undefined })
+}
+
+// POST: 수동 동기화 (설정 저장 후 동기화 버튼)
+export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+
+  const user = session.user as any
+  if (user.role !== 'ceo') return NextResponse.json({ error: '권한 없음' }, { status: 403 })
+
+  const { calendars, api_key } = await req.json()
+  if (!calendars || !api_key) {
+    return NextResponse.json({ error: 'calendars와 api_key가 필요합니다' }, { status: 400 })
+  }
+
+  const result = await syncCalendars(calendars, api_key)
+
   return NextResponse.json({
-    synced: totalSynced,
-    errors: errors.length > 0 ? errors : undefined,
+    synced: result.synced,
+    errors: result.errors.length > 0 ? result.errors : undefined,
   })
 }

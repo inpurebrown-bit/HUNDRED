@@ -74,7 +74,8 @@ function getDow(ds: string) {
 
 export default function CalendarTab() {
   const now = new Date()
-  const todayStr = now.toISOString().slice(0, 10)
+  // 타임존 안전 (toISOString은 UTC 변환으로 한국 자정~오전9시에 전날 반환)
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
 
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
@@ -134,12 +135,9 @@ export default function CalendarTab() {
         setApiKey(gcalData.settings.api_key)
         setGcalList(gcalData.settings.calendars || [{ id: '', color: 'green', label: '회사 캘린더' }])
         setGcalSaved(true)
+        // GET 방식으로 자동 동기화 (저장된 설정으로 내부에서 처리)
         setAutoSyncing(true)
-        await fetch('/api/events/gcal', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ calendars: gcalData.settings.calendars, api_key: gcalData.settings.api_key }),
-        })
+        await fetch('/api/events/gcal')
         setAutoSyncing(false)
       }
 
