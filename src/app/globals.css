@@ -266,6 +266,9 @@
 
 /* ── Skeleton loader in dark ── */
 .page-bg .animate-pulse > * { background: rgba(255,255,255,0.08) !important; }
+/* Skeleton bg-[#E8E2D4] → dark shimmer */
+.page-bg .bg-\[#E8E2D4\]  { background: rgba(255,255,255,0.09) !important; }
+.page-bg .border-\[#D5D0C8\] { border-color: rgba(255,255,255,0.12) !important; }
 
 /* ── Scrollbar — dark ── */
 .page-bg *::-webkit-scrollbar        { width: 4px; height: 4px; }
