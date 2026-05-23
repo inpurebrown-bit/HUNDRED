@@ -262,27 +262,27 @@ function MonthSection({
               <EmployeeTable rows={employeeRows} loading={loading} />
             </div>
             {/* 구분선 */}
-            <div className="w-px bg-[#E8E2D4] self-stretch" />
+            <div className="w-px bg-[#E8E2D4] self-stretch shrink-0" />
             {/* 관리팀 */}
-            <div className="flex-1 min-w-0">
+            <div className="shrink-0 w-64">
               <p className="text-[10px] font-bold text-emerald-700 bg-emerald-50 inline-block px-2 py-0.5 rounded mb-2">관리팀</p>
               {opsUserRows.length > 0 ? (
-                <table className="w-full text-xs">
+                <table className="text-xs w-full">
                   <thead>
                     <tr className="border-b border-[#E8E2D4]">
-                      <th className="text-left pb-2 text-[11px] font-semibold text-[#1B2A45]/40">담당자</th>
+                      <th className="text-left pb-2 text-[11px] font-semibold text-[#1B2A45]/40 w-24">담당자</th>
                       <th className="text-right pb-2 text-[11px] font-semibold text-[#1B2A45]/40">수수료</th>
                       <th className="text-right pb-2 text-[11px] font-semibold text-[#1B2A45]/40">계약</th>
-                      <th className="text-right pb-2 text-[11px] font-semibold text-[#1B2A45]/40">계약수</th>
+                      <th className="text-right pb-2 text-[11px] font-semibold text-[#1B2A45]/40 w-12">건</th>
                     </tr>
                   </thead>
                   <tbody>
                     {opsUserRows.map(r => (
                       <tr key={r.name} className="border-b border-[#E8E2D4]/40 last:border-0">
-                        <td className="py-2 font-semibold text-[#1B2A45]/80">{r.name}</td>
-                        <td className="py-2 text-right font-black text-emerald-600">{r.feeAmount > 0 ? fmtKrw(r.feeAmount) : '-'}</td>
-                        <td className="py-2 text-right font-black text-sky-600">{r.contractAmount > 0 ? fmtKrw(r.contractAmount) : '-'}</td>
-                        <td className="py-2 text-right text-gray-500">{r.contractCount > 0 ? r.contractCount + '건' : '-'}</td>
+                        <td className="py-2 font-semibold text-[#1B2A45]/80 truncate max-w-[6rem]">{r.name}</td>
+                        <td className="py-2 text-right font-black text-emerald-600 whitespace-nowrap">{r.feeAmount > 0 ? fmtKrw(r.feeAmount) : '-'}</td>
+                        <td className="py-2 text-right font-black text-sky-600 whitespace-nowrap">{r.contractAmount > 0 ? fmtKrw(r.contractAmount) : '-'}</td>
+                        <td className="py-2 text-right text-gray-500 whitespace-nowrap">{r.contractCount > 0 ? r.contractCount + '건' : '-'}</td>
                       </tr>
                     ))}
                   </tbody>
