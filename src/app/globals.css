@@ -542,11 +542,28 @@ select:not(.page-bg select) {
 /* Emerald-700 header (ops tab etc.) */
 .page-bg .bg-emerald-700 {
   background: linear-gradient(145deg, #059669 0%, #047857 100%) !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.12) inset,
+    0 2px 8px rgba(16,185,129,0.30) !important;
+}
+
+/* Navy stat chips → enhanced gradient */
+.page-bg .bg-\[#1B2A45\].rounded-xl {
+  background: linear-gradient(145deg, #243659 0%, #1B2A45 70%, #162338 100%) !important;
+  border: 1px solid rgba(255,255,255,0.11) !important;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.09) inset,
+    0 2px 10px rgba(0,0,0,0.40) !important;
 }
 
 /* Gold bg */
-.page-bg .bg-\[#C5A258\],
-.page-bg .bg-\[#C5A258\]\/10 { /* keep gold as-is */ }
+.page-bg .bg-\[#C5A258\] {
+  background: linear-gradient(145deg, #d4a84b 0%, #C5A258 100%) !important;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.20) inset,
+    0 2px 8px rgba(197,162,88,0.30) !important;
+}
 
 /* Ring focus */
 .page-bg *:focus-visible {
@@ -554,9 +571,11 @@ select:not(.page-bg select) {
   outline-offset: 2px !important;
 }
 
-/* Rounded-2xl white auto-shadow (dark version) */
+/* Rounded-2xl/xl white cards — glass morphism */
 .page-bg .rounded-2xl.bg-white,
 .page-bg .rounded-xl.bg-white {
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
   box-shadow:
     0 0 0 1px rgba(255,255,255,0.10),
     0 4px 24px rgba(0,0,0,0.35),
@@ -569,4 +588,111 @@ select:not(.page-bg select) {
     0 0 0 1px rgba(255,255,255,0.15),
     0 6px 30px rgba(0,0,0,0.40),
     0 1px 0 rgba(255,255,255,0.09) inset !important;
+}
+
+/* Section headers with border-b */
+.page-bg section.bg-white > div:first-child,
+.page-bg .rounded-2xl.bg-white > div.border-b:first-child {
+  border-bottom-color: rgba(255,255,255,0.08) !important;
+}
+
+/* ── Premium kanban card hover ── */
+.page-bg .rounded-xl.bg-white.cursor-pointer:hover,
+.page-bg .rounded-xl.bg-white.hover\:shadow-md:hover {
+  box-shadow:
+    0 0 0 1px rgba(197,162,88,0.20),
+    0 8px 30px rgba(0,0,0,0.45),
+    0 1px 0 rgba(255,255,255,0.09) inset !important;
+  transform: translateY(-1px) !important;
+  transition: all 0.15s ease !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   13. PREMIUM DIMENSIONAL ELEMENTS
+   ══════════════════════════════════════════════════════════════ */
+
+/* Main content area sections */
+.page-bg .space-y-5 > * { animation: fadeInUp 0.35s ease both; }
+.page-bg .space-y-4 > * { animation: fadeInUp 0.30s ease both; }
+
+/* Numbered stagger for visible fade-in */
+.page-bg .space-y-5 > *:nth-child(2) { animation-delay: 0.04s; }
+.page-bg .space-y-5 > *:nth-child(3) { animation-delay: 0.08s; }
+.page-bg .space-y-5 > *:nth-child(4) { animation-delay: 0.12s; }
+.page-bg .space-y-5 > *:nth-child(5) { animation-delay: 0.16s; }
+
+/* Section header labels enhanced */
+.page-bg section.bg-white > :first-child {
+  background: linear-gradient(to right, rgba(255,255,255,0.04), transparent) !important;
+}
+
+/* Pipeline column headers in ops board */
+.page-bg .bg-gray-50.rounded-xl {
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+}
+
+/* ── Amber tint backgrounds (important notices, etc.) ── */
+.page-bg .bg-amber-50 {
+  background: rgba(245,158,11,0.10) !important;
+  border-left: 2px solid rgba(245,158,11,0.40) !important;
+}
+
+/* ── Progress bars in dark ── */
+.page-bg .bg-gray-200 > div {
+  background: linear-gradient(90deg, #C5A258 0%, #d4a84b 100%) !important;
+}
+
+/* ── Green progress bars ── */
+.page-bg .bg-emerald-500 {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  box-shadow: 0 0 8px rgba(16,185,129,0.40) !important;
+}
+
+/* ── Floating notepad in dark ── */
+.page-bg .bg-amber-50.border.border-amber-200.rounded-2xl {
+  background: rgba(30,40,60,0.92) !important;
+  border-color: rgba(197,162,88,0.25) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+}
+.page-bg .bg-amber-400.rounded-t-2xl {
+  background: linear-gradient(135deg, #C5A258 0%, #a88640 100%) !important;
+}
+
+/* ── Mobile-friendly padded sections ── */
+@media (max-width: 768px) {
+  .page-bg .px-4.md\:px-6.py-5 { padding-bottom: 80px; }
+  .page-bg .px-4.md\:px-6.pt-5 { padding-bottom: 80px; }
+}
+
+/* ── Tooltip / popover shadow boost ── */
+.page-bg .z-50.bg-white {
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.12),
+    0 8px 40px rgba(0,0,0,0.55),
+    0 1px 0 rgba(255,255,255,0.08) inset !important;
+}
+
+/* ── Select dropdown option (browser-native, can't style much) ── */
+.page-bg select option {
+  background: #1B2A45;
+  color: #EEE9E0;
+}
+
+/* ── Table in dark ── */
+.page-bg table { border-collapse: separate; border-spacing: 0; }
+.page-bg thead th {
+  background: rgba(255,255,255,0.04) !important;
+  color: rgba(238,233,224,0.55) !important;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.page-bg tbody tr:nth-child(even) td {
+  background: rgba(255,255,255,0.02) !important;
+}
+.page-bg tbody tr:hover td {
+  background: rgba(255,255,255,0.05) !important;
 }
