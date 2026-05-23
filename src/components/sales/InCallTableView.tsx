@@ -871,9 +871,29 @@ function CustomerCard({
   const expanded = expandedId === c.id
   const isTransferred = !!(c.details as any)?.ops_transferred
 
+  // 확장 패널 열리면 배경 스크롤 잠금 (iOS 호환)
   useEffect(() => {
-    if (expanded && expandedRef.current) {
-      setTimeout(() => expandedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80)
+    if (expanded) {
+      const scrollY = window.scrollY
+      document.body.style.overflow = 'hidden'
+      document.body.style.position = 'fixed'
+      document.body.style.top = `-${scrollY}px`
+      document.body.style.width = '100%'
+    } else {
+      const scrollY = Math.abs(parseInt(document.body.style.top || '0', 10))
+      document.body.style.overflow = ''
+      document.body.style.position = ''
+      document.body.style.top = ''
+      document.body.style.width = ''
+      if (scrollY) window.scrollTo(0, scrollY)
+    }
+    return () => {
+      const scrollY = Math.abs(parseInt(document.body.style.top || '0', 10))
+      document.body.style.overflow = ''
+      document.body.style.position = ''
+      document.body.style.top = ''
+      document.body.style.width = ''
+      if (scrollY) window.scrollTo(0, scrollY)
     }
   }, [expanded])
 
@@ -1388,12 +1408,16 @@ function CustomerCard({
         )}
       </div>
 
-      {/* ── 확장 패널 (col-span-full) ── */}
+      {/* ── 확장 패널 (fixed 오버레이) ── */}
       {expanded && (
-        <div ref={expandedRef} className="col-span-full bg-[#FAFAF8] border border-blue-100 rounded-xl">
+        <>
+          {/* 배경 오버레이 */}
+          <div className="fixed inset-0 bg-black/40 z-[199]" onClick={() => onExpand(null)} />
+          {/* 우측 슬라이딩 패널 */}
+          <div ref={expandedRef} className="fixed top-0 right-0 bottom-0 w-full md:w-[680px] bg-[#FAFAF8] z-[200] overflow-y-auto shadow-2xl">
 
           {/* 상단 액션 바 */}
-          <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b border-gray-100 bg-white">
+          <div className="sticky top-0 flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b border-gray-100 bg-white z-10">
             <span className="text-xs font-bold text-[#1B2A45] mr-2">
               {c.details?.company || c.company || c.name}
             </span>
@@ -1508,7 +1532,7 @@ function CustomerCard({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-0 divide-y md:divide-y-0 md:divide-x divide-gray-200">
 
             {/* ── 좌측: 인콜일지 ── */}
-            <div className="p-4 flex flex-col" style={{ maxHeight: 520 }}>
+            <div className="p-4 flex flex-col">
               {/* 헤더 + 수정 버튼 (자금팀 전송 전만) */}
               <div className="flex items-center justify-between mb-2 shrink-0">
                 <p className="text-[10px] font-bold text-[#1B2A45] uppercase tracking-wide">📋 인콜일지</p>
@@ -1666,7 +1690,7 @@ function CustomerCard({
             </div>
 
             {/* ── 우측: 인콜결과 또는 자금팀 현황 ── */}
-            <div className="p-4 overflow-y-auto max-h-[520px] space-y-4">
+            <div className="p-4 space-y-4">
               {/* 담당자 (자동 - 읽기 전용) */}
               <div className="flex items-center justify-between">
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">
@@ -1915,7 +1939,8 @@ function CustomerCard({
               )}
             </div>
           </div>
-        </div>
+          </div>{/* fixed panel */}
+        </>
       )}
     </>
   )

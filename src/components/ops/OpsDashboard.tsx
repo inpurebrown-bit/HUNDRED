@@ -3562,14 +3562,30 @@ export default function OpsDashboard({ userId, userName }: Props) {
       .catch(() => {})
   }, [])
 
-  // 패널 열리면 배경 스크롤 잠금
+  // 패널 열리면 배경 스크롤 잠금 (iOS 호환)
   useEffect(() => {
     if (openPanelIds.length > 0) {
+      const scrollY = window.scrollY
       document.body.style.overflow = 'hidden'
+      document.body.style.position = 'fixed'
+      document.body.style.top = `-${scrollY}px`
+      document.body.style.width = '100%'
     } else {
+      const scrollY = Math.abs(parseInt(document.body.style.top || '0', 10))
       document.body.style.overflow = ''
+      document.body.style.position = ''
+      document.body.style.top = ''
+      document.body.style.width = ''
+      if (scrollY) window.scrollTo(0, scrollY)
     }
-    return () => { document.body.style.overflow = '' }
+    return () => {
+      const scrollY = Math.abs(parseInt(document.body.style.top || '0', 10))
+      document.body.style.overflow = ''
+      document.body.style.position = ''
+      document.body.style.top = ''
+      document.body.style.width = ''
+      if (scrollY) window.scrollTo(0, scrollY)
+    }
   }, [openPanelIds])
 
   function closePanel(id: string) {
