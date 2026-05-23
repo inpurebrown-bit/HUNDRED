@@ -84,3 +84,200 @@ input:-webkit-autofill:active {
   20%, 60% { transform: translateX(-8px); }
   40%, 80% { transform: translateX(8px); }
 }
+
+/* ══════════════════════════════════════════════
+   입체감 디자인 시스템
+   ══════════════════════════════════════════════ */
+
+/* 기본 카드 — 흰 배경, 입체 그림자 */
+.card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid rgba(27, 42, 69, 0.07);
+  box-shadow:
+    0 1px 2px rgba(0,0,0,0.04),
+    0 4px 12px rgba(0,0,0,0.06),
+    0 0 0 1px rgba(255,255,255,0.8) inset;
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+.card:hover {
+  box-shadow:
+    0 2px 4px rgba(0,0,0,0.05),
+    0 8px 20px rgba(0,0,0,0.09),
+    0 0 0 1px rgba(255,255,255,0.8) inset;
+  transform: translateY(-1px);
+}
+
+/* 네이비 카드 — 어두운 배경 */
+.card-navy {
+  background: linear-gradient(145deg, #1e3154 0%, #1B2A45 60%, #162338 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow:
+    0 2px 4px rgba(0,0,0,0.2),
+    0 8px 24px rgba(0,0,0,0.25),
+    0 1px 0 rgba(255,255,255,0.08) inset;
+}
+
+/* 골드 강조 카드 */
+.card-gold {
+  background: linear-gradient(145deg, #d4a84b 0%, #C5A258 50%, #b8913f 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.15);
+  box-shadow:
+    0 2px 4px rgba(197,162,88,0.25),
+    0 8px 20px rgba(197,162,88,0.2),
+    0 1px 0 rgba(255,255,255,0.2) inset;
+}
+
+/* 통계 숫자 카드 (밝은 배경 색상 카드) */
+.stat-card {
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.9);
+  box-shadow:
+    0 1px 3px rgba(0,0,0,0.05),
+    0 4px 10px rgba(0,0,0,0.06),
+    0 0 0 1px rgba(255,255,255,0.6) inset;
+}
+
+/* 섹션 타이틀 언더바 */
+.section-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: #1B2A45;
+  font-size: 14px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #C5A258;
+  margin-bottom: 16px;
+}
+
+/* 입체 버튼 */
+.btn-primary {
+  background: linear-gradient(180deg, #243659 0%, #1B2A45 100%);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow:
+    0 1px 3px rgba(0,0,0,0.2),
+    0 4px 8px rgba(0,0,0,0.15),
+    0 1px 0 rgba(255,255,255,0.07) inset;
+  border-radius: 12px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-primary:hover {
+  background: linear-gradient(180deg, #2d4470 0%, #243659 100%);
+  box-shadow:
+    0 2px 4px rgba(0,0,0,0.25),
+    0 6px 14px rgba(0,0,0,0.2),
+    0 1px 0 rgba(255,255,255,0.1) inset;
+  transform: translateY(-1px);
+}
+.btn-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.btn-gold {
+  background: linear-gradient(180deg, #d4a84b 0%, #C5A258 100%);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.15);
+  box-shadow:
+    0 1px 3px rgba(197,162,88,0.3),
+    0 4px 10px rgba(197,162,88,0.2),
+    0 1px 0 rgba(255,255,255,0.2) inset;
+  border-radius: 12px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-gold:hover {
+  box-shadow:
+    0 2px 5px rgba(197,162,88,0.4),
+    0 6px 16px rgba(197,162,88,0.3),
+    0 1px 0 rgba(255,255,255,0.25) inset;
+  transform: translateY(-1px);
+}
+
+/* 배지/태그 입체감 */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 0 rgba(255,255,255,0.4) inset;
+}
+
+/* ── 흰 카드 공통 — 자동 입체감 ── */
+/* rounded-2xl 또는 rounded-xl + bg-white 조합에 자동 적용 */
+.rounded-2xl.bg-white,
+.rounded-xl.bg-white {
+  box-shadow:
+    0 1px 2px rgba(0,0,0,0.04),
+    0 3px 10px rgba(0,0,0,0.06),
+    0 0 0 1px rgba(255,255,255,0.7) inset !important;
+  border-color: rgba(27,42,69,0.08) !important;
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+/* 입력 필드 입체감 */
+input:not([type="checkbox"]):not([type="radio"]),
+textarea,
+select {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06) inset, 0 1px 0 rgba(255,255,255,0.8);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+input:not([type="checkbox"]):not([type="radio"]):focus,
+textarea:focus,
+select:focus {
+  box-shadow:
+    0 1px 3px rgba(0,0,0,0.08) inset,
+    0 0 0 3px rgba(197,162,88,0.15);
+  outline: none;
+}
+
+/* 페이지 배경 */
+.page-bg {
+  background: linear-gradient(160deg, #f7f5f0 0%, #FAF8F3 50%, #f5f3ee 100%);
+  min-height: 100vh;
+}
+
+/* 네이비 배경 카드 — 자동 그라디언트 */
+.bg-\[#1B2A45\] {
+  background: linear-gradient(145deg, #1e3154 0%, #1B2A45 60%, #162338 100%) !important;
+}
+
+/* 헤더 */
+header.bg-\[#1B2A45\] {
+  background: linear-gradient(180deg, #1e3154 0%, #1B2A45 100%) !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2) !important;
+}
+
+/* 데스크탑 탭바 */
+.tabbar-shadow {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+/* 버튼 입체감 — 네이비 */
+button.bg-\[#1B2A45\] {
+  background: linear-gradient(180deg, #243659 0%, #1B2A45 100%) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2), 0 3px 8px rgba(0,0,0,0.15), 0 1px 0 rgba(255,255,255,0.07) inset !important;
+  transition: all 0.15s ease !important;
+}
+button.bg-\[#1B2A45\]:hover:not(:disabled) {
+  background: linear-gradient(180deg, #2d4470 0%, #243659 100%) !important;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.25), 0 5px 14px rgba(0,0,0,0.2), 0 1px 0 rgba(255,255,255,0.1) inset !important;
+  transform: translateY(-1px) !important;
+}
+button.bg-\[#1B2A45\]:active:not(:disabled) {
+  transform: translateY(0) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
+}
