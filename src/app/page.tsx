@@ -357,7 +357,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF8F3] text-[#1B2A45] overflow-x-hidden">
+    <div className="home-page min-h-screen bg-[#FAF8F3] text-[#1B2A45] overflow-x-hidden">
 
       {/* ── 플로팅 AI 위젯 ── */}
       <FloatingAiWidget />

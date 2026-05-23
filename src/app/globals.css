@@ -502,29 +502,21 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* ── Input fields not inside page-bg (login page 등) ── */
-input:not(.page-bg input),
-input[type="text"]:not(.page-bg input),
-input[type="number"]:not(.page-bg input),
-input[type="tel"]:not(.page-bg input),
-input[type="email"]:not(.page-bg input),
-input[type="date"]:not(.page-bg input),
-input[type="month"]:not(.page-bg input),
-input[type="password"]:not(.page-bg input),
-textarea:not(.page-bg textarea),
-select:not(.page-bg select) {
-  color: #EEE9E0 !important;
-  -webkit-text-fill-color: #EEE9E0 !important;
-}
+/* ── login 페이지는 자체 inline 스타일 사용 (no override needed) ── */
 
-/* login 페이지는 자체 스타일 유지 */
-.login-page input {
-  color: #111 !important;
-  -webkit-text-fill-color: #111 !important;
+/* 홈페이지(라이트 배경) 인풋 — 원래 색상 유지 */
+.home-page input,
+.home-page textarea,
+.home-page select {
+  color: #1B2A45 !important;
+  -webkit-text-fill-color: #1B2A45 !important;
+  background: inherit !important;
+  border-color: inherit !important;
 }
-.login-page input::placeholder {
-  color: #aaa !important;
-  -webkit-text-fill-color: #aaa !important;
+.home-page input::placeholder,
+.home-page textarea::placeholder {
+  color: rgba(27,42,69,0.40) !important;
+  -webkit-text-fill-color: rgba(27,42,69,0.40) !important;
 }
 
 /* ══════════════════════════════════════════════════════════════
