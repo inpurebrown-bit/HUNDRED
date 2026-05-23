@@ -104,22 +104,53 @@
 .page-bg .text-\[#1B2A45\]\/20    { color: rgba(238,233,224,0.20) !important; }
 
 /* Colored text → brightened for dark bg */
-.page-bg .text-blue-700,  .page-bg .text-blue-800  { color: #93c5fd !important; }
+.page-bg .text-blue-900, .page-bg .text-blue-800,
+.page-bg .text-blue-700                             { color: #93c5fd !important; }
 .page-bg .text-blue-600                             { color: #60a5fa !important; }
-.page-bg .text-blue-500                             { color: #60a5fa !important; }
-.page-bg .text-emerald-700,.page-bg .text-emerald-800{ color: #6ee7b7 !important; }
+.page-bg .text-blue-500, .page-bg .text-blue-400   { color: #60a5fa !important; }
+.page-bg .text-emerald-900, .page-bg .text-emerald-800,
+.page-bg .text-emerald-700                          { color: #6ee7b7 !important; }
 .page-bg .text-emerald-600                          { color: #34d399 !important; }
-.page-bg .text-red-700,   .page-bg .text-red-800   { color: #fca5a5 !important; }
+.page-bg .text-emerald-500                          { color: #10d49e !important; }
+.page-bg .text-red-900, .page-bg .text-red-800,
+.page-bg .text-red-700                              { color: #fca5a5 !important; }
 .page-bg .text-red-600                              { color: #f87171 !important; }
-.page-bg .text-red-500                              { color: #f87171 !important; }
-.page-bg .text-amber-700, .page-bg .text-amber-800  { color: #fcd34d !important; }
+.page-bg .text-red-500, .page-bg .text-red-400     { color: #f87171 !important; }
+.page-bg .text-amber-900, .page-bg .text-amber-800,
+.page-bg .text-amber-700                            { color: #fcd34d !important; }
 .page-bg .text-amber-600, .page-bg .text-amber-500  { color: #fbbf24 !important; }
+.page-bg .text-amber-400                            { color: #f59e0b !important; }
+.page-bg .text-orange-700, .page-bg .text-orange-800 { color: #fdba74 !important; }
 .page-bg .text-orange-500, .page-bg .text-orange-400 { color: #fb923c !important; }
 .page-bg .text-orange-600                           { color: #f97316 !important; }
-.page-bg .text-violet-700, .page-bg .text-violet-800 { color: #c4b5fd !important; }
+.page-bg .text-violet-900, .page-bg .text-violet-800,
+.page-bg .text-violet-700                           { color: #c4b5fd !important; }
+.page-bg .text-violet-600, .page-bg .text-violet-500 { color: #a78bfa !important; }
 .page-bg .text-pink-700,  .page-bg .text-pink-800  { color: #f9a8d4 !important; }
-.page-bg .text-sky-600,   .page-bg .text-sky-700   { color: #7dd3fc !important; }
-.page-bg .text-cyan-600                             { color: #67e8f9 !important; }
+.page-bg .text-pink-600,  .page-bg .text-pink-500  { color: #f472b6 !important; }
+.page-bg .text-sky-800, .page-bg .text-sky-700     { color: #7dd3fc !important; }
+.page-bg .text-sky-600, .page-bg .text-sky-500     { color: #38bdf8 !important; }
+.page-bg .text-cyan-600,  .page-bg .text-cyan-700  { color: #67e8f9 !important; }
+.page-bg .text-teal-600,  .page-bg .text-teal-700  { color: #2dd4bf !important; }
+.page-bg .text-teal-500,  .page-bg .text-teal-400  { color: #14b8a6 !important; }
+.page-bg .text-indigo-700, .page-bg .text-indigo-800 { color: #a5b4fc !important; }
+.page-bg .text-slate-500, .page-bg .text-slate-600 { color: rgba(238,233,224,0.50) !important; }
+.page-bg .text-slate-400                            { color: rgba(238,233,224,0.40) !important; }
+
+/* More tint backgrounds */
+.page-bg .bg-teal-50,   .page-bg .bg-teal-100      { background: rgba(20,184,166,0.12)  !important; }
+.page-bg .bg-cyan-50,   .page-bg .bg-cyan-100       { background: rgba(6,182,212,0.12)   !important; }
+.page-bg .bg-indigo-50, .page-bg .bg-indigo-100     { background: rgba(99,102,241,0.12)  !important; }
+.page-bg .bg-slate-50,  .page-bg .bg-slate-100      { background: rgba(255,255,255,0.05) !important; }
+.page-bg .bg-neutral-50,.page-bg .bg-neutral-100    { background: rgba(255,255,255,0.05) !important; }
+.page-bg .bg-zinc-50,   .page-bg .bg-zinc-100       { background: rgba(255,255,255,0.05) !important; }
+
+/* hover bg-color variants */
+.page-bg .hover\:bg-amber-200:hover  { background: rgba(245,158,11,0.25)  !important; }
+.page-bg .hover\:bg-blue-100:hover   { background: rgba(59,130,246,0.20)  !important; }
+.page-bg .hover\:bg-emerald-100:hover{ background: rgba(16,185,129,0.20)  !important; }
+.page-bg .hover\:bg-red-100:hover    { background: rgba(239,68,68,0.20)   !important; }
+.page-bg .hover\:border-gray-400:hover { border-color: rgba(255,255,255,0.30) !important; }
 
 /* ── Borders ── */
 .page-bg .border-gray-50    { border-color: rgba(255,255,255,0.05) !important; }
@@ -414,6 +445,15 @@ button.bg-\[#1B2A45\]:active:not(:disabled) {
 /* Tab bar border */
 .page-bg .border-b.border-gray-200 {
   border-color: rgba(255,255,255,0.09) !important;
+}
+
+/* Desktop sticky tab bar — premium dark glass */
+.page-bg .hidden.md\:flex.bg-white.border-b.sticky {
+  background: rgba(13,27,46,0.88) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.06), 0 2px 12px rgba(0,0,0,0.30) !important;
 }
 
 /* ══════════════════════════════════════════════════════════════
