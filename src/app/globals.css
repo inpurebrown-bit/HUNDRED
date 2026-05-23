@@ -176,6 +176,8 @@
 .page-bg .hover\:bg-emerald-100:hover     { background: rgba(16,185,129,0.20)  !important; }
 .page-bg .hover\:bg-red-100:hover         { background: rgba(239,68,68,0.20)   !important; }
 .page-bg .hover\:border-gray-400:hover    { border-color: rgba(255,255,255,0.30) !important; }
+.page-bg .hover\:border-\[#1B2A45\]\/30:hover { border-color: rgba(255,255,255,0.20) !important; }
+.page-bg .hover\:border-\[#C5A258\]\/60:hover  { border-color: rgba(197,162,88,0.60) !important; }
 /* Calendar cell hover variants */
 .page-bg .hover\:bg-red-50\/80:hover      { background: rgba(239,68,68,0.16)   !important; }
 .page-bg .hover\:bg-blue-50\/80:hover     { background: rgba(59,130,246,0.16)  !important; }
@@ -215,6 +217,10 @@
 .page-bg .hover\:bg-\[#FAFAF8\]:hover { background: rgba(255,255,255,0.05) !important; }
 .page-bg .hover\:bg-red-50\/70:hover  { background: rgba(239,68,68,0.14)  !important; }
 .page-bg .hover\:bg-blue-50\/70:hover { background: rgba(59,130,246,0.16)  !important; }
+.page-bg .hover\:bg-white\/90:hover  { background: rgba(255,255,255,0.18) !important; }
+.page-bg .hover\:bg-white\/80:hover  { background: rgba(255,255,255,0.15) !important; }
+.page-bg .hover\:bg-gray-200:hover   { background: rgba(255,255,255,0.12) !important; }
+.page-bg .hover\:bg-gray-300:hover   { background: rgba(255,255,255,0.18) !important; }
 
 /* ── Card depth — glass morphism ── */
 .page-bg .rounded-xl.bg-white,
