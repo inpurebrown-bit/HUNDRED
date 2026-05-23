@@ -776,12 +776,22 @@ function PayRateSubView() {
         )
 
         // 기관별 집계 (regularCases 기준 — 실제 ops 화면 카드 수와 일치)
+        // 진행/대기 기준: direct_stage or indirect_stage (OpsCeoTab과 동일)
+        const INDIRECT_INST = new Set(['기보', '신보', '재단'])
+        const UPCOMING = new Set(['', '미선택', '서류받는중', '접수전'])
+
         const instStats = INST_LIST.map(inst => {
           const matched = regularCases.filter(c =>
             (c.institution || '').split(',').map((s: string) => s.trim()).includes(inst)
           )
-          // stage가 '홀딩'인 케이스는 대기로 분류
-          const waiting = matched.filter(c => (c.stage ?? '') === '홀딩')
+          const isIndirect = INDIRECT_INST.has(inst)
+          // 기관별 세부 단계로 대기 판별
+          const waiting = matched.filter(c => {
+            const stg = isIndirect
+              ? (c.details?.indirect_stage || '')
+              : (c.details?.direct_stage   || '')
+            return UPCOMING.has(stg)
+          })
           return {
             inst,
             label: inst === '서민금융(미소)' ? '미소' : inst,
