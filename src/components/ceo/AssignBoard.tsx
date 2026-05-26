@@ -171,7 +171,32 @@ const EMPTY_HK = {
   company: '', name: '', phone: '',
   business_no: '', industry: '', region: '',
   date: today(), revenue: '', credit: '',
+  loan: '', required_funds: '', tax_status: '',
   assign_id: '',
+}
+
+function parsePastedRow(text: string): Partial<typeof EMPTY_HK> {
+  const cols = text.split('\t')
+  if (cols.length < 2) return {}
+  // cols[1]: 접수일시 "2024-03-15 09:30" → "2024-03-15"
+  const rawDate = (cols[1] || '').trim()
+  const dateMatch = rawDate.match(/(\d{4}-\d{2}-\d{2})/)
+  const dateOnly = dateMatch ? dateMatch[1] : today()
+  return {
+    date: dateOnly,
+    phone: (cols[2] || '').trim(),
+    business_no: (cols[3] || '').trim(),
+    company: (cols[4] || '').trim(),
+    name: (cols[5] || '').trim(),
+    industry: (cols[6] || '').trim(),
+    region: (cols[7] || '').trim(),
+    // cols[8]: 희망서비스 → skip
+    revenue: (cols[9] || '').trim(),
+    loan: (cols[10] || '').trim(),
+    required_funds: (cols[11] || '').trim(),
+    tax_status: (cols[12] || '').trim(),
+    credit: (cols[13] || '').trim(),
+  }
 }
 
 function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
@@ -187,8 +212,26 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
   const [toast, setToast] = useState<string | null>(null)
   // 재배정 모드 — 이미 배정된 항목도 담당자 변경 가능
   const [reassignMode, setReassignMode] = useState<Record<string, boolean>>({})
+  // 붙여넣기 자동파싱
+  const [pasteText, setPasteText] = useState('')
+  const [parseStatus, setParseStatus] = useState<string | null>(null)
 
   function set(k: string, v: string) { setForm(p => ({ ...p, [k]: v })) }
+
+  function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const text = e.clipboardData.getData('text')
+    setPasteText(text)
+    const parsed = parsePastedRow(text)
+    if (Object.keys(parsed).length > 0) {
+      setForm(p => ({ ...p, ...parsed }))
+      const company = parsed.company || ''
+      const name = parsed.name || ''
+      setParseStatus(`✓ 자동 입력 완료 — ${company}${name ? ` / ${name}` : ''}`)
+    } else {
+      setParseStatus('⚠ 파싱 실패: 탭 구분 데이터인지 확인하세요')
+    }
+    e.preventDefault()
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -225,6 +268,9 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
           reception_date: form.date,
           revenue_2025: form.revenue,
           credit_nice: form.credit,
+          loan: form.loan,
+          required_funds: form.required_funds,
+          tax_status: form.tax_status,
         },
       }
       if (selectedUser) {
@@ -238,8 +284,10 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || '등록 실패')
+      // 폼 초기화 (닫지 않음 — 연속 등록용)
       setForm({ ...EMPTY_HK })
-      setShowForm(false)
+      setPasteText('')
+      setParseStatus(null)
       const assignedTo = selectedUser ? ` → ${selectedUser.name} 배정` : ' (미배정)'
       setToast(`등록 완료${assignedTo}`)
       setTimeout(() => setToast(null), 3000)
@@ -315,7 +363,28 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
       {/* 등록 폼 */}
       {showForm && (
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-[#E8E2D4] shadow-sm p-5 mb-4">
-          <p className="text-xs font-bold text-[#1B2A45] mb-4">한경연 DB 등록</p>
+          <p className="text-xs font-bold text-[#1B2A45] mb-3">한경연 DB 등록</p>
+
+          {/* 붙여넣기 자동파싱 영역 */}
+          <div className="mb-4 p-3 bg-[#F8F6F1] rounded-xl border border-[#E8E2D4]">
+            <label className="block text-[11px] font-semibold text-[#1B2A45]/60 mb-1.5">
+              📋 DB 행 붙여넣기 <span className="font-normal text-[#1B2A45]/40">(한 행을 복사해서 붙여넣으면 아래 필드가 자동으로 채워집니다)</span>
+            </label>
+            <textarea
+              className="w-full border border-[#E8E2D4] rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#C5A258]/40 bg-white resize-none font-mono text-[#1B2A45]/70 placeholder:text-[#1B2A45]/30"
+              rows={2}
+              value={pasteText}
+              onPaste={handlePaste}
+              onChange={e => setPasteText(e.target.value)}
+              placeholder="여기에 DB 행을 붙여넣으세요 (Ctrl+V)"
+            />
+            {parseStatus && (
+              <p className={`text-[11px] mt-1 font-medium ${parseStatus.startsWith('✓') ? 'text-emerald-600' : 'text-amber-600'}`}>
+                {parseStatus}
+              </p>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
             <div>
               <label className={lbl}>업체명 *</label>
@@ -352,6 +421,18 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
             <div>
               <label className={lbl}>NICE 신용점수</label>
               <input className={inp} value={form.credit} onChange={e => set('credit', e.target.value)} placeholder="예: 720" />
+            </div>
+            <div>
+              <label className={lbl}>기존대출</label>
+              <input className={inp} value={form.loan} onChange={e => set('loan', e.target.value)} placeholder="예: 5000만원" />
+            </div>
+            <div>
+              <label className={lbl}>필요자금</label>
+              <input className={inp} value={form.required_funds} onChange={e => set('required_funds', e.target.value)} placeholder="예: 1억" />
+            </div>
+            <div>
+              <label className={lbl}>연체/체납</label>
+              <input className={inp} value={form.tax_status} onChange={e => set('tax_status', e.target.value)} placeholder="X=없음 / O=있음" />
             </div>
           </div>
           {/* 담당자 배정 */}
@@ -457,7 +538,7 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
                 </div>
                 {/* 상세 */}
                 {expandedId === e.id && (
-                  <div className="px-4 pb-3 grid grid-cols-4 gap-2 bg-[#FAF8F3] text-[11px]">
+                  <div className="px-4 pb-3 grid grid-cols-3 sm:grid-cols-4 gap-2 bg-[#FAF8F3] text-[11px]">
                     {[
                       ['사업자번호', (e as any).details?.business_reg_no],
                       ['업종', (e as any).details?.business_type],
@@ -465,6 +546,9 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
                       ['접수일', (e as any).details?.reception_date],
                       ['작년매출', (e as any).details?.revenue_2025],
                       ['NICE점수', (e as any).details?.credit_nice],
+                      ['기존대출', (e as any).details?.loan],
+                      ['필요자금', (e as any).details?.required_funds],
+                      ['연체/체납', (e as any).details?.tax_status],
                     ].map(([label, val]) => (
                       <div key={label as string} className="bg-white rounded-lg px-3 py-2 border border-[#E8E2D4]">
                         <p className="text-[10px] text-[#1B2A45]/40 mb-0.5">{label}</p>
