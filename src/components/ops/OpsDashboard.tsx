@@ -3637,8 +3637,12 @@ export default function OpsDashboard({ userId, userName }: Props) {
   const filteredCases = q.length >= 1
     ? cases.filter(c =>
         (c.customers?.details?.company || '').toLowerCase().includes(q) ||
+        (c.customers?.company || '').toLowerCase().includes(q) ||
+        (c.customer_name || '').toLowerCase().includes(q) ||
+        (c.details?.incall_journal?.company || '').toLowerCase().includes(q) ||
         (c.customers?.name || '').toLowerCase().includes(q) ||
         (c.customers?.phone || '').replace(/-/g, '').includes(q.replace(/-/g, '')) ||
+        (c.phone || '').replace(/-/g, '').includes(q.replace(/-/g, '')) ||
         (c.institution || '').toLowerCase().includes(q)
       )
     : cases

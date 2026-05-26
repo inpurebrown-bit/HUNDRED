@@ -506,12 +506,17 @@ function CustomerQuickDrawer({ customer, onClose }: { customer: any; onClose: ()
   const d = customer.details || {}
 
   useEffect(() => {
-    // ops_case 조회 (customer_id로)
+    // ops_case 조회 (customer_id 우선, 없으면 전화번호 fallback)
     setLoading(true)
+    const normPhone = (p: string) => (p || '').replace(/[^0-9]/g, '')
+    const custPhone = normPhone(customer.phone || '')
     fetch('/api/ops-cases')
       .then(r => r.json())
       .then(data => {
-        const found = (data.cases || []).find((c: any) => c.customer_id === customer.id)
+        const found = (data.cases || []).find((c: any) =>
+          (c.customer_id && c.customer_id === customer.id) ||
+          (custPhone && normPhone(c.phone || '') === custPhone)
+        )
         setOpsCase(found || null)
         // ops_case 있으면 관리팀 탭 먼저 보여주기
         if (found) setActiveTab('ops')
