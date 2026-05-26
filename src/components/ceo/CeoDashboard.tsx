@@ -133,6 +133,7 @@ export default function CeoDashboard() {
   const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'staffmanage' | 'minutesreports' | 'calendar' | 'ailogs' | 'trash' | 'dbmanage' | 'profile'>('overview')
   const [menuOpen, setMenuOpen] = useState(false)
   const [salesInitialView, setSalesInitialView] = useState<'customers' | 'inspection' | 'as' | 'transfer' | 'diary' | undefined>(undefined)
+  const [salesInitialStatusTab, setSalesInitialStatusTab] = useState<'all' | 'lead' | 'db010' | 'contracted' | 'emotional' | 'trash' | undefined>(undefined)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [allCustomersCache, setAllCustomersCache] = useState<any[]>([])
@@ -384,10 +385,16 @@ export default function CeoDashboard() {
 
         {activeTab === 'overview'       && <OverviewTabNew onNavigate={(tab, subView) => {
           setActiveTab(tab as any)
-          if (subView) setSalesInitialView(subView as any)
+          if (subView === 'db010') {
+            setSalesInitialStatusTab('db010')
+            setSalesInitialView(undefined)
+          } else if (subView) {
+            setSalesInitialView(subView as any)
+            setSalesInitialStatusTab(undefined)
+          }
         }} />}
         {activeTab === 'assign'         && <AssignBoard />}
-        {activeTab === 'sales'          && <SalesCeoTab initialView={salesInitialView} />}
+        {activeTab === 'sales'          && <SalesCeoTab initialView={salesInitialView} initialStatusTab={salesInitialStatusTab} />}
         {activeTab === 'ops'            && <OpsCeoTab />}
         {activeTab === 'analytics'      && <AnalyticsTab />}
         {activeTab === 'staffmanage'    && <StaffManageTab />}

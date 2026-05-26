@@ -696,13 +696,13 @@ function SalesDiaryView({ customers }: { customers: Customer[] }) {
   )
 }
 
-export default function SalesCeoTab({ initialView }: { initialView?: CeoView }) {
+export default function SalesCeoTab({ initialView, initialStatusTab }: { initialView?: CeoView; initialStatusTab?: StatusKey }) {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [ceoView, setCeoView] = useState<CeoView>(initialView ?? 'customers')
   const [supplyBannerDismissed, setSupplyBannerDismissed] = useState(false)
   const [personTab, setPersonTab] = useState<string>('all')
-  const [statusTab, setStatusTab] = useState<StatusKey>('all')
+  const [statusTab, setStatusTab] = useState<StatusKey>(initialStatusTab ?? 'all')
   const [inspDetail, setInspDetail] = useState<Customer | null>(null)
   const [opsUsers, setOpsUsers] = useState<string[]>([])
   const [supplyConfig, setSupplyConfig] = useState<SupplyConfig>({})
@@ -1622,10 +1622,16 @@ export default function SalesCeoTab({ initialView }: { initialView?: CeoView }) 
                 const tmRevenue = tm?.revenue || 0
                 const tmCount = tm?.count || 0
                 return (
-                  <div className={"flex gap-2 mt-1.5 text-[10px] " + (personTab === p.name ? 'text-white/70' : 'text-gray-400')}>
+                  <div className={"flex flex-wrap gap-2 mt-1.5 text-[10px] " + (personTab === p.name ? 'text-white/70' : 'text-gray-400')}>
                     <span>이번달 매출 <b className={personTab === p.name ? 'text-[#C5A258]' : 'text-emerald-600'}>{fmtWon(tmRevenue)}</b></span>
                     <span>·</span>
                     <span>계약 {tmCount % 1 === 0 ? tmCount : tmCount.toFixed(1)}</span>
+                    {p.db010 > 0 && (
+                      <>
+                        <span>·</span>
+                        <span>직가 <b className={personTab === p.name ? 'text-violet-300' : 'text-violet-500'}>{p.db010}</b></span>
+                      </>
+                    )}
                   </div>
                 )
               })()}
