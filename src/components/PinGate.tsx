@@ -4,12 +4,19 @@ import { useSession } from 'next-auth/react'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Image from 'next/image'
 
-const PIN_KEY = 'pin_verified'
+const PIN_KEY      = 'pin_verified'
 const ACTIVITY_KEY = 'pin_last_activity'
+const USER_KEY     = 'pin_user_id'        // ← 계정 변경 감지용
 const INACTIVITY_LIMIT = 30 * 60 * 1000
 
-function isPinVerified(): boolean {
-  try { return sessionStorage.getItem(PIN_KEY) === '1' } catch { return false }
+function getPinUserId(): string | null {
+  try { return sessionStorage.getItem(USER_KEY) } catch { return null }
+}
+function isPinVerified(userId: string): boolean {
+  try {
+    return sessionStorage.getItem(PIN_KEY) === '1' &&
+           sessionStorage.getItem(USER_KEY) === userId   // 동일 계정만 통과
+  } catch { return false }
 }
 function isActivityFresh(): boolean {
   try {
@@ -18,9 +25,10 @@ function isActivityFresh(): boolean {
     return Date.now() - Number(ts) < INACTIVITY_LIMIT
   } catch { return false }
 }
-function markPinVerified() {
+function markPinVerified(userId: string) {
   try {
-    sessionStorage.setItem(PIN_KEY, '1')
+    sessionStorage.setItem(PIN_KEY,      '1')
+    sessionStorage.setItem(USER_KEY,     userId)
     sessionStorage.setItem(ACTIVITY_KEY, String(Date.now()))
   } catch {}
 }
@@ -30,6 +38,7 @@ function bumpActivity() {
 function clearPin() {
   try {
     sessionStorage.removeItem(PIN_KEY)
+    sessionStorage.removeItem(USER_KEY)
     sessionStorage.removeItem(ACTIVITY_KEY)
   } catch {}
 }
@@ -37,7 +46,7 @@ function clearPin() {
 interface PinGateProps { children: React.ReactNode }
 
 export default function PinGate({ children }: PinGateProps) {
-  const { status } = useSession()
+  const { status, data: session } = useSession()
   const [verified, setVerified]   = useState(false)
   const [digits, setDigits]       = useState('')
   const [error, setError]         = useState('')
@@ -47,8 +56,17 @@ export default function PinGate({ children }: PinGateProps) {
   const hiddenRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (isPinVerified() && isActivityFresh()) setVerified(true)
-  }, [])
+    if (status === 'loading') return
+    const userId = (session?.user as any)?.id as string | undefined
+    if (!userId) return
+    // 다른 계정이 PIN 인증한 기록이면 무조건 초기화
+    const storedUserId = getPinUserId()
+    if (storedUserId && storedUserId !== userId) {
+      clearPin()
+      return
+    }
+    if (isPinVerified(userId) && isActivityFresh()) setVerified(true)
+  }, [status, session])
 
   useEffect(() => {
     if (!verified) return
@@ -60,11 +78,15 @@ export default function PinGate({ children }: PinGateProps) {
 
   useEffect(() => {
     if (!verified) return
+    const userId = (session?.user as any)?.id as string | undefined
     const id = setInterval(() => {
-      if (!isActivityFresh()) { clearPin(); setVerified(false); setDigits(''); setError('') }
+      // 무활동 OR 계정 불일치 → 잠금
+      const stale = !isActivityFresh()
+      const mismatch = userId && getPinUserId() !== userId
+      if (stale || mismatch) { clearPin(); setVerified(false); setDigits(''); setError('') }
     }, 60_000)
     return () => clearInterval(id)
-  }, [verified])
+  }, [verified, session])
 
   const triggerShake = useCallback(() => {
     setShake(true)
@@ -74,10 +96,11 @@ export default function PinGate({ children }: PinGateProps) {
   const verifyPin = useCallback(async (pin: string) => {
     if (loading) return
     setLoading(true)
+    const userId = (session?.user as any)?.id as string | undefined
     try {
       const res  = await fetch('/api/pin/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin }) })
       const data = await res.json()
-      if (data.ok) { markPinVerified(); setVerified(true) }
+      if (data.ok) { markPinVerified(userId ?? 'unknown'); setVerified(true) }
       else {
         setError(data.error || '잘못된 PIN입니다')
         if (data.locked) setLocked(true)
@@ -86,7 +109,7 @@ export default function PinGate({ children }: PinGateProps) {
     } catch {
       setError('서버 오류가 발생했습니다'); triggerShake()
     } finally { setLoading(false) }
-  }, [loading, triggerShake])
+  }, [loading, triggerShake, session])
 
   const handleDigit = useCallback((d: string) => {
     if (locked || loading) return

@@ -3713,7 +3713,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
                   <p className="text-[10px] text-[#C5A258] font-bold tracking-wide uppercase mb-0.5">관리팀</p>
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-bold text-[#1B2A45]">{userName}</p>
-                    <button onClick={() => signOut({ callbackUrl: '/login' })}
+                    <button onClick={async () => { try { sessionStorage.removeItem('pin_verified'); sessionStorage.removeItem('pin_user_id'); sessionStorage.removeItem('pin_last_activity') } catch {} await signOut({ redirect: false }); window.location.replace('/login') }}
                       className="text-[10px] text-gray-400 hover:text-red-500 transition-colors font-medium">로그아웃</button>
                   </div>
                   {installable && (
