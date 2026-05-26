@@ -698,11 +698,11 @@ export default function OpsCeoTab() {
     ? cases.filter(c =>
         (c.customers?.details?.company || '').toLowerCase().includes(q) ||
         (c.customers?.company || '').toLowerCase().includes(q) ||
-        (c.customer_name || '').toLowerCase().includes(q) ||
+        ((c as any).customer_name || '').toLowerCase().includes(q) ||
         (c.details?.incall_journal?.company || '').toLowerCase().includes(q) ||
         (c.customers?.name || '').toLowerCase().includes(q) ||
         (c.customers?.phone || '').replace(/-/g, '').includes(q.replace(/-/g, '')) ||
-        (c.phone || '').replace(/-/g, '').includes(q.replace(/-/g, '')) ||
+        ((c as any).phone || '').replace(/-/g, '').includes(q.replace(/-/g, '')) ||
         (c.institution || '').toLowerCase().includes(q) ||
         (c.ops_user_name || '').toLowerCase().includes(q)
       )
