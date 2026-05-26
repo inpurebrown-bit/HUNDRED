@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import type { ReactNode } from 'react'
 import { Geist, Noto_Serif_KR, Nanum_Brush_Script } from 'next/font/google'
 import './globals.css'
@@ -21,6 +21,13 @@ const nanumBrush = Nanum_Brush_Script({
   subsets: ['latin'],
   weight: '400',
 })
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+}
 
 export const metadata: Metadata = {
   title: 'Hundred Consulting',
