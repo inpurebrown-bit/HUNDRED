@@ -159,6 +159,7 @@ export interface Props {
   onCeoTransfer?: (id: string, destPerson: string, destBucket: string, destRole: 'sales' | 'ops') => Promise<void>
   onMarkDirect?: (id: string) => Promise<void>  // 대표 전용: 공가→직가 전환
   showOwner?: boolean
+  groupBy?: 'date' | 'mood'   // db010 전용: 접수날짜별 or 감도별
 }
 
 // ── ops 진행단계 스타일 ──────────────────────────────────────────
@@ -1294,8 +1295,8 @@ function CustomerCard({
         {/* 전화번호 */}
         <p className="text-[9px] text-gray-400 mt-0.5 font-mono truncate px-1">{formatPhone(c.phone || '')}</p>
 
-        {/* 감도 */}
-        {c.details?.sensitivity && (
+        {/* 감도 — contracted(계약업체)에서는 숨김 */}
+        {c.details?.sensitivity && tabType !== 'contracted' && (
           <div className="mt-1.5 flex justify-center w-full">
             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
               c.details.sensitivity === '상' ? 'bg-red-100 text-red-600' :
@@ -1321,7 +1322,22 @@ function CustomerCard({
             ))}
           </div>
         )}
-        {tabType !== 'emotional' && c.details?.rejection_mood && (
+        {tabType === 'db010' && (
+          <div className="mt-1 flex gap-0.5 justify-center w-full" onClick={e => e.stopPropagation()}>
+            {(['상', '중', '하'] as const).map(m => (
+              <button key={m} type="button"
+                onClick={() => onUpdate(c.id, { details: { sensitivity: c.details?.sensitivity === m ? '' : m } })}
+                className={`text-[8px] font-bold px-1 py-0.5 rounded transition-colors ${
+                  c.details?.sensitivity === m
+                    ? m === '상' ? 'bg-red-500 text-white'
+                      : m === '중' ? 'bg-orange-400 text-white'
+                      : 'bg-gray-400 text-white'
+                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                }`}>{m}</button>
+            ))}
+          </div>
+        )}
+        {tabType !== 'emotional' && tabType !== 'db010' && tabType !== 'contracted' && c.details?.rejection_mood && (
           <div className="mt-1 flex justify-center w-full">
             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
               c.details.rejection_mood === '상' ? 'bg-red-100 text-red-600' :
@@ -1797,6 +1813,28 @@ function CustomerCard({
                     </div>
                   )}
 
+                  {/* 직가DB 감도 — db010 탭 전용 */}
+                  {tabType === 'db010' && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                      <label className="text-[10px] text-blue-700 mb-2 block font-bold">감도 설정</label>
+                      <div className="flex gap-2">
+                        {(['상', '중', '하'] as const).map(m => (
+                          <button key={m} type="button"
+                            onClick={() => onUpdate(c.id, { details: { sensitivity: c.details?.sensitivity === m ? '' : m } })}
+                            className={`flex-1 py-1.5 rounded-lg text-xs font-bold border-2 transition-all ${
+                              c.details?.sensitivity === m
+                                ? m === '상' ? 'bg-red-500 text-white border-red-500'
+                                  : m === '중' ? 'bg-orange-400 text-white border-orange-400'
+                                  : 'bg-gray-400 text-white border-gray-400'
+                                : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
+                            }`}>
+                            감도 {m}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* 감성톡 감도 — emotional 탭 전용 */}
                   {tabType === 'emotional' && (
                     <div className="bg-pink-50 border border-pink-200 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
@@ -1963,12 +2001,21 @@ export default function InCallTableView({
   onCeoTransfer,
   onMarkDirect,
   showOwner = false,
+  groupBy = 'date',
 }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  const isMoodGroup = tabType === 'emotional' || (tabType === 'db010' && groupBy === 'mood')
+
   const groups = tabType === 'emotional'
     ? (['상', '중', '하', ''] as const).map(mood => ({
         date: mood || '__none__',
         items: customers.filter(c => (c.details?.rejection_mood || '') === mood),
+      })).filter(g => g.items.length > 0)
+    : (tabType === 'db010' && groupBy === 'mood')
+    ? (['상', '중', '하', ''] as const).map(mood => ({
+        date: mood || '__none__',
+        items: customers.filter(c => (c.details?.sensitivity || '') === mood),
       })).filter(g => g.items.length > 0)
     : groupByDate(customers, tabType === 'contracted')
 
@@ -1983,7 +2030,7 @@ export default function InCallTableView({
   return (
     <div className="space-y-4">
       {groups.map(({ date, items }) => {
-        const display = tabType === 'emotional'
+        const display = isMoodGroup
           ? date === '__none__' ? '감도 미설정'
             : date === '상' ? '감도 상'
             : date === '중' ? '감도 중'

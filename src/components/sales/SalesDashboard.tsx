@@ -63,6 +63,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [db010GroupBy, setDb010GroupBy] = useState<'date' | 'mood'>('date')
   // ── 메모장 ──────────────────────────────────────────────────────────────
   const [notepadOpen, setNotepadOpen] = useState(false)
   const [notepadOpacity, setNotepadOpacity] = useState(90)
@@ -1182,13 +1183,32 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
           <div className="space-y-3">
             <div className="bg-gradient-to-r from-[#1B2A45] to-blue-600 rounded-xl px-5 py-3.5 flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-bold text-white">📂 직가 DB</h2>
+                <h2 className="text-sm font-bold text-white">직가 DB</h2>
                 <p className="text-white/50 text-[11px] mt-0.5">총 {db010List.length}건</p>
               </div>
-              <button onClick={() => setShow010Form(v => !v)}
-                className="bg-white/15 hover:bg-white/25 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-colors border border-white/20">
-                {show010Form ? '✕ 취소' : '+ 직가DB 등록'}
-              </button>
+              <div className="flex items-center gap-2">
+                {/* 보기 방식 토글 */}
+                <div className="flex bg-white/10 rounded-lg p-0.5 border border-white/20">
+                  <button
+                    onClick={() => setDb010GroupBy('date')}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                      db010GroupBy === 'date' ? 'bg-white text-[#1B2A45]' : 'text-white/60 hover:text-white'
+                    }`}>
+                    접수일
+                  </button>
+                  <button
+                    onClick={() => setDb010GroupBy('mood')}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                      db010GroupBy === 'mood' ? 'bg-white text-[#1B2A45]' : 'text-white/60 hover:text-white'
+                    }`}>
+                    감도
+                  </button>
+                </div>
+                <button onClick={() => setShow010Form(v => !v)}
+                  className="bg-white/15 hover:bg-white/25 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-colors border border-white/20">
+                  {show010Form ? '✕ 취소' : '+ 직가DB 등록'}
+                </button>
+              </div>
             </div>
 
             {show010Form && (
@@ -1224,6 +1244,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 tabType="db010"
                 salesUsers={salesUserNames}
                 userName={userName}
+                groupBy={db010GroupBy}
                 onUpdate={updateCustomer}
                 onStatusChange={async (id, status) => moveCustomer(id, status as any)}
                 onDelete={async (id) => requestDeleteDb010(id)}
