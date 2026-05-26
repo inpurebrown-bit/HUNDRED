@@ -83,7 +83,7 @@ export default function InCallForm({ title, salesUsers, submitting, initialData,
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       {/* 헤더 */}
       <div className="bg-gradient-to-r from-[#1B2A45] to-sky-700 px-4 py-2.5 flex items-center justify-between">
-        <h3 className="text-white font-semibold text-sm">📋 {title}</h3>
+        <h3 className="text-white font-semibold text-sm">{title}</h3>
         <button type="button" onClick={onCancel} className="text-white/50 hover:text-white text-base leading-none">✕</button>
       </div>
 
@@ -91,7 +91,7 @@ export default function InCallForm({ title, salesUsers, submitting, initialData,
         <div className="grid grid-cols-4 gap-x-2 gap-y-2">
 
           {/* ── 기본 정보 ── */}
-          <SectionTitle>📋 기본 정보</SectionTitle>
+          <SectionTitle>기본 정보</SectionTitle>
 
           {/* 접수일자 · 담당자 · 상호명 */}
           <div>
@@ -134,7 +134,7 @@ export default function InCallForm({ title, salesUsers, submitting, initialData,
           </div>
 
           {/* ── 사업 정보 ── */}
-          <SectionTitle>🏢 사업 정보</SectionTitle>
+          <SectionTitle>사업 정보</SectionTitle>
 
           {/* 법인/개인 · 업종 · 업력 · 직원수 */}
           <div>
@@ -180,7 +180,7 @@ export default function InCallForm({ title, salesUsers, submitting, initialData,
           </div>
 
           {/* ── 재무 정보 ── */}
-          <SectionTitle>💰 재무 정보</SectionTitle>
+          <SectionTitle>재무 정보</SectionTitle>
 
           {/* 매출 4개 한 줄 */}
           <div>
@@ -227,7 +227,7 @@ export default function InCallForm({ title, salesUsers, submitting, initialData,
           </div>
 
           {/* ── 상담 메모 ── */}
-          <SectionTitle>💬 상담 메모</SectionTitle>
+          <SectionTitle>상담 메모</SectionTitle>
 
           {/* 감도 버튼 + 메모 옆으로 나란히 */}
           <div>

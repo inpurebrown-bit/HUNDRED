@@ -292,7 +292,7 @@ export default function CustomerCard({
           {/* ── Section: 기본 정보 ── */}
           <section>
             <h3 className="text-xs font-bold text-gray-500 mb-3 flex items-center gap-1.5">
-              <span>📋 기본 정보</span>
+              <span>기본 정보</span>
             </h3>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -353,7 +353,7 @@ export default function CustomerCard({
 
           {/* ── Section: 사업 정보 ── */}
           <section>
-            <h3 className="text-xs font-bold text-gray-500 mb-3">🏢 사업 정보</h3>
+            <h3 className="text-xs font-bold text-gray-500 mb-3">사업 정보</h3>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={lbl}>업종</label>
@@ -385,7 +385,7 @@ export default function CustomerCard({
 
           {/* ── Section: 재무 정보 ── */}
           <section>
-            <h3 className="text-xs font-bold text-gray-500 mb-3">💰 재무 정보</h3>
+            <h3 className="text-xs font-bold text-gray-500 mb-3">재무 정보</h3>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={lbl}>26년 매출</label>
@@ -432,7 +432,7 @@ export default function CustomerCard({
 
           {/* ── Section: A/S 요청 ── */}
           <section>
-            <h3 className="text-xs font-bold text-gray-500 mb-3">📝 A/S 요청</h3>
+            <h3 className="text-xs font-bold text-gray-500 mb-3">A/S 요청</h3>
             <textarea
               value={details.as_request ?? ''}
               onChange={e => setDetailField('as_request', e.target.value)}
@@ -445,7 +445,7 @@ export default function CustomerCard({
           {/* ── Section: Tab-specific ── */}
           {tabType === 'db010' && (
             <section>
-              <h3 className="text-xs font-bold text-gray-500 mb-3">📊 영업 현황</h3>
+              <h3 className="text-xs font-bold text-gray-500 mb-3">영업 현황</h3>
               <div className="space-y-3">
                 {/* 감도 */}
                 <div>
@@ -483,7 +483,7 @@ export default function CustomerCard({
 
           {tabType === 'lead' && (
             <section>
-              <h3 className="text-xs font-bold text-gray-500 mb-3">📊 진행현황</h3>
+              <h3 className="text-xs font-bold text-gray-500 mb-3">진행현황</h3>
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
                   {['클로징대기', '재통화예정', '고민중', '부재', 'A/S요청', '거절', '자체거절', '계약결정'].map(label => leadProgressChip(label))}
@@ -501,7 +501,7 @@ export default function CustomerCard({
 
           {tabType === 'contracted' && (
             <section>
-              <h3 className="text-xs font-bold text-gray-500 mb-3">🤝 계약 정보</h3>
+              <h3 className="text-xs font-bold text-gray-500 mb-3">계약 정보</h3>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div className={details.is_cancelled ? 'opacity-50' : ''}>
@@ -564,7 +564,7 @@ export default function CustomerCard({
                   {details.ops_transferred ? (
                     <>
                       <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-full text-xs font-semibold">
-                        ✅ 자금팀 전송 완료
+                        자금팀 전송 완료
                       </span>
                       <div className="flex items-center gap-2">
                         <label className="text-xs text-gray-500">환불/취소</label>
@@ -583,7 +583,7 @@ export default function CustomerCard({
                     <button
                       onClick={() => onTransferToOps?.()}
                       className="inline-flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-colors">
-                      🚀 관리팀으로 전송
+                      관리팀으로 전송
                     </button>
                   )}
                   {details.is_cancelled && (
@@ -598,17 +598,17 @@ export default function CustomerCard({
 
           {tabType === 'emotional' && (
             <section>
-              <h3 className="text-xs font-bold text-gray-500 mb-3">💬 감성톡 관리</h3>
+              <h3 className="text-xs font-bold text-gray-500 mb-3">감성톡 관리</h3>
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => onStatusChange('lead')}
                   className="inline-flex items-center gap-1 bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-2 rounded-lg text-xs font-semibold transition-colors">
-                  ↩️ 신규고객 복귀
+                  신규고객 복귀
                 </button>
                 <button
                   onClick={() => onStatusChange('trash')}
                   className="inline-flex items-center gap-1 bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2 rounded-lg text-xs font-semibold transition-colors">
-                  🗑 자체거절로 이동
+                  자체거절로 이동
                 </button>
               </div>
             </section>
@@ -616,12 +616,12 @@ export default function CustomerCard({
 
           {tabType === 'trash' && (
             <section>
-              <h3 className="text-xs font-bold text-gray-500 mb-3">🗑 자체거절</h3>
+              <h3 className="text-xs font-bold text-gray-500 mb-3">자체거절</h3>
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => onStatusChange('lead')}
                   className="inline-flex items-center gap-1 bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-2 rounded-lg text-xs font-semibold transition-colors">
-                  ↩️ 신규고객 복귀
+                  신규고객 복귀
                 </button>
               </div>
             </section>
@@ -629,7 +629,7 @@ export default function CustomerCard({
 
           {/* ── Section: 통화메모 ── */}
           <section>
-            <h3 className="text-xs font-bold text-gray-500 mb-3">💬 통화메모</h3>
+            <h3 className="text-xs font-bold text-gray-500 mb-3">통화메모</h3>
             {/* Input area */}
             <div className="flex gap-2 mb-3">
               <textarea

@@ -128,11 +128,11 @@ export default function MeetingJournal({ customer, onClose }: MeetingJournalProp
             padding: '10px 18px', borderBottom: '1px solid #e5e7eb',
             background: '#f9fafb', borderRadius: '12px 12px 0 0',
           }}>
-            <span style={{ fontWeight: 700, fontSize: 13, color: '#1a2a40' }}>📋 미팅일지 미리보기 — {company}</span>
+            <span style={{ fontWeight: 700, fontSize: 13, color: '#1a2a40' }}>미팅일지 미리보기 — {company}</span>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => window.print()}
                 style={{ padding: '6px 16px', borderRadius: 8, background: '#1a2a40', color: '#fff', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
-                🖨️ 출력 / PDF 저장
+                출력 / PDF 저장
               </button>
               <button onClick={onClose}
                 style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280', fontSize: 12, cursor: 'pointer' }}>

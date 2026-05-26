@@ -97,11 +97,11 @@ export default function FreelancerTab() {
         setSelected(emp)
         setEditData(null)
         setIsNew(false)
-        setMsg('✅ 저장 완료')
+        setMsg('저장 완료')
       } else {
-        setMsg('❌ 저장 실패')
+        setMsg('저장 실패')
       }
-    } catch { setMsg('❌ 저장 실패') }
+    } catch { setMsg('저장 실패') }
     finally { setSaving(false) }
   }
 
@@ -150,13 +150,13 @@ export default function FreelancerTab() {
       <div className="bg-[#1B2A45] rounded-xl px-5 py-4">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h2 className="font-bold text-white text-base">📋 프리랜서 관리대장</h2>
+            <h2 className="font-bold text-white text-base">프리랜서 관리대장</h2>
             <p className="text-xs text-white/50 mt-0.5">헌드레드 컨설팅 · 사업자 533-36-01551</p>
           </div>
           <div className="flex gap-2 items-center">
             <button onClick={() => setShowMasked(m => !m)}
               className="text-xs text-white/70 border border-white/20 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors">
-              {showMasked ? '🔒 마스킹' : '👁 전체보기'}
+              {showMasked ? '마스킹' : '전체보기'}
             </button>
             <button onClick={() => startNew()}
               className="text-xs bg-white text-[#1B2A45] font-semibold px-3 py-1.5 rounded-lg hover:bg-white/90 transition-colors">
@@ -282,7 +282,7 @@ export default function FreelancerTab() {
                           {copiedId === emp.id ? (
                             <span className="text-[10px] text-emerald-500 font-medium">복사됨</span>
                           ) : (
-                            <span className="text-xs">📋</span>
+                            <span className="text-xs">복사</span>
                           )}
                         </button>
                       )}
@@ -315,7 +315,7 @@ export default function FreelancerTab() {
           <div className="w-80 shrink-0 bg-white rounded-xl border border-[#E8E2D4] overflow-hidden">
             <div className="px-4 py-3 border-b border-[#E8E2D4] bg-gray-50/50 flex items-center justify-between">
               <p className="text-xs font-bold text-gray-700">
-                {editData ? (isNew ? '+ 신규 등록' : '✏️ 편집') : '👤 상세정보'}
+                {editData ? (isNew ? '+ 신규 등록' : '편집') : '상세정보'}
               </p>
               {editData && (
                 <button onClick={() => { setEditData(null); setIsNew(false) }}
@@ -400,7 +400,7 @@ export default function FreelancerTab() {
                         {copiedId === editData.id ? (
                           <span className="text-[10px] text-emerald-500 font-medium">복사됨</span>
                         ) : (
-                          <span className="text-base">📋</span>
+                          <span className="text-base">복사</span>
                         )}
                       </button>
                     )}
@@ -503,7 +503,7 @@ export default function FreelancerTab() {
                         {copiedId === selected.id ? (
                           <span className="text-[10px] text-emerald-500 font-medium">복사됨</span>
                         ) : (
-                          <span className="text-xs">📋</span>
+                          <span className="text-xs">복사</span>
                         )}
                       </button>
                     </div>
@@ -516,7 +516,7 @@ export default function FreelancerTab() {
                 </div>
                 <button onClick={() => setEditData({ ...selected })}
                   className="w-full border border-gray-200 text-gray-700 py-2 rounded-lg text-sm hover:bg-gray-50 mt-2">
-                  ✏️ 편집
+                  편집
                 </button>
               </div>
             ) : null}

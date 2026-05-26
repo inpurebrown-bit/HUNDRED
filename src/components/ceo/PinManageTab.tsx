@@ -53,7 +53,7 @@ export default function PinManageTab() {
       if (data.ok) {
         setMsgs(prev => ({
           ...prev,
-          [userId]: { type: 'ok', text: `✅ ${data.resetTo}(으)로 초기화됨` },
+          [userId]: { type: 'ok', text: `${data.resetTo}(으)로 초기화됨` },
         }))
         setNewPins(prev => { const n = { ...prev }; delete n[userId]; return n })
         load()
@@ -83,7 +83,7 @@ export default function PinManageTab() {
       <div className="bg-white rounded-2xl border border-[#E8E2D4] shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-[#E8E2D4] flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-lg">🔒</span>
+            <span className="text-lg">PIN</span>
             <h3 className="text-sm font-bold text-[#1B2A45]">잠긴 계정</h3>
             {lockedUsers.length > 0 && (
               <span className="ml-1 px-2 py-0.5 bg-red-100 text-red-600 rounded-full text-xs font-bold">
@@ -95,7 +95,7 @@ export default function PinManageTab() {
             onClick={load}
             className="text-xs text-[#1B2A45]/50 hover:text-[#1B2A45] transition-colors flex items-center gap-1"
           >
-            🔄 새로고침
+            새로고침
           </button>
         </div>
 
@@ -105,7 +105,7 @@ export default function PinManageTab() {
           </div>
         ) : lockedUsers.length === 0 ? (
           <div className="text-center py-10">
-            <p className="text-3xl mb-2">✅</p>
+            <p className="text-3xl mb-2">OK</p>
             <p className="text-sm text-[#1B2A45]/50">잠긴 계정이 없습니다</p>
           </div>
         ) : (
@@ -173,7 +173,7 @@ export default function PinManageTab() {
       <div className="bg-white rounded-2xl border border-[#E8E2D4] shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-[#E8E2D4]">
           <div className="flex items-center gap-2">
-            <span className="text-lg">👥</span>
+            <span className="text-lg">직원</span>
             <h3 className="text-sm font-bold text-[#1B2A45]">전체 직원 PIN 관리</h3>
           </div>
           <p className="text-[11px] text-[#1B2A45]/40 mt-0.5">

@@ -432,9 +432,9 @@ export default function PayrollTab() {
 
       const ts = nowTimestamp()
       setLastUpdated(ts)
-      setMsg('✅ 자동 반영 완료')
+      setMsg('자동 반영 완료')
     } catch {
-      setMsg('❌ 자동 로드 실패')
+      setMsg('자동 로드 실패')
     } finally {
       setAutoLoading(false)
     }
@@ -524,7 +524,7 @@ export default function PayrollTab() {
         {isCurrentMonth && (
           <button onClick={autoLoad} disabled={autoLoading}
             className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 disabled:opacity-40 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
-            {autoLoading ? '⏳ 반영 중...' : '🔄 이달 매출 자동 반영'}
+            {autoLoading ? '반영 중...' : '이달 매출 자동 반영'}
           </button>
         )}
 
@@ -534,23 +534,23 @@ export default function PayrollTab() {
             setMsg('')
             try {
               await doSave(opsEmps, salesEmps, costs, revTotals)
-              setMsg('✅ 저장 완료')
-            } catch { setMsg('❌ 저장 실패') }
+              setMsg('저장 완료')
+            } catch { setMsg('저장 실패') }
             finally { setSaving(false) }
           }}
           disabled={saving}
           className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors">
-          {saving ? '⏳ 저장 중...' : '💾 저장하기'}
+          {saving ? '저장 중...' : '저장하기'}
         </button>
 
         {loading && <span className="text-xs text-blue-500 animate-pulse">불러오는 중...</span>}
 
         {msg && (
           <div className="flex items-center gap-2">
-            <span className={`text-xs font-medium ${msg.includes('✅') || msg.includes('완료') ? 'text-emerald-600' : msg.includes('❌') || msg.includes('실패') ? 'text-red-500' : 'text-gray-500'}`}>
+            <span className={`text-xs font-medium ${msg.includes('완료') ? 'text-emerald-600' : msg.includes('실패') ? 'text-red-500' : 'text-gray-500'}`}>
               {msg}
             </span>
-            {lastUpdated && msg.includes('✅') && (
+            {lastUpdated && msg.includes('완료') && (
               <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
                 {lastUpdated} 기준
               </span>
@@ -621,7 +621,7 @@ export default function PayrollTab() {
         <div className="px-5 py-4 border-b border-[#E8E2D4] flex items-center justify-between bg-gradient-to-r from-[#1B2A45]/4 to-transparent">
           <h3 className="text-sm font-bold text-[#1B2A45]">회사 손익 요약</h3>
           {revTotals && (
-            <span className="text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-100 px-2 py-0.5 rounded-full">📡 매출 자동 반영됨</span>
+            <span className="text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-100 px-2 py-0.5 rounded-full">매출 자동 반영됨</span>
           )}
         </div>
 
@@ -640,7 +640,7 @@ export default function PayrollTab() {
             </p>
           </div>
           <div className={`px-5 py-4 text-center ${netProfit >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
-            <p className="text-[10px] font-bold mb-1 ${netProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}">💰 순이익</p>
+            <p className="text-[10px] font-bold mb-1 ${netProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}">순이익</p>
             <p className={`text-xl font-black tracking-tight ${netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
               {totalRevenue > 0 ? netProfit.toLocaleString('ko-KR') + '원' : '—'}
             </p>
@@ -677,7 +677,7 @@ export default function PayrollTab() {
                 <span className="text-xs text-gray-500 shrink-0">DB 공급비용</span>
                 <div className="flex items-center gap-1 text-xs shrink-0 flex-wrap justify-end">
                   <span className="flex items-center gap-1 bg-gray-100 text-gray-500 rounded px-1.5 py-1 font-mono whitespace-nowrap">
-                    🔒 <span className="font-bold text-gray-700">{costs.db_count}</span>개
+                    <span className="font-bold text-gray-700">{costs.db_count}</span>개
                   </span>
                   <span className="text-gray-300">×</span>
                   <div className="flex items-center gap-0.5 whitespace-nowrap">

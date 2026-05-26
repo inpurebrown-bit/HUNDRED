@@ -413,7 +413,7 @@ export default function CeoDashboard() {
           style={{ width: notepadSize.w, height: notepadSize.h, opacity: notepadOpacity / 100 }}
         >
           <div className="flex items-center justify-between px-3 py-2 bg-amber-400 rounded-t-2xl shrink-0">
-            <span className="text-[11px] font-bold text-white">📝 메모장</span>
+            <span className="text-[11px] font-bold text-white">메모장</span>
             <button onClick={() => setNotepadOpen(false)} className="text-white/80 hover:text-white text-sm leading-none">✕</button>
           </div>
           <div className="flex-1 overflow-y-auto flex flex-col">
@@ -440,7 +440,7 @@ export default function CeoDashboard() {
             </div>
             <div className="px-2.5 py-2 space-y-3 shrink-0">
               {(['today', 'week', 'month'] as const).map(p => {
-                const sectionLabel = { today: '📅 오늘', week: '📆 이번주', month: '🗓 이번달' }[p]
+                const sectionLabel = { today: '오늘', week: '이번주', month: '이번달' }[p]
                 const items = ceoTodos.filter(t => t.period === p)
                 return (
                   <div key={p}>
@@ -465,7 +465,7 @@ export default function CeoDashboard() {
               })}
             </div>
             <div className="border-t border-amber-200 px-2.5 pt-2 pb-3 flex flex-col flex-1" style={{ minHeight: 120 }}>
-              <p className="text-[9px] font-bold text-amber-600 mb-1.5">✏️ 자유 메모</p>
+              <p className="text-[9px] font-bold text-amber-600 mb-1.5">자유 메모</p>
               <textarea value={memoText}
                 onChange={e => { setMemoText(e.target.value); if (typeof window !== 'undefined') localStorage.setItem('ceo-notepad-memo', e.target.value) }}
                 placeholder="자유롭게 메모하세요..."
@@ -582,11 +582,11 @@ function CustomerQuickDrawer({ customer, onClose }: { customer: any; onClose: ()
         <div className="flex border-b border-gray-100 shrink-0">
           <button onClick={() => setActiveTab('incall')}
             className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors ${activeTab === 'incall' ? 'border-[#1B2A45] text-[#1B2A45]' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
-            📋 인콜일지
+            인콜일지
           </button>
           <button onClick={() => setActiveTab('ops')}
             className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors ${activeTab === 'ops' ? 'border-violet-500 text-violet-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
-            ⚙️ 관리팀 타임라인 {opsCase ? '' : loading ? '…' : '(없음)'}
+            관리팀 타임라인 {opsCase ? '' : loading ? '…' : '(없음)'}
           </button>
         </div>
 
@@ -831,10 +831,10 @@ function AssignTab() {
                   <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">배정 대기</span>
                 </div>
                 <div className="flex gap-3 text-xs text-gray-400">
-                  <span>📞 {c.customers?.phone}</span>
-                  {c.contract_amount > 0 && <span>💰 {c.contract_amount.toLocaleString()}원</span>}
+                  <span>{c.customers?.phone}</span>
+                  {c.contract_amount > 0 && <span>{c.contract_amount.toLocaleString()}원</span>}
                   <span>영업: {c.sales_user_name}</span>
-                  <span>📅 {new Date(c.created_at).toLocaleDateString('ko-KR')}</span>
+                  <span>{new Date(c.created_at).toLocaleDateString('ko-KR')}</span>
                 </div>
                 {c.memo && <p className="text-xs text-gray-500 mt-2 bg-gray-50 px-3 py-2 rounded-lg">{c.memo}</p>}
               </div>
@@ -1112,7 +1112,7 @@ function RevenueTab() {
         {/* 영업팀 이달 계약 */}
         <div className="bg-white rounded-xl border border-blue-100 overflow-hidden">
           <div className="px-4 py-3 bg-blue-50 border-b border-blue-100 flex items-center justify-between">
-            <p className="text-xs font-bold text-blue-800">📋 영업팀 이달 계약 매출</p>
+            <p className="text-xs font-bold text-blue-800">영업팀 이달 계약 매출</p>
             <span className="text-[10px] text-blue-600">{thisMonthSales.length}건 · {fmt(thisMonthSalesTotal)}원</span>
           </div>
           {thisMonthSales.length === 0 ? (
@@ -1134,7 +1134,7 @@ function RevenueTab() {
         {/* 관리팀 이달 수수료 */}
         <div className="bg-white rounded-xl border border-violet-100 overflow-hidden">
           <div className="px-4 py-3 bg-violet-50 border-b border-violet-100 flex items-center justify-between">
-            <p className="text-xs font-bold text-violet-800">💰 관리팀 이달 수수료 매출</p>
+            <p className="text-xs font-bold text-violet-800">관리팀 이달 수수료 매출</p>
             <span className="text-[10px] text-violet-600">{thisMonthOps.length}건 · {fmt(thisMonthOpsTotal)}원</span>
           </div>
           {thisMonthOps.length === 0 ? (
@@ -1369,7 +1369,7 @@ function EmployeeManageSection() {
     if (!res.ok) { setEditError(data.error || '저장 실패'); setEditSaving(false); return }
 
     if (data.customersUnassigned) {
-      alert(`⚠️ 팀이관 완료: ${editForm.name}의 담당 고객 DB가 전부 미배정으로 변경됐습니다.\n다른 영업사원에게 재배정해주세요.`)
+      alert(`팀이관 완료: ${editForm.name}의 담당 고객 DB가 전부 미배정으로 변경됐습니다.\n다른 영업사원에게 재배정해주세요.`)
     }
     setEmployees(p => p.map(e => e.id === editId ? { ...e, ...data.user } : e))
     setEditId(null)
@@ -1407,11 +1407,11 @@ function EmployeeManageSection() {
     <div className="space-y-4 max-w-3xl">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-bold text-gray-800">👤 직원 관리</h3>
+          <h3 className="text-sm font-bold text-gray-800">직원 관리</h3>
           <p className="text-xs text-gray-400 mt-0.5">이름·아이디·비밀번호 수정, 팀이관, 계정 삭제</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={load} className="px-3 py-1.5 text-xs bg-white border border-gray-200 text-gray-600 rounded-xl hover:border-gray-400 transition-colors">🔄 새로고침</button>
+          <button onClick={load} className="px-3 py-1.5 text-xs bg-white border border-gray-200 text-gray-600 rounded-xl hover:border-gray-400 transition-colors">새로고침</button>
           <button onClick={() => { setShowCreate(v => !v); setCreateError('') }}
             className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition-colors ${showCreate ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-[#1B2A45] text-white border-[#1B2A45]'}`}>
             {showCreate ? '✕ 취소' : '➕ 직원 추가'}
@@ -1427,7 +1427,7 @@ function EmployeeManageSection() {
             {(['sales', 'ops'] as const).map(r => (
               <button key={r} onClick={() => setCreateForm(f => ({ ...f, role: r }))}
                 className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${createForm.role === r ? (r === 'sales' ? 'bg-sky-500 text-white border-sky-500' : 'bg-violet-500 text-white border-violet-500') : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'}`}>
-                {r === 'sales' ? '📞 영업팀' : '🗂 관리팀'}
+                {r === 'sales' ? '영업팀' : '관리팀'}
               </button>
             ))}
           </div>
@@ -1442,10 +1442,10 @@ function EmployeeManageSection() {
               </div>
             ))}
           </div>
-          {createError && <p className="text-xs text-red-500 font-medium">⚠️ {createError}</p>}
+          {createError && <p className="text-xs text-red-500 font-medium">{createError}</p>}
           <button onClick={createEmployee} disabled={creating}
             className="w-full py-2.5 bg-[#1B2A45] hover:bg-[#1B2A45]/90 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50">
-            {creating ? '생성 중...' : `✅ ${createForm.role === 'sales' ? '영업팀' : '관리팀'} 직원 계정 생성`}
+            {creating ? '생성 중...' : `${createForm.role === 'sales' ? '영업팀' : '관리팀'} 직원 계정 생성`}
           </button>
         </div>
       )}
@@ -1484,14 +1484,14 @@ function EmployeeManageSection() {
                   </div>
                   {editForm.role !== emp.role && (
                     <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                      <p className="text-xs text-amber-700 font-semibold">⚠️ 팀이관 시 {emp.name}의 담당 고객 DB가 모두 미배정으로 변경됩니다</p>
+                      <p className="text-xs text-amber-700 font-semibold">팀이관 시 {emp.name}의 담당 고객 DB가 모두 미배정으로 변경됩니다</p>
                     </div>
                   )}
-                  {editError && <p className="text-xs text-red-500">⚠️ {editError}</p>}
+                  {editError && <p className="text-xs text-red-500">{editError}</p>}
                   <div className="flex gap-2">
                     <button onClick={saveEdit} disabled={editSaving}
                       className="flex-1 py-2 bg-[#1B2A45] text-white text-sm font-semibold rounded-xl disabled:opacity-50">
-                      {editSaving ? '저장 중...' : '💾 저장'}
+                      {editSaving ? '저장 중...' : '저장'}
                     </button>
                     <button onClick={() => setEditId(null)}
                       className="px-4 py-2 bg-gray-100 text-gray-600 text-sm rounded-xl hover:bg-gray-200">
@@ -1512,17 +1512,17 @@ function EmployeeManageSection() {
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${roleBg[emp.role] || 'bg-gray-100 text-gray-600'}`}>
                         {roleLabel[emp.role] || emp.role}
                       </span>
-                      {emp.id === newlyCreatedId && <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-green-100 text-green-700">✨ 방금 생성</span>}
+                      {emp.id === newlyCreatedId && <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-green-100 text-green-700">방금 생성</span>}
                     </div>
                   </div>
                   <div className="flex gap-2 shrink-0">
                     <button onClick={() => openEdit(emp)}
                       className="text-xs text-[#1B2A45] hover:text-[#1B2A45]/80 px-3 py-1.5 rounded-xl hover:bg-[#1B2A45]/10 border border-transparent hover:border-[#1B2A45]/20 transition-colors font-medium">
-                      ✏️ 수정
+                      수정
                     </button>
                     <button onClick={() => deleteEmployee(emp)}
                       className="text-xs text-red-400 hover:text-red-600 px-3 py-1.5 rounded-xl hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors font-medium">
-                      🗑 삭제
+                      삭제
                     </button>
                   </div>
                 </div>
@@ -1619,7 +1619,7 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
       {/* 오늘 현황 */}
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
-          <p className="text-xs text-amber-600 font-semibold mb-1">☀️ 오늘 오전보고</p>
+          <p className="text-xs text-amber-600 font-semibold mb-1">오늘 오전보고</p>
           {todayMorning.length === 0 ? <p className="text-sm text-amber-400">아직 제출 없음</p> : (
             <div className="space-y-1">
               {todayMorning.map(r => (
@@ -1632,7 +1632,7 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
           )}
         </div>
         <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-          <p className="text-xs text-blue-600 font-semibold mb-1">📋 오늘 마감보고</p>
+          <p className="text-xs text-blue-600 font-semibold mb-1">오늘 마감보고</p>
           {todayDaily.length === 0 ? <p className="text-sm text-blue-400">아직 제출 없음</p> : (
             <div className="space-y-1">
               {todayDaily.map(r => (
@@ -1650,8 +1650,8 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
       <div className="flex gap-2 flex-wrap">
         {[
           { key: 'all',     label: `전체 (${reports.length})` },
-          { key: 'morning', label: `☀️ 오전보고 (${morningReports.length})` },
-          { key: 'daily',   label: `📋 마감보고 (${dailyReports.length})` },
+          { key: 'morning', label: `오전보고 (${morningReports.length})` },
+          { key: 'daily',   label: `마감보고 (${dailyReports.length})` },
         ].map(f => (
           <button key={f.key} onClick={() => { setFilter(f.key as any); setSelected(new Set()) }}
             className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
@@ -1665,7 +1665,7 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
       {/* ── 통계 카드 ── */}
       {filter === 'morning' && morningReports.length > 0 && (
         <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
-          <p className="text-xs text-amber-700 font-bold mb-3">☀️ 오전보고 누적 통계 ({morningReports.length}건)</p>
+          <p className="text-xs text-amber-700 font-bold mb-3">오전보고 누적 통계 ({morningReports.length}건)</p>
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
             {([
               { label: '총 콜', value: morningStats.total_calls, rate: null, rateLabel: '' },
@@ -1687,7 +1687,7 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
       )}
       {filter === 'daily' && dailyReports.length > 0 && (
         <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-          <p className="text-xs text-blue-700 font-bold mb-3">📋 마감보고 누적 통계 ({dailyReports.length}건)</p>
+          <p className="text-xs text-blue-700 font-bold mb-3">마감보고 누적 통계 ({dailyReports.length}건)</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
               { label: '누적 계약', value: dailyStats.today_contracts + '건', sub: null },
@@ -1718,7 +1718,7 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
           {selected.size > 0 && (
             <button onClick={deleteSelected} disabled={deleting}
               className="text-xs bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-bold px-3 py-1.5 rounded-lg transition-colors">
-              {deleting ? '삭제 중...' : `🗑 ${selected.size}건 삭제`}
+              {deleting ? '삭제 중...' : `${selected.size}건 삭제`}
             </button>
           )}
         </div>
@@ -1796,7 +1796,7 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
                         <div className="flex-1 min-w-0">
                           {mr ? (
                             <div className="flex items-center gap-3 flex-wrap">
-                              <span className="text-[10px] text-amber-600 font-bold">☀️오전</span>
+                              <span className="text-[10px] text-amber-600 font-bold">오전</span>
                               <span className="text-xs text-gray-600">콜 <b>{tc}</b></span>
                               <span className="text-xs text-gray-600">연결 <b className="text-amber-600">{cn}</b>{tc>0&&<span className="text-gray-400">({(cn/tc*100).toFixed(0)}%)</span>}</span>
                               <span className="text-xs text-gray-600">DB <b>{db}</b></span>
@@ -1808,7 +1808,7 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
                           )}
                           {dr ? (
                             <div className="flex items-center gap-3 flex-wrap mt-0.5">
-                              <span className="text-[10px] text-blue-600 font-bold">📋마감</span>
+                              <span className="text-[10px] text-blue-600 font-bold">마감</span>
                               <span className="text-xs text-gray-600">당일 <b className="text-blue-600">{dr.data?.today_contracts||0}</b>건</span>
                               <span className="text-xs text-gray-600">월누적 <b>{dr.data?.month_contracts||0}</b>건</span>
                               <span className="text-xs text-gray-600">목표 <b>{dr.data?.goal||0}</b>건</span>
@@ -1835,7 +1835,7 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
             <div className="sticky top-0 bg-white px-6 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-gray-900">
-                  {viewReport.report_type === 'morning' ? '☀️ 오전보고' : '📋 마감보고'}
+                  {viewReport.report_type === 'morning' ? '오전보고' : '마감보고'}
                 </h3>
                 <p className="text-xs text-gray-400">{viewReport.user_name} · {viewReport.report_date}</p>
               </div>
@@ -1983,9 +1983,9 @@ function DailyDetail({ data }: { data: any }) {
           : (data.meetings as any[]).map((item: any, i: number) => (
             <div key={i} className="bg-gray-50 rounded-lg p-3 mb-2 grid grid-cols-2 gap-1 text-xs">
               <span className="font-semibold text-gray-800 col-span-2">{item.company}</span>
-              <span className="text-gray-500">📅 {item.date}</span>
-              <span className="text-gray-500">⏰ {item.time}</span>
-              <span className="text-gray-500 col-span-2">📍 {item.location}</span>
+              <span className="text-gray-500">{item.date}</span>
+              <span className="text-gray-500">{item.time}</span>
+              <span className="text-gray-500 col-span-2">{item.location}</span>
             </div>
           ))
         }
@@ -1998,7 +1998,7 @@ function DailyDetail({ data }: { data: any }) {
             <div key={i} className="bg-gray-50 rounded-lg p-3 mb-2 grid grid-cols-2 gap-1 text-xs">
               <span className="font-semibold text-gray-800 col-span-2">{item.company}</span>
               <span className="text-gray-500">대표: {item.ceo_name}</span>
-              <span className="text-gray-500">📞 {item.phone}</span>
+              <span className="text-gray-500">{item.phone}</span>
               <span className="text-gray-500 col-span-2">첫콜: {item.first_call_date}</span>
             </div>
           ))
@@ -2071,7 +2071,7 @@ function AiLogsTab() {
         <div className="text-center py-16 text-gray-400 text-sm">불러오는 중...</div>
       ) : filtered.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
-          <p className="text-4xl mb-3">🤖</p>
+          <p className="text-4xl mb-3"></p>
           <p className="text-gray-400 text-sm">아직 홈페이지 AI 질문이 없습니다.</p>
           <p className="text-xs text-gray-300 mt-1">홈페이지 방문자가 AI에 질문하면 여기 저장됩니다.</p>
         </div>
@@ -2267,13 +2267,13 @@ function NoticesTab() {
         setContent('')
         setTargetTeam('all')
         const teamLabel = targetTeam === 'all' ? '전 직원' : targetTeam === 'sales' ? '영업팀' : '관리팀'
-        showToast(`✅ 공지 등록 완료! ${teamLabel}에게 알림 발송됐습니다.`)
+        showToast(`공지 등록 완료! ${teamLabel}에게 알림 발송됐습니다.`)
         loadNotices()
       } else {
-        showToast(`❌ ${data.error || '등록 실패'}`)
+        showToast(`${data.error || '등록 실패'}`)
       }
     } catch {
-      showToast('❌ 네트워크 오류')
+      showToast('네트워크 오류')
     }
     setPosting(false)
   }
@@ -2298,7 +2298,7 @@ function NoticesTab() {
       {/* 공지 작성 폼 */}
       <div className="bg-white rounded-2xl border border-[#E8E2D4] p-5 mb-6 shadow-sm">
         <h2 className="text-base font-bold text-[#1B2A45] mb-1 flex items-center gap-2">
-          <span className="text-xl">📢</span> 새 공지사항 작성
+          새 공지사항 작성
         </h2>
         <p className="text-xs text-gray-400 mb-4">등록하면 대상 직원 핸드폰으로 즉시 알림이 발송됩니다</p>
         <form onSubmit={handlePost} className="space-y-3">
@@ -2329,7 +2329,7 @@ function NoticesTab() {
                     : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
                 }`}
               >
-                {t === 'all' ? '👥 전 직원' : t === 'sales' ? '📞 영업팀만' : '⚙️ 관리팀만'}
+                {t === 'all' ? '전 직원' : t === 'sales' ? '영업팀만' : '관리팀만'}
               </button>
             ))}
           </div>
@@ -2338,7 +2338,7 @@ function NoticesTab() {
             disabled={posting || !title.trim()}
             className="w-full bg-[#1B2A45] hover:bg-[#243860] disabled:opacity-40 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors"
           >
-            {posting ? '발송 중...' : '📤 공지 등록 + 알림 발송'}
+            {posting ? '발송 중...' : '공지 등록 + 알림 발송'}
           </button>
         </form>
       </div>

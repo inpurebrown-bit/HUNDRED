@@ -160,14 +160,14 @@ export default function DailyRateWidget() {
       {/* 헤더 */}
       <div className="px-5 py-3 border-b border-[#E8E2D4] flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h2 className="font-semibold text-[#1B2A45] text-base">📈 결제율 현황</h2>
+          <h2 className="font-semibold text-[#1B2A45] text-base">결제율 현황</h2>
           <span className="text-[10px] text-[#1B2A45]/30">{today}</span>
         </div>
         <div className="flex items-center gap-2">
           {msg && <span className={`text-xs font-medium ${msg.includes('완료') ? 'text-emerald-600' : 'text-red-500'}`}>{msg}</span>}
           <button onClick={save} disabled={saving}
             className="px-3 py-1.5 bg-[#1B2A45] hover:bg-[#263d66] text-white text-xs font-bold rounded-lg disabled:opacity-40 transition-colors">
-            {saving ? '저장중…' : '💾 저장'}
+            {saving ? '저장중…' : '저장'}
           </button>
         </div>
       </div>

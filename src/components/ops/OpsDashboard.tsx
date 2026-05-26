@@ -255,7 +255,7 @@ const opsTabs: { key: OpsTab; label: string }[] = [
 ]
 
 // ── Detail Tab Types: 진행현황 우선, 타임라인 진행현황 하단에 통합 ──────────
-const DETAIL_TABS = ['진행현황', '인콜일지', '기관ID/PW', '💰 입금/계약'] as const
+const DETAIL_TABS = ['진행현황', '인콜일지', '기관ID/PW', '입금/계약'] as const
 type DetailTab = typeof DETAIL_TABS[number]
 
 // ──────────────────────────────────────────────────────────────────────
@@ -526,7 +526,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="bg-violet-600 px-4 py-3 flex items-center justify-between">
               <div>
-                <p className="font-bold text-white text-sm">📋 영업팀 전달 기록</p>
+                <p className="font-bold text-white text-sm">영업팀 전달 기록</p>
                 <p className="text-white/70 text-xs mt-0.5">{c.customers?.name} · {c.customers?.company || c.customers?.phone}</p>
               </div>
               <button onClick={() => setSalesLogOpen(false)} className="text-white/70 hover:text-white text-lg leading-none">✕</button>
@@ -577,11 +577,11 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
             <div className="flex gap-1.5 shrink-0">
               <button onClick={handleCeoApprove}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-colors ${local.progress_stage === '환불예정' ? 'bg-rose-500 hover:bg-rose-600' : 'bg-orange-500 hover:bg-orange-600'}`}>
-                ✅ 승인
+                승인
               </button>
               <button onClick={handleCeoReject}
                 className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors">
-                ❌ 반려
+                반려
               </button>
             </div>
           </div>
@@ -616,12 +616,12 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
           {local.progress_stage === 'assigned' && (
             <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 flex items-center justify-between">
               <div>
-                <p className="text-sm font-bold text-indigo-800">📥 신규 배정 업체</p>
+                <p className="text-sm font-bold text-indigo-800">신규 배정 업체</p>
                 <p className="text-xs text-indigo-600 mt-0.5">내용 확인 및 고객과 통화 후 흡수 처리해주세요</p>
               </div>
               <button type="button" onClick={() => field('progress_stage', 'absorbed')}
                 className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">
-                ✅ 흡수 완료
+                흡수 완료
               </button>
             </div>
           )}
@@ -634,7 +634,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
               {(local.timeline || []).some((e: any) => e.source === 'sales') && (
                 <button type="button" onClick={() => setSalesLogOpen(true)}
                   className="flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-600 text-[10px] font-bold border border-violet-200 transition-colors whitespace-nowrap">
-                  📋 전달화면
+                  전달화면
                 </button>
               )}
             </div>
@@ -672,9 +672,9 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
             </div>
             <div className="flex gap-2 flex-wrap">
               {[
-                { key: 'handling_no_contact',  label: '📵 연락 안됨',      on: 'bg-red-500 text-white border-red-500',    off: 'bg-white text-gray-500 border-gray-300 hover:bg-red-50' },
-                { key: 'handling_no_fit',      label: '🚫 들어갈 곳 없음', on: 'bg-orange-500 text-white border-orange-500', off: 'bg-white text-gray-500 border-gray-300 hover:bg-orange-50' },
-                { key: 'handling_mindless',    label: '🔄 무지성 핸들링',  on: 'bg-slate-500 text-white border-slate-500',  off: 'bg-white text-gray-500 border-gray-300 hover:bg-slate-50' },
+                { key: 'handling_no_contact',  label: '연락 안됨',      on: 'bg-red-500 text-white border-red-500',    off: 'bg-white text-gray-500 border-gray-300 hover:bg-red-50' },
+                { key: 'handling_no_fit',      label: '들어갈 곳 없음', on: 'bg-orange-500 text-white border-orange-500', off: 'bg-white text-gray-500 border-gray-300 hover:bg-orange-50' },
+                { key: 'handling_mindless',    label: '무지성 핸들링',  on: 'bg-slate-500 text-white border-slate-500',  off: 'bg-white text-gray-500 border-gray-300 hover:bg-slate-50' },
               ].map(({ key, label, on, off }) => {
                 const active = !!(d as any)[key]
                 return (
@@ -693,7 +693,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                     ? 'bg-indigo-600 text-white border-indigo-600'
                     : 'bg-white text-indigo-600 border-indigo-300 hover:bg-indigo-50'
                 }`}>
-                🔒 홀딩{(d as any).is_holding ? ' (해제)' : ''}
+                홀딩{(d as any).is_holding ? ' (해제)' : ''}
               </button>
             </div>
             {((d as any).handling_no_contact || (d as any).handling_no_fit || (d as any).handling_mindless) && (
@@ -708,7 +708,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
           {/* ── 직접자금 섹션 (항상 표시) ── */}
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-3">
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-blue-700">🏦 직접자금</span>
+              <span className="text-[11px] font-bold text-blue-700">직접자금</span>
               <div className="flex-1 h-px bg-blue-200" />
             </div>
             {/* 기관 선택 */}
@@ -733,7 +733,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                 </select>
               </div>
               <div>
-                <label className={lbl}>기관방문 날짜/시간 📅</label>
+                <label className={lbl}>기관방문 날짜/시간</label>
                 <div className="flex gap-1">
                   <input type="date" value={d.direct_visit_date || ''} onChange={e => {
                     if (e.target.value) handleDirectVisitDate(e.target.value)
@@ -741,10 +741,10 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                   }} className={inp + ' flex-1'} />
                   <input type="time" value={d.direct_visit_time || ''} onChange={e => detailField('direct_visit_time', e.target.value)} className={inp + ' w-20'} />
                 </div>
-                {d.direct_visit_date && <p className="text-[10px] text-emerald-600 mt-0.5">✅ 캘린더 자동 등록</p>}
+                {d.direct_visit_date && <p className="text-[10px] text-emerald-600 mt-0.5">캘린더 자동 등록</p>}
               </div>
               <div>
-                <label className={lbl}>실사일정 날짜/시간 📅</label>
+                <label className={lbl}>실사일정 날짜/시간</label>
                 <div className="flex gap-1">
                   <input type="date" value={d.direct_inspection_date || ''} onChange={e => detailField('direct_inspection_date', e.target.value)} className={inp + ' flex-1'} />
                   <input type="time" value={d.direct_inspection_time || ''} onChange={e => detailField('direct_inspection_time', e.target.value)} className={inp + ' w-20'} />
@@ -756,7 +756,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
           {/* ── 간접자금 섹션 (항상 표시) ── */}
           <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 space-y-3">
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-violet-700">🏛 간접자금</span>
+              <span className="text-[11px] font-bold text-violet-700">간접자금</span>
               <div className="flex-1 h-px bg-violet-200" />
             </div>
             {/* 기관 선택 */}
@@ -781,7 +781,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                 </select>
               </div>
               <div>
-                <label className={lbl}>기관방문 날짜/시간 📅</label>
+                <label className={lbl}>기관방문 날짜/시간</label>
                 <div className="flex gap-1">
                   <input type="date" value={d.indirect_visit_date || ''} onChange={e => {
                     if (e.target.value) handleIndirectVisitDate(e.target.value)
@@ -789,10 +789,10 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                   }} className={inp + ' flex-1'} />
                   <input type="time" value={d.indirect_visit_time || ''} onChange={e => detailField('indirect_visit_time', e.target.value)} className={inp + ' w-20'} />
                 </div>
-                {d.indirect_visit_date && <p className="text-[10px] text-emerald-600 mt-0.5">✅ 캘린더 자동 등록</p>}
+                {d.indirect_visit_date && <p className="text-[10px] text-emerald-600 mt-0.5">캘린더 자동 등록</p>}
               </div>
               <div>
-                <label className={lbl}>실사일정 날짜/시간 📅</label>
+                <label className={lbl}>실사일정 날짜/시간</label>
                 <div className="flex gap-1">
                   <input type="date" value={d.indirect_inspection_date || ''} onChange={e => detailField('indirect_inspection_date', e.target.value)} className={inp + ' flex-1'} />
                   <input type="time" value={d.indirect_inspection_time || ''} onChange={e => detailField('indirect_inspection_time', e.target.value)} className={inp + ' w-20'} />
@@ -804,7 +804,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
           {/* ── 확인서 섹션 ── */}
           <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] font-bold text-amber-700 shrink-0">📄 소진공 확인서</span>
+              <span className="text-[10px] font-bold text-amber-700 shrink-0">소진공 확인서</span>
               <div className="h-px bg-amber-200 flex-1 min-w-[8px]" />
               {[
                 { key: 'cert_general',   label: '일반경영안정' },
@@ -842,7 +842,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
 
           {/* 기본 식별 정보 */}
           <div className="bg-[#1B2A45]/5 border border-[#1B2A45]/15 rounded-lg p-3">
-            <p className="text-[11px] font-bold text-[#1B2A45] mb-2">📋 기본 식별 정보</p>
+            <p className="text-[11px] font-bold text-[#1B2A45] mb-2">기본 식별 정보</p>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className={lbl}>사업자등록번호</label>
@@ -921,7 +921,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
           {/* 기타 아이디/비밀번호 */}
           <div className="bg-gray-50 rounded-lg p-3">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-[11px] font-bold text-gray-600">🔑 기타 아이디/비밀번호</p>
+              <p className="text-[11px] font-bold text-gray-600">기타 아이디/비밀번호</p>
               <button
                 type="button"
                 onClick={() => {
@@ -1037,14 +1037,14 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
               <div>
                 {/* ── 헤더: 수정 버튼 ── */}
                 <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-100 sticky top-0 z-10">
-                  <span className="text-[11px] font-bold text-gray-600">📋 인콜일지</span>
+                  <span className="text-[11px] font-bold text-gray-600">인콜일지</span>
                   <button type="button" onClick={() => setIncallEditing(e => !e)}
                     className={`text-[10px] px-3 py-1 rounded-full font-bold transition-colors ${
                       incallEditing
                         ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
                         : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
                     }`}>
-                    {incallEditing ? '✓ 저장완료' : '✏️ 수정'}
+                    {incallEditing ? '✓ 저장완료' : '수정'}
                   </button>
                 </div>
 
@@ -1129,7 +1129,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                   return (
                     <div className="border-t border-emerald-100">
                       <div className="bg-emerald-600 px-3 py-1.5 flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold text-white tracking-wide">💬 영업팀 통화메모</span>
+                        <span className="text-[10px] font-bold text-white tracking-wide">영업팀 통화메모</span>
                         <span className="text-[9px] bg-white/20 text-white px-1.5 py-0.5 rounded-full">{salesTL.length}건</span>
                       </div>
                       <div className="divide-y divide-emerald-50">
@@ -1203,7 +1203,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                         className="text-[10px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none" />
                     ) : (
                       <span className={`text-[10px] font-semibold ${subcallDate ? 'text-amber-700' : 'text-gray-300'}`}>
-                        {subcallDate ? `📅 ${subcallDate}` : '—'}
+                        {subcallDate ? `${subcallDate}` : '—'}
                       </span>
                     )}
                   </div>
@@ -1216,12 +1216,12 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
       )}
 
       {/* ── 💰 입금/계약 ── */}
-      {activeDetailTab === '💰 입금/계약' && (
+      {activeDetailTab === '입금/계약' && (
         <div className="space-y-4">
           {/* 영업팀 계약 정보 (읽기 전용) */}
           {local.progress_memo && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-              <p className="text-[10px] font-bold text-amber-700 mb-1.5">📋 영업팀 계약 정보 (읽기전용)</p>
+              <p className="text-[10px] font-bold text-amber-700 mb-1.5">영업팀 계약 정보 (읽기전용)</p>
               <p className="text-xs text-gray-700 whitespace-pre-wrap">{local.progress_memo}</p>
             </div>
           )}
@@ -1246,7 +1246,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
               <div className={`border rounded-xl p-3 ${feeLocked ? 'bg-gray-50 border-gray-200' : 'bg-emerald-50 border-emerald-200'}`}>
                 <div className="flex items-center justify-between mb-2">
                   <p className={`text-[10px] font-bold ${feeLocked ? 'text-gray-500' : 'text-emerald-700'}`}>
-                    💰 1차 입금 {feeLocked && <span className="ml-1 text-[9px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">🔒 저장됨 (대표만 수정)</span>}
+                    1차 입금 {feeLocked && <span className="ml-1 text-[9px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">저장됨 (대표만 수정)</span>}
                   </p>
                   {isCeo && d.fee_locked && (
                     <button type="button"
@@ -1257,7 +1257,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                         setFeeSaved(false)
                       }}
                       className="text-[9px] bg-amber-100 hover:bg-amber-200 text-amber-700 px-2 py-0.5 rounded font-bold transition-colors">
-                      🔓 잠금 해제
+                      잠금 해제
                     </button>
                   )}
                 </div>
@@ -1285,7 +1285,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                               <span className="text-gray-500 text-[10px] font-bold">실제입금액</span>
                               <span className="font-black text-gray-700 text-sm">{formatComma(Math.round(parseComma(String(d.fee_amount)) * 1.1))}원</span>
                             </div>
-                            <div className="text-[9px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-bold inline-block">📄 세금계산서 발행</div>
+                            <div className="text-[9px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-bold inline-block">세금계산서 발행</div>
                           </>
                         )}
                         {!d.tax_invoice_issued && (
@@ -1373,7 +1373,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                         onClick={handleFeeSave}
                         disabled={feeSaving || !d.fee_amount}
                         className="px-4 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors shadow-sm">
-                        {feeSaving ? '저장 중…' : feeSaved ? '✅ 저장됨' : '💾 저장하기'}
+                        {feeSaving ? '저장 중…' : feeSaved ? '저장됨' : '저장하기'}
                       </button>
                     </div>
                   </div>
@@ -1430,14 +1430,14 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                 <div key={entry.id || idx} className={`border rounded-xl p-3 ${entryLocked ? 'bg-blue-50/50 border-blue-200' : 'bg-blue-50 border-blue-200'}`}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <p className="text-[10px] font-bold text-blue-700">💰 {idx + 2}차 입금</p>
-                      {entryLocked && <span className="text-[9px] bg-blue-500 text-white px-1.5 py-0.5 rounded-full font-bold">🔒 잠금</span>}
+                      <p className="text-[10px] font-bold text-blue-700">{idx + 2}차 입금</p>
+                      {entryLocked && <span className="text-[9px] bg-blue-500 text-white px-1.5 py-0.5 rounded-full font-bold">잠금</span>}
                     </div>
                     <div className="flex items-center gap-1.5">
                       {entryLocked && (isCeo) && (
                         <button type="button" onClick={unlockEntry}
                           className="text-[9px] text-orange-500 hover:text-orange-700 font-bold border border-orange-300 rounded px-1.5 py-0.5">
-                          🔓 해제
+                          해제
                         </button>
                       )}
                       {!entryLocked && (
@@ -1510,7 +1510,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                           }}
                           className="w-3.5 h-3.5 accent-blue-500" />
                         <span className={`text-xs font-semibold ${entryLocked ? 'text-gray-400' : 'text-gray-700'}`}>세금계산서 발행</span>
-                        {entry.tax_invoice_issued && <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-bold">📄 발행</span>}
+                        {entry.tax_invoice_issued && <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-bold">발행</span>}
                       </label>
                     </div>
                     {/* 실제입금액 */}
@@ -1547,7 +1547,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                       <button type="button" onClick={saveEntry}
                         disabled={!entry.fee_amount}
                         className="px-4 py-1.5 rounded-lg text-xs font-bold bg-blue-500 hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors shadow-sm">
-                        💾 저장하기
+                        저장하기
                       </button>
                     </div>
                   )}
@@ -1567,7 +1567,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
             {/* 환불없이 계약 뱃지 (영업팀이 체크한 경우) */}
             {(local.customers?.details?.no_refund || d.no_refund) && (
               <div className="mb-2 inline-flex items-center gap-1.5 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">
-                <span className="text-red-500 text-sm">🚫</span>
+                <span className="text-red-500 text-sm"></span>
                 <span className="text-xs font-bold text-red-700">환불없이 계약</span>
               </div>
             )}
@@ -1636,12 +1636,12 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
 
   // 경고 뱃지 (홀딩, 핸들링, 승인대기)
   const warningBadges = [
-    c.details?.is_holding && '🔒홀딩',
-    c.progress_stage === '환불예정' && '⏳환불예정',
-    c.progress_stage === '종료예정' && '⏳종료예정',
-    c.details?.handling_no_contact && '📵연락안됨',
-    c.details?.handling_no_fit     && '🚫곳없음',
-    c.details?.handling_mindless   && '🔄무지성',
+    c.details?.is_holding && '홀딩',
+    c.progress_stage === '환불예정' && '환불예정',
+    c.progress_stage === '종료예정' && '종료예정',
+    c.details?.handling_no_contact && '연락안됨',
+    c.details?.handling_no_fit     && '곳없음',
+    c.details?.handling_mindless   && '무지성',
   ].filter(Boolean) as string[]
 
   return (
@@ -1760,7 +1760,7 @@ function CaseListRow({ c, onToggle, isOpen }: { c: OpsCase; onToggle: (id: strin
           <span className="text-[10px] text-gray-400 font-mono">{formatPhone(c.customers?.phone || '')}</span>
         </div>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-          {c.institution && <span className="text-[10px] text-gray-500">🏦 {c.institution}</span>}
+          {c.institution && <span className="text-[10px] text-gray-500">{c.institution}</span>}
           {latestTimeline && (
             <span className="text-[10px] text-gray-400">
               {formatKST(latestTimeline.created_at || latestTimeline.date || '').date} — {(latestTimeline.content || latestTimeline.text || '').slice(0, 30)}
@@ -1814,7 +1814,7 @@ function CaseCard({ c, onToggle, isOpen, cardType }: {
     >
       {/* 스테이지 뱃지 */}
       <div className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold mb-1 ${stageBg}`}>
-        {cardType === 'refund' ? '💸 환불' : '✅ 종료'}
+        {cardType === 'refund' ? '환불' : '종료'}
       </div>
       {/* 업체명 */}
       <p className="font-bold text-[#1B2A45] text-[11px] leading-snug break-all" style={{ wordBreak: 'break-all' }}>
@@ -1824,11 +1824,11 @@ function CaseCard({ c, onToggle, isOpen, cardType }: {
       <p className="text-[10px] text-gray-400 mt-0.5">{c.customers?.name}</p>
       {/* 기관 */}
       {c.institution && (
-        <p className="text-[9px] text-violet-500 mt-0.5 font-medium">🏦 {c.institution.split(',')[0].trim()}</p>
+        <p className="text-[9px] text-violet-500 mt-0.5 font-medium">{c.institution.split(',')[0].trim()}</p>
       )}
       {/* 이동 날짜 */}
       <div className={`mt-1.5 inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded ${cardType === 'refund' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
-        📅 {movedDate || '—'}
+        {movedDate || '—'}
       </div>
       {/* 담당자 */}
       {c.ops_user_name && (
@@ -1901,7 +1901,7 @@ function DashboardOverview({ cases }: { cases: OpsCase[] }) {
       {/* 본인 매출 현황 */}
       {(allMonthRevenue > 0 || totalAllRevenue > 0) && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-          <p className="text-[11px] font-bold text-emerald-700 mb-3">💰 나의 매출 현황</p>
+          <p className="text-[11px] font-bold text-emerald-700 mb-3">나의 매출 현황</p>
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-white rounded-lg p-3 text-center border border-emerald-100">
               <p className="text-[10px] text-gray-400 mb-1">이번달 입금</p>
@@ -1928,7 +1928,7 @@ function DashboardOverview({ cases }: { cases: OpsCase[] }) {
       {/* 기관별 분포 */}
       {instEntries.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-xs font-bold text-gray-500 mb-3">📊 기관별 진행 현황</p>
+          <p className="text-xs font-bold text-gray-500 mb-3">기관별 진행 현황</p>
           <div className="space-y-2">
             {instEntries.map(({ inst, count }) => {
               const isIndirect = INDIRECT_SET.has(inst)
@@ -1950,7 +1950,7 @@ function DashboardOverview({ cases }: { cases: OpsCase[] }) {
       {/* 단계별 분포 */}
       {stageEntries.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-xs font-bold text-gray-500 mb-3">📋 단계별 현황</p>
+          <p className="text-xs font-bold text-gray-500 mb-3">단계별 현황</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {stageEntries.map(([stage, count]) => {
               const s = PIPELINE_STAGES.find(p => p.key === stage)
@@ -2011,11 +2011,11 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
   const unassigned = regularCases.filter(c => !c.institution || c.institution.trim() === '')
   if (unassigned.length > 0) instGroups.unshift({ inst: '신규 유입', items: unassigned })
   // 핸들링 그룹
-  if (handlingCases.length > 0) instGroups.push({ inst: '🔧 핸들링', items: handlingCases })
+  if (handlingCases.length > 0) instGroups.push({ inst: '핸들링', items: handlingCases })
   // 홀딩 그룹 — 핸들링 아래
-  if (holdingCases.length > 0) instGroups.push({ inst: '🔒 홀딩', items: holdingCases })
+  if (holdingCases.length > 0) instGroups.push({ inst: '홀딩', items: holdingCases })
   // 승인 대기 — 최상단에 배치
-  if (pendingCases.length > 0) instGroups.unshift({ inst: '⏳ 대표 승인 대기', items: pendingCases })
+  if (pendingCases.length > 0) instGroups.unshift({ inst: '대표 승인 대기', items: pendingCases })
 
   if (instGroups.length === 0) {
     return (
@@ -2041,7 +2041,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
       {instGroups.map(({ inst, items }) => {
         const isIndirect = INDIRECT_SET.has(inst)
         const isOpen = !collapsed[inst]
-        const isSpecial = inst === '신규 유입' || inst === '⏳ 대표 승인 대기' || inst === '🔧 핸들링' || inst === '🔒 홀딩'
+        const isSpecial = inst === '신규 유입' || inst === '대표 승인 대기' || inst === '핸들링' || inst === '홀딩'
 
         // 기관 그룹만 진행/대기 분리 (특수 그룹 제외)
         // 직접자금 탭 → direct_stage 기준, 간접자금 탭 → indirect_stage 기준
@@ -2058,11 +2058,11 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
                   ? 'bg-violet-600 hover:bg-violet-700'
                   : inst === '신규 유입'
                     ? 'bg-sky-500 hover:bg-sky-600'
-                    : inst === '⏳ 대표 승인 대기'
+                    : inst === '대표 승인 대기'
                       ? 'bg-rose-500 hover:bg-rose-600'
-                      : inst === '🔧 핸들링'
+                      : inst === '핸들링'
                         ? 'bg-slate-500 hover:bg-slate-600'
-                        : inst === '🔒 홀딩'
+                        : inst === '홀딩'
                           ? 'bg-indigo-600 hover:bg-indigo-700'
                           : 'bg-[#1B2A45] hover:bg-[#1B2A45]/90'
               }`}
@@ -2105,7 +2105,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle 
                 </div>
                 {/* 다음 자금 대기 — 항상 w-1/2 고정, 분리선 항상 표시 */}
                 <div className="w-1/2 min-w-0 border-l-2 border-dashed border-gray-200 pl-3">
-                  <p className="text-[9px] font-bold text-gray-400 mb-1.5 uppercase tracking-wide">📋 다음 자금 대기</p>
+                  <p className="text-[9px] font-bold text-gray-400 mb-1.5 uppercase tracking-wide">다음 자금 대기</p>
                   {upcomingItems.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                       {upcomingItems.map(c => (
@@ -2270,7 +2270,7 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
             <div className="px-5 py-4 space-y-3">
               {/* 담당 기관 */}
               <div>
-                <p className="text-[10px] font-bold text-gray-400 mb-1.5">🏦 담당 기관 (복수 선택)</p>
+                <p className="text-[10px] font-bold text-gray-400 mb-1.5">담당 기관 (복수 선택)</p>
                 <div className="space-y-1">
                   <div className="flex flex-wrap gap-1">
                     <span className="text-[10px] text-blue-500 font-medium w-12 flex items-center">직접</span>
@@ -2310,7 +2310,7 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
               </div>
               {/* 계약금액 */}
               <div>
-                <label className="text-[10px] font-bold text-gray-400 mb-1 block">💰 계약금액 (원)</label>
+                <label className="text-[10px] font-bold text-gray-400 mb-1 block">계약금액 (원)</label>
                 <input
                   type="text"
                   value={form.contract_amount}
@@ -2321,7 +2321,7 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
               </div>
               {/* 시작 단계 */}
               <div>
-                <label className="text-[10px] font-bold text-gray-400 mb-1 block">📌 시작 단계</label>
+                <label className="text-[10px] font-bold text-gray-400 mb-1 block">시작 단계</label>
                 <select
                   value={form.stage}
                   onChange={e => setForm(p => ({ ...p, stage: e.target.value }))}
@@ -2333,7 +2333,7 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
               </div>
               {/* 담당 관리자 배정 */}
               <div>
-                <label className="text-[10px] font-bold text-gray-400 mb-1 block">👤 담당 관리자 배정</label>
+                <label className="text-[10px] font-bold text-gray-400 mb-1 block">담당 관리자 배정</label>
                 <select
                   value={form.manager}
                   onChange={e => setForm(p => ({ ...p, manager: e.target.value }))}
@@ -2348,7 +2348,7 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
               </div>
               {/* 메모 */}
               <div>
-                <label className="text-[10px] font-bold text-gray-400 mb-1 block">📝 메모</label>
+                <label className="text-[10px] font-bold text-gray-400 mb-1 block">메모</label>
                 <textarea
                   value={form.memo}
                   onChange={e => setForm(p => ({ ...p, memo: e.target.value }))}
@@ -2365,7 +2365,7 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
               </button>
               <button onClick={handleContract} disabled={saving || !form.institution}
                 className="flex-1 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
-                {saving ? '처리중...' : '✅ 계약 시작 → 진행중'}
+                {saving ? '처리중...' : '계약 시작 → 진행중'}
               </button>
             </div>
           </div>
@@ -2380,7 +2380,7 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
             {/* 헤더 */}
             <div className="bg-gradient-to-r from-[#1B2A45] to-emerald-700 px-5 py-4 flex items-center justify-between rounded-t-2xl flex-shrink-0">
               <div>
-                <h3 className="font-bold text-white text-sm">➕ 신규DB 직접 추가</h3>
+                <h3 className="font-bold text-white text-sm">신규DB 직접 추가</h3>
                 <p className="text-white/60 text-xs mt-0.5">내가 발굴한 DB 정보를 입력합니다</p>
               </div>
               <button onClick={() => setAddModal(false)} className="text-white/60 hover:text-white text-lg">✕</button>
@@ -2396,31 +2396,31 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
-                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">🏢 업체명 <span className="text-red-400">*</span></label>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">업체명 <span className="text-red-400">*</span></label>
                     <input type="text" value={addForm.company} onChange={e => af('company', e.target.value)}
                       placeholder="업체명 입력" autoFocus
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">👤 대표자명</label>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">대표자명</label>
                     <input type="text" value={addForm.name} onChange={e => af('name', e.target.value)}
                       placeholder="대표자명"
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">📞 연락처</label>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">연락처</label>
                     <input type="tel" value={addForm.phone} onChange={e => af('phone', autoHyphenPhone(e.target.value))}
                       placeholder="010-0000-0000"
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">📍 지역</label>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">지역</label>
                     <input type="text" value={addForm.region} onChange={e => af('region', e.target.value)}
                       placeholder="예: 서울 강남구"
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">📅 접수일</label>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">접수일</label>
                     <input type="date" value={addForm.reception_date} onChange={e => af('reception_date', e.target.value)}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400" />
                   </div>
@@ -2434,43 +2434,43 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">🏭 업종</label>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">업종</label>
                     <input type="text" value={addForm.business_type} onChange={e => af('business_type', e.target.value)}
                       placeholder="예: 제조업"
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-sky-400" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">🔧 실업종</label>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">실업종</label>
                     <input type="text" value={addForm.real_work} onChange={e => af('real_work', e.target.value)}
                       placeholder="실제 업종"
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-sky-400" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">📅 업력</label>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">업력</label>
                     <input type="text" value={addForm.years_in_business} onChange={e => af('years_in_business', e.target.value)}
                       placeholder="예: 5년"
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-sky-400" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">👥 직원수</label>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">직원수</label>
                     <input type="text" value={addForm.employee_count} onChange={e => af('employee_count', e.target.value)}
                       placeholder="예: 10명"
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-sky-400" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">🔬 특허</label>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">특허</label>
                     <input type="text" value={addForm.patent} onChange={e => af('patent', e.target.value)}
                       placeholder="예: 2건"
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-sky-400" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">💡 솔루션</label>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">솔루션</label>
                     <input type="text" value={addForm.solution} onChange={e => af('solution', e.target.value)}
                       placeholder="예: 기보, 신보"
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-sky-400" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">💰 필요자금</label>
+                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">필요자금</label>
                     <input type="text" value={addForm.required_funds} onChange={e => af('required_funds', e.target.value)}
                       placeholder="예: 2억"
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-sky-400" />
@@ -2558,7 +2558,7 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
 
               {/* ── 메모 ── */}
               <div>
-                <label className="text-[10px] font-bold text-gray-400 mb-1 block">📝 메모</label>
+                <label className="text-[10px] font-bold text-gray-400 mb-1 block">메모</label>
                 <textarea value={addForm.memo} onChange={e => af('memo', e.target.value)}
                   rows={3} placeholder="특이사항, 상담 내용 등"
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-400 resize-none" />
@@ -2571,7 +2571,7 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
                 className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50">취소</button>
               <button onClick={handleAddDb} disabled={addSaving || !addForm.company.trim()}
                 className="flex-1 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
-                {addSaving ? '추가 중...' : '✅ 추가하기'}
+                {addSaving ? '추가 중...' : '추가하기'}
               </button>
             </div>
           </div>
@@ -2582,13 +2582,13 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
       <div className="bg-gradient-to-r from-[#1B2A45] to-sky-700 rounded-xl px-5 py-4 text-white">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h2 className="font-bold text-base">🆕 신규DB (뿌토)</h2>
+            <h2 className="font-bold text-base">신규DB (뿌토)</h2>
             <p className="text-white/60 text-xs mt-0.5">배정받은 DB · 계약 처리 시 진행중업체로 자동 이동</p>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setAddModal(true)}
               className="bg-emerald-500 hover:bg-emerald-400 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">
-              ➕ 직접 추가
+              직접 추가
             </button>
             <span className="bg-white/20 text-white font-black text-xl px-4 py-1.5 rounded-xl">{cases.length}</span>
           </div>
@@ -2598,7 +2598,7 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
       {/* 카드 그리드 */}
       {cases.length === 0 ? (
         <div className="bg-white rounded-xl border border-[#E8E2D4] p-16 text-center">
-          <p className="text-2xl mb-2">📭</p>
+          <p className="text-2xl mb-2"></p>
           <p className="text-sm font-semibold text-gray-400">배정된 신규DB가 없습니다</p>
           <p className="text-xs text-gray-300 mt-1">대표가 뿌토 DB를 배정하면 여기에 표시됩니다</p>
         </div>
@@ -2638,7 +2638,7 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 mb-1">
                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold ${isSelfAdded ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'}`}>
-                          {isSelfAdded ? '✍️ 직접추가' : '🆕 배정'}
+                          {isSelfAdded ? '직접추가' : '배정'}
                         </span>
                         {solution && (
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700">
@@ -2648,7 +2648,7 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
                       </div>
                       <p className="font-bold text-[#1B2A45] text-sm leading-tight truncate">{company}</p>
                       {repName && repName !== company && (
-                        <p className="text-[11px] text-gray-500 mt-0.5">👤 {repName}</p>
+                        <p className="text-[11px] text-gray-500 mt-0.5">{repName}</p>
                       )}
                     </div>
                   </div>
@@ -2657,37 +2657,37 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1 mb-3">
                     {phone && (
                       <div className="col-span-2 flex items-center gap-1">
-                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">📞 연락처</span>
+                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">연락처</span>
                         <span className="text-[11px] font-medium text-gray-700">{formatPhone(phone)}</span>
                       </div>
                     )}
                     {(businessType || realWork) && (
                       <div className="col-span-2 flex items-center gap-1">
-                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">🏭 업종</span>
+                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">업종</span>
                         <span className="text-[11px] text-gray-700 truncate">{realWork || businessType}</span>
                       </div>
                     )}
                     {yearsInBiz && (
                       <div className="flex items-center gap-1">
-                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">📅 업력</span>
+                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">업력</span>
                         <span className="text-[11px] text-gray-700">{yearsInBiz}</span>
                       </div>
                     )}
                     {creditKcb && (
                       <div className="flex items-center gap-1">
-                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">💳 KCB</span>
+                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">KCB</span>
                         <span className="text-[11px] text-gray-700">{creditKcb}</span>
                       </div>
                     )}
                     {patent && (
                       <div className="flex items-center gap-1">
-                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">🔬 특허</span>
+                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">특허</span>
                         <span className="text-[11px] text-gray-700">{patent}</span>
                       </div>
                     )}
                     {revenueLatest && (
                       <div className="flex items-center gap-1">
-                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">📊 매출</span>
+                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">매출</span>
                         <span className="text-[11px] text-gray-700">{revenueLatest}</span>
                       </div>
                     )}
@@ -2719,7 +2719,7 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
                       onClick={e => { e.stopPropagation(); openContractModal(c) }}
                       className="text-[10px] bg-sky-500 hover:bg-sky-600 text-white rounded-lg px-3 py-1.5 font-semibold transition-colors flex-shrink-0"
                     >
-                      ✅ 계약하기
+                      계약하기
                     </button>
                   </div>
                 </div>
@@ -2742,7 +2742,7 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
               <div className="flex gap-2">
                 <button onClick={() => openContractModal(c)}
                   className="text-xs bg-sky-500 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-sky-600">
-                  ✅ 계약하기
+                  계약하기
                 </button>
                 <button onClick={() => setOpenId(null)} className="text-gray-400 hover:text-gray-600 text-sm">✕</button>
               </div>
@@ -2800,12 +2800,12 @@ function OpsContractTab({ userName, openPanelIds, onToggle, onScriptToggle }: {
       <div className="bg-gradient-to-r from-[#1B2A45] to-sky-700 rounded-xl px-5 py-4 text-white">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h2 className="font-bold text-base">📋 계약업체 현황</h2>
+            <h2 className="font-bold text-base">계약업체 현황</h2>
             <p className="text-white/60 text-xs mt-0.5">뿌토DB에서 계약 처리된 업체 목록 (읽기전용)</p>
           </div>
           <button onClick={loadContracts}
             className="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-            🔄 새로고침
+            새로고침
           </button>
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -2907,7 +2907,7 @@ function OpsMiniRevenue({ userName }: { userName: string }) {
       <div className="flex items-center justify-between mb-3">
         <p className="text-white/70 text-xs font-semibold">{monthLabel}월 내 매출</p>
         <button onClick={() => fetch('/api/revenue').then(r=>r.json()).then(d=>setRev(d))}
-          className="text-white/40 hover:text-white/70 text-[10px]">🔄</button>
+          className="text-white/40 hover:text-white/70 text-[10px]">↺</button>
       </div>
       <p className="text-2xl font-black tracking-tight">{rev ? fmtMoney(total) : '—'}</p>
       <div className="flex gap-3 mt-3">
@@ -2989,7 +2989,7 @@ function OpsRevenueTab({ userName }: { userName: string }) {
         </div>
         <button onClick={load}
           className="flex items-center gap-1.5 text-xs bg-white border border-[#E8E2D4] text-[#1B2A45]/60 px-3 py-1.5 rounded-lg hover:border-[#1B2A45]/30 transition-colors">
-          🔄 새로고침
+          새로고침
         </button>
       </div>
 
@@ -3013,7 +3013,7 @@ function OpsRevenueTab({ userName }: { userName: string }) {
 
       {/* 탭 전환 */}
       <div className="flex bg-gray-100 rounded-xl p-1 gap-1">
-        {([['fee', '💰 수수료 매출'], ['contract', '📋 계약 매출']] as const).map(([key, label]) => (
+        {([['fee', '수수료 매출'], ['contract', '계약 매출']] as const).map(([key, label]) => (
           <button key={key} onClick={() => setRevenueTab(key)}
             className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${revenueTab === key ? 'bg-white text-[#1B2A45] shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>
             {label}
@@ -3190,7 +3190,7 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
       {/* 누적 통계 */}
       {opsReports.length > 0 && (
         <div className="bg-violet-50 border border-violet-100 rounded-xl p-4">
-          <p className="text-xs text-violet-700 font-bold mb-3">📋 나의 업무보고 누적 통계 ({opsReports.length}건)</p>
+          <p className="text-xs text-violet-700 font-bold mb-3">나의 업무보고 누적 통계 ({opsReports.length}건)</p>
           <div className="grid grid-cols-3 gap-3">
             {[
               { label: '총 처리건수', value: totalProcessed + '건', color: 'text-[#1B2A45]' },
@@ -3211,7 +3211,7 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] px-6">
           <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm text-center">
             <div className="w-20 h-20 rounded-full bg-violet-100 flex items-center justify-center mx-auto mb-5">
-              <span className="text-4xl">✅</span>
+              <span className="text-4xl">✓</span>
             </div>
             <h2 className="text-xl font-black text-gray-900 mb-2">업무보고 완료!</h2>
             <p className="text-sm text-gray-500 mb-1">대표님께 성공적으로 전송되었습니다.</p>
@@ -3229,12 +3229,12 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
         <div className="bg-white rounded-xl border border-gray-100 p-5">
           {editDate && (
             <div className="bg-violet-50 border border-violet-200 rounded-lg px-3 py-2 flex items-center justify-between mb-3">
-              <span className="text-xs text-violet-700 font-medium">✏️ 수정 중 — {editDate}</span>
+              <span className="text-xs text-violet-700 font-medium">수정 중 — {editDate}</span>
               <button type="button" onClick={() => setEditDate(null)} className="text-xs text-violet-500 hover:text-violet-700">취소</button>
             </div>
           )}
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-800">📋 관리팀 일일업무보고</h3>
+            <h3 className="font-semibold text-gray-800">관리팀 일일업무보고</h3>
             <span className="text-xs text-gray-400">{editDate || todayStr} · {userName}</span>
           </div>
 
@@ -3256,7 +3256,7 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
         {/* 오늘 처리 업체 */}
         <div className="bg-white rounded-xl border border-gray-100 p-5">
           <div className="flex items-center justify-between mb-3">
-            <h4 className="font-semibold text-gray-800 text-sm">📂 오늘 처리 업체</h4>
+            <h4 className="font-semibold text-gray-800 text-sm">오늘 처리 업체</h4>
             <button type="button" onClick={addProcessed}
               className="text-xs px-3 py-1.5 rounded-lg font-medium bg-violet-50 text-violet-600 border border-violet-100 hover:bg-violet-100 transition-colors">
               + 추가
@@ -3277,7 +3277,7 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
                             {item.action}
                           </span>
                         )}
-                        {item.institution && <span className="text-[10px] text-gray-500">🏦 {item.institution}</span>}
+                        {item.institution && <span className="text-[10px] text-gray-500">{item.institution}</span>}
                         {item.amount && <span className="text-[10px] text-emerald-600 font-semibold">{item.amount}</span>}
                       </div>
                       {item.memo && <p className="text-xs text-gray-500 mt-0.5">{item.memo}</p>}
@@ -3353,7 +3353,7 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
         {/* 특이사항 & 내일 예정 */}
         <div className="bg-white rounded-xl border border-gray-100 p-5 space-y-4">
           <div>
-            <label className="text-sm font-semibold text-gray-800 block mb-2">⚠️ 특이사항</label>
+            <label className="text-sm font-semibold text-gray-800 block mb-2">특이사항</label>
             <textarea
               value={data.special_notes}
               onChange={e => setData(p => ({ ...p, special_notes: e.target.value }))}
@@ -3361,7 +3361,7 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
               className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400/50 resize-none" />
           </div>
           <div>
-            <label className="text-sm font-semibold text-gray-800 block mb-2">📅 내일 예정 업무</label>
+            <label className="text-sm font-semibold text-gray-800 block mb-2">내일 예정 업무</label>
             <textarea
               value={data.tomorrow_plan}
               onChange={e => setData(p => ({ ...p, tomorrow_plan: e.target.value }))}
@@ -3372,7 +3372,7 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
 
         <button type="submit" disabled={submitting}
           className="w-full bg-violet-500 hover:bg-violet-600 disabled:opacity-50 text-white py-3 rounded-xl text-sm font-semibold transition-colors">
-          {submitting ? '전송 중...' : editDate ? '✏️ 업무보고 수정 전송 →' : '📋 업무보고 전송 →'}
+          {submitting ? '전송 중...' : editDate ? '업무보고 수정 전송 →' : '업무보고 전송 →'}
         </button>
       </form>
 
@@ -3414,7 +3414,7 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
           <div className="bg-white rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl">
             <div className="sticky top-0 bg-white px-6 py-4 border-b border-gray-100 flex items-center justify-between rounded-t-2xl">
               <div>
-                <h3 className="font-bold text-gray-900">📋 관리팀 업무보고</h3>
+                <h3 className="font-bold text-gray-900">관리팀 업무보고</h3>
                 <p className="text-xs text-gray-400 mt-0.5">{viewReport.report_date} · {userName}</p>
               </div>
               <button onClick={() => setViewReport(null)} className="text-gray-400 hover:text-gray-700 text-xl">✕</button>
@@ -3433,7 +3433,7 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
                             {item.action && actionInfo && (
                               <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold text-white ${actionInfo.color}`}>{item.action}</span>
                             )}
-                            {item.institution && <span className="text-[10px] text-gray-500">🏦 {item.institution}</span>}
+                            {item.institution && <span className="text-[10px] text-gray-500">{item.institution}</span>}
                             {item.amount && <span className="text-[10px] text-emerald-600 font-semibold">{item.amount}</span>}
                           </div>
                           {item.memo && <p className="text-xs text-gray-500 mt-1">{item.memo}</p>}
@@ -3806,13 +3806,13 @@ export default function OpsDashboard({ userId, userName }: Props) {
               {/* 빠른 메뉴 */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4">
                 {[
-                  { tab: 'active' as OpsTab, icon: '🔄', label: '진행중업체', count: activeCases.length, color: 'border-amber-200 hover:border-amber-400' },
-                  { tab: 'refund' as OpsTab, icon: '💸', label: '환불업체', count: refundCases.length, color: 'border-rose-200 hover:border-rose-400' },
-                  { tab: 'completed' as OpsTab, icon: '✅', label: '종료업체', count: completedCases.length, color: 'border-emerald-200 hover:border-emerald-400' },
-                  { tab: 'ops_contract' as OpsTab, icon: '📝', label: '관리팀계약', count: null, color: 'border-violet-200 hover:border-violet-400' },
-                  { tab: 'report' as OpsTab, icon: '📋', label: '관리팀보고', count: null, color: 'border-blue-200 hover:border-blue-400' },
-                  { tab: 'revenue' as OpsTab, icon: '💰', label: '매출 현황', count: null, color: 'border-emerald-200 hover:border-emerald-400' },
-                  { tab: 'profile' as OpsTab, icon: '👤', label: '사원정보', count: null, color: 'border-gray-200 hover:border-gray-400' },
+                  { tab: 'active' as OpsTab, icon: '', label: '진행중업체', count: activeCases.length, color: 'border-amber-200 hover:border-amber-400' },
+                  { tab: 'refund' as OpsTab, icon: '', label: '환불업체', count: refundCases.length, color: 'border-rose-200 hover:border-rose-400' },
+                  { tab: 'completed' as OpsTab, icon: '', label: '종료업체', count: completedCases.length, color: 'border-emerald-200 hover:border-emerald-400' },
+                  { tab: 'ops_contract' as OpsTab, icon: '', label: '관리팀계약', count: null, color: 'border-violet-200 hover:border-violet-400' },
+                  { tab: 'report' as OpsTab, icon: '', label: '관리팀보고', count: null, color: 'border-blue-200 hover:border-blue-400' },
+                  { tab: 'revenue' as OpsTab, icon: '', label: '매출 현황', count: null, color: 'border-emerald-200 hover:border-emerald-400' },
+                  { tab: 'profile' as OpsTab, icon: '', label: '사원정보', count: null, color: 'border-gray-200 hover:border-gray-400' },
                 ].map(item => (
                   <button key={item.tab} onClick={() => setActiveTab(item.tab)}
                     className={`bg-white border rounded-xl p-4 text-left transition-colors ${item.color}`}>
@@ -3834,12 +3834,12 @@ export default function OpsDashboard({ userId, userName }: Props) {
         {activeTab === 'active' && (
           <div className="max-w-6xl space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="font-bold text-[#1B2A45] text-base">🔄 진행중업체</h2>
+              <h2 className="font-bold text-[#1B2A45] text-base">진행중업체</h2>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-400">{activeCases.length}건</span>
                 <button onClick={loadCases}
                   className="text-xs bg-white border border-[#E8E2D4] text-[#1B2A45]/60 px-3 py-1.5 rounded-lg hover:border-[#1B2A45]/30 transition-colors">
-                  🔄 새로고침
+                  새로고침
                 </button>
               </div>
             </div>
@@ -3862,7 +3862,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
         {activeTab === 'refund' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="font-bold text-[#1B2A45] text-base">💸 환불업체</h2>
+              <h2 className="font-bold text-[#1B2A45] text-base">환불업체</h2>
               <span className="text-xs text-gray-400">{refundCases.length}건</span>
             </div>
             {loading ? (
@@ -3884,7 +3884,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
         {activeTab === 'completed' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="font-bold text-[#1B2A45] text-base">✅ 종료업체</h2>
+              <h2 className="font-bold text-[#1B2A45] text-base">종료업체</h2>
               <span className="text-xs text-gray-400">{completedCases.length}건</span>
             </div>
             {loading ? (
@@ -3944,7 +3944,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
           style={{ width: notepadSize.w, height: notepadSize.h, opacity: notepadOpacity / 100 }}
         >
           <div className="flex items-center justify-between px-3 py-2 bg-amber-400 rounded-t-2xl shrink-0">
-            <span className="text-[11px] font-bold text-white">📝 메모장</span>
+            <span className="text-[11px] font-bold text-white">메모장</span>
             <button onClick={() => setNotepadOpen(false)} className="text-white/80 hover:text-white text-sm leading-none">✕</button>
           </div>
           <div className="flex-1 overflow-y-auto flex flex-col">
@@ -3971,7 +3971,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
             </div>
             <div className="px-2.5 py-2 space-y-3 shrink-0">
               {(['today', 'week', 'month'] as const).map(p => {
-                const sectionLabel = { today: '📅 오늘', week: '📆 이번주', month: '🗓 이번달' }[p]
+                const sectionLabel = { today: '오늘', week: '이번주', month: '이번달' }[p]
                 const items = todos.filter(t => t.period === p)
                 return (
                   <div key={p}>
@@ -3996,7 +3996,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
               })}
             </div>
             <div className="border-t border-amber-200 px-2.5 pt-2 pb-3 flex flex-col flex-1" style={{ minHeight: 120 }}>
-              <p className="text-[9px] font-bold text-amber-600 mb-1.5">✏️ 자유 메모</p>
+              <p className="text-[9px] font-bold text-amber-600 mb-1.5">자유 메모</p>
               <textarea value={memoText}
                 onChange={e => { setMemoText(e.target.value); if (typeof window !== 'undefined') localStorage.setItem('ops-notepad-memo', e.target.value) }}
                 placeholder="자유롭게 메모하세요..."

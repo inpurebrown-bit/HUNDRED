@@ -12,7 +12,7 @@ type TransferDir = 'sales_to_sales' | 'sales_to_ops' | 'ops_to_sales' | 'ops_to_
 
 const DIR_CONFIG: Record<TransferDir, { label: string; icon: string; from: string; to: string; color: string; bg: string }> = {
   sales_to_sales: { label: '영업↔영업',   icon: '🔄', from: '영업팀', to: '영업팀', color: 'text-blue-700',   bg: 'bg-blue-500' },
-  sales_to_ops:   { label: '영업→관리팀', icon: '📤', from: '영업팀', to: '관리팀', color: 'text-violet-700', bg: 'bg-violet-500' },
+  sales_to_ops:   { label: '영업→관리팀', icon: '', from: '영업팀', to: '관리팀', color: 'text-violet-700', bg: 'bg-violet-500' },
   ops_to_sales:   { label: '관리팀→영업', icon: '↩️', from: '관리팀', to: '영업팀', color: 'text-amber-700',  bg: 'bg-amber-500' },
   ops_to_ops:     { label: '관리팀↔관리팀', icon: '🔀', from: '관리팀', to: '관리팀', color: 'text-emerald-700', bg: 'bg-emerald-500' },
 }
@@ -279,7 +279,7 @@ function TransferModeView({
         {/* 직원 필터 */}
         <div>
           <p className="text-[10px] font-bold text-gray-400 mb-1.5">
-            {isOpsSrc ? '👤 관리팀 직원 필터' : '👤 영업팀 직원 필터'}
+            {isOpsSrc ? '관리팀 직원 필터' : '영업팀 직원 필터'}
           </p>
           <div className="flex flex-wrap gap-1.5">
             <button onClick={() => { setFilterPerson('all'); clearAll() }}
@@ -311,7 +311,7 @@ function TransferModeView({
       {/* 이동 대상 설정 */}
       <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
         <p className="text-sm font-bold text-gray-700">
-          🎯 이동 대상 —{' '}
+          이동 대상 —{' '}
           <span className={cfg.color}>{cfg.to}</span> 담당자
         </p>
 
@@ -347,7 +347,7 @@ function TransferModeView({
       {/* 결과 메시지 */}
       {result && (
         <div className={`rounded-xl px-4 py-3 text-sm font-semibold ${result.fail === 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
-          ✅ 이동 완료: {result.ok}건 성공{result.fail > 0 ? `, ${result.fail}건 실패` : ''}
+          이동 완료: {result.ok}건 성공{result.fail > 0 ? `, ${result.fail}건 실패` : ''}
         </div>
       )}
 
@@ -485,7 +485,7 @@ function UnknownOwnerCleanup({
       <button onClick={() => setExpanded(v => !v)}
         className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-amber-100/50 transition-colors">
         <span className="text-xs font-bold text-amber-700">
-          ⚠️ 등록되지 않은 담당자 이름 {unknownOwners.length}개 발견 — 재배정 필요
+          등록되지 않은 담당자 이름 {unknownOwners.length}개 발견 — 재배정 필요
         </span>
         <span className="text-amber-600 text-xs">{expanded ? '▲ 닫기' : '▼ 펼치기'}</span>
       </button>
@@ -1205,7 +1205,7 @@ export default function SalesCeoTab({ initialView }: { initialView?: CeoView }) 
           className={"flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border transition-colors " + (
             ceoView === 'customers' ? 'bg-[#1B2A45] text-white border-[#1B2A45]' : 'bg-white text-gray-600 border-[#E8E2D4] hover:border-[#1B2A45]/40'
           )}>
-          📋 고객관리
+          고객관리
           <span className={"text-xs px-1.5 py-0.5 rounded-full font-bold " + (ceoView === 'customers' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500')}>
             {customers.length}
           </span>
@@ -1259,13 +1259,13 @@ export default function SalesCeoTab({ initialView }: { initialView?: CeoView }) 
               <button onClick={() => setShowCeoDirectForm(false)} className="text-white/70 hover:text-white text-lg">✕</button>
             </div>
             <div className="bg-violet-50 px-5 py-2.5 text-xs text-violet-700 border-x border-violet-200">
-              ✅ 직가DB로 분류 · <b>CEO직가</b>로 저장 · 등록 후 관리팀 전송하여 인콜카드 생성
+              직가DB로 분류 · <b>CEO직가</b>로 저장 · 등록 후 관리팀 전송하여 인콜카드 생성
             </div>
             <InCallForm
               title="직가업체 인콜일지"
               salesUsers={['CEO직가', ...salesPeople]}
               submitting={ceoDirectSaving}
-              submitLabel="✅ 직가업체 등록 + 관리팀 전송 대기"
+              submitLabel="직가업체 등록 + 관리팀 전송 대기"
               onSubmit={submitCeoDirect}
               onCancel={() => setShowCeoDirectForm(false)}
             />
@@ -1277,7 +1277,7 @@ export default function SalesCeoTab({ initialView }: { initialView?: CeoView }) 
       {ceoDirectTransferQueue && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-white border border-violet-300 shadow-2xl rounded-2xl px-5 py-4 flex items-center gap-4 max-w-lg w-full mx-4">
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-violet-700">✅ 직가업체 등록 완료!</p>
+            <p className="text-sm font-bold text-violet-700">직가업체 등록 완료!</p>
             <p className="text-xs text-gray-600 mt-0.5 truncate">
               <b>{(ceoDirectTransferQueue as any).details?.company || ceoDirectTransferQueue.company || ceoDirectTransferQueue.name}</b> — 지금 관리팀으로 전송하여 인콜카드를 생성하세요
             </p>
@@ -1290,7 +1290,7 @@ export default function SalesCeoTab({ initialView }: { initialView?: CeoView }) 
               setCeoView('transfer')
             }}
             className="shrink-0 px-4 py-2 bg-violet-600 text-white text-xs font-bold rounded-xl hover:bg-violet-700 transition-colors">
-            📤 관리팀 전송
+            관리팀 전송
           </button>
           <button onClick={() => setCeoDirectTransferQueue(null)} className="text-gray-400 hover:text-gray-600 shrink-0">✕</button>
         </div>
@@ -1333,7 +1333,7 @@ export default function SalesCeoTab({ initialView }: { initialView?: CeoView }) 
                           </div>
                         </div>
                         <span className={`text-xs px-2 py-1 rounded-lg border font-medium shrink-0 transition-colors ${isOpen ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
-                          {isOpen ? '▲ 닫기' : '📋 인콜일지 보기'}
+                          {isOpen ? '▲ 닫기' : '인콜일지 보기'}
                         </span>
                       </div>
 
@@ -1345,7 +1345,7 @@ export default function SalesCeoTab({ initialView }: { initialView?: CeoView }) 
                             <p className="text-xs text-gray-500 flex-1">타임라인에 메모 작성 후 완료 또는 반려하세요. 완료 시 담당자에게 알림이 전송됩니다.</p>
                             <button type="button" onClick={async () => { await handleInspection(c.id, 'approved'); setInspDetail(null) }}
                               className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg transition-colors">
-                              ✅ 심사완료
+                              심사완료
                             </button>
                             <button type="button" onClick={async () => { await handleInspection(c.id, 'rejected'); setInspDetail(null) }}
                               className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-lg border border-red-200 transition-colors">
@@ -1418,7 +1418,7 @@ export default function SalesCeoTab({ initialView }: { initialView?: CeoView }) 
                       <div className="flex flex-col gap-2 shrink-0 pt-1">
                         <button type="button" onClick={() => approveAs(c.id)}
                           className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg transition-colors whitespace-nowrap">
-                          ✅ A/S완료
+                          A/S완료
                         </button>
                         <button type="button" onClick={() => notApplicableAs(c.id)}
                           className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold rounded-lg border border-gray-200 transition-colors whitespace-nowrap">
@@ -1435,7 +1435,7 @@ export default function SalesCeoTab({ initialView }: { initialView?: CeoView }) 
           {/* A/S 승인된 업체 목록 */}
           <div className="bg-white border border-emerald-200 rounded-2xl overflow-hidden">
             <div className="px-5 py-3 bg-emerald-50 border-b border-emerald-200 flex items-center justify-between">
-              <span className="text-sm font-bold text-emerald-800">✅ A/S 승인 업체</span>
+              <span className="text-sm font-bold text-emerald-800">A/S 승인 업체</span>
               <span className="text-[10px] text-emerald-600">{asApprovedList.length}건 · 나중에 재활용 가능한 DB</span>
             </div>
             {asApprovedList.length === 0 ? (
@@ -1485,7 +1485,7 @@ export default function SalesCeoTab({ initialView }: { initialView?: CeoView }) 
 
       {/* ── 매출 통계 패널 ── */}
       <div className="bg-gradient-to-r from-[#1B2A45] to-blue-800 rounded-2xl px-5 py-4 text-white">
-        <p className="text-xs font-bold text-white/60 uppercase tracking-wide mb-3">💰 영업팀 매출 현황</p>
+        <p className="text-xs font-bold text-white/60 uppercase tracking-wide mb-3">영업팀 매출 현황</p>
 
         {/* 이번달 / 저번달 나란히 */}
         <div className="grid grid-cols-2 gap-3 mb-4">
@@ -1553,7 +1553,7 @@ export default function SalesCeoTab({ initialView }: { initialView?: CeoView }) 
       {/* ── A/S 승인 → 공급 DB 보충 알림 배너 ── */}
       {asApprovedList.length > 0 && !supplyBannerDismissed && (
         <div className="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 flex items-center gap-3">
-          <span className="text-xl">⚠️</span>
+          <span className="text-xl font-bold text-amber-500">!</span>
           <div className="flex-1">
             <p className="text-sm font-bold text-amber-800">공급 DB 보충 필요</p>
             <p className="text-xs text-amber-600">A/S 승인 {asApprovedList.length}건 확인됨 · 소진된 DB {asApprovedList.length}개를 보충해주세요</p>
@@ -1589,7 +1589,7 @@ export default function SalesCeoTab({ initialView }: { initialView?: CeoView }) 
                 : 'bg-white text-gray-600 border-[#E8E2D4] hover:border-[#1B2A45]/40'
             )}
           >
-            📊 전체
+            전체
             <span className={"text-xs px-1.5 py-0.5 rounded-full font-bold " + (
               personTab === 'all' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
             )}>{customers.length}</span>

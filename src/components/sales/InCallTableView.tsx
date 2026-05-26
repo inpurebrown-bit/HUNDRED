@@ -164,11 +164,11 @@ export interface Props {
 // ── ops 진행단계 스타일 ──────────────────────────────────────────
 function getOpsStageStyle(stage: string): { bg: string; label: string } {
   if (!stage) return { bg: 'bg-gray-300 text-white', label: '대기중' }
-  if (stage === '환불')     return { bg: 'bg-rose-600 text-white',   label: '💸 환불' }
-  if (stage === '환불예정') return { bg: 'bg-rose-400 text-white',   label: '⏳ 환불예정' }
-  if (stage === '종료예정') return { bg: 'bg-orange-400 text-white', label: '⏳ 종료예정' }
-  if (stage === '종료' || stage === '완료') return { bg: 'bg-gray-400 text-white', label: '✅ ' + stage }
-  if (stage === '승인')     return { bg: 'bg-emerald-500 text-white', label: '✅ 승인' }
+  if (stage === '환불')     return { bg: 'bg-rose-600 text-white',   label: '환불' }
+  if (stage === '환불예정') return { bg: 'bg-rose-400 text-white',   label: '환불예정' }
+  if (stage === '종료예정') return { bg: 'bg-orange-400 text-white', label: '종료예정' }
+  if (stage === '종료' || stage === '완료') return { bg: 'bg-gray-400 text-white', label: stage }
+  if (stage === '승인')     return { bg: 'bg-emerald-500 text-white', label: '승인' }
   if (['서류받는중', '접수전'].includes(stage)) return { bg: 'bg-gray-400 text-white', label: stage }
   return { bg: 'bg-blue-500 text-white', label: stage }
 }
@@ -234,7 +234,7 @@ function CeoMoveModal({
         {/* 헤더 */}
         <div className="bg-gradient-to-r from-[#1B2A45] to-blue-700 px-5 py-4 text-white flex items-start justify-between">
           <div>
-            <p className="font-bold text-sm">🔀 DB 이동</p>
+            <p className="font-bold text-sm">DB 이동</p>
             <p className="text-white/70 text-xs mt-0.5 break-all">{company}</p>
           </div>
           <button onClick={onClose} className="text-white/60 hover:text-white text-lg leading-none ml-4">✕</button>
@@ -248,11 +248,11 @@ function CeoMoveModal({
             <div className="grid grid-cols-2 gap-2">
               <button onClick={() => pickTeam('sales')}
                 className={`py-3 rounded-xl text-sm font-bold border-2 transition-all ${selTeam === 'sales' ? 'bg-[#1B2A45] text-white border-[#1B2A45]' : 'bg-white text-[#1B2A45] border-[#1B2A45]/30 hover:border-[#1B2A45]'}`}>
-                📂 영업팀
+                영업팀
               </button>
               <button onClick={() => pickTeam('ops')}
                 className={`py-3 rounded-xl text-sm font-bold border-2 transition-all ${selTeam === 'ops' ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-violet-600 border-violet-200 hover:border-violet-400'}`}>
-                📂 관리팀
+                관리팀
               </button>
             </div>
           </div>
@@ -300,7 +300,7 @@ function CeoMoveModal({
           {/* 이동 경로 요약 */}
           {canMove && bucketLabel && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800">
-              <p className="font-bold text-sm mb-0.5">📍 이동 경로 확인</p>
+              <p className="font-bold text-sm mb-0.5">이동 경로 확인</p>
               <p className="text-amber-600">
                 <span className="font-bold text-amber-900">{company}</span>{' '}
                 →{' '}<span className="font-bold text-amber-900">{selPerson}</span>의{' '}
@@ -317,7 +317,7 @@ function CeoMoveModal({
           </button>
           <button onClick={handleMove} disabled={!canMove || loading}
             className="flex-1 bg-[#C5A258] hover:bg-[#C5A258]/90 disabled:opacity-40 text-white py-2.5 rounded-xl text-sm font-bold transition-colors">
-            {loading ? '이동중...' : '🔀 이동하기'}
+            {loading ? '이동중...' : '이동하기'}
           </button>
         </div>
       </div>
@@ -528,7 +528,7 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
         {/* Header */}
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
-            <h2 className="font-bold text-[#1B2A45] text-sm">✅ 계약완료 처리</h2>
+            <h2 className="font-bold text-[#1B2A45] text-sm">계약완료 처리</h2>
             <p className="text-[11px] text-gray-400 mt-0.5">{company}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
@@ -577,7 +577,7 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
           {/* 수수료율 */}
           <div className="bg-violet-50 rounded-xl p-3 space-y-2.5 border border-violet-100">
             <p className="text-[10px] text-violet-700 font-bold">
-              💼 수수료율
+              수수료율
             </p>
             <div>
               <label className="text-[10px] text-gray-500 mb-1 block">수수료율</label>
@@ -628,7 +628,7 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
           {/* ★ 계약 일자 (매출 월 반영 기준) */}
           <div>
             <label className="text-[10px] text-red-600 mb-1 block font-bold">
-              📅 계약 일자 <span className="text-gray-400 font-normal">(매출 월 분류 기준 — 정확히 입력)</span>
+              계약 일자 <span className="text-gray-400 font-normal">(매출 월 분류 기준 — 정확히 입력)</span>
             </label>
             <input
               type="date"
@@ -647,7 +647,7 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
           {/* 누적 매출 (자동계산 읽기전용) */}
           <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-bold text-emerald-700">📈 이번달 누적 매출 (자동계산)</p>
+              <p className="text-[10px] font-bold text-emerald-700">이번달 누적 매출 (자동계산)</p>
               <p className="text-[10px] text-emerald-600 mt-0.5">기존 {cumulativeBase.toLocaleString()}원 + 이번 {myRevNum.toLocaleString()}원</p>
             </div>
             <p className="text-base font-bold text-emerald-700">
@@ -990,7 +990,7 @@ function CustomerCard({
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>
-                <h2 className="font-bold text-[#1B2A45] text-sm">📤 자금팀 전송</h2>
+                <h2 className="font-bold text-[#1B2A45] text-sm">자금팀 전송</h2>
                 <p className="text-[11px] text-gray-400 mt-0.5">{c.company || c.name}</p>
               </div>
               <button onClick={() => setQuickTransferOpen(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
@@ -999,7 +999,7 @@ function CustomerCard({
               {/* ★ 계약일자 확인/수정 */}
               <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
                 <label className="text-[10px] text-red-700 font-bold block mb-1.5">
-                  📅 계약 일자 확인 <span className="font-normal text-red-500">(매출 월 반영 기준 — 꼭 확인)</span>
+                  계약 일자 확인 <span className="font-normal text-red-500">(매출 월 반영 기준 — 꼭 확인)</span>
                 </label>
                 <input
                   type="date"
@@ -1008,7 +1008,7 @@ function CustomerCard({
                   className="w-full border border-red-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300/50 text-gray-800 bg-white"
                 />
               </div>
-              <p className="text-[10px] text-gray-400 font-semibold">📋 전송 전 체크리스트</p>
+              <p className="text-[10px] text-gray-400 font-semibold">전송 전 체크리스트</p>
               <label className="flex items-center gap-3 cursor-pointer bg-emerald-50 rounded-lg px-3 py-2.5 border border-emerald-100">
                 <input type="checkbox" checked={qtCheckedGroup} onChange={e => setQtCheckedGroup(e.target.checked)} className="w-4 h-4 accent-emerald-500" />
                 <span className={`text-xs font-medium ${qtCheckedGroup ? 'text-emerald-700 line-through' : 'text-gray-700'}`}>단톡방 초대 완료</span>
@@ -1027,7 +1027,7 @@ function CustomerCard({
               </button>
               <button onClick={handleQuickTransfer} disabled={qtLoading}
                 className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
-                {qtLoading ? '전송중...' : '📤 자금팀 전송'}
+                {qtLoading ? '전송중...' : '자금팀 전송'}
               </button>
             </div>
           </div>
@@ -1041,7 +1041,7 @@ function CustomerCard({
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>
-                <h2 className="font-bold text-[#1B2A45] text-sm">💬 거절업체 이동</h2>
+                <h2 className="font-bold text-[#1B2A45] text-sm">거절업체 이동</h2>
                 <p className="text-[11px] text-gray-400 mt-0.5">{c.company || c.name}</p>
               </div>
               <button onClick={() => setEmotionalOpen(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
@@ -1086,7 +1086,7 @@ function CustomerCard({
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>
-                <h2 className="font-bold text-[#1B2A45] text-sm">🗑 자체거절 처리</h2>
+                <h2 className="font-bold text-[#1B2A45] text-sm">자체거절 처리</h2>
                 <p className="text-[11px] text-gray-400 mt-0.5">{c.company || c.name}</p>
               </div>
               <button onClick={() => setTrashOpen(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
@@ -1172,31 +1172,31 @@ function CustomerCard({
                 {tabType !== 'contracted' && (
                   <button type="button" onClick={() => { setContractModalOpen(true); setMenuOpen(false) }}
                     className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-emerald-600 font-medium">
-                    ✅ 계약완료
+                    계약완료
                   </button>
                 )}
                 {tabType !== 'emotional' && (
                   <button type="button" onClick={() => { setEmotionalMood(''); setEmotionalOpen(true); setMenuOpen(false) }}
                     className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-violet-600 font-medium">
-                    💬 감성톡(거절업체)
+                    감성톡(거절업체)
                   </button>
                 )}
                 {tabType !== 'trash' && (
                   <button type="button" onClick={() => { setTrashReason(''); setTrashOpen(true); setMenuOpen(false) }}
                     className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-gray-500 font-medium">
-                    🗑 자체거절
+                    자체거절
                   </button>
                 )}
                 {tabType === 'db010' && (
                   <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); setMenuOpen(false) }}
                     className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-blue-600 font-medium">
-                    📤 공가DB로 전송
+                    공가DB로 전송
                   </button>
                 )}
                 {tabType === 'lead' && (
                   <button type="button" onClick={async () => { await setToDirectDb(); setMenuOpen(false) }}
                     className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-indigo-600 font-medium">
-                    📥 직가DB로 전송
+                    직가DB로 전송
                   </button>
                 )}
                 {tabType !== 'lead' && tabType !== 'db010' && (
@@ -1214,7 +1214,7 @@ function CustomerCard({
                 {tabType === 'contracted' && onTransferToOps && (
                   <button type="button" onClick={() => { onTransferToOps(c); setMenuOpen(false) }}
                     className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-amber-600 font-medium">
-                    📤 자금팀전송
+                    자금팀전송
                   </button>
                 )}
                 {/* 대표 전용: 카드 이동 */}
@@ -1223,7 +1223,7 @@ function CustomerCard({
                     <div className="border-t border-gray-100 my-0.5" />
                     <button type="button" onClick={() => { setCeoMoveOpen(true); setMenuOpen(false) }}
                       className="w-full text-left px-3 py-2 text-xs hover:bg-amber-50 text-amber-600 font-semibold">
-                      🔀 DB 이동
+                      DB 이동
                     </button>
                   </>
                 )}
@@ -1232,13 +1232,13 @@ function CustomerCard({
                   <>
                     <div className="border-t border-gray-100 my-0.5" />
                     <button type="button" onClick={async () => {
-                      if (confirm(`"${(c.details as any)?.company || c.company || c.name}" 업체를 직가로 전환하시겠습니까?\n\n⚠️ 전환 후 결제율 탭에서 해당 직원 공급수를 -1 해주세요.`)) {
+                      if (confirm(`"${(c.details as any)?.company || c.company || c.name}" 업체를 직가로 전환하시겠습니까?\n\n전환 후 결제율 탭에서 해당 직원 공급수를 -1 해주세요.`)) {
                         await onMarkDirect(c.id)
                         setMenuOpen(false)
                       }
                     }}
                       className="w-full text-left px-3 py-2 text-xs hover:bg-violet-50 text-violet-600 font-semibold">
-                      🔁 직가로 전환
+                      직가로 전환
                     </button>
                   </>
                 )}
@@ -1246,7 +1246,7 @@ function CustomerCard({
                 <button type="button"
                   onClick={() => { if (confirm('삭제하시겠습니까?')) { onDelete(c.id); setMenuOpen(false) } }}
                   className="w-full text-left px-3 py-2 text-xs hover:bg-red-50 text-red-500 font-medium">
-                  🗑 삭제
+                  삭제
                 </button>
               </div>
             )}
@@ -1366,7 +1366,7 @@ function CustomerCard({
                 ? 'bg-sky-500 text-white animate-pulse'
                 : 'bg-sky-100 text-sky-700'
             }`}>
-              📞 {c.details.follow_up_date.slice(5)}
+              {c.details.follow_up_date.slice(5)}
             </span>
           </div>
         )}
@@ -1374,7 +1374,7 @@ function CustomerCard({
         {/* 계약일자 표시 (contracted 탭) */}
         {tabType === 'contracted' && (
           <p className="text-[9px] text-emerald-600 font-semibold mt-1">
-            📅 {(c as any).details?.contract_date ? (c as any).details.contract_date.slice(0, 10) : '계약일 미입력'}
+            {(c as any).details?.contract_date ? (c as any).details.contract_date.slice(0, 10) : '계약일 미입력'}
           </p>
         )}
 
@@ -1389,7 +1389,7 @@ function CustomerCard({
             }}
             className="mt-1.5 w-full text-[9px] bg-amber-500 hover:bg-amber-600 text-white rounded py-1 font-semibold transition-colors"
           >
-            📤 자금팀 전송
+            자금팀 전송
           </button>
         )}
         {tabType === 'contracted' && isTransferred && (
@@ -1399,7 +1399,7 @@ function CustomerCard({
                 {getOpsStageStyle(opsStatus.stage).label}
               </span>
             ) : (
-              <span className="block w-full text-center text-[9px] text-emerald-600 font-semibold">✅ 자금팀 전송완료</span>
+              <span className="block w-full text-center text-[9px] text-emerald-600 font-semibold">자금팀 전송완료</span>
             )}
             {opsStatus?.institution && (
               <p className="text-[8px] text-gray-400 text-center truncate">{opsStatus.institution}</p>
@@ -1427,31 +1427,31 @@ function CustomerCard({
                 {tabType !== 'contracted' && (
                   <button type="button" onClick={() => setContractModalOpen(true)}
                     className="px-2.5 py-1 rounded text-[11px] font-semibold bg-emerald-500 text-white hover:bg-emerald-600">
-                    ✅ 계약완료
+                    계약완료
                   </button>
                 )}
                 {tabType !== 'emotional' && (
                   <button type="button" onClick={() => { setEmotionalMood(''); setEmotionalOpen(true) }}
                     className="px-2.5 py-1 rounded text-[11px] font-semibold bg-violet-500 text-white">
-                    💬 감성톡(거절업체)
+                    감성톡(거절업체)
                   </button>
                 )}
                 {tabType !== 'trash' && (
                   <button type="button" onClick={() => { setTrashReason(''); setTrashOpen(true) }}
                     className="px-2.5 py-1 rounded text-[11px] font-semibold bg-gray-400 text-white">
-                    🗑 자체거절
+                    자체거절
                   </button>
                 )}
                 {tabType === 'db010' && (
                   <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); onExpand(null) }}
                     className="px-2.5 py-1 rounded text-[11px] font-semibold bg-blue-600 text-white hover:bg-blue-700">
-                    📤 공가DB로 전송
+                    공가DB로 전송
                   </button>
                 )}
                 {tabType === 'lead' && (
                   <button type="button" onClick={async () => { await setToDirectDb(); onExpand(null) }}
                     className="px-2.5 py-1 rounded text-[11px] font-semibold bg-indigo-600 text-white hover:bg-indigo-700">
-                    📥 직가DB로 전송
+                    직가DB로 전송
                   </button>
                 )}
                 {tabType !== 'lead' && tabType !== 'db010' && (
@@ -1470,7 +1470,7 @@ function CustomerCard({
                 <div className="relative" ref={tradeRef}>
                   <button type="button" onClick={() => setTradeOpen(v => !v)}
                     className="px-2.5 py-1 rounded text-[11px] font-semibold bg-sky-500 hover:bg-sky-600 text-white">
-                    🔄 DB 트레이드
+                    DB 트레이드
                   </button>
                   {tradeOpen && (
                     <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 py-1 z-50 min-w-[160px]">
@@ -1507,13 +1507,13 @@ function CustomerCard({
             {userName === 'ceo' && onMarkDirect && !(c.details as any)?.is_direct && (
               <button type="button"
                 onClick={async () => {
-                  if (confirm(`"${(c.details as any)?.company || c.company || c.name}" 업체를\n직가로 전환하시겠습니까?\n\n✅ 공급결제 → 직접결제로 즉시 재계산됩니다.\n⚠️ 결제율 탭에서 해당 직원 공급수를 -1 해주세요.`)) {
+                  if (confirm(`"${(c.details as any)?.company || c.company || c.name}" 업체를\n직가로 전환하시겠습니까?\n\n공급결제 → 직접결제로 즉시 재계산됩니다.\n결제율 탭에서 해당 직원 공급수를 -1 해주세요.`)) {
                     await onMarkDirect(c.id)
                     onExpand(null)
                   }
                 }}
                 className="px-2.5 py-1 rounded text-[11px] font-semibold bg-violet-600 hover:bg-violet-700 text-white">
-                🔁 직가 전환
+                직가 전환
               </button>
             )}
             {/* 미팅일지 출력 버튼 */}
@@ -1522,7 +1522,7 @@ function CustomerCard({
               onClick={e => { e.stopPropagation(); setMeetingJournalOpen(true) }}
               className="ml-auto px-2.5 py-1 rounded text-[11px] font-semibold bg-[#C5A258] hover:bg-[#b8923f] text-white flex items-center gap-1"
             >
-              🖨️ 미팅일지
+              미팅일지
             </button>
             <button type="button" onClick={() => onExpand(null)}
               className="text-gray-400 hover:text-gray-600 text-sm font-bold px-1">✕</button>
@@ -1535,7 +1535,7 @@ function CustomerCard({
             <div className="p-4 flex flex-col">
               {/* 헤더 + 수정 버튼 (자금팀 전송 전만) */}
               <div className="flex items-center justify-between mb-2 shrink-0">
-                <p className="text-[10px] font-bold text-[#1B2A45] uppercase tracking-wide">📋 인콜일지</p>
+                <p className="text-[10px] font-bold text-[#1B2A45] uppercase tracking-wide">인콜일지</p>
                 {!isTransferred && (
                   <button type="button" onClick={logEditMode ? () => setLogEditMode(false) : openLogEdit}
                     className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-semibold transition-colors ${
@@ -1543,7 +1543,7 @@ function CustomerCard({
                         ? 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
                         : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
                     }`}>
-                    {logEditMode ? '✕ 취소' : '✏️ 수정'}
+                    {logEditMode ? '✕ 취소' : '수정'}
                   </button>
                 )}
                 {isTransferred && (
@@ -1678,12 +1678,12 @@ function CustomerCard({
                         ? 'bg-blue-600 hover:bg-blue-700 text-white'
                         : 'bg-gray-100 text-gray-300 cursor-not-allowed'
                     }`}>
-                    {logSaving ? '저장중…' : '💾 저장'}
+                    {logSaving ? '저장중…' : '저장'}
                   </button>
                   <button type="button"
                     onClick={() => { if (confirm('이 고객을 삭제하시겠습니까?')) { onDelete(c.id); onExpand(null) } }}
                     className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-red-50 text-red-400 hover:bg-red-100 border border-red-100 transition-colors">
-                    🗑 삭제
+                    삭제
                   </button>
                 </div>
               )}
@@ -1694,7 +1694,7 @@ function CustomerCard({
               {/* 담당자 (자동 - 읽기 전용) */}
               <div className="flex items-center justify-between">
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">
-                  {isTransferred ? '🏢 자금팀 진행현황' : '📞 인콜결과'}
+                  {isTransferred ? '자금팀 진행현황' : '인콜결과'}
                 </p>
                 <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
                   담당: {c.sales_user_name || c.details?.sales_user_name || userName}
@@ -1739,17 +1739,17 @@ function CustomerCard({
                         ? 'bg-rose-50 border-rose-200 text-rose-700'
                         : 'bg-orange-50 border-orange-200 text-orange-700'
                     }`}>
-                      {opsStatus.stage === '환불예정' && '⏳ 환불 진행 예정 — 대표 승인 대기중입니다'}
-                      {opsStatus.stage === '환불'     && '💸 환불 처리가 완료되었습니다'}
-                      {opsStatus.stage === '종료예정' && '⏳ 종료 예정 — 대표 승인 대기중입니다'}
-                      {(opsStatus.stage === '종료' || opsStatus.stage === '완료') && '✅ 업무가 종료되었습니다'}
+                      {opsStatus.stage === '환불예정' && '환불 진행 예정 — 대표 승인 대기중입니다'}
+                      {opsStatus.stage === '환불'     && '환불 처리가 완료되었습니다'}
+                      {opsStatus.stage === '종료예정' && '종료 예정 — 대표 승인 대기중입니다'}
+                      {(opsStatus.stage === '종료' || opsStatus.stage === '완료') && '업무가 종료되었습니다'}
                     </div>
                   )}
 
                   {/* 아직 진행정보 없음 */}
                   {!opsStatus?.stage && (
                     <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-center">
-                      <p className="text-xs text-amber-700 font-semibold">📤 자금팀으로 전송 완료</p>
+                      <p className="text-xs text-amber-700 font-semibold">자금팀으로 전송 완료</p>
                       <p className="text-[10px] text-amber-500 mt-0.5">자금팀에서 진행사항을 업데이트하면 여기에 표시됩니다</p>
                     </div>
                   )}
@@ -1783,7 +1783,7 @@ function CustomerCard({
                   {tabType === 'contracted' && (
                     <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                       <label className="text-[10px] text-red-700 mb-1.5 block font-bold">
-                        📅 계약 일자 <span className="text-red-400 font-normal">(매출 월 기준 — 수정 가능)</span>
+                        계약 일자 <span className="text-red-400 font-normal">(매출 월 기준 — 수정 가능)</span>
                       </label>
                       <input
                         type="date"
@@ -1792,7 +1792,7 @@ function CustomerCard({
                         className="w-full border border-red-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-red-400/50 text-gray-800 bg-white"
                       />
                       {!(c as any).details?.contract_date && (
-                        <p className="text-[9px] text-red-500 mt-1 font-medium">⚠️ 계약일 미입력 — 반드시 입력해야 해당 월 매출에 반영됩니다</p>
+                        <p className="text-[9px] text-red-500 mt-1 font-medium">계약일 미입력 — 반드시 입력해야 해당 월 매출에 반영됩니다</p>
                       )}
                     </div>
                   )}
@@ -1800,7 +1800,7 @@ function CustomerCard({
                   {/* 감성톡 감도 — emotional 탭 전용 */}
                   {tabType === 'emotional' && (
                     <div className="bg-pink-50 border border-pink-200 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                      <label className="text-[10px] text-pink-700 mb-2 block font-bold">💬 감도 설정</label>
+                      <label className="text-[10px] text-pink-700 mb-2 block font-bold">감도 설정</label>
                       <div className="flex gap-2">
                         {(['상', '중', '하'] as const).map(m => (
                           <button key={m} type="button"
@@ -1817,7 +1817,7 @@ function CustomerCard({
                         ))}
                       </div>
                       {!c.details?.rejection_mood && (
-                        <p className="text-[9px] text-pink-500 mt-1.5 font-medium">⚠️ 감도 미설정 — 그룹 분류를 위해 선택해주세요</p>
+                        <p className="text-[9px] text-pink-500 mt-1.5 font-medium">감도 미설정 — 그룹 분류를 위해 선택해주세요</p>
                       )}
                     </div>
                   )}
@@ -1837,15 +1837,15 @@ function CustomerCard({
                   <div className="flex flex-wrap items-center gap-2">
                     {c.details?.as_not_applicable ? (
                       <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 border border-gray-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
-                        ⛔ A/S비해당 {c.details.as_not_applicable_date ? `(${c.details.as_not_applicable_date})` : ''}
+                        A/S비해당 {c.details.as_not_applicable_date ? `(${c.details.as_not_applicable_date})` : ''}
                       </span>
                     ) : c.details?.as_approved ? (
                       <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
-                        ✅ A/S완료 {c.details.as_approve_date ? `(${c.details.as_approve_date})` : ''}
+                        A/S완료 {c.details.as_approve_date ? `(${c.details.as_approve_date})` : ''}
                       </span>
                     ) : c.details?.as_requested ? (
                       <span className="inline-flex items-center gap-1 bg-orange-100 text-orange-700 border border-orange-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
-                        🔧 A/S 요청됨 {c.details.as_request_date ? `(${c.details.as_request_date})` : ''}
+                        A/S 요청됨 {c.details.as_request_date ? `(${c.details.as_request_date})` : ''}
                       </span>
                     ) : (
                       <button type="button"
@@ -1855,27 +1855,27 @@ function CustomerCard({
                         }})}
                         className="inline-flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors"
                       >
-                        🔧 A/S 요청
+                        A/S 요청
                       </button>
                     )}
                     {(tabType === 'lead' || tabType === 'db010') && (
                       inspectionStatus === 'pending' ? (
                         <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
-                          ⏳ 심사요청 중
+                          심사요청 중
                         </span>
                       ) : inspectionStatus === 'approved' ? (
                         <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
-                          ✅ 심사완료
+                          심사완료
                         </span>
                       ) : inspectionStatus === 'rejected' ? (
                         <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 border border-red-200 px-3 py-1.5 rounded-full text-[11px] font-semibold">
-                          ❌ 심사 반려
+                          심사 반려
                         </span>
                       ) : (
                         <button type="button" onClick={handleInspectionRequest}
                           className="inline-flex items-center gap-1 bg-violet-500 hover:bg-violet-600 text-white px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors"
                         >
-                          🔍 심사 요청
+                          심사 요청
                         </button>
                       )
                     )}
@@ -1883,7 +1883,7 @@ function CustomerCard({
 
                   {/* 타임라인 */}
                   <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                    <p className="text-[10px] font-bold text-blue-700 mb-2">📝 타임라인</p>
+                    <p className="text-[10px] font-bold text-blue-700 mb-2">타임라인</p>
                     <div className="flex gap-2 mb-3">
                       <input
                         type="text"
@@ -1984,13 +1984,13 @@ export default function InCallTableView({
     <div className="space-y-4">
       {groups.map(({ date, items }) => {
         const display = tabType === 'emotional'
-          ? date === '__none__' ? '💬 감도 미설정'
-            : date === '상' ? '🔴 감도 상'
-            : date === '중' ? '🟠 감도 중'
-            : '⚪ 감도 하'
+          ? date === '__none__' ? '감도 미설정'
+            : date === '상' ? '감도 상'
+            : date === '중' ? '감도 중'
+            : '감도 하'
           : date === '__none__'
-          ? '📅 날짜 미정'
-          : `📅 ${date.slice(0, 7).replace('-', '년 ')}월  ${date.slice(8, 10)}일`
+          ? '날짜 미정'
+          : `${date.slice(0, 7).replace('-', '년 ')}월  ${date.slice(8, 10)}일`
 
         return (
           <div key={date}>

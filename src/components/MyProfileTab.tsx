@@ -93,7 +93,7 @@ export default function MyProfileTab() {
       })
       const data = await res.json()
       if (data.ok) {
-        setMsg({ type: 'ok', text: '✅ PIN이 변경되었습니다' })
+        setMsg({ type: 'ok', text: 'PIN이 변경되었습니다' })
         setCurrentPin('')
         setNewPin('')
         setConfirmPin('')
@@ -141,7 +141,6 @@ export default function MyProfileTab() {
       {/* PIN 변경 카드 */}
       <div className="bg-white rounded-2xl border border-[#E8E2D4] p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-5">
-          <span className="text-lg">🔐</span>
           <div>
             <h3 className="text-sm font-bold text-[#1B2A45]">PIN 변경</h3>
             <p className="text-[11px] text-[#1B2A45]/40 mt-0.5">
@@ -193,7 +192,7 @@ export default function MyProfileTab() {
 
       {/* 보안 안내 */}
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-        <p className="text-xs font-semibold text-amber-700 mb-1.5">🔒 PIN 보안 안내</p>
+        <p className="text-xs font-semibold text-amber-700 mb-1.5">PIN 보안 안내</p>
         <ul className="text-[11px] text-amber-700/80 space-y-1 leading-relaxed">
           <li>• PIN은 5회 연속 틀리면 계정이 자동 잠깁니다</li>
           <li>• 잠기면 대표에게 문의하여 초기화 받으세요</li>

@@ -66,7 +66,7 @@ export default function MinutesTab() {
       {/* 헤더 */}
       <div className="bg-[#1B2A45] rounded-xl px-5 py-4 flex items-center justify-between flex-wrap gap-3 print-hide">
         <div>
-          <h2 className="font-bold text-white text-base">📒 오늘 회의 자료</h2>
+          <h2 className="font-bold text-white text-base">오늘 회의 자료</h2>
           <p className="text-xs text-white/50 mt-0.5">
             마감보고 기준: <b className="text-white/80">{prepDate}</b> &nbsp;·&nbsp; 오전보고: <b className="text-white/80">{today}</b>
           </p>
@@ -85,19 +85,19 @@ export default function MinutesTab() {
             onClick={() => loadReports(prepDate)}
             className="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
           >
-            🔄 새로고침
+            새로고침
           </button>
           <button
             onClick={() => window.print()}
             className="bg-[#C5A258] hover:bg-[#D4B568] text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
           >
-            🖨️ 출력
+            출력
           </button>
         </div>
       </div>
       {/* 인쇄 전용 타이틀 */}
       <div className="hidden print:block text-center mb-3">
-        <h2 className="text-base font-bold text-gray-800">📒 회의 자료 — 마감보고: {prepDate} · 오전보고: {today}</h2>
+        <h2 className="text-base font-bold text-gray-800">회의 자료 — 마감보고: {prepDate} · 오전보고: {today}</h2>
       </div>
 
       {/* 직원별 보고 */}
@@ -149,7 +149,7 @@ export default function MinutesTab() {
                 <div className="p-5 grid md:grid-cols-2 print:grid-cols-1 gap-4">
                   {/* 오전보고 */}
                   <div>
-                    <p className="text-xs font-bold text-amber-600 mb-3">☀️ 오전보고</p>
+                    <p className="text-xs font-bold text-amber-600 mb-3">오전보고</p>
                     {mr ? (
                       <>
                         <div className="grid grid-cols-4 gap-2 mb-3">
@@ -167,7 +167,7 @@ export default function MinutesTab() {
                           ))}
                         </div>
                         <div className="bg-red-50 border border-red-100 rounded-lg p-3">
-                          <p className="text-[10px] font-bold text-red-600 mb-1.5">📌 프레스 체크</p>
+                          <p className="text-[10px] font-bold text-red-600 mb-1.5">프레스 체크</p>
                           <div className="space-y-0.5">
                             {pressPoints.map((pt, i) => (
                               <p key={i} className={`text-xs ${pt.startsWith('✓') ? 'text-green-600' : 'text-red-600'}`}>{pt}</p>
@@ -182,7 +182,7 @@ export default function MinutesTab() {
 
                   {/* 마감보고 */}
                   <div>
-                    <p className="text-xs font-bold text-blue-600 mb-3">📋 마감보고</p>
+                    <p className="text-xs font-bold text-blue-600 mb-3">마감보고</p>
                     {!dr && (
                       <div className="bg-gray-50 rounded-lg px-3 py-2 text-xs text-gray-400 mb-2 text-center">마감보고 미제출</div>
                     )}
@@ -203,7 +203,7 @@ export default function MinutesTab() {
 
                       {/* 공급DB 상담결과 */}
                       <div>
-                        <p className="text-[10px] font-bold text-green-700 mb-1">🟢 공급DB 상담결과</p>
+                        <p className="text-[10px] font-bold text-green-700 mb-1">공급DB 상담결과</p>
                         {(dr?.data?.supply_db || []).length > 0 ? (
                           <div className="space-y-1">
                             {(dr!.data.supply_db as any[]).map((i: any, idx: number) => {
@@ -236,7 +236,7 @@ export default function MinutesTab() {
 
                       {/* 아웃바운딩 상담결과 */}
                       <div>
-                        <p className="text-[10px] font-bold text-violet-700 mb-1">🟣 아웃바운딩 상담결과</p>
+                        <p className="text-[10px] font-bold text-violet-700 mb-1">아웃바운딩 상담결과</p>
                         {(dr?.data?.outbound || []).length > 0 ? (
                           <div className="space-y-1">
                             {(dr!.data.outbound as any[]).map((i: any, idx: number) => {
@@ -269,7 +269,7 @@ export default function MinutesTab() {
 
                       {/* 결정업체 */}
                       <div>
-                        <p className="text-[10px] font-bold text-emerald-700 mb-1">✅ 결정업체</p>
+                        <p className="text-[10px] font-bold text-emerald-700 mb-1">결정업체</p>
                         {(dr?.data?.decided || []).length > 0 ? (
                           <div className="space-y-1">
                             {(dr!.data.decided as any[]).map((d: any, idx: number) => (
@@ -288,7 +288,7 @@ export default function MinutesTab() {
 
                       {/* 고민관리업체 */}
                       <div>
-                        <p className="text-[10px] font-bold text-amber-700 mb-1">🤔 고민관리업체</p>
+                        <p className="text-[10px] font-bold text-amber-700 mb-1">고민관리업체</p>
                         {(dr?.data?.worried || []).length > 0 ? (
                           <div className="space-y-1">
                             {(dr!.data.worried as any[]).map((w: any, idx: number) => (
@@ -315,7 +315,7 @@ export default function MinutesTab() {
 
                       {/* 미팅 일정 */}
                       <div>
-                        <p className="text-[10px] font-bold text-sky-700 mb-1">📅 미팅 일정</p>
+                        <p className="text-[10px] font-bold text-sky-700 mb-1">미팅 일정</p>
                         {(dr?.data?.meetings || []).length > 0 ? (
                           <div className="space-y-0.5">
                             {(dr!.data.meetings as any[]).map((m: any, idx: number) => (
@@ -331,7 +331,7 @@ export default function MinutesTab() {
 
                       {/* 입금대기 */}
                       <div>
-                        <p className="text-[10px] font-bold text-indigo-700 mb-1">💰 입금대기 업체</p>
+                        <p className="text-[10px] font-bold text-indigo-700 mb-1">입금대기 업체</p>
                         {(dr?.data?.payment_waiting || []).length > 0 ? (
                           <div className="space-y-1">
                             {(dr!.data.payment_waiting as any[]).map((p: any, idx: number) => (
@@ -354,7 +354,7 @@ export default function MinutesTab() {
                 {/* 다음날 확인 필요 */}
                 <div className="border-t border-blue-100 px-5 py-3 bg-blue-50/40">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-[10px] font-bold text-blue-600">🔔 다음날 확인 필요</p>
+                    <p className="text-[10px] font-bold text-blue-600">다음날 확인 필요</p>
                     <button
                       onClick={() => setNextDayChecks(prev => ({
                         ...prev,
@@ -420,7 +420,7 @@ export default function MinutesTab() {
 
       {/* 전체 메모 공간 */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 print:break-before-page">
-        <p className="text-xs font-bold text-gray-500 mb-3">📝 전체 결정사항 / 메모</p>
+        <p className="text-xs font-bold text-gray-500 mb-3">전체 결정사항 / 메모</p>
         <div className="space-y-2">
           {[1, 2, 3, 4].map(i => (
             <div key={i} className="h-5 border-b border-dashed border-gray-300" />

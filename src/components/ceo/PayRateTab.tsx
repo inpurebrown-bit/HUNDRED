@@ -33,13 +33,13 @@ const TESTER = 'TESTER'
 
 function rateGrade(rate: number | null, top: number) {
   if (rate === null || rate === undefined) return { label: '—', cls: 'text-gray-400' }
-  if (rate >= top)        return { label: '🔥최상', cls: 'text-blue-600 font-bold' }
-  if (rate >= top - 5)    return { label: '✨우수', cls: 'text-cyan-600 font-bold' }
-  if (rate >= top - 10)   return { label: '✅양호', cls: 'text-emerald-600 font-bold' }
-  if (rate >= top - 15)   return { label: '📊보통', cls: 'text-amber-500 font-bold' }
-  if (rate >= top - 20)   return { label: '⚠️미흡', cls: 'text-orange-400 font-bold' }
-  if (rate >= top - 25)   return { label: '⚡부진', cls: 'text-orange-600 font-bold' }
-  return                         { label: '🚨위험', cls: 'text-red-500 font-bold' }
+  if (rate >= top)        return { label: '최상', cls: 'text-blue-600 font-bold' }
+  if (rate >= top - 5)    return { label: '우수', cls: 'text-cyan-600 font-bold' }
+  if (rate >= top - 10)   return { label: '양호', cls: 'text-emerald-600 font-bold' }
+  if (rate >= top - 15)   return { label: '보통', cls: 'text-amber-500 font-bold' }
+  if (rate >= top - 20)   return { label: '미흡', cls: 'text-orange-400 font-bold' }
+  if (rate >= top - 25)   return { label: '부진', cls: 'text-orange-600 font-bold' }
+  return                         { label: '위험', cls: 'text-red-500 font-bold' }
 }
 
 // 직책 제거 이름 정규화 (예: "손제후 수석팀장" → "손제후")
@@ -197,7 +197,7 @@ function EmpCard({
               title={`DB자동값(${fmtVal(autoVal)})으로 동기화`}
               onClick={() => onChange(idx, field, autoVal)}
               className="text-[8px] text-gray-400 hover:text-blue-500 transition-colors"
-            >🔄</button>
+            >동기화</button>
           )}
         </div>
         <div className="relative w-full">
@@ -348,7 +348,7 @@ function EmpCard({
           className="w-full flex items-center justify-between py-1.5 px-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
         >
           <span className="text-[9px] text-gray-500 font-semibold">
-            📅 일별 공급 입력
+            일별 공급 입력
             <span className="ml-1.5 text-sky-600 font-black">합계 {supplyCount}개</span>
           </span>
           <span className="text-[9px] text-gray-400">{showDaily ? '▲ 접기' : '▼ 펼치기'}</span>
@@ -582,9 +582,9 @@ function PayRateSubView() {
       const json = await res.json()
       if (!silent) {
         if (!res.ok) {
-          setSaveMsg(`❌ 저장 실패: ${json.error || res.status}`)
+          setSaveMsg(`저장 실패: ${json.error || res.status}`)
         } else {
-          setSaveMsg(json.record ? '✅ 저장 완료' : '❌ 저장 실패')
+          setSaveMsg(json.record ? '저장 완료' : '저장 실패')
         }
         setSaving(false)
         setTimeout(() => setSaveMsg(''), 4000)
@@ -594,7 +594,7 @@ function PayRateSubView() {
       }
     } catch (e: any) {
       if (!silent) {
-        setSaveMsg(`❌ 네트워크 오류`)
+        setSaveMsg(`네트워크 오류`)
         setSaving(false)
         setTimeout(() => setSaveMsg(''), 4000)
       }
@@ -659,7 +659,7 @@ function PayRateSubView() {
       {/* ─── 이번달 계약 자동집계 (compact) ─── */}
       {autoStats.length > 0 && (
         <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2.5 flex items-center gap-3 flex-wrap">
-          <span className="text-[10px] font-bold text-emerald-600 shrink-0">🤖 이번달 계약</span>
+          <span className="text-[10px] font-bold text-emerald-600 shrink-0">이번달 계약</span>
           <div className="flex gap-2 flex-wrap flex-1">
             {autoStats.map(s => (
               <div key={s.name} className="bg-white rounded-lg px-3 py-1.5 border border-emerald-100 flex items-center gap-1.5">
@@ -685,7 +685,7 @@ function PayRateSubView() {
 
       {/* ─── 👥 직원별 현황 (영업일기준보다 먼저) ─── */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-        <h3 className="text-sm font-bold text-gray-800 mb-4">👥 직원별 현황</h3>
+        <h3 className="text-sm font-bold text-gray-800 mb-4">직원별 현황</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {employees.filter(r => r.name !== TESTER).map((row, i) => (
             <EmpCard
@@ -718,7 +718,7 @@ function PayRateSubView() {
       {/* ─── 📈 영업일 기준 (영업팀) ─── */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-gray-800">📈 영업일 기준 <span className="text-violet-500 font-semibold">(영업팀)</span></h3>
+          <h3 className="text-sm font-bold text-gray-800">영업일 기준 <span className="text-violet-500 font-semibold">(영업팀)</span></h3>
           <span className="text-[11px] text-gray-300">{today}</span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
@@ -838,7 +838,7 @@ function PayRateSubView() {
 
         return (
           <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-gray-800">🏢 관리팀 현재 매출 &amp; 진행 현황 <span className="text-[11px] text-gray-400 font-normal">({month})</span></h3>
+            <h3 className="text-sm font-bold text-gray-800">관리팀 현재 매출 &amp; 진행 현황 <span className="text-[11px] text-gray-400 font-normal">({month})</span></h3>
 
             {/* 매출 요약 */}
             {opsRevenue !== null && (
@@ -939,14 +939,14 @@ function PayRateSubView() {
       {/* ─── 저장 ─── */}
       <div className="flex items-center justify-end gap-3">
         {saveMsg && (
-          <span className={`text-sm font-medium ${saveMsg.includes('✅') ? 'text-emerald-600' : 'text-red-500'}`}>
+          <span className={`text-sm font-medium ${saveMsg.includes('저장 완료') ? 'text-emerald-600' : 'text-red-500'}`}>
             {saveMsg}
           </span>
         )}
         <button onClick={handleSave} disabled={saving}
           className="bg-[#1B2A45] hover:bg-[#263d66] disabled:opacity-40 text-white
             px-7 py-2.5 rounded-2xl text-sm font-bold shadow-sm transition-colors">
-          {saving ? '저장 중…' : '💾 저장'}
+          {saving ? '저장 중…' : '저장'}
         </button>
       </div>
     </div>
@@ -1068,12 +1068,12 @@ export function PnlSubView() {
       })
       const json = await res.json()
       if (!res.ok) {
-        setMsg(`❌ 저장 실패: ${json.error || res.status}`)
+        setMsg(`저장 실패: ${json.error || res.status}`)
       } else {
-        setMsg(json.record ? '✅ 저장 완료' : '❌ 저장 실패')
+        setMsg(json.record ? '저장 완료' : '저장 실패')
       }
     } catch {
-      setMsg('❌ 네트워크 오류 (로컬 백업됨)')
+      setMsg('네트워크 오류 (로컬 백업됨)')
     }
     setSaving(false)
     setTimeout(() => setMsg(''), 4000)
@@ -1093,7 +1093,7 @@ export function PnlSubView() {
     <div className="space-y-5 pb-8">
       {/* ── 월별 손익 3개월 비교 ── */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5">
-        <h3 className="text-sm font-bold text-gray-800 mb-3">📊 월별 매출 3개월 비교</h3>
+        <h3 className="text-sm font-bold text-gray-800 mb-3">월별 매출 3개월 비교</h3>
         {last3.length === 0 ? (
           <p className="text-xs text-gray-400">데이터 불러오는 중...</p>
         ) : (
@@ -1138,10 +1138,10 @@ export function PnlSubView() {
       <div className="flex items-center justify-between">
         <p className="text-[11px] text-gray-400">{today}</p>
         <div className="flex items-center gap-3">
-          {msg && <span className={`text-sm font-medium ${msg.includes('✅') ? 'text-emerald-600' : msg.includes('❌') ? 'text-red-500' : 'text-gray-500'}`}>{msg}</span>}
+          {msg && <span className={`text-sm font-medium ${msg.includes('저장 완료') ? 'text-emerald-600' : msg.includes('실패') || msg.includes('오류') ? 'text-red-500' : 'text-gray-500'}`}>{msg}</span>}
           <button onClick={handleSave} disabled={saving}
             className="bg-[#1B2A45] hover:bg-[#263d66] text-white px-5 py-2 rounded-xl text-sm font-bold disabled:opacity-40 transition-colors">
-            {saving ? '저장 중…' : '💾 저장'}
+            {saving ? '저장 중…' : '저장'}
           </button>
         </div>
       </div>
@@ -1171,7 +1171,7 @@ export function PnlSubView() {
                     {(e.supply_count !== undefined && e.supply_count > 0) && (
                       <div className="flex items-center gap-1.5 mt-0.5 mb-1 ml-1">
                         <span className="text-[9px] bg-sky-100 text-sky-600 rounded-full px-2 py-0.5 font-semibold">
-                          📦 공급수 {e.supply_count}개 · 결제율탭 자동반영
+                          공급수 {e.supply_count}개 · 결제율탭 자동반영
                         </span>
                       </div>
                     )}
@@ -1256,10 +1256,10 @@ export function PnlSubView() {
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">개인 고정 생활비</p>
             <div className="grid grid-cols-2 gap-2">
               <div className="bg-rose-50 border border-rose-100 rounded-xl px-3 py-2.5 flex items-center justify-between">
-                <span className="text-xs text-rose-600">💳 카드값</span><span className="text-sm font-black text-rose-700">300만원</span>
+                <span className="text-xs text-rose-600">카드값</span><span className="text-sm font-black text-rose-700">300만원</span>
               </div>
               <div className="bg-orange-50 border border-orange-100 rounded-xl px-3 py-2.5 flex items-center justify-between">
-                <span className="text-xs text-orange-600">🏠 집월세</span><span className="text-sm font-black text-orange-700">65만원</span>
+                <span className="text-xs text-orange-600">집월세</span><span className="text-sm font-black text-orange-700">65만원</span>
               </div>
             </div>
             <div className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 flex items-center justify-between">

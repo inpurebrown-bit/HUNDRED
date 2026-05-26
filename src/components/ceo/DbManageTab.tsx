@@ -221,9 +221,9 @@ export default function DbManageTab({ initialView = 'trash' }: { initialView?: '
     <div className="space-y-4 max-w-5xl mx-auto">
       <div className="flex items-center gap-2 flex-wrap">
         {[
-          { key: 'delete_requests' as const, label: '📨 삭제 요청' },
-          { key: 'trash' as const,           label: '🗑 거절 DB 쓰레기통' },
-          { key: 'duplicate' as const,       label: '♻️ 중복 DB 감지' },
+          { key: 'delete_requests' as const, label: '삭제 요청' },
+          { key: 'trash' as const,           label: '거절 DB 쓰레기통' },
+          { key: 'duplicate' as const,       label: '중복 DB 감지' },
         ].map(v => (
           <button key={v.key} onClick={() => setView(v.key)}
             className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-colors ${
@@ -241,12 +241,12 @@ export default function DbManageTab({ initialView = 'trash' }: { initialView?: '
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-bold text-gray-800">📨 직가DB 삭제 요청</h3>
+              <h3 className="text-sm font-bold text-gray-800">직가DB 삭제 요청</h3>
               <p className="text-xs text-gray-400 mt-0.5">직원이 요청한 직가DB 삭제 — 수락 시 삭제DB로 이동, 거절 시 원복</p>
             </div>
             <button onClick={loadDeleteRequests}
               className="px-3 py-1.5 text-xs bg-white border border-gray-200 text-gray-600 rounded-xl hover:border-gray-400 transition-colors">
-              🔄 새로고침
+              새로고침
             </button>
           </div>
 
@@ -254,7 +254,6 @@ export default function DbManageTab({ initialView = 'trash' }: { initialView?: '
             <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
           ) : deleteReqList.length === 0 ? (
             <div className="bg-white border border-[#E8E2D4] rounded-xl p-12 text-center">
-              <p className="text-2xl mb-2">✅</p>
               <p className="text-sm text-gray-400">대기 중인 삭제 요청이 없습니다</p>
             </div>
           ) : (
@@ -286,13 +285,13 @@ export default function DbManageTab({ initialView = 'trash' }: { initialView?: '
                           disabled={isPending}
                           onClick={() => approveDeleteRequest(c.id)}
                           className="px-3 py-2 text-xs font-bold bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white rounded-xl transition-colors">
-                          {isPending ? '처리중...' : '✅ 수락'}
+                          {isPending ? '처리중...' : '수락'}
                         </button>
                         <button
                           disabled={isPending}
                           onClick={() => rejectDeleteRequest(c.id)}
                           className="px-3 py-2 text-xs font-bold bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 rounded-xl transition-colors">
-                          {isPending ? '처리중...' : '❌ 거절'}
+                          {isPending ? '처리중...' : '거절'}
                         </button>
                       </div>
                     </div>
@@ -309,19 +308,19 @@ export default function DbManageTab({ initialView = 'trash' }: { initialView?: '
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-bold text-gray-800">🗑 거절 DB 쓰레기통</h3>
+              <h3 className="text-sm font-bold text-gray-800">거절 DB 쓰레기통</h3>
               <p className="text-xs text-gray-400 mt-0.5">자체거절/감성톡 이후 삭제된 고객 DB — 영구 삭제 가능</p>
             </div>
             <div className="flex gap-2">
               {trashSelected.size > 0 && (
                 <button onClick={hardDeleteSelected}
                   className="px-3 py-1.5 text-xs font-bold bg-red-500 hover:bg-red-600 text-white rounded-xl transition-colors">
-                  🗑 선택 {trashSelected.size}개 영구삭제
+                  선택 {trashSelected.size}개 영구삭제
                 </button>
               )}
               <button onClick={loadTrash}
                 className="px-3 py-1.5 text-xs bg-white border border-gray-200 text-gray-600 rounded-xl hover:border-gray-400 transition-colors">
-                🔄 새로고침
+                새로고침
               </button>
             </div>
           </div>
@@ -330,7 +329,7 @@ export default function DbManageTab({ initialView = 'trash' }: { initialView?: '
             <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
           ) : trashList.length === 0 ? (
             <div className="bg-white border border-[#E8E2D4] rounded-xl p-12 text-center">
-              <p className="text-2xl mb-2">🎉</p>
+              <p className="text-2xl mb-2"></p>
               <p className="text-sm text-gray-400">거절 DB가 없습니다</p>
             </div>
           ) : (
@@ -392,12 +391,12 @@ export default function DbManageTab({ initialView = 'trash' }: { initialView?: '
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-bold text-gray-800">♻️ 중복 DB 감지</h3>
+              <h3 className="text-sm font-bold text-gray-800">중복 DB 감지</h3>
               <p className="text-xs text-gray-400 mt-0.5">동일 전화번호로 등록된 중복 고객 — {dupList.length}건의 중복 발견</p>
             </div>
             <button onClick={loadDuplicates}
               className="px-3 py-1.5 text-xs bg-white border border-gray-200 text-gray-600 rounded-xl hover:border-gray-400 transition-colors">
-              🔄 재검사
+              재검사
             </button>
           </div>
 
@@ -405,7 +404,6 @@ export default function DbManageTab({ initialView = 'trash' }: { initialView?: '
             <div className="text-center py-12 text-gray-400 text-sm">분석 중...</div>
           ) : dupList.length === 0 ? (
             <div className="bg-white border border-[#E8E2D4] rounded-xl p-12 text-center">
-              <p className="text-2xl mb-2">✅</p>
               <p className="text-sm text-gray-400">중복 DB 없음</p>
             </div>
           ) : (
@@ -413,7 +411,7 @@ export default function DbManageTab({ initialView = 'trash' }: { initialView?: '
               {dupList.map((group, gi) => (
                 <div key={gi} className="bg-white border border-amber-200 rounded-xl overflow-hidden">
                   <div className="px-4 py-2 bg-amber-50 border-b border-amber-100">
-                    <span className="text-xs font-bold text-amber-700">⚠️ 동일 번호 {group.length}개: {group[0]?.phone}</span>
+                    <span className="text-xs font-bold text-amber-700">동일 번호 {group.length}개: {group[0]?.phone}</span>
                   </div>
                   <div className="divide-y divide-gray-50">
                     {group.map((c, i) => {
@@ -457,13 +455,13 @@ export default function DbManageTab({ initialView = 'trash' }: { initialView?: '
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-bold text-gray-800">👤 직원 관리</h3>
+              <h3 className="text-sm font-bold text-gray-800">직원 관리</h3>
               <p className="text-xs text-gray-400 mt-0.5">직원 계정 조회·생성·삭제 (대표 계정 제외)</p>
             </div>
             <div className="flex gap-2">
               <button onClick={loadEmployees}
                 className="px-3 py-1.5 text-xs bg-white border border-gray-200 text-gray-600 rounded-xl hover:border-gray-400 transition-colors">
-                🔄 새로고침
+                새로고침
               </button>
               <button onClick={() => { setShowCreateForm(v => !v); setCreateError('') }}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition-colors ${
@@ -492,7 +490,7 @@ export default function DbManageTab({ initialView = 'trash' }: { initialView?: '
                           : 'bg-violet-500 text-white border-violet-500'
                         : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
                     }`}>
-                    {r === 'sales' ? '📞 영업팀' : '🗂 관리팀'}
+                    {r === 'sales' ? '영업팀' : '관리팀'}
                   </button>
                 ))}
               </div>
@@ -537,7 +535,7 @@ export default function DbManageTab({ initialView = 'trash' }: { initialView?: '
               }`}>
                 {createForm.role === 'sales' ? (
                   <>
-                    <p className="font-semibold mb-1">📞 영업팀 권한</p>
+                    <p className="font-semibold mb-1">영업팀 권한</p>
                     <p>• 고객 DB 등록·조회·수정 (본인 담당 고객)</p>
                     <p>• 인콜일지 작성, 콜 타임라인 기록</p>
                     <p>• 오전/마감 보고서 제출</p>
@@ -545,7 +543,7 @@ export default function DbManageTab({ initialView = 'trash' }: { initialView?: '
                   </>
                 ) : (
                   <>
-                    <p className="font-semibold mb-1">🗂 관리팀 권한</p>
+                    <p className="font-semibold mb-1">관리팀 권한</p>
                     <p>• 흡수 업체 배정·진행현황 관리</p>
                     <p>• 정책자금 기관·솔루션 배정</p>
                     <p>• 환불·종료 처리 (대표 승인 후 확정)</p>
@@ -555,14 +553,14 @@ export default function DbManageTab({ initialView = 'trash' }: { initialView?: '
               </div>
 
               {createError && (
-                <p className="text-xs text-red-500 font-medium">⚠️ {createError}</p>
+                <p className="text-xs text-red-500 font-medium">{createError}</p>
               )}
 
               <button
                 onClick={createEmployee}
                 disabled={creating}
                 className="w-full py-2.5 bg-[#1B2A45] hover:bg-[#1B2A45]/90 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50">
-                {creating ? '생성 중...' : `✅ ${createForm.role === 'sales' ? '영업팀' : '관리팀'} 직원 계정 생성`}
+                {creating ? '생성 중...' : `${createForm.role === 'sales' ? '영업팀' : '관리팀'} 직원 계정 생성`}
               </button>
             </div>
           )}
@@ -589,13 +587,13 @@ export default function DbManageTab({ initialView = 'trash' }: { initialView?: '
                           {roleLabel[emp.role] || emp.role}
                         </span>
                         {emp.id === newlyCreatedId && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-green-100 text-green-700">✨ 방금 생성</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-green-100 text-green-700">방금 생성</span>
                         )}
                       </div>
                     </div>
                     <button onClick={() => deleteEmployee(emp)}
                       className="shrink-0 text-sm text-red-400 hover:text-red-600 px-3 py-1.5 rounded-xl hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors font-medium">
-                      🗑 삭제
+                      삭제
                     </button>
                   </div>
                 ))}

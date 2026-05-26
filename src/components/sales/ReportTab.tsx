@@ -126,7 +126,7 @@ function LockedInput({ value, onChange, locked, onLock, onUnlock, ...rest }: {
       {locked ? (
         <button type="button" onClick={onUnlock} title="수정"
           className="absolute right-2 top-1/2 -translate-y-1/2 text-emerald-500 hover:text-emerald-700 text-sm leading-none">
-          ✏️
+          수정
         </button>
       ) : (
         String(value).trim() && (
@@ -347,7 +347,7 @@ export default function ReportTab({ userId, userName }: Props) {
             activeReport === 'morning' ? 'bg-amber-500 text-white' : 'bg-white text-gray-600 border border-gray-200'
           }`}
         >
-          ☀️ 오전보고
+          오전보고
         </button>
         <button
           onClick={() => setActiveReport('daily')}
@@ -355,14 +355,14 @@ export default function ReportTab({ userId, userName }: Props) {
             activeReport === 'daily' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border border-gray-200'
           }`}
         >
-          📋 일일마감보고
+          일일마감보고
         </button>
       </div>
 
       {/* ── 통계 카드 ── */}
       {activeReport === 'morning' && morningReports.length > 0 && (
         <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
-          <p className="text-xs text-amber-700 font-bold mb-3">☀️ 내 오전보고 누적 통계 ({morningReports.length}건)</p>
+          <p className="text-xs text-amber-700 font-bold mb-3">내 오전보고 누적 통계 ({morningReports.length}건)</p>
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
             {([
               { label: '총 콜', value: morningStats.total_calls, rate: null, rateLabel: '' },
@@ -384,7 +384,7 @@ export default function ReportTab({ userId, userName }: Props) {
       )}
       {activeReport === 'daily' && dailyReports.length > 0 && (
         <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-          <p className="text-xs text-blue-700 font-bold mb-3">📋 내 마감보고 누적 통계 ({dailyReports.length}건)</p>
+          <p className="text-xs text-blue-700 font-bold mb-3">내 마감보고 누적 통계 ({dailyReports.length}건)</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
               { label: '누적 계약', value: dailyStats.today_contracts + '건' },
@@ -407,7 +407,6 @@ export default function ReportTab({ userId, userName }: Props) {
           <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm text-center animate-[fadeIn_0.2s_ease]">
             {/* 아이콘 */}
             <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-5">
-              <span className="text-4xl">✅</span>
             </div>
             {/* 제목 */}
             <h2 className="text-xl font-black text-gray-900 mb-2">
@@ -435,20 +434,20 @@ export default function ReportTab({ userId, userName }: Props) {
         <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
           <button type="button" onClick={() => setShowYesterdayPreview(v => !v)}
             className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
-            <span>📅 어제({yesterdayStr}) 보고 미리보기</span>
+            <span>어제({yesterdayStr}) 보고 미리보기</span>
             <span className="text-gray-400 text-xs">{showYesterdayPreview ? '▲ 접기' : '▼ 펼치기'}</span>
           </button>
           {showYesterdayPreview && (
             <div className="px-4 pb-4 space-y-3 text-xs text-gray-600">
               {yesterdayMorning && (
                 <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
-                  <p className="text-[11px] font-bold text-amber-700 mb-2">☀️ 어제 오전보고</p>
+                  <p className="text-[11px] font-bold text-amber-700 mb-2">어제 오전보고</p>
                   <MorningDetailView data={yesterdayMorning.data} />
                 </div>
               )}
               {yesterdayDaily && (
                 <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
-                  <p className="text-[11px] font-bold text-blue-700 mb-2">📋 어제 마감보고</p>
+                  <p className="text-[11px] font-bold text-blue-700 mb-2">어제 마감보고</p>
                   <DailyDetailView data={yesterdayDaily.data} />
                 </div>
               )}
@@ -464,13 +463,13 @@ export default function ReportTab({ userId, userName }: Props) {
             onKeyDown={e => { if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') e.preventDefault() }}>
             {editDate && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center justify-between">
-                <span className="text-xs text-amber-700 font-medium">✏️ 수정 중 — {editDate}</span>
+                <span className="text-xs text-amber-700 font-medium">수정 중 — {editDate}</span>
                 <button type="button" onClick={() => { setEditDate(null); setLockedMorning({}) }}
                   className="text-xs text-amber-500 hover:text-amber-700">취소</button>
               </div>
             )}
             <div className="flex items-center justify-between mb-1">
-              <h3 className="font-semibold text-gray-800">☀️ 오전보고</h3>
+              <h3 className="font-semibold text-gray-800">오전보고</h3>
               <span className="text-xs text-gray-400">{editDate || today()} · {userName}</span>
             </div>
 
@@ -499,7 +498,7 @@ export default function ReportTab({ userId, userName }: Props) {
 
             <button type="submit" disabled={loading}
               className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
-              {loading ? '전송 중...' : editDate ? '✏️ 오전보고 수정 전송 →' : '오전보고 전송 →'}
+              {loading ? '전송 중...' : editDate ? '오전보고 수정 전송 →' : '오전보고 전송 →'}
             </button>
           </form>
 
@@ -550,20 +549,20 @@ export default function ReportTab({ userId, userName }: Props) {
             <div className="bg-white rounded-xl border border-gray-100 p-5">
               {editDate && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center justify-between mb-3">
-                  <span className="text-xs text-amber-700 font-medium">✏️ 수정 중 — {editDate}</span>
+                  <span className="text-xs text-amber-700 font-medium">수정 중 — {editDate}</span>
                   <button type="button" onClick={() => setEditDate(null)}
                     className="text-xs text-amber-500 hover:text-amber-700">취소</button>
                 </div>
               )}
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-800">📋 일일업무마감보고서</h3>
+                <h3 className="font-semibold text-gray-800">일일업무마감보고서</h3>
                 <span className="text-xs text-gray-400">{editDate || today()} · {userName}</span>
               </div>
 
               {/* 계약 현황 — 자동집계 배너 */}
               <div className="bg-gradient-to-r from-emerald-50 to-blue-50 border border-emerald-200 rounded-xl px-4 py-3 mb-3 flex flex-wrap items-center gap-4">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-emerald-600 font-bold">🤖 DB 자동집계</span>
+                  <span className="text-[10px] text-emerald-600 font-bold">DB 자동집계</span>
                   <span className="text-[10px] text-gray-400">(계약완료 처리된 내 업체 기준)</span>
                 </div>
                 <div className="flex flex-wrap gap-3 text-[11px]">
@@ -632,7 +631,7 @@ export default function ReportTab({ userId, userName }: Props) {
                     {remaining !== null
                       ? remaining > 0
                         ? `${remaining}개 남음`
-                        : '🎉 목표달성!'
+                        : '목표달성!'
                       : '-'}
                   </div>
                 </div>
@@ -740,7 +739,7 @@ export default function ReportTab({ userId, userName }: Props) {
             {/* 내일도 계속 */}
             <div className="bg-white rounded-xl border border-gray-100 p-5">
               <div className="flex items-center justify-between mb-3">
-                <h4 className="font-semibold text-gray-800 text-sm">📅 내일도 계속</h4>
+                <h4 className="font-semibold text-gray-800 text-sm">내일도 계속</h4>
                 <div className="flex gap-2">
                   <button type="button"
                     onClick={() => setDaily(p => ({ ...p, continue_tomorrow: p.continue_tomorrow === null ? [] : null }))}
@@ -789,7 +788,7 @@ export default function ReportTab({ userId, userName }: Props) {
 
             <button type="submit" disabled={loading}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-3 rounded-xl text-sm font-semibold transition-colors">
-              {loading ? '전송 중...' : editDate ? '✏️ 마감보고 수정 전송 →' : '📋 마감보고 전송 →'}
+              {loading ? '전송 중...' : editDate ? '마감보고 수정 전송 →' : '마감보고 전송 →'}
             </button>
           </form>
 
@@ -830,7 +829,7 @@ export default function ReportTab({ userId, userName }: Props) {
             <div className="sticky top-0 bg-white px-6 py-4 border-b border-gray-100 flex items-center justify-between rounded-t-2xl">
               <div>
                 <h3 className="font-bold text-gray-900">
-                  {viewReport.report_type === 'morning' ? '☀️ 오전보고' : '📋 마감보고'}
+                  {viewReport.report_type === 'morning' ? '오전보고' : '마감보고'}
                 </h3>
                 <p className="text-xs text-gray-400 mt-0.5">{viewReport.report_date} · {userName}</p>
               </div>
@@ -916,7 +915,7 @@ function CompanyInput({ value, onChange, onKeyDown, allCompanies, companyHistory
             <button key={c} type="button"
               onMouseDown={() => { onChange(c); setOpen(false) }}
               className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-2">
-              <span className="text-gray-300 text-xs">🕐</span>{c}
+              {c}
             </button>
           ))}
         </div>
@@ -925,7 +924,7 @@ function CompanyInput({ value, onChange, onKeyDown, allCompanies, companyHistory
       {value.trim() && companyHistory.length > 0 && (
         <div className="mt-2 border border-blue-100 rounded-xl overflow-hidden bg-blue-50/30">
           <div className="px-3 py-1.5 bg-blue-100/60 flex items-center gap-1.5">
-            <span className="text-[10px] text-blue-600 font-semibold">📋 {value} 과거 보고 기록</span>
+            <span className="text-[10px] text-blue-600 font-semibold">{value} 과거 보고 기록</span>
           </div>
           <div className="divide-y divide-blue-100/60 max-h-48 overflow-y-auto">
             {companyHistory.map((h, i) => (
@@ -1440,7 +1439,7 @@ function DailyDetailView({ data }: { data: any }) {
           <div className="space-y-2">
             {(data.meetings as any[]).map((m: any, i: number) => (
               <div key={i} className="flex items-center gap-3 bg-blue-50 rounded-xl p-3 border border-blue-100">
-                <div className="text-blue-500 text-lg">📅</div>
+                <div className="text-blue-500 text-lg"></div>
                 <div>
                   <p className="text-sm font-semibold text-gray-800">{m.company}</p>
                   <p className="text-xs text-gray-500">{m.date} {m.time} {m.location && `· ${m.location}`}</p>
@@ -1458,7 +1457,7 @@ function DailyDetailView({ data }: { data: any }) {
           <div className="space-y-2">
             {(data.payment_waiting as any[]).map((p: any, i: number) => (
               <div key={i} className="flex items-center gap-3 bg-amber-50 rounded-xl p-3 border border-amber-100">
-                <div className="text-amber-500 text-lg">💰</div>
+                <div className="text-amber-500 text-lg"></div>
                 <div>
                   <p className="text-sm font-semibold text-gray-800">{p.company} ({p.ceo_name})</p>
                   <p className="text-xs text-gray-500">{p.phone} · 최초콜 {p.first_call_date}</p>

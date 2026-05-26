@@ -852,7 +852,7 @@ function TwoWeekCalendar({
       .filter(exp => exp.day === dayNum)
       .map(exp => ({
         id: `__exp__${toStr(d)}_${exp.day}`,
-        title: `💸 ${exp.label}${exp.amount !== null ? ` (${Math.abs(exp.amount).toLocaleString()}원)` : ''}`,
+        title: `${exp.label}${exp.amount !== null ? ` (${Math.abs(exp.amount).toLocaleString()}원)` : ''}`,
         start_date: toStr(d),
         end_date: toStr(d),
         color: 'red',
@@ -997,9 +997,9 @@ function NoticeSection() {
     })
     if (r.ok) {
       setTitle(''); setContent(''); setIsImportant(false); setShowForm(false)
-      toast_('✅ 공지 등록 완료!')
+      toast_('공지 등록 완료!')
       load()
-    } else toast_('❌ 등록 실패')
+    } else toast_('등록 실패')
     setPosting(false)
   }
 
@@ -1007,7 +1007,7 @@ function NoticeSection() {
     if (!confirm('이 공지를 삭제할까요?')) return
     const r = await fetch(`/api/notices?id=${id}`, { method: 'DELETE' })
     if (r.ok) { await load(); setExpandedId(null) }
-    else toast_('❌ 삭제 실패')
+    else toast_('삭제 실패')
   }
 
   function startEdit(n: any) {
@@ -1031,8 +1031,8 @@ function NoticeSection() {
         notice_type: editImportant ? 'important' : 'general',
       }),
     })
-    if (r.ok) { await load(); setEditingId(null); toast_('✅ 공지 수정 완료!') }
-    else toast_('❌ 수정 실패')
+    if (r.ok) { await load(); setEditingId(null); toast_('공지 수정 완료!') }
+    else toast_('수정 실패')
     setUpdating(false)
   }
 
@@ -1043,8 +1043,8 @@ function NoticeSection() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ notice_type: newType }),
     })
-    if (r.ok) { await load(); toast_(newType === 'important' ? '⭐ 중요 공지로 설정됐습니다' : '중요 해제됐습니다') }
-    else toast_('❌ 변경 실패')
+    if (r.ok) { await load(); toast_(newType === 'important' ? '중요 공지로 설정됐습니다' : '중요 해제됐습니다') }
+    else toast_('변경 실패')
   }
 
   const teamLabel = (t: string) => t === 'sales' ? '영업팀' : t === 'ops' ? '관리팀' : '전체'
@@ -1060,7 +1060,7 @@ function NoticeSection() {
 
       {/* 헤더 */}
       <div className="px-5 py-3.5 border-b border-[#E8E2D4] flex items-center justify-between bg-[#FAFAF8]">
-        <h2 className="font-bold text-[#1B2A45] text-base">📢 공지사항</h2>
+        <h2 className="font-bold text-[#1B2A45] text-base">공지사항</h2>
         <button onClick={() => setShowForm(v => !v)}
           className="text-xs bg-[#1B2A45] hover:bg-[#1B2A45]/80 text-white px-3.5 py-1.5 rounded-lg font-semibold transition-colors">
           {showForm ? '✕ 취소' : '+ 공지 작성'}
@@ -1087,7 +1087,7 @@ function NoticeSection() {
             {/* 중요 토글 */}
             <button type="button" onClick={() => setIsImportant(v => !v)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors shrink-0 ${isImportant ? 'bg-amber-400 text-white border-amber-400' : 'border-gray-200 text-gray-400 hover:border-amber-300 hover:text-amber-500'}`}>
-              {isImportant ? '⭐ 중요' : '☆ 중요'}
+              {isImportant ? '중요' : '중요'}
             </button>
             <button type="submit" disabled={posting || !title.trim()}
               className="bg-[#C5A258] hover:bg-[#C5A258]/80 disabled:opacity-40 text-white px-5 py-1.5 rounded-lg text-xs font-bold transition-colors shrink-0">
@@ -1116,7 +1116,7 @@ function NoticeSection() {
                     {teamLabel(n.target_team)}
                   </span>
                   {imp && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-400 text-white shrink-0">⭐ 중요</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-400 text-white shrink-0">중요</span>
                   )}
                   <span className={`text-sm font-semibold flex-1 truncate ${imp ? 'text-amber-900' : 'text-[#1B2A45]'}`}>
                     {n.title}
@@ -1150,7 +1150,7 @@ function NoticeSection() {
                           </div>
                           <button type="button" onClick={() => setEditImportant(v => !v)}
                             className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors shrink-0 ${editImportant ? 'bg-amber-400 text-white border-amber-400' : 'border-gray-200 text-gray-400 hover:border-amber-300 hover:text-amber-500'}`}>
-                            {editImportant ? '⭐ 중요' : '☆ 중요'}
+                            {editImportant ? '중요' : '중요'}
                           </button>
                         </div>
                         <div className="flex justify-end gap-2">
@@ -1161,7 +1161,7 @@ function NoticeSection() {
                           <button type="button" onClick={() => handleUpdate(n.id)}
                             disabled={updating || !editTitle.trim()}
                             className="text-xs px-4 py-1.5 rounded-lg bg-[#C5A258] hover:bg-[#C5A258]/80 disabled:opacity-40 text-white font-bold transition-colors">
-                            {updating ? '저장 중...' : '💾 저장'}
+                            {updating ? '저장 중...' : '저장'}
                           </button>
                         </div>
                       </div>
@@ -1184,18 +1184,18 @@ function NoticeSection() {
                                   ? 'border-amber-300 text-amber-700 bg-amber-100 hover:bg-amber-200'
                                   : 'border-gray-200 text-gray-400 hover:text-amber-500 hover:border-amber-300 hover:bg-amber-50'
                               }`}>
-                              {imp ? '⭐ 중요 해제' : '☆ 중요로 설정'}
+                              {imp ? '중요 해제' : '중요로 설정'}
                             </button>
                             <button onClick={() => startEdit(n)}
                               className="text-xs px-3 py-1 rounded-lg font-semibold border border-gray-200 text-gray-500 hover:text-[#1B2A45] hover:border-[#1B2A45]/30 hover:bg-gray-50 transition-colors">
-                              ✏️ 수정
+                              수정
                             </button>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] text-gray-300 sm:hidden">{fmtDate(n.created_at)}</span>
                             <button onClick={() => del(n.id)}
                               className="text-xs text-gray-300 hover:text-red-400 transition-colors px-2 py-1 rounded">
-                              🗑 삭제
+                              삭제
                             </button>
                           </div>
                         </div>

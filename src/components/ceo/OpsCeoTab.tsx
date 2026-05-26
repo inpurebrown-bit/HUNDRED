@@ -191,7 +191,7 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
             className={`flex-1 text-[9px] font-bold py-1 rounded-lg text-white transition-colors ${
               c.progress_stage === '환불예정' ? 'bg-rose-500 hover:bg-rose-600' : 'bg-orange-500 hover:bg-orange-600'
             }`}>
-            ✅ {c.progress_stage === '환불예정' ? '환불' : '종료'}
+            {c.progress_stage === '환불예정' ? '환불' : '종료'}
           </button>
           <button onClick={() => onApprove(c.id, 'reject')}
             className="flex-1 text-[9px] font-bold py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors">
@@ -363,7 +363,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
                     )}
                   </div>
                   <div className="w-1/2 min-w-0 border-l-2 border-dashed border-gray-200 pl-3">
-                    <p className="text-[9px] font-bold text-gray-400 mb-1.5 uppercase tracking-wide">📋 다음 자금 대기</p>
+                    <p className="text-[9px] font-bold text-gray-400 mb-1.5 uppercase tracking-wide">다음 자금 대기</p>
                     {upcomingItems.length > 0 ? (
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                         {upcomingItems.map(c => (
@@ -426,7 +426,7 @@ function CeoOpsRevenueView() {
   return (
     <div className="max-w-2xl space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-bold text-[#1B2A45] text-base">💰 관리팀 매출 현황</h3>
+        <h3 className="font-bold text-[#1B2A45] text-base">관리팀 매출 현황</h3>
         <button onClick={load} className="text-xs bg-white border border-[#E8E2D4] text-[#1B2A45]/60 px-3 py-1.5 rounded-lg hover:border-[#1B2A45]/30">🔄 새로고침</button>
       </div>
 

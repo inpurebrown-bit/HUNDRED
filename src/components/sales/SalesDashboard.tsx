@@ -326,7 +326,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
       ? { ...c, details: { ...(c.details || {}), delete_requested: true, delete_reason: reason.trim() || '사유 없음', delete_requested_by: userName, delete_requested_at: todayIso } }
       : c
     ))
-    showToast('✅ 대표님께 삭제 요청을 전송했습니다.')
+    showToast('대표님께 삭제 요청을 전송했습니다.')
   }, [customers, userName, showToast])
 
   // 직가DB 전용 삭제요청 — 대표 승인 후 삭제
@@ -521,7 +521,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
       const json = await res.json()
       if (res.ok) {
         setShowNewForm(false)
-        showToast(`✅ "${data.company || data.name}" 고객 DB 등록 완료!`)
+        showToast(`"${data.company || data.name}" 고객 DB 등록 완료`)
         loadAll()
       } else {
         showToast(`❌ 등록 실패: ${json.error || '알 수 없는 오류'}`, 'error')
@@ -544,7 +544,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
       const json = await res.json()
       if (res.ok) {
         setShow010Form(false)
-        showToast(`✅ "${data.company || data.name}" 직가DB 등록 완료!`)
+        showToast(`"${data.company || data.name}" 직가DB 등록 완료`)
         loadAll()
       } else {
         showToast(`❌ 등록 실패: ${json.error || '알 수 없는 오류'}`, 'error')
@@ -732,7 +732,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>
-                <h2 className="font-bold text-[#1B2A45] text-sm">📤 관리팀 담당자 배정</h2>
+                <h2 className="font-bold text-[#1B2A45] text-sm">관리팀 담당자 배정</h2>
                 <p className="text-[11px] text-gray-400 mt-0.5">{(opsTransferModal.customer as any).details?.company || opsTransferModal.customer.company || opsTransferModal.customer.name}</p>
               </div>
               <button onClick={() => setOpsTransferModal({ customer: null, opsUserId: '', opsUserName: '' })}
@@ -768,11 +768,11 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   if (!customer || !opsUserId) return
                   setOpsTransferModal({ customer: null, opsUserId: '', opsUserName: '' })
                   await doTransferToOps(customer, opsUserId, opsUserName)
-                  showToast('✅ 자금팀 전송 완료!')
+                  showToast('자금팀 전송 완료')
                 }}
                 disabled={!opsTransferModal.opsUserId}
                 className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
-                📤 {opsTransferModal.opsUserId ? `${opsTransferModal.opsUserName}에게 전송` : '담당자 선택 필요'}
+                {opsTransferModal.opsUserId ? `${opsTransferModal.opsUserName}에게 전송` : '담당자 선택 필요'}
               </button>
             </div>
             {/* 테스터 — 우측 하단 작게 */}
@@ -996,13 +996,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               // 결제율 등급 — top: 최상 기준값, 5% 구간씩 단계 내려감
               const rateGrade = (rate: number | null, top: number) => {
                 if (rate === null) return { label: null, numCls: 'text-gray-400' }
-                if (rate >= top)        return { label: <span className="text-blue-500 font-bold">🔥 최상</span>,      numCls: 'text-blue-700' }
-                if (rate >= top - 5)    return { label: <span className="text-cyan-500 font-bold">✨ 우수</span>,      numCls: 'text-cyan-700' }
-                if (rate >= top - 10)   return { label: <span className="text-emerald-500 font-bold">✅ 양호</span>,   numCls: 'text-emerald-700' }
-                if (rate >= top - 15)   return { label: <span className="text-amber-500 font-bold">📊 보통</span>,     numCls: 'text-amber-600' }
-                if (rate >= top - 20)   return { label: <span className="text-orange-400 font-bold">⚠️ 미흡</span>,   numCls: 'text-orange-500' }
-                if (rate >= top - 25)   return { label: <span className="text-orange-600 font-bold">⚡ 부진</span>,    numCls: 'text-orange-700' }
-                return                         { label: <span className="text-red-500 font-bold">🚨 위험</span>,       numCls: 'text-red-600' }
+                if (rate >= top)        return { label: <span className="text-blue-500 font-bold">최상</span>,      numCls: 'text-blue-700' }
+                if (rate >= top - 5)    return { label: <span className="text-cyan-500 font-bold">우수</span>,      numCls: 'text-cyan-700' }
+                if (rate >= top - 10)   return { label: <span className="text-emerald-500 font-bold">양호</span>,   numCls: 'text-emerald-700' }
+                if (rate >= top - 15)   return { label: <span className="text-amber-500 font-bold">보통</span>,     numCls: 'text-amber-600' }
+                if (rate >= top - 20)   return { label: <span className="text-orange-400 font-bold">미흡</span>,   numCls: 'text-orange-500' }
+                if (rate >= top - 25)   return { label: <span className="text-orange-600 font-bold">부진</span>,    numCls: 'text-orange-700' }
+                return                         { label: <span className="text-red-500 font-bold">위험</span>,       numCls: 'text-red-600' }
               }
 
               return (
@@ -1023,7 +1023,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                       <p className="text-[10px] text-white/40">{thisMonth} · 영업일 {bizElapsed}/{bizTotal}일</p>
                       <p className="text-xs font-bold text-white/70 mt-0.5">잔여 {bizRemaining}일 · 목표까지 {fmtV(needed)}개</p>
                       <p className="text-[11px] text-[#C5A258] font-black mt-1">
-                        💰 {thisMonthTotalRevenue > 0
+                        {thisMonthTotalRevenue > 0
                           ? (thisMonthTotalRevenue >= 100000000
                             ? (thisMonthTotalRevenue / 100000000).toFixed(1) + '억'
                             : (thisMonthTotalRevenue / 10000).toFixed(0) + '만원')
@@ -1282,7 +1282,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         {activeTab === 'contracted' && (
           <div className="space-y-3">
             <div className="bg-gradient-to-r from-[#1B2A45] to-emerald-600 rounded-xl px-5 py-3.5">
-              <h2 className="text-sm font-bold text-white">✅ 계약 업체</h2>
+              <h2 className="text-sm font-bold text-white">계약 업체</h2>
               <p className="text-white/50 text-[11px] mt-0.5">총 {contractedCustomers.length}건</p>
             </div>
 
@@ -1325,7 +1325,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         {activeTab === 'emotional' && (
           <div className="space-y-3">
             <div className="bg-gradient-to-r from-[#1B2A45] to-violet-600 rounded-xl px-5 py-3.5">
-              <h2 className="text-sm font-bold text-white">💬 감성톡 관리 업체</h2>
+              <h2 className="text-sm font-bold text-white">감성톡 관리 업체</h2>
               <p className="text-white/50 text-[11px] mt-0.5">총 {emotionalCustomers.length}건 · 장기 육성 대상</p>
             </div>
 
@@ -1336,7 +1336,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               if (todayCallbacks.length === 0) return null
               return (
                 <div className="bg-sky-50 border border-sky-200 rounded-xl px-4 py-3">
-                  <p className="text-[11px] font-bold text-sky-700 mb-2">📞 오늘 재통화 업체 ({todayCallbacks.length}건)</p>
+                  <p className="text-[11px] font-bold text-sky-700 mb-2">오늘 재통화 업체 ({todayCallbacks.length}건)</p>
                   <div className="flex flex-wrap gap-2">
                     {todayCallbacks.map(c => (
                       <div key={c.id} className="bg-white border border-sky-200 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
@@ -1408,13 +1408,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         {activeTab === 'revenue' && (
           <div className="space-y-4">
             <div className="bg-gradient-to-r from-[#1B2A45] to-amber-600 rounded-xl px-5 py-3.5">
-              <h2 className="text-sm font-bold text-white">💰 매출 현황</h2>
+              <h2 className="text-sm font-bold text-white">매출 현황</h2>
               <p className="text-white/50 text-[11px] mt-0.5">나의 계약 · 입금 현황</p>
             </div>
 
             {/* ── 이번달 요약 카드 ── */}
             <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">📅 {thisMonth} 이번달</p>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">{thisMonth} 이번달</p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
                   { label: '계약 갯수', value: thisMonthContractCount % 1 === 0 ? `${thisMonthContractCount}개` : `${thisMonthContractCount.toFixed(1)}개`, color: 'text-[#C5A258]' },
@@ -1451,7 +1451,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                       <div className={`px-5 py-3 flex items-center justify-between border-b ${isThisM ? 'bg-emerald-50 border-emerald-100' : 'bg-gray-50 border-gray-100'}`}>
                         <div className="flex items-center gap-2">
                           <span className={`text-sm font-bold ${isThisM ? 'text-emerald-700' : 'text-gray-600'}`}>
-                            {month === '날짜미입력' ? '📌 계약일 미입력' : `📅 ${month}`}
+                            {month === '날짜미입력' ? '계약일 미입력' : `${month}`}
                             {isThisM && <span className="ml-1.5 text-[10px] bg-emerald-500 text-white px-1.5 py-0.5 rounded-full">이번달</span>}
                           </span>
                         </div>
@@ -1536,7 +1536,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         >
           {/* 헤더 */}
           <div className="flex items-center justify-between px-3 py-2 bg-amber-400 rounded-t-2xl shrink-0">
-            <span className="text-[11px] font-bold text-white">📝 메모장</span>
+            <span className="text-[11px] font-bold text-white">메모장</span>
             <button onClick={() => setNotepadOpen(false)} className="text-white/80 hover:text-white text-sm leading-none">✕</button>
           </div>
 
@@ -1577,7 +1577,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             {/* 할일 목록 — 기간별 그룹 */}
             <div className="px-2.5 py-2 space-y-3 shrink-0">
               {(['today', 'week', 'month'] as const).map(p => {
-                const sectionLabel = { today: '📅 오늘', week: '📆 이번주', month: '🗓 이번달' }[p]
+                const sectionLabel = { today: '오늘', week: '이번주', month: '이번달' }[p]
                 const items = todos.filter(t => t.period === p)
                 return (
                   <div key={p}>
@@ -1605,7 +1605,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             {/* 오늘 재통화 업체 */}
             {todayCallbackCustomers.length > 0 && (
               <div className="border-t border-amber-200 px-2.5 py-2 shrink-0">
-                <p className="text-[10px] font-bold text-sky-700 mb-1.5">📞 오늘 재통화 ({todayCallbackCustomers.length}건)</p>
+                <p className="text-[10px] font-bold text-sky-700 mb-1.5">오늘 재통화 ({todayCallbackCustomers.length}건)</p>
                 <div className="space-y-0.5">
                   {todayCallbackCustomers.map(c => {
                     const company = (c as any).details?.company || c.name || '—'

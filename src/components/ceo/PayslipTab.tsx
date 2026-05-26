@@ -461,8 +461,8 @@ export default function PayslipTab() {
         body: JSON.stringify({ employees }),
       })
       const json = await res.json()
-      setMsg(json.settings ? '✅ 저장 완료' : '❌ 저장 실패')
-    } catch { setMsg('❌ 저장 실패') }
+      setMsg(json.settings ? '저장 완료' : '저장 실패')
+    } catch { setMsg('저장 실패') }
     finally { setSaving(false) }
   }, [employees])
 
@@ -522,8 +522,8 @@ export default function PayslipTab() {
         return next
       })
       const loaded = Object.keys(updates).length
-      setMsg(loaded > 0 ? `✅ ${loaded}명 급여 데이터 불러오기 완료` : '⚠️ 이름이 일치하는 직원이 없습니다')
-    } catch { setMsg('❌ 불러오기 실패') }
+      setMsg(loaded > 0 ? `${loaded}명 급여 데이터 불러오기 완료` : '이름이 일치하는 직원이 없습니다')
+    } catch { setMsg('불러오기 실패') }
     finally { setLoading(false) }
   }
 
@@ -563,15 +563,15 @@ export default function PayslipTab() {
             className="border border-white/20 bg-white/10 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none" />
           <button onClick={handleLoad} disabled={loading}
             className="bg-white/10 hover:bg-white/20 disabled:opacity-40 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">
-            {loading ? '불러오는 중...' : '📥 급여계산기에서 불러오기'}
+            {loading ? '불러오는 중...' : '급여계산기에서 불러오기'}
           </button>
           <button onClick={handleSave} disabled={saving}
             className="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">
-            {saving ? '저장 중...' : '💾 직원 정보 저장'}
+            {saving ? '저장 중...' : '직원 정보 저장'}
           </button>
           <button onClick={() => window.print()}
             className="bg-white/10 hover:bg-white/20 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">
-            🖨️ 인쇄
+            인쇄
           </button>
           {msg && <span className="text-xs text-white/80">{msg}</span>}
         </div>
@@ -636,7 +636,7 @@ export default function PayslipTab() {
                       className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
                         editMode ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                       }`}>
-                      {editMode ? '✓ 미리보기' : '✏️ 편집'}
+                      {editMode ? '✓ 미리보기' : '편집'}
                     </button>
                     <button onClick={() => {
                       if (!confirm('이 직원을 삭제하시겠습니까?')) return
@@ -652,7 +652,7 @@ export default function PayslipTab() {
                   <div className="no-print bg-white rounded-xl border border-[#E8E2D4] p-5 space-y-5">
                     {/* 개인 정보 */}
                     <div>
-                      <h4 className="text-sm font-bold text-gray-700 mb-3">👤 개인 정보</h4>
+                      <h4 className="text-sm font-bold text-gray-700 mb-3">개인 정보</h4>
                       <div className="grid grid-cols-2 gap-3">
                         {([
                           ['name', '성명'],
@@ -695,7 +695,7 @@ export default function PayslipTab() {
 
                     {/* 공통: 환수금 */}
                     <div>
-                      <h4 className="text-sm font-bold text-gray-700 mb-3">💸 환수금</h4>
+                      <h4 className="text-sm font-bold text-gray-700 mb-3">환수금</h4>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className={lbl}>환수금 합계 (원)</label>
@@ -796,7 +796,7 @@ function SalesFinancialForm({ fin, update }: { fin: EmpFinancial; update: (p: Pa
 
   return (
     <div>
-      <h4 className="text-sm font-bold text-gray-700 mb-3">💰 영업팀 재무 정보</h4>
+      <h4 className="text-sm font-bold text-gray-700 mb-3">영업팀 재무 정보</h4>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className={lbl}>이달 매출 (원) <span className="text-gray-400 text-[10px]">자동불러오기 가능</span></label>
@@ -869,7 +869,7 @@ function OpsFinancialForm({ fin, update }: { fin: EmpFinancial; update: (p: Part
 
   return (
     <div>
-      <h4 className="text-sm font-bold text-gray-700 mb-3">💰 관리팀 재무 정보</h4>
+      <h4 className="text-sm font-bold text-gray-700 mb-3">관리팀 재무 정보</h4>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className={lbl}>기본급 (원) <span className="text-gray-400 text-[10px]">자동불러오기 가능</span></label>

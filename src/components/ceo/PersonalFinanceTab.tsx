@@ -138,7 +138,7 @@ function LoanModal({
     <div className="fixed inset-0 bg-black/60 z-[300] flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="bg-gradient-to-r from-[#1B2A45] to-[#2d4a7a] px-5 py-4 flex items-center justify-between">
-          <h3 className="font-bold text-white text-sm">🏦 대출 편집</h3>
+          <h3 className="font-bold text-white text-sm">대출 편집</h3>
           <button onClick={onClose} className="text-white/60 hover:text-white text-lg">✕</button>
         </div>
 
@@ -175,7 +175,7 @@ function LoanModal({
 
           {/* 거치기간 */}
           <div className="bg-blue-50 rounded-xl p-3">
-            <p className="text-[11px] font-bold text-blue-600 mb-2">📅 {phaseLabels[0]}</p>
+            <p className="text-[11px] font-bold text-blue-600 mb-2">{phaseLabels[0]}</p>
             <div className="grid grid-cols-3 gap-2">
               {[['p1_principal','원금'] as const,['p1_interest','이자'] as const,['p1_monthly','월상환금'] as const].map(([k,l]) => (
                 <div key={k}>
@@ -190,7 +190,7 @@ function LoanModal({
           {/* 상환기간 */}
           <div className="bg-emerald-50 rounded-xl p-3">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-[11px] font-bold text-emerald-600">📅 {phaseLabels[1]}</p>
+              <p className="text-[11px] font-bold text-emerald-600">{phaseLabels[1]}</p>
               <label className="flex items-center gap-1.5 cursor-pointer">
                 <input type="checkbox" checked={f.p2_same} onChange={e => set('p2_same', e.target.checked)} className="accent-emerald-500 w-3 h-3" />
                 <span className="text-[11px] text-emerald-600 font-medium">상동 (Phase 1과 동일)</span>
@@ -213,12 +213,12 @@ function LoanModal({
 
           {/* 메모 + 목표 */}
           <div>
-            <label className="text-[11px] font-semibold text-gray-400 mb-1 block">📝 메모</label>
+            <label className="text-[11px] font-semibold text-gray-400 mb-1 block">메모</label>
             <textarea className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30 resize-none"
               rows={2} value={f.memo} onChange={e => set('memo', e.target.value)} placeholder="메모..." />
           </div>
           <div>
-            <label className="text-[11px] font-semibold text-gray-400 mb-1 block">🎯 목표</label>
+            <label className="text-[11px] font-semibold text-gray-400 mb-1 block">목표</label>
             <input className={INP} type="text" value={f.goal} onChange={e => set('goal', e.target.value)} placeholder="상환 목표..." />
           </div>
         </div>
@@ -386,7 +386,7 @@ export default function PersonalFinanceTab() {
       {/* 헤더 */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex bg-gray-100 rounded-xl p-1 gap-1">
-          {([['loans','🏦 대출 현황'],['subs','💳 정기구독']] as const).map(([k,l]) => (
+          {([['loans','대출 현황'],['subs','정기구독']] as const).map(([k,l]) => (
             <button key={k} onClick={() => setActiveTab(k)}
               className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === k ? 'bg-white text-[#1B2A45] shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>
               {l}
@@ -395,7 +395,7 @@ export default function PersonalFinanceTab() {
         </div>
         <button onClick={save} disabled={saving}
           className="ml-auto bg-[#1B2A45] hover:bg-[#1B2A45]/90 disabled:opacity-40 text-white px-4 py-2 rounded-xl text-sm font-semibold">
-          {saving ? '저장 중...' : '💾 저장'}
+          {saving ? '저장 중...' : '저장'}
         </button>
         {loading && <span className="text-xs text-blue-400 animate-pulse">불러오는 중...</span>}
         {msg && <span className={`text-xs font-medium ${msg.includes('완료') ? 'text-emerald-600' : 'text-red-500'}`}>{msg}</span>}
@@ -440,7 +440,7 @@ export default function PersonalFinanceTab() {
                 <span className="bg-blue-50 text-blue-500 px-2 py-0.5 rounded font-medium">{phaseLabels[0]}</span>
                 <span>→</span>
                 <span className="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded font-medium">{phaseLabels[1]}</span>
-                <button onClick={() => setEditPhase(true)} className="text-gray-400 hover:text-gray-600">✏️ 편집</button>
+                <button onClick={() => setEditPhase(true)} className="text-gray-400 hover:text-gray-600">편집</button>
               </>
             )}
           </div>
@@ -500,7 +500,7 @@ export default function PersonalFinanceTab() {
                       )}
                       {loan.goal && (
                         <div className="flex items-start gap-1.5">
-                          <span className="text-amber-400 text-[10px] font-bold shrink-0 mt-0.5">🎯</span>
+                          <span className="text-amber-400 text-[10px] font-bold shrink-0 mt-0.5">목표</span>
                           <p className="text-[11px] text-amber-700 font-medium leading-relaxed">{loan.goal}</p>
                         </div>
                       )}
@@ -511,7 +511,7 @@ export default function PersonalFinanceTab() {
                   <div className="px-3 pb-3 flex gap-2">
                     <button onClick={() => setEditingLoan(loan)}
                       className="flex-1 py-1.5 text-xs font-semibold text-[#1B2A45] border border-[#1B2A45]/20 rounded-lg hover:bg-[#1B2A45]/5 transition-colors">
-                      ✏️ 편집
+                      편집
                     </button>
                     <button onClick={() => setLoans(prev => prev.filter((_, j) => j !== i))}
                       className="px-3 py-1.5 text-xs text-red-400 border border-red-100 rounded-lg hover:bg-red-50 transition-colors">

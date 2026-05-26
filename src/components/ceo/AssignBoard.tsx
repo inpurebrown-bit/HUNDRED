@@ -273,7 +273,7 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || '배정 실패')
       setReassignMode(p => ({ ...p, [id]: false }))
-      setToast(`✅ ${selectedUser.name} 배정 완료`)
+      setToast(`${selectedUser.name} 배정 완료`)
       setTimeout(() => setToast(null), 3000)
       load()
     } catch (e: any) { alert(e.message) } finally { setPatching(null) }
@@ -308,14 +308,14 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
 
       {toast && (
         <div className="mb-3 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-700">
-          ✅ {toast}
+          {toast}
         </div>
       )}
 
       {/* 등록 폼 */}
       {showForm && (
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-[#E8E2D4] shadow-sm p-5 mb-4">
-          <p className="text-xs font-bold text-[#1B2A45] mb-4">📋 한경연 DB 등록</p>
+          <p className="text-xs font-bold text-[#1B2A45] mb-4">한경연 DB 등록</p>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
             <div>
               <label className={lbl}>업체명 *</label>
@@ -578,7 +578,7 @@ function SupplyDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
         setShowForm(false)
         setAssignTo('')
         const target = selectedUser ? `${selectedUser.name}에게 배정` : '미배정'
-        setToast(`✅ DB 등록 완료 (${target})`)
+        setToast(`DB 등록 완료 (${target})`)
         setTimeout(() => setToast(null), 3500)
       } else {
         alert(`등록 실패: ${json.error}`)
@@ -715,7 +715,7 @@ function SupplyDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
       {showForm && (
         <div className="bg-white rounded-xl border border-[#E8E2D4] p-5 mb-5">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-bold text-[#1B2A45]">📋 신규 DB 등록 (인콜일지 양식)</p>
+            <p className="text-sm font-bold text-[#1B2A45]">신규 DB 등록 (인콜일지 양식)</p>
             <button
               onClick={() => { setShowForm(false); setAssignTo('') }}
               className="text-gray-400 hover:text-gray-600 text-sm"
@@ -736,7 +736,7 @@ function SupplyDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
             </select>
             {assignTo && (
               <p className="text-xs text-emerald-600 mt-1">
-                ✅ {salesUsers.find(u => u.id === assignTo)?.name}의 010DB 탭에 등록됩니다
+                {salesUsers.find(u => u.id === assignTo)?.name}의 010DB 탭에 등록됩니다
               </p>
             )}
           </div>
@@ -922,7 +922,7 @@ function LeadDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
         }),
       })
       if (!res.ok) throw new Error('이동 실패')
-      toast_('✅ 한경연DB로 이동 완료')
+      toast_('한경연DB로 이동 완료')
       load()
     } catch (e: any) { alert(e.message) } finally { setPatching(null) }
   }
@@ -947,7 +947,7 @@ function LeadDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
       } catch {}
     }
     setMigrating(false)
-    toast_(`✅ ${ok}건 한경연DB로 이동 완료`)
+    toast_(`${ok}건 한경연DB로 이동 완료`)
     load()
   }
 

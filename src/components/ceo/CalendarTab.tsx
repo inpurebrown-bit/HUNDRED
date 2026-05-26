@@ -175,7 +175,7 @@ export default function CalendarTab() {
           const t = e.start_time ? e.start_time.slice(0, 5) + ' ' : ''
           return t + e.title
         }).join(' · ')
-        new Notification(`📅 오늘 일정 ${todayEvents.length}건`, { body: titles, tag: 'calendar-today' })
+        new Notification(`오늘 일정 ${todayEvents.length}건`, { body: titles, tag: 'calendar-today' })
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -200,7 +200,7 @@ export default function CalendarTab() {
         const key = `cal-notif-ev-${ev.id}-${nowTime}`
         if (!localStorage.getItem(key)) {
           localStorage.setItem(key, '1')
-          new Notification(`⏰ 지금 시작: ${ev.title}`, {
+          new Notification(`지금 시작: ${ev.title}`, {
             body: ev.description || nowTime,
             tag: `ev-${ev.id}`,
           })
@@ -252,10 +252,10 @@ export default function CalendarTab() {
     })
     const data = await res.json()
     if (res.ok) {
-      setSyncMsg(`✅ ${data.synced}개 동기화 완료`)
+      setSyncMsg(`ok:${data.synced}개 동기화 완료`)
       load()
     } else {
-      setSyncMsg(`❌ ${data.error}`)
+      setSyncMsg(`err:${data.error}`)
     }
     setSyncing(false)
   }
@@ -346,7 +346,7 @@ export default function CalendarTab() {
             <button
               onClick={() => Notification.requestPermission()}
               className="flex items-center gap-1.5 text-xs border border-yellow-400/40 bg-yellow-400/10 text-yellow-300 px-3 py-2 rounded-lg hover:bg-yellow-400/20 transition-colors">
-              🔔 알림 켜기
+              알림 켜기
             </button>
           )}
           <button onClick={() => setShowExpenseMgr(!showExpenseMgr)}
@@ -355,7 +355,7 @@ export default function CalendarTab() {
                 ? 'border-red-400/40 bg-red-400/10 text-red-300'
                 : 'border-white/20 bg-white/10 text-white/70 hover:bg-white/20'
             }`}>
-            💸 고정 지출 관리
+            고정 지출 관리
           </button>
           <button onClick={() => setShowGcal(!showGcal)}
             className={`flex items-center gap-1.5 text-xs border px-3 py-2 rounded-lg transition-colors ${
@@ -363,7 +363,7 @@ export default function CalendarTab() {
                 ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300'
                 : 'border-white/20 bg-white/10 text-white/70 hover:bg-white/20'
             }`}>
-            🗓 {gcalSaved ? 'Google 연동됨 ✓' : 'Google 캘린더 연동'}
+            {gcalSaved ? 'Google 연동됨 ✓' : 'Google 캘린더 연동'}
           </button>
           <button
             onClick={() => openAddForm(selectedDay)}
@@ -377,7 +377,7 @@ export default function CalendarTab() {
       {showGcal && (
         <div className="bg-white rounded-xl border border-[#E8E2D4] p-5 space-y-4">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-gray-800">🗓 Google 캘린더 연동 설정</span>
+            <span className="text-sm font-semibold text-gray-800">Google 캘린더 연동 설정</span>
           </div>
           <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-700 space-y-1">
             <p className="font-semibold">설정 방법</p>
@@ -426,8 +426,8 @@ export default function CalendarTab() {
             ))}
           </div>
           {syncMsg && (
-            <p className={`text-sm px-3 py-2 rounded-lg ${syncMsg.startsWith('✅') ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
-              {syncMsg}
+            <p className={`text-sm px-3 py-2 rounded-lg ${syncMsg.startsWith('ok:') ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+              {syncMsg.startsWith('ok:') || syncMsg.startsWith('err:') ? syncMsg.slice(3) : syncMsg}
             </p>
           )}
           <div className="flex justify-end">
@@ -443,7 +443,7 @@ export default function CalendarTab() {
       {showExpenseMgr && (
         <div className="bg-white rounded-xl border border-red-100 p-5 space-y-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-gray-800">💸 매월 고정 지출 관리</span>
+            <span className="text-sm font-semibold text-gray-800">매월 고정 지출 관리</span>
             <span className="text-[11px] text-gray-400">캘린더 각 날짜 하단에 빨간색으로 표시됩니다</span>
           </div>
 
@@ -557,7 +557,7 @@ export default function CalendarTab() {
         <form onSubmit={submitEvent} className="bg-white rounded-xl border border-blue-200 p-5 space-y-3 shadow-sm">
           <div className="flex items-center justify-between mb-1">
             <h3 className="font-semibold text-gray-800 text-sm">
-              ✏️ 새 일정 — {formatDate(form.start_date)} ({getDow(form.start_date)})
+              새 일정 — {formatDate(form.start_date)} ({getDow(form.start_date)})
             </h3>
             <button type="button" onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-700 text-lg">✕</button>
           </div>
@@ -702,7 +702,7 @@ export default function CalendarTab() {
                       {dayExpenses.map((exp, ei) => (
                         <div key={`exp-${ei}`}
                           className="text-[9px] px-1 py-0.5 rounded font-semibold truncate leading-tight bg-white border-l-[3px] border-red-400 text-red-600">
-                          💸 {exp.label}{exp.amount !== null ? ` ${Math.abs(exp.amount).toLocaleString()}` : ''}
+                          {exp.label}{exp.amount !== null ? ` ${Math.abs(exp.amount).toLocaleString()}` : ''}
                         </div>
                       ))}
                       {dayEvs.length > 2 && (
@@ -769,7 +769,7 @@ export default function CalendarTab() {
                     </div>
                     {!ev.is_allday && ev.start_time && (
                       <p className="text-[10px] text-gray-400 mt-0.5 pl-4.5">
-                        ⏰ {ev.start_time.slice(0, 5)}{ev.end_time && ` ~ ${ev.end_time.slice(0, 5)}`}
+                        {ev.start_time.slice(0, 5)}{ev.end_time && ` ~ ${ev.end_time.slice(0, 5)}`}
                       </p>
                     )}
                     {ev.description && (
@@ -785,7 +785,7 @@ export default function CalendarTab() {
           {upcomingThisMonth.length > 0 && (
             <div className="bg-white rounded-xl border border-[#E8E2D4] overflow-hidden">
               <div className="px-4 py-3 border-b border-[#E8E2D4]">
-                <p className="text-xs font-bold text-gray-500">📅 다가오는 일정</p>
+                <p className="text-xs font-bold text-gray-500">다가오는 일정</p>
               </div>
               <div className="divide-y divide-gray-50">
                 {upcomingThisMonth.map(ev => {
@@ -796,7 +796,7 @@ export default function CalendarTab() {
                       className="w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors">
                       <div className="flex items-center gap-2">
                         {isExpense
-                          ? <span className="text-[10px] text-red-500 shrink-0">💸</span>
+                          ? <span className="w-2 h-2 rounded-full shrink-0 bg-red-400" />
                           : <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colorHex(ev.color) }} />
                         }
                         <span className={`text-xs font-medium flex-1 truncate ${isExpense ? 'text-red-700' : 'text-gray-800'}`}>
@@ -806,7 +806,7 @@ export default function CalendarTab() {
                       <p className="text-[10px] text-gray-400 mt-0.5 pl-4">
                         {ev.start_date.slice(5).replace('-', '/')} ({getDow(ev.start_date)})
                         {!ev.is_allday && ev.start_time && ` ${ev.start_time.slice(0, 5)}`}
-                        {ev.source === 'google' && !isExpense && ' 🗓'}
+                        {ev.source === 'google' && !isExpense && ' G'}
                       </p>
                     </button>
                   )
@@ -848,7 +848,6 @@ export default function CalendarTab() {
             </div>
             <div className="space-y-2 text-sm text-gray-600">
               <div className="flex items-center gap-2">
-                <span className="text-gray-400">📅</span>
                 <span>
                   {formatDate(detailEvent.start_date)} ({getDow(detailEvent.start_date)})
                   {detailEvent.end_date !== detailEvent.start_date && ` ~ ${formatDate(detailEvent.end_date)}`}
@@ -856,13 +855,11 @@ export default function CalendarTab() {
               </div>
               {!detailEvent.is_allday && detailEvent.start_time && (
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-400">⏰</span>
                   <span>{detailEvent.start_time.slice(0, 5)}{detailEvent.end_time && ` ~ ${detailEvent.end_time.slice(0, 5)}`}</span>
                 </div>
               )}
               {detailEvent.source === 'google' && (
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-400">🗓</span>
                   <span className="text-emerald-600 text-xs font-medium">
                     Google 캘린더{detailEvent.gcal_label && ` · ${detailEvent.gcal_label}`}
                   </span>
@@ -877,7 +874,7 @@ export default function CalendarTab() {
             {detailEvent.source === 'local' && (
               <button onClick={() => deleteEvent(detailEvent.id)}
                 className="mt-4 w-full text-red-400 hover:text-red-600 text-sm border border-red-100 hover:border-red-200 py-2 rounded-lg transition-colors">
-                🗑 일정 삭제
+                일정 삭제
               </button>
             )}
           </div>
