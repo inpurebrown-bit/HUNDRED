@@ -874,7 +874,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
       lead: mine.filter((c: any) => ['lead', 'consulting'].includes(c.status)).length,
       db010: mine.filter((c: any) => {
         const m = (c as any).details?.db010_month || ((c as any).details?.is_direct ? ((c as any).created_at || '').slice(0, 7) : null)
-        return m === thisMonth
+        return m === thisMonthStr
       }).length,
       contracted: contracted.reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0),
       revenue: contracted.reduce((sum, c) => sum + parseNum((c as any).details?.my_revenue), 0),
@@ -929,7 +929,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
       const owner = (c.details?.sales_user_name || c.sales_user_name || '').trim()
       if (owner !== name) return false
       const m = c.details?.db010_month || (c.details?.is_direct ? (c.created_at || '').slice(0, 7) : null)
-      return m === thisMonth
+      return m === thisMonthStr
     }).length
     return {
       name,
@@ -938,7 +938,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
       count:   mine.reduce((s, c) => s + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0),
       db010,
     }
-  }), [salesPeople, thisMonthContracted, customers, thisMonth])
+  }), [salesPeople, thisMonthContracted, customers, thisMonthStr])
   const bizElapsed = getElapsedBusinessDays(now.getFullYear(), now.getMonth(), now.getDate())
 
   const supplyStats = useMemo(() => {
@@ -965,7 +965,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
     lead:       personCustomers.filter(c => ['lead', 'consulting'].includes(c.status)).length,
     db010:      personCustomers.filter(c => {
       const m = (c as any).details?.db010_month || ((c as any).details?.is_direct ? ((c as any).created_at || '').slice(0, 7) : null)
-      return m === thisMonth
+      return m === thisMonthStr
     }).length,
     contracted: personCustomers.filter(c => c.status === 'contracted').length,
     emotional:  personCustomers.filter(c => c.status === 'emotional').length,
