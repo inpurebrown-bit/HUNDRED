@@ -763,15 +763,15 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
 
   const salesPeople = useMemo(() => {
     if (officialSalesUsers.length > 0) {
-      // 실제 users 테이블에 있는 영업팀 이름만 표시 (순서: 가나다순)
-      return [...officialSalesUsers].sort()
+      // 실제 users 테이블에 있는 영업팀 이름만 표시 (TESTER 제외, 가나다순)
+      return [...officialSalesUsers].filter(n => n !== DIARY_TESTER).sort()
     }
-    // fallback: 고객 데이터에서 유니코드 정규화 후 추출
+    // fallback: 고객 데이터에서 유니코드 정규화 후 추출 (TESTER 제외)
     const names = Array.from(
       new Set(
         customers
           .map((c: any) => (c.details?.sales_user_name || c.sales_user_name || '').normalize('NFC').trim())
-          .filter(Boolean)
+          .filter(n => Boolean(n) && n !== DIARY_TESTER)
       )
     ).sort() as string[]
     return names
