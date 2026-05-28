@@ -63,6 +63,7 @@ interface DailyData {
   outbound: ConsultItem[] | null
   today_contracts: string
   month_contracts: string
+  month_direct_db: string              // 이번달 직가DB 등록 누적
   goal: string
   worried: WorriedItem[] | null
   decided: DecidedItem[] | null
@@ -166,6 +167,7 @@ export default function ReportTab({ userId, userName }: Props) {
     outbound: [],
     today_contracts: '',
     month_contracts: '',
+    month_direct_db: '',
     goal: '',
     worried: [],
     decided: [],
@@ -225,6 +227,15 @@ export default function ReportTab({ userId, userName }: Props) {
     .filter((c: any) => (c.details?.contract_date || '').startsWith(monthStr))
     .reduce((sum: number, c: any) => sum + contractWeight(c.details?.payment_amount, c.details?.vat_included), 0)
 
+  // 이번달 직가DB 등록 수 (현재 status 무관 — db010_month 기준)
+  const autoMonthDirectDb = allCustomers.filter((c: any) => {
+    const owner = (c.details?.sales_user_name || c.sales_user_name || '').trim()
+    const isOwner = owner === userName || cleanNameLocal(owner) === cleanNameLocal(userName)
+    const regMonth = c.details?.db010_month
+      || (c.details?.is_direct ? (c.created_at || '').slice(0, 7) : null)
+    return isOwner && regMonth === monthStr
+  }).length
+
   const [showYesterdayPreview, setShowYesterdayPreview] = useState(false)
 
   // ── 과거 보고 수정하기 ────────────────────────────────
@@ -236,8 +247,8 @@ export default function ReportTab({ userId, userName }: Props) {
     } else {
       setDaily({
         supply_db: [], outbound: [], today_contracts: '', month_contracts: '',
-        goal: '', worried: [], decided: [], meetings: [], payment_waiting: [],
-        continue_tomorrow: [],
+        month_direct_db: '', goal: '', worried: [], decided: [], meetings: [],
+        payment_waiting: [], continue_tomorrow: [],
         ...r.data,
       })
       setActiveReport('daily')
@@ -563,14 +574,17 @@ export default function ReportTab({ userId, userName }: Props) {
               <div className="bg-gradient-to-r from-emerald-50 to-blue-50 border border-emerald-200 rounded-xl px-4 py-3 mb-3 flex flex-wrap items-center gap-4">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] text-emerald-600 font-bold">DB 자동집계</span>
-                  <span className="text-[10px] text-gray-400">(계약완료 처리된 내 업체 기준)</span>
+                  <span className="text-[10px] text-gray-400">(내 업체 기준)</span>
                 </div>
                 <div className="flex flex-wrap gap-3 text-[11px]">
                   <span className="bg-white border border-emerald-200 rounded-full px-2.5 py-1 font-semibold text-emerald-700">
                     오늘 계약 {autoTodayContracts % 1 === 0 ? autoTodayContracts : autoTodayContracts.toFixed(1)}건
                   </span>
                   <span className="bg-white border border-blue-200 rounded-full px-2.5 py-1 font-semibold text-blue-700">
-                    이번달 {autoMonthContracts % 1 === 0 ? autoMonthContracts : autoMonthContracts.toFixed(1)}건
+                    이번달 계약 {autoMonthContracts % 1 === 0 ? autoMonthContracts : autoMonthContracts.toFixed(1)}건
+                  </span>
+                  <span className="bg-white border border-violet-200 rounded-full px-2.5 py-1 font-semibold text-violet-700">
+                    이번달 직가DB {autoMonthDirectDb}개
                   </span>
                 </div>
                 <button type="button"
@@ -578,6 +592,7 @@ export default function ReportTab({ userId, userName }: Props) {
                     ...p,
                     today_contracts: String(autoTodayContracts),
                     month_contracts: String(autoMonthContracts),
+                    month_direct_db: String(autoMonthDirectDb),
                     ...(supplyGoal !== null && p.goal === '' ? { goal: String(supplyGoal) } : {}),
                   }))}
                   className="ml-auto shrink-0 text-[11px] bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-semibold transition-colors">
@@ -586,7 +601,7 @@ export default function ReportTab({ userId, userName }: Props) {
               </div>
 
               {/* 계약 현황 입력 */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-2">
                 <div>
                   <label className={label}>당일 계약 개수</label>
                   <div className="relative">
@@ -610,6 +625,17 @@ export default function ReportTab({ userId, userName }: Props) {
                   </div>
                 </div>
                 <div>
+                  <label className={label}>이번달 직가DB 등록</label>
+                  <div className="relative">
+                    <input type="number" className={inp} placeholder="0"
+                      value={daily.month_direct_db}
+                      onChange={e => setDaily(p => ({ ...p, month_direct_db: e.target.value }))} />
+                    {daily.month_direct_db === '' && autoMonthDirectDb > 0 && (
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-violet-400 pointer-events-none">{autoMonthDirectDb}</span>
+                    )}
+                  </div>
+                </div>
+                <div>
                   <label className={label}>
                     월 목표 개수
                     {supplyGoal !== null && (
@@ -625,7 +651,7 @@ export default function ReportTab({ userId, userName }: Props) {
                     )}
                   </div>
                 </div>
-                <div>
+                <div className="md:col-span-2">
                   <label className={label}>목표까지 남은 수</label>
                   <div className={`${inp} bg-gray-50 font-semibold ${remaining !== null && remaining > 0 ? 'text-orange-600' : 'text-emerald-600'}`}>
                     {remaining !== null
@@ -805,7 +831,7 @@ export default function ReportTab({ userId, userName }: Props) {
                     <div>
                       <span className="text-sm font-medium text-gray-800">{r.report_date}</span>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        당일계약 {r.data?.today_contracts || 0}건 · 월누적 {r.data?.month_contracts || 0}건 · 목표 {r.data?.goal || 0}건
+                        당일계약 {r.data?.today_contracts || 0}건 · 월누적 {r.data?.month_contracts || 0}건 · 직가DB {r.data?.month_direct_db || 0}개 · 목표 {r.data?.goal || 0}건
                       </p>
                     </div>
                     <div className="flex gap-2 shrink-0 ml-2">
@@ -1363,6 +1389,7 @@ function DailyDetailView({ data }: { data: any }) {
           {[
             { label: '당일 계약', value: (data?.today_contracts || 0) + '건', color: 'text-blue-700', bg: 'bg-blue-50' },
             { label: '이번달 누적', value: month + '건', color: 'text-emerald-700', bg: 'bg-emerald-50' },
+            { label: '이번달 직가DB', value: (data?.month_direct_db || 0) + '개', color: 'text-violet-700', bg: 'bg-violet-50' },
             { label: '월 목표', value: goal > 0 ? goal + '건' : '미설정', color: 'text-gray-700', bg: 'bg-gray-50' },
             { label: '남은 목표', value: remaining !== null ? remaining + '건' + (rate !== null ? ` (${rate}%)` : '') : '—', color: 'text-amber-700', bg: 'bg-amber-50' },
           ].map(f => (

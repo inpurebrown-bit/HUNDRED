@@ -872,7 +872,10 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
       name,
       total: mine.length,
       lead: mine.filter((c: any) => ['lead', 'consulting'].includes(c.status)).length,
-      db010: mine.filter((c: any) => c.status === 'db010').length,
+      db010: mine.filter((c: any) => {
+        const m = (c as any).details?.db010_month || ((c as any).details?.is_direct ? ((c as any).created_at || '').slice(0, 7) : null)
+        return m === thisMonth
+      }).length,
       contracted: contracted.reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0),
       revenue: contracted.reduce((sum, c) => sum + parseNum((c as any).details?.my_revenue), 0),
     }
@@ -952,7 +955,10 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
   const counts = useMemo(() => ({
     all:        personCustomers.length,
     lead:       personCustomers.filter(c => ['lead', 'consulting'].includes(c.status)).length,
-    db010:      personCustomers.filter(c => c.status === 'db010').length,
+    db010:      personCustomers.filter(c => {
+      const m = (c as any).details?.db010_month || ((c as any).details?.is_direct ? ((c as any).created_at || '').slice(0, 7) : null)
+      return m === thisMonth
+    }).length,
     contracted: personCustomers.filter(c => c.status === 'contracted').length,
     emotional:  personCustomers.filter(c => c.status === 'emotional').length,
     trash:      personCustomers.filter(c => c.status === 'trash').length,

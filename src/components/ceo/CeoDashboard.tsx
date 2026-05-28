@@ -1836,6 +1836,9 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
                               <span className="text-[10px] text-blue-600 font-bold">마감</span>
                               <span className="text-xs text-gray-600">당일 <b className="text-blue-600">{dr.data?.today_contracts||0}</b>건</span>
                               <span className="text-xs text-gray-600">월누적 <b>{dr.data?.month_contracts||0}</b>건</span>
+                              {(dr.data?.month_direct_db > 0 || dr.data?.month_direct_db === '0') && (
+                                <span className="text-xs text-violet-600">직가DB <b>{dr.data?.month_direct_db}</b>개</span>
+                              )}
                               <span className="text-xs text-gray-600">목표 <b>{dr.data?.goal||0}</b>건</span>
                               <button onClick={() => setViewReport(dr)} className="text-[10px] text-blue-500 hover:underline ml-auto shrink-0">상세</button>
                             </div>
@@ -1914,12 +1917,13 @@ function DailyDetail({ data }: { data: any }) {
           {[
             { label: '당일 계약', value: data?.today_contracts + '건' },
             { label: '이번달 누적', value: data?.month_contracts + '건' },
+            { label: '이번달 직가DB', value: (data?.month_direct_db || 0) + '개', violet: true },
             { label: '월 목표', value: data?.goal + '건' },
             { label: '남은 목표', value: data?.goal && data?.month_contracts ? Math.max(0, Number(data.goal) - Number(data.month_contracts)) + '건' : '-' },
           ].map(f => (
-            <div key={f.label} className="bg-gray-50 rounded-lg p-2.5">
+            <div key={f.label} className={(f as any).violet ? 'bg-violet-50 rounded-lg p-2.5' : 'bg-gray-50 rounded-lg p-2.5'}>
               <p className="text-xs text-gray-400">{f.label}</p>
-              <p className="text-lg font-black text-gray-900">{f.value}</p>
+              <p className={(f as any).violet ? 'text-lg font-black text-violet-700' : 'text-lg font-black text-gray-900'}>{f.value}</p>
             </div>
           ))}
         </div>
