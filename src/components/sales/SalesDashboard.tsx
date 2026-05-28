@@ -10,7 +10,6 @@ import CustomerCard, { Customer, CustomerDetails, CardTabType } from './Customer
 import InCallForm, { InCallData } from './InCallForm'
 import InCallTableView from './InCallTableView'
 import PullToRefresh from '@/components/ui/PullToRefresh'
-import CustomerReferencePanel from '@/components/shared/CustomerReferencePanel'
 import {
   getBusinessDaysInMonth,
   getElapsedBusinessDays,
@@ -186,9 +185,6 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   // 검색
   const [searchQuery, setSearchQuery] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
-  // 창분할
-  const [splitMode, setSplitMode] = useState(false)
-  const [splitCustomer, setSplitCustomer] = useState<any | null>(null)
   const [scrollToCustomerId, setScrollToCustomerId] = useState<string | undefined>(undefined)
 
   // New customer form state
@@ -841,7 +837,6 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                       const tab = STATUS_TAB[c.status] ?? 'customers'
                       setActiveTab(tab)
                       setScrollToCustomerId(c.id)
-                      if (splitMode) setSplitCustomer(c)
                       setSearchQuery('')
                     }}
                     className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors flex items-center justify-between gap-2 border-t border-gray-50">
@@ -864,10 +859,10 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
           </div>
           {/* 창분할 버튼 */}
           <button
-            onClick={() => { setSplitMode(v => !v); if (splitMode) setSplitCustomer(null) }}
-            className={`text-[11px] px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap font-medium hidden md:block ${splitMode ? 'bg-[#C5A258]/80 text-white' : 'text-white/50 hover:text-white hover:bg-white/10'}`}
-            title="창 분할 — 검색 결과를 우측 패널에 표시">
-            {splitMode ? '⊟ 분할' : '⊞ 분할'}
+            onClick={() => window.open('/split', '_blank', 'noopener')}
+            className="text-[11px] px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap font-medium hidden md:block text-white/50 hover:text-white hover:bg-white/10"
+            title="창 분할 — 새 탭에서 좌우 두 패널을 독립적으로 사용">
+            ⊞ 분할
           </button>
           {/* 메모장 버튼 */}
           <button
@@ -954,18 +949,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         ))}
       </div>
 
-      {/* 창분할 우측 고정 패널 */}
-      {splitMode && (
-        <div className="fixed right-0 top-[100px] w-[400px] h-[calc(100vh-100px)] border-l border-gray-200 z-20 shadow-xl hidden md:flex flex-col">
-          <CustomerReferencePanel
-            customer={splitCustomer}
-            onClose={() => { setSplitMode(false); setSplitCustomer(null) }}
-            userName={userName}
-          />
-        </div>
-      )}
-
-      <div className={`px-4 md:px-6 py-5 max-w-5xl mx-auto ${splitMode ? 'md:pr-[420px]' : ''}`}>
+      <div className="px-4 md:px-6 py-5 max-w-5xl mx-auto">
 
         {/* ══════════ 메인보드 ══════════ */}
         {activeTab === 'board' && (

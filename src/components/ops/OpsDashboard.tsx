@@ -6,8 +6,6 @@ import Image from 'next/image'
 import Link from 'next/link'
 import MyProfileTab from '@/components/MyProfileTab'
 import PullToRefresh from '@/components/ui/PullToRefresh'
-import CustomerReferencePanel from '@/components/shared/CustomerReferencePanel'
-
 // ── KST Utils ──────────────────────────────────────────────────────────
 function nowKST() {
   return new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(' ', 'T') + '+09:00'
@@ -3475,9 +3473,6 @@ export default function OpsDashboard({ userId, userName }: Props) {
   const [cases, setCases] = useState<OpsCase[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
-  // 창분할
-  const [splitMode, setSplitMode] = useState(false)
-  const [splitCustomer, setSplitCustomer] = useState<any | null>(null)
   const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const [openPanelIds, setOpenPanelIds] = useState<string[]>([])
   const [closingPanelIds, setClosingPanelIds] = useState<string[]>([])
@@ -3713,7 +3708,6 @@ export default function OpsDashboard({ userId, userName }: Props) {
                     <button key={c.id}
                       onClick={() => {
                         setActiveTab(tabKey as any)
-                        if (splitMode && c.customers) setSplitCustomer(c.customers)
                         setSearchQuery('')
                         // 스크롤 to ops case
                         setTimeout(() => {
@@ -3749,10 +3743,10 @@ export default function OpsDashboard({ userId, userName }: Props) {
           </div>
           {/* 창분할 버튼 */}
           <button
-            onClick={() => { setSplitMode(v => !v); if (splitMode) setSplitCustomer(null) }}
-            className={`text-[11px] px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap font-medium hidden md:block ${splitMode ? 'bg-[#C5A258]/80 text-white' : 'text-white/50 hover:text-white hover:bg-white/10'}`}
-            title="창 분할 — 검색 결과를 우측 패널에 표시">
-            {splitMode ? '⊟ 분할' : '⊞ 분할'}
+            onClick={() => window.open('/split', '_blank', 'noopener')}
+            className="text-[11px] px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap font-medium hidden md:block text-white/50 hover:text-white hover:bg-white/10"
+            title="창 분할 — 새 탭에서 좌우 두 패널을 독립적으로 사용">
+            ⊞ 분할
           </button>
           <button
             onClick={() => setNotepadOpen(v => !v)}
@@ -3832,19 +3826,8 @@ export default function OpsDashboard({ userId, userName }: Props) {
         ))}
       </div>
 
-      {/* 창분할 우측 고정 패널 */}
-      {splitMode && (
-        <div className="fixed right-0 top-[100px] w-[400px] h-[calc(100vh-100px)] border-l border-gray-200 z-20 shadow-xl hidden md:flex flex-col">
-          <CustomerReferencePanel
-            customer={splitCustomer}
-            onClose={() => { setSplitMode(false); setSplitCustomer(null) }}
-            userName={userName}
-          />
-        </div>
-      )}
-
       {/* 콘텐츠 */}
-      <div className={`px-4 md:px-6 py-6 max-w-6xl mx-auto ${splitMode ? 'md:pr-[420px]' : ''}`}>
+      <div className="px-4 md:px-6 py-6 max-w-6xl mx-auto">
 
         {/* ── 대시보드 ── */}
         {activeTab === 'dashboard' && (

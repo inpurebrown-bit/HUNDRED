@@ -14,7 +14,6 @@ import FreelancerTab from './FreelancerTab'
 import AssignBoard from './AssignBoard'
 import OverviewTabNew from './OverviewTabNew'
 import SalesCeoTab from './SalesCeoTab'
-import CustomerReferencePanel from '@/components/shared/CustomerReferencePanel'
 import OpsCeoTab from './OpsCeoTab'
 import PinManageTab from './PinManageTab'
 import MyProfileTab from '@/components/MyProfileTab'
@@ -135,9 +134,6 @@ export default function CeoDashboard() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [salesInitialView, setSalesInitialView] = useState<'customers' | 'inspection' | 'as' | 'transfer' | 'diary' | undefined>(undefined)
   const [salesInitialStatusTab, setSalesInitialStatusTab] = useState<'all' | 'lead' | 'db010' | 'contracted' | 'emotional' | 'trash' | undefined>(undefined)
-  // 창분할
-  const [splitMode, setSplitMode] = useState(false)
-  const [splitCustomer, setSplitCustomer] = useState<any | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [allCustomersCache, setAllCustomersCache] = useState<any[]>([])
@@ -282,11 +278,7 @@ export default function CeoDashboard() {
                   return (
                     <button key={c.id}
                       onClick={() => {
-                        if (splitMode) {
-                          setSplitCustomer(c)
-                        } else {
-                          setQuickViewCustomer(c)
-                        }
+                        setQuickViewCustomer(c)
                         setSearchQuery(''); setSearchResults([])
                       }}
                       className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors flex items-center justify-between gap-2 border-t border-gray-50">
@@ -310,10 +302,10 @@ export default function CeoDashboard() {
           </div>
           {/* 창분할 버튼 */}
           <button
-            onClick={() => { setSplitMode(v => !v); if (splitMode) setSplitCustomer(null) }}
-            className={`text-[11px] px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap font-medium hidden md:block ${splitMode ? 'bg-[#C5A258]/80 text-white' : 'text-white/50 hover:text-white hover:bg-white/10'}`}
-            title="창 분할 — 검색 결과를 우측 패널에 표시">
-            {splitMode ? '⊟ 분할' : '⊞ 분할'}
+            onClick={() => window.open('/split', '_blank', 'noopener')}
+            className="text-[11px] px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap font-medium hidden md:block text-white/50 hover:text-white hover:bg-white/10"
+            title="창 분할 — 새 탭에서 좌우 두 패널을 독립적으로 사용">
+            ⊞ 분할
           </button>
           {/* 홈 버튼 */}
           <button
@@ -399,18 +391,7 @@ export default function CeoDashboard() {
         ))}
       </div>
 
-      {/* 창분할 우측 고정 패널 */}
-      {splitMode && (
-        <div className="fixed right-0 top-[96px] w-[400px] h-[calc(100vh-96px)] border-l border-gray-200 z-20 shadow-xl hidden md:flex flex-col">
-          <CustomerReferencePanel
-            customer={splitCustomer}
-            onClose={() => { setSplitMode(false); setSplitCustomer(null) }}
-            userName={ceoName}
-          />
-        </div>
-      )}
-
-      <div className={`px-4 md:px-6 pt-5 pb-10 ${splitMode ? 'md:pr-[420px]' : ''}`}>
+      <div className="px-4 md:px-6 pt-5 pb-10">
 
         {activeTab === 'overview'       && <OverviewTabNew onNavigate={(tab, subView) => {
           setActiveTab(tab as any)
