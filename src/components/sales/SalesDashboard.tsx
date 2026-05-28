@@ -10,6 +10,7 @@ import CustomerCard, { Customer, CustomerDetails, CardTabType } from './Customer
 import InCallForm, { InCallData } from './InCallForm'
 import InCallTableView from './InCallTableView'
 import PullToRefresh from '@/components/ui/PullToRefresh'
+import SplitView from '@/components/shared/SplitView'
 import {
   getBusinessDaysInMonth,
   getElapsedBusinessDays,
@@ -185,6 +186,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   // 검색
   const [searchQuery, setSearchQuery] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
+  const [splitActive, setSplitActive] = useState(false)
   const [scrollToCustomerId, setScrollToCustomerId] = useState<string | undefined>(undefined)
 
   // New customer form state
@@ -727,6 +729,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   return (
     <PullToRefresh onRefresh={loadAll}>
     <div className="min-h-screen page-bg">
+      {splitActive && <SplitView onClose={() => setSplitActive(false)} />}
       {/* ── 자금팀 전송 담당자 선택 모달 ── */}
       {opsTransferModal.customer && (
         <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4"
@@ -859,9 +862,9 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
           </div>
           {/* 창분할 버튼 */}
           <button
-            onClick={() => window.open('/split', '_blank', 'noopener')}
+            onClick={() => setSplitActive(true)}
             className="text-[11px] px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap font-medium hidden md:block text-white/50 hover:text-white hover:bg-white/10"
-            title="창 분할 — 새 탭에서 좌우 두 패널을 독립적으로 사용">
+            title="창 분할 — 화면을 두 패널로 나눠서 독립적으로 사용">
             ⊞ 분할
           </button>
           {/* 메모장 버튼 */}

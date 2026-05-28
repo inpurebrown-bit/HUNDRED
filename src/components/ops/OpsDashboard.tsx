@@ -6,6 +6,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import MyProfileTab from '@/components/MyProfileTab'
 import PullToRefresh from '@/components/ui/PullToRefresh'
+import SplitView from '@/components/shared/SplitView'
 // ── KST Utils ──────────────────────────────────────────────────────────
 function nowKST() {
   return new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(' ', 'T') + '+09:00'
@@ -3473,6 +3474,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
   const [cases, setCases] = useState<OpsCase[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [splitActive, setSplitActive] = useState(false)
   const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const [openPanelIds, setOpenPanelIds] = useState<string[]>([])
   const [closingPanelIds, setClosingPanelIds] = useState<string[]>([])
@@ -3671,6 +3673,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
   return (
     <PullToRefresh onRefresh={loadCases}>
     <div className="min-h-screen page-bg">
+      {splitActive && <SplitView onClose={() => setSplitActive(false)} />}
       {/* Header */}
       <header className="bg-[#1B2A45] px-4 md:px-6 py-3 flex items-center justify-between sticky top-0 z-30 shadow-md">
         <Link href="/" className="relative h-8 w-24 shrink-0 block">
@@ -3743,9 +3746,9 @@ export default function OpsDashboard({ userId, userName }: Props) {
           </div>
           {/* 창분할 버튼 */}
           <button
-            onClick={() => window.open('/split', '_blank', 'noopener')}
+            onClick={() => setSplitActive(true)}
             className="text-[11px] px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap font-medium hidden md:block text-white/50 hover:text-white hover:bg-white/10"
-            title="창 분할 — 새 탭에서 좌우 두 패널을 독립적으로 사용">
+            title="창 분할 — 화면을 두 패널로 나눠서 독립적으로 사용">
             ⊞ 분할
           </button>
           <button

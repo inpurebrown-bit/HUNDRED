@@ -20,6 +20,7 @@ import MyProfileTab from '@/components/MyProfileTab'
 import DbManageTab from './DbManageTab'
 import PersonalFinanceTab from './PersonalFinanceTab'
 import PullToRefresh from '@/components/ui/PullToRefresh'
+import SplitView from '@/components/shared/SplitView'
 
 // ── 공통 서브탭 바 컴포넌트 ────────────────────────────────────
 function SubTabBar<T extends string>({ tabs, active, onChange }: {
@@ -134,6 +135,7 @@ export default function CeoDashboard() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [salesInitialView, setSalesInitialView] = useState<'customers' | 'inspection' | 'as' | 'transfer' | 'diary' | undefined>(undefined)
   const [salesInitialStatusTab, setSalesInitialStatusTab] = useState<'all' | 'lead' | 'db010' | 'contracted' | 'emotional' | 'trash' | undefined>(undefined)
+  const [splitActive, setSplitActive] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [allCustomersCache, setAllCustomersCache] = useState<any[]>([])
@@ -247,6 +249,7 @@ export default function CeoDashboard() {
   return (
     <PullToRefresh onRefresh={async () => { window.location.reload() }}>
     <div className="min-h-screen page-bg">
+      {splitActive && <SplitView onClose={() => setSplitActive(false)} />}
       {/* ── 헤더 ── */}
       <header className="bg-[#1B2A45] px-4 md:px-6 py-3 flex items-center justify-between sticky top-0 z-30 shadow-md">
         <Link href="/" className="relative h-8 w-24 shrink-0 block">
@@ -302,9 +305,9 @@ export default function CeoDashboard() {
           </div>
           {/* 창분할 버튼 */}
           <button
-            onClick={() => window.open('/split', '_blank', 'noopener')}
+            onClick={() => setSplitActive(true)}
             className="text-[11px] px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap font-medium hidden md:block text-white/50 hover:text-white hover:bg-white/10"
-            title="창 분할 — 새 탭에서 좌우 두 패널을 독립적으로 사용">
+            title="창 분할 — 화면을 두 패널로 나눠서 독립적으로 사용">
             ⊞ 분할
           </button>
           {/* 홈 버튼 */}
