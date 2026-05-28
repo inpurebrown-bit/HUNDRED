@@ -29,7 +29,7 @@ interface OtherCost {
 }
 
 // ── 상수 ──────────────────────────────────────────────────────────────────────
-const TESTER = 'TESTER'
+const TESTER = 'sales-tester'
 
 function rateGrade(rate: number | null, top: number) {
   if (rate === null || rate === undefined) return { label: '—', cls: 'text-gray-400' }

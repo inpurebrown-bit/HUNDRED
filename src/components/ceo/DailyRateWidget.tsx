@@ -10,7 +10,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { getElapsedBusinessDays } from '@/lib/businessDays'
 
-const TESTER = 'TESTER'
+const TESTER = 'sales-tester'
 
 function todayStr() { return new Date().toISOString().slice(0, 10) }
 

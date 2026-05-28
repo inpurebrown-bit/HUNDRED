@@ -541,7 +541,7 @@ interface PersonSupply {
 type SupplyConfig = Record<string, PersonSupply>
 
 // ════════════════════════════════════════════════════════════════════════════════
-const DIARY_TESTER = 'TESTER'
+const DIARY_TESTER = 'sales-tester'
 
 // 고객 배열에서 월별 인별 계약수 실시간 계산
 function buildLivePayMap(customers: Customer[], ym: string): Record<string, { supply: number; direct: number }> {
@@ -1525,7 +1525,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
         ) : (
           <>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-            {personThisMonth.filter(p => p.name !== 'TESTER').map(p => (
+            {personThisMonth.filter(p => p.name !== DIARY_TESTER).map(p => (
               <div key={p.name} className="bg-white/10 rounded-xl px-3 py-2.5">
                 <div className="flex items-center gap-1.5 mb-1">
                   <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-bold">{p.name.charAt(0)}</div>
@@ -1545,10 +1545,10 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
             ))}
           </div>
           {/* TESTER 계정 — 테스트용, 별도 표시 */}
-          {personThisMonth.some(p => p.name === 'TESTER') && (
+          {personThisMonth.some(p => p.name === DIARY_TESTER) && (
             <div className="flex items-center gap-2 mt-1 opacity-40">
               <span className="text-[9px] text-white/50 border border-white/20 rounded px-1.5 py-0.5">테스트 계정</span>
-              {personThisMonth.filter(p => p.name === 'TESTER').map(p => (
+              {personThisMonth.filter(p => p.name === DIARY_TESTER).map(p => (
                 <span key={p.name} className="text-[9px] text-white/40">
                   TESTER · 매출 {p.revenue > 0 ? fmtWon(p.revenue) : '—'} · 계약 {p.count % 1 === 0 ? p.count : p.count.toFixed(1)}건
                 </span>
