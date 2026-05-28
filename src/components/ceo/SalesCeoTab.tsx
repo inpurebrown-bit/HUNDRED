@@ -924,13 +924,21 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
     const mine = thisMonthContracted.filter(
       c => (c as any).details?.sales_user_name === name || c.sales_user_name === name
     )
+    // 이번달 직가DB 등록 수 (status 무관 — db010_month 기준, 거절/계약 이동해도 유지)
+    const db010 = customers.filter((c: any) => {
+      const owner = (c.details?.sales_user_name || c.sales_user_name || '').trim()
+      if (owner !== name) return false
+      const m = c.details?.db010_month || (c.details?.is_direct ? (c.created_at || '').slice(0, 7) : null)
+      return m === thisMonth
+    }).length
     return {
       name,
       revenue: mine.reduce((s, c) => s + parseNum((c as any).details?.my_revenue), 0),
       payment: mine.reduce((s, c) => s + parseNum((c as any).details?.payment_amount), 0),
       count:   mine.reduce((s, c) => s + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0),
+      db010,
     }
-  }), [salesPeople, thisMonthContracted])
+  }), [salesPeople, thisMonthContracted, customers, thisMonth])
   const bizElapsed = getElapsedBusinessDays(now.getFullYear(), now.getMonth(), now.getDate())
 
   const supplyStats = useMemo(() => {
@@ -1525,6 +1533,9 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
                 </div>
                 <p className="text-base font-black text-[#C5A258]">{fmtWon(p.revenue)}</p>
                 <p className="text-[10px] text-white/40 mt-0.5">계약 {p.count % 1 === 0 ? p.count : p.count.toFixed(1)}건</p>
+                {(p as any).db010 > 0 && (
+                  <p className="text-[10px] text-violet-300 font-semibold mt-0.5">직가 {(p as any).db010}개</p>
+                )}
                 <div className="mt-0.5 text-[9px] text-white/30 leading-relaxed">
                   <span>입금 {p.payment > 0 ? fmtWon(p.payment) : '—'}</span>
                   <span className="mx-0.5 text-white/15">·</span>

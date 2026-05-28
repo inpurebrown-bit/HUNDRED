@@ -722,7 +722,6 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           { label: '오늘 일정', count: todayEvents.length,    nav: () => onNavigate?.('calendar'),       base: 'border-[#E8E2D4] text-[#1B2A45]',   num: 'text-[#1B2A45]',    hover: 'hover:bg-[#1B2A45] hover:border-[#1B2A45] hover:text-white' },
           { label: '심사요청',  count: allCustomers.filter((c: any) => c.details?.inspection_status === 'pending').length, nav: () => onNavigate?.('sales', 'inspection'), base: 'border-amber-200 text-amber-700', num: 'text-amber-600', hover: 'hover:bg-amber-500 hover:border-amber-500 hover:text-white' },
           { label: 'A/S요청',   count: allCustomers.filter((c: any) => c.details?.as_requested === true && !c.details?.as_resolved).length, nav: () => onNavigate?.('sales', 'as'), base: 'border-orange-200 text-orange-700', num: 'text-orange-500', hover: 'hover:bg-orange-500 hover:border-orange-500 hover:text-white' },
-          { label: '직가DB', count: allCustomers.filter((c: any) => { const m = c.details?.db010_month || (c.details?.is_direct ? (c.created_at||'').slice(0,7) : null); return m === thisMonthStr }).length, nav: () => onNavigate?.('sales', 'db010'), base: 'border-violet-200 text-violet-700', num: 'text-violet-600', hover: 'hover:bg-violet-500 hover:border-violet-500 hover:text-white' },
         ].map(item => (
           <button key={item.label} onClick={item.nav}
             className={`group flex items-center gap-2 bg-white border rounded-xl px-3 py-2 transition-all duration-150 ${item.base} ${item.hover}`}>
