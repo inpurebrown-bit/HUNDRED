@@ -6,6 +6,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import MyProfileTab from '@/components/MyProfileTab'
 import PullToRefresh from '@/components/ui/PullToRefresh'
+import CustomerReferencePanel from '@/components/shared/CustomerReferencePanel'
 
 // ── KST Utils ──────────────────────────────────────────────────────────
 function nowKST() {
@@ -3474,6 +3475,9 @@ export default function OpsDashboard({ userId, userName }: Props) {
   const [cases, setCases] = useState<OpsCase[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  // 창분할
+  const [splitMode, setSplitMode] = useState(false)
+  const [splitCustomer, setSplitCustomer] = useState<any | null>(null)
   const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const [openPanelIds, setOpenPanelIds] = useState<string[]>([])
   const [closingPanelIds, setClosingPanelIds] = useState<string[]>([])
@@ -3687,13 +3691,69 @@ export default function OpsDashboard({ userId, userName }: Props) {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="업체명·이름·기관..."
-              className="bg-white/10 text-white placeholder-white/40 text-xs px-3 py-1.5 rounded-lg border border-white/20 focus:outline-none focus:bg-white/20 w-28 md:w-44"
+              className="bg-white/10 text-white placeholder-white/40 text-xs px-3 py-1.5 rounded-lg border border-white/20 focus:outline-none focus:bg-white/20 w-28 md:w-40"
             />
             {q.length >= 1 && (
               <button onClick={() => setSearchQuery('')}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-white/50 hover:text-white text-xs">✕</button>
             )}
+            {/* 검색 결과 드롭다운 */}
+            {q.length >= 1 && filteredCases.length > 0 && filteredCases.length < cases.length && (
+              <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 w-80 max-h-80 overflow-y-auto">
+                <p className="text-[10px] text-gray-400 px-3 pt-2.5 pb-1 font-semibold">{filteredCases.length}건 검색됨</p>
+                {filteredCases.slice(0, 15).map((c: any) => {
+                  const company = c.customers?.details?.company || c.customers?.company || c.customer_name || c.details?.incall_journal?.company || '(업체명 없음)'
+                  const phone = c.customers?.phone || c.phone || ''
+                  const tabKey = NEWDB_STAGE_KEYS.has(c.progress_stage) ? 'newdb'
+                    : (REFUND_STAGE_KEYS.has(c.progress_stage) || c.is_refund) ? 'refund'
+                    : (COMPLETED_STAGE_KEYS.has(c.progress_stage) || c.is_completed) ? 'completed'
+                    : 'active'
+                  const tabLabel: Record<string, string> = { active: '진행중', refund: '환불', completed: '종료', newdb: '신규DB' }
+                  return (
+                    <button key={c.id}
+                      onClick={() => {
+                        setActiveTab(tabKey as any)
+                        if (splitMode && c.customers) setSplitCustomer(c.customers)
+                        setSearchQuery('')
+                        // 스크롤 to ops case
+                        setTimeout(() => {
+                          const el = document.getElementById(`opscase-${c.id}`)
+                          if (el) {
+                            el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                            el.classList.add('ring-2', 'ring-[#C5A258]', 'ring-offset-1')
+                            setTimeout(() => el.classList.remove('ring-2', 'ring-[#C5A258]', 'ring-offset-1'), 2500)
+                          } else {
+                            // OpsCard 안에 있는 경우 togglePanel로 열기
+                            setOpenPanelIds(prev => prev.includes(c.id) ? prev : [...prev, c.id])
+                          }
+                        }, 200)
+                      }}
+                      className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors flex items-center justify-between gap-2 border-t border-gray-50">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{company}</p>
+                        <p className="text-[11px] text-gray-400 truncate">{phone} · {c.institution || '기관미정'} · {c.ops_user_name || '-'}</p>
+                      </div>
+                      <span className="shrink-0 text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">
+                        {tabLabel[tabKey]}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            {q.length >= 1 && filteredCases.length === 0 && (
+              <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-200 z-50 w-72 px-4 py-3 text-xs text-gray-400">
+                검색 결과 없음
+              </div>
+            )}
           </div>
+          {/* 창분할 버튼 */}
+          <button
+            onClick={() => { setSplitMode(v => !v); if (splitMode) setSplitCustomer(null) }}
+            className={`text-[11px] px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap font-medium hidden md:block ${splitMode ? 'bg-[#C5A258]/80 text-white' : 'text-white/50 hover:text-white hover:bg-white/10'}`}
+            title="창 분할 — 검색 결과를 우측 패널에 표시">
+            {splitMode ? '⊟ 분할' : '⊞ 분할'}
+          </button>
           <button
             onClick={() => setNotepadOpen(v => !v)}
             className={`text-[11px] px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap font-medium ${notepadOpen ? 'bg-[#C5A258]/80 text-white' : 'text-white/50 hover:text-white hover:bg-white/10'}`}>
@@ -3772,8 +3832,19 @@ export default function OpsDashboard({ userId, userName }: Props) {
         ))}
       </div>
 
+      {/* 창분할 우측 고정 패널 */}
+      {splitMode && (
+        <div className="fixed right-0 top-[100px] w-[400px] h-[calc(100vh-100px)] border-l border-gray-200 z-20 shadow-xl hidden md:flex flex-col">
+          <CustomerReferencePanel
+            customer={splitCustomer}
+            onClose={() => { setSplitMode(false); setSplitCustomer(null) }}
+            userName={userName}
+          />
+        </div>
+      )}
+
       {/* 콘텐츠 */}
-      <div className="px-4 md:px-6 py-6 max-w-6xl mx-auto">
+      <div className={`px-4 md:px-6 py-6 max-w-6xl mx-auto ${splitMode ? 'md:pr-[420px]' : ''}`}>
 
         {/* ── 대시보드 ── */}
         {activeTab === 'dashboard' && (

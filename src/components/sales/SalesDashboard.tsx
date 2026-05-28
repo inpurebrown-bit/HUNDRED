@@ -10,6 +10,7 @@ import CustomerCard, { Customer, CustomerDetails, CardTabType } from './Customer
 import InCallForm, { InCallData } from './InCallForm'
 import InCallTableView from './InCallTableView'
 import PullToRefresh from '@/components/ui/PullToRefresh'
+import CustomerReferencePanel from '@/components/shared/CustomerReferencePanel'
 import {
   getBusinessDaysInMonth,
   getElapsedBusinessDays,
@@ -185,6 +186,10 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   // 검색
   const [searchQuery, setSearchQuery] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
+  // 창분할
+  const [splitMode, setSplitMode] = useState(false)
+  const [splitCustomer, setSplitCustomer] = useState<any | null>(null)
+  const [scrollToCustomerId, setScrollToCustomerId] = useState<string | undefined>(undefined)
 
   // New customer form state
   const [showNewForm, setShowNewForm] = useState(false)
@@ -820,14 +825,12 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="업체명·이름·연락처..."
-              className="bg-white/10 text-white placeholder-white/40 text-xs px-3 py-1.5 rounded-lg border border-white/20 focus:outline-none focus:bg-white/20 w-36 md:w-52"
+              className="bg-white/10 text-white placeholder-white/40 text-xs px-3 py-1.5 rounded-lg border border-white/20 focus:outline-none focus:bg-white/20 w-32 md:w-44"
             />
-            <button
-              onClick={() => setSearchQuery(searchQuery)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-white/50 hover:text-white text-[10px]"
-              title="검색하기">
-              검색
-            </button>
+            {searchQuery.length >= 1 && (
+              <button onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-white/50 hover:text-white text-xs">✕</button>
+            )}
             {/* 검색 결과 드롭다운 */}
             {searchResults.length > 0 && (
               <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 w-80 max-h-80 overflow-y-auto">
@@ -837,6 +840,8 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                     onClick={() => {
                       const tab = STATUS_TAB[c.status] ?? 'customers'
                       setActiveTab(tab)
+                      setScrollToCustomerId(c.id)
+                      if (splitMode) setSplitCustomer(c)
                       setSearchQuery('')
                     }}
                     className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors flex items-center justify-between gap-2 border-t border-gray-50">
@@ -857,6 +862,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               </div>
             )}
           </div>
+          {/* 창분할 버튼 */}
+          <button
+            onClick={() => { setSplitMode(v => !v); if (splitMode) setSplitCustomer(null) }}
+            className={`text-[11px] px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap font-medium hidden md:block ${splitMode ? 'bg-[#C5A258]/80 text-white' : 'text-white/50 hover:text-white hover:bg-white/10'}`}
+            title="창 분할 — 검색 결과를 우측 패널에 표시">
+            {splitMode ? '⊟ 분할' : '⊞ 분할'}
+          </button>
           {/* 메모장 버튼 */}
           <button
             onClick={() => setNotepadOpen(v => !v)}
@@ -942,7 +954,18 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         ))}
       </div>
 
-      <div className="px-4 md:px-6 py-5 max-w-5xl mx-auto">
+      {/* 창분할 우측 고정 패널 */}
+      {splitMode && (
+        <div className="fixed right-0 top-[100px] w-[400px] h-[calc(100vh-100px)] border-l border-gray-200 z-20 shadow-xl hidden md:flex flex-col">
+          <CustomerReferencePanel
+            customer={splitCustomer}
+            onClose={() => { setSplitMode(false); setSplitCustomer(null) }}
+            userName={userName}
+          />
+        </div>
+      )}
+
+      <div className={`px-4 md:px-6 py-5 max-w-5xl mx-auto ${splitMode ? 'md:pr-[420px]' : ''}`}>
 
         {/* ══════════ 메인보드 ══════════ */}
         {activeTab === 'board' && (
@@ -1245,6 +1268,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 salesUsers={salesUserNames}
                 userName={userName}
                 groupBy={db010GroupBy}
+                scrollToId={scrollToCustomerId}
                 onUpdate={updateCustomer}
                 onStatusChange={async (id, status) => moveCustomer(id, status as any)}
                 onDelete={async (id) => requestDeleteDb010(id)}
@@ -1291,6 +1315,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 tabType="lead"
                 salesUsers={salesUserNames}
                 userName={userName}
+                scrollToId={scrollToCustomerId}
                 onUpdate={updateCustomer}
                 onStatusChange={async (id, status) => moveCustomer(id, status as any)}
                 onDelete={async (id) => deleteCustomer(id)}
@@ -1331,6 +1356,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   tabType="contracted"
                   salesUsers={salesUserNames}
                   userName={userName}
+                  scrollToId={scrollToCustomerId}
                   onUpdate={updateCustomer}
                   onStatusChange={async (id, status) => moveCustomer(id, status as any)}
                   onDelete={async (id) => deleteCustomer(id)}
@@ -1388,6 +1414,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 tabType="emotional"
                 salesUsers={salesUserNames}
                 userName={userName}
+                scrollToId={scrollToCustomerId}
                 onUpdate={updateCustomer}
                 onStatusChange={async (id, status) => moveCustomer(id, status as any)}
                 onDelete={async (id) => deleteCustomer(id)}
@@ -1417,6 +1444,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 tabType="trash"
                 salesUsers={salesUserNames}
                 userName={userName}
+                scrollToId={scrollToCustomerId}
                 onUpdate={updateCustomer}
                 onStatusChange={async (id, status) => moveCustomer(id, status as any)}
                 onDelete={async (id) => deleteCustomer(id)}

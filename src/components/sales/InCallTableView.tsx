@@ -160,6 +160,7 @@ export interface Props {
   onMarkDirect?: (id: string) => Promise<void>  // 대표 전용: 공가→직가 전환
   showOwner?: boolean
   groupBy?: 'date' | 'mood'   // db010 전용: 접수날짜별 or 감도별
+  scrollToId?: string          // 이 ID의 카드로 자동 스크롤 + 펼침
 }
 
 // ── ops 진행단계 스타일 ──────────────────────────────────────────
@@ -2002,8 +2003,26 @@ export default function InCallTableView({
   onMarkDirect,
   showOwner = false,
   groupBy = 'date',
+  scrollToId,
 }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  // scrollToId가 바뀌면 해당 카드로 스크롤 + 펼치기
+  useEffect(() => {
+    if (!scrollToId) return
+    setExpandedId(scrollToId)
+    // 렌더링 후 스크롤
+    const timer = setTimeout(() => {
+      const el = document.getElementById(`ccard-${scrollToId}`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        // 노란 highlight 효과
+        el.classList.add('ring-2', 'ring-[#C5A258]', 'ring-offset-1')
+        setTimeout(() => el.classList.remove('ring-2', 'ring-[#C5A258]', 'ring-offset-1'), 2500)
+      }
+    }, 120)
+    return () => clearTimeout(timer)
+  }, [scrollToId])
 
   const isMoodGroup = tabType === 'emotional' || (tabType === 'db010' && groupBy === 'mood')
 
@@ -2056,26 +2075,27 @@ export default function InCallTableView({
                 const opsContract = opsContracts?.find(ct => ct.customer_id === c.id)
                 const opsUserName = opsContract?.ops_user_name
                 return (
-                  <CustomerCard
-                    key={c.id}
-                    customer={c}
-                    salesUsers={salesUsers}
-                    opsUsers={opsUsers}
-                    userName={userName}
-                    tabType={tabType}
-                    showOwner={showOwner}
-                    opsUserName={opsUserName}
-                    opsStatus={opsStatusMap[c.id]}
-                    cumulativeBase={cumBase}
-                    expandedId={expandedId}
-                    onExpand={setExpandedId}
-                    onUpdate={onUpdate}
-                    onStatusChange={onStatusChange}
-                    onDelete={onDelete}
-                    onTransferToOps={onTransferToOps}
-                    onCeoTransfer={onCeoTransfer}
-                    onMarkDirect={onMarkDirect}
-                  />
+                  <div key={c.id} id={`ccard-${c.id}`} className="rounded-xl transition-all duration-300">
+                    <CustomerCard
+                      customer={c}
+                      salesUsers={salesUsers}
+                      opsUsers={opsUsers}
+                      userName={userName}
+                      tabType={tabType}
+                      showOwner={showOwner}
+                      opsUserName={opsUserName}
+                      opsStatus={opsStatusMap[c.id]}
+                      cumulativeBase={cumBase}
+                      expandedId={expandedId}
+                      onExpand={setExpandedId}
+                      onUpdate={onUpdate}
+                      onStatusChange={onStatusChange}
+                      onDelete={onDelete}
+                      onTransferToOps={onTransferToOps}
+                      onCeoTransfer={onCeoTransfer}
+                      onMarkDirect={onMarkDirect}
+                    />
+                  </div>
                 )
               })}
             </div>
