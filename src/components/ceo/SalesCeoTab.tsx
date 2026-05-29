@@ -865,6 +865,12 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
     })
   }
 
+  // ── 공급 현황 계산 ──────────────────────────────────────
+  const now = new Date()
+  const thisMonthStr = now.toISOString().slice(0, 7)
+  const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const lastMonthStr = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`
+
   const personStats = useMemo(() => salesPeople.map(name => {
     const mine = customers.filter((c: any) => (c.details?.sales_user_name || c.sales_user_name || '').trim() === name)
     const contracted = mine.filter((c: any) => c.status === 'contracted')
@@ -879,18 +885,12 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
       contracted: contracted.reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0),
       revenue: contracted.reduce((sum, c) => sum + parseNum((c as any).details?.my_revenue), 0),
     }
-  }), [customers, salesPeople])
+  }), [customers, salesPeople, thisMonthStr])
 
   const totalRevenue = useMemo(() =>
     customers.filter(c => c.status === 'contracted')
       .reduce((sum, c) => sum + parseNum((c as any).details?.my_revenue), 0),
   [customers])
-
-  // ── 공급 현황 계산 ──────────────────────────────────────
-  const now = new Date()
-  const thisMonthStr = now.toISOString().slice(0, 7)
-  const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-  const lastMonthStr = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`
 
   // ── 이번달 / 저번달 매출 · 계약 수 ──────────────────────
   const thisMonthContracted = useMemo(() =>
