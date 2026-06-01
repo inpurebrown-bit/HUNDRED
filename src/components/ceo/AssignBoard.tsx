@@ -964,7 +964,6 @@ function LeadDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [assignSelect, setAssignSelect] = useState<Record<string, string>>({})
   const [patching, setPatching] = useState<string | null>(null)
-  const [migrating, setMigrating] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
   function toast_(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000) }
@@ -977,17 +976,12 @@ function LeadDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '불러오기 실패')
       const all: LeadCustomer[] = data.customers || []
-      // 홈페이지 문의 유입만 표시
-      // 제외: 한경연(db_source='한경연'), CEO공급(db_source='ceo_supply')
       const EXCLUDED_SOURCES = ['한경연', 'ceo_supply']
       setLeads(all.filter(c => {
         if (c.status !== 'lead') return false
         const dbSrc = (c as any).details?.db_source
         if (EXCLUDED_SOURCES.includes(dbSrc)) return false
-        // 홈페이지문의 명시 / source=lead_form(구버전) / db_source 없는 lead
-        return dbSrc === '홈페이지문의' ||
-          (c as any).source === 'lead_form' ||
-          !dbSrc
+        return dbSrc === '홈페이지문의' || (c as any).source === 'lead_form' || !dbSrc
       }))
     } catch (e: any) {
       setError(e.message)
@@ -996,74 +990,32 @@ function LeadDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
     }
   }, [])
 
-  // 단건 한경연DB로 이동
-  async function moveToHankyung(id: string) {
-    setPatching(id)
-    try {
-      const res = await fetch(`/api/customers/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: 'db010',
-          details: { db_source: '한경연', sub_status: 'db010' },
-        }),
-      })
-      if (!res.ok) throw new Error('이동 실패')
-      toast_('한경연DB로 이동 완료')
-      load()
-    } catch (e: any) { alert(e.message) } finally { setPatching(null) }
-  }
-
-  // 전체 이동
-  async function migrateAllToHankyung() {
-    if (!leads.length) return
-    if (!confirm(`리드폼 ${leads.length}건을 모두 한경연DB로 이동하시겠습니까?`)) return
-    setMigrating(true)
-    let ok = 0
-    for (const lead of leads) {
-      try {
-        await fetch(`/api/customers/${lead.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            status: 'db010',
-            details: { db_source: '한경연', sub_status: 'db010' },
-          }),
-        })
-        ok++
-      } catch {}
-    }
-    setMigrating(false)
-    toast_(`${ok}건 한경연DB로 이동 완료`)
-    load()
-  }
-
   useEffect(() => { load() }, [load])
 
   function toggleExpand(id: string, lead: LeadCustomer) {
-    if (expandedId === id) {
-      setExpandedId(null)
-    } else {
-      setExpandedId(id)
-      setAssignSelect(prev => ({ ...prev, [id]: lead.sales_user_id ?? '' }))
-    }
+    setExpandedId(prev => prev === id ? null : id)
+    setAssignSelect(prev => ({ ...prev, [id]: lead.sales_user_id ?? '' }))
   }
 
+  // 배정 → 담당자 공급DB(owner_id 변경)로 이동
   async function handleAssign(id: string) {
+    const userId = assignSelect[id] ?? ''
+    if (!userId) { alert('담당자를 선택하세요'); return }
+    const selectedUser = salesUsers.find(u => u.id === userId)
     setPatching(id)
     try {
-      const userId = assignSelect[id] ?? ''
-      const selectedUser = salesUsers.find(u => u.id === userId)
       const res = await fetch(`/api/customers/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sales_user_id: userId || null,
+          sales_user_id: userId,
           sales_user_name: selectedUser?.name || null,
         }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || '수정 실패')
+      if (!res.ok) throw new Error(data.error || '배정 실패')
+      toast_(`✅ ${selectedUser?.name ?? '담당자'} 공급DB로 배정 완료`)
+      setExpandedId(null)
       load()
     } catch (e: any) {
       alert('오류: ' + e.message)
@@ -1099,17 +1051,8 @@ function LeadDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
       )}
       <SectionHeader
         title="리드폼 DB"
-        subtitle="홈페이지 상담신청 유입 DB"
+        subtitle="홈페이지 상담신청 유입 — 담당자 배정 시 해당 팀장 공급DB로 이동"
         count={leads.length}
-        action={leads.length > 0 ? (
-          <button
-            onClick={migrateAllToHankyung}
-            disabled={migrating}
-            className="px-3 py-1.5 text-[11px] font-semibold rounded-lg bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-40 transition-colors"
-          >
-            {migrating ? '이동 중...' : `전체 한경연DB로 이동 (${leads.length}건)`}
-          </button>
-        ) : undefined}
       />
 
       {loading ? (
@@ -1167,15 +1110,15 @@ function LeadDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
                       ))}
                     </div>
 
-                    <div className="flex items-end gap-3">
-                      <div className="flex-1 max-w-xs">
-                        <label className="block text-xs text-[#1B2A45]/50 mb-1">담당자 배정</label>
+                    <div className="flex items-end gap-3 flex-wrap">
+                      <div className="flex-1 min-w-[160px] max-w-xs">
+                        <label className="block text-xs text-[#1B2A45]/50 mb-1">담당자 배정 → 공급DB 이동</label>
                         <select
                           value={assignSelect[lead.id] ?? lead.sales_user_id ?? ''}
                           onChange={e => setAssignSelect(prev => ({ ...prev, [lead.id]: e.target.value }))}
                           className={inputCls}
                         >
-                          <option value="">미배정</option>
+                          <option value="">담당자 선택</option>
                           {salesUsers.map(u => (
                             <option key={u.id} value={u.id}>{u.name}</option>
                           ))}
@@ -1183,17 +1126,10 @@ function LeadDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
                       </div>
                       <button
                         onClick={() => handleAssign(lead.id)}
-                        disabled={patching === lead.id}
-                        className="px-4 py-2 rounded-lg bg-[#1B2A45] text-white text-xs font-medium hover:bg-[#1B2A45]/90 disabled:opacity-40 transition-colors"
+                        disabled={patching === lead.id || !assignSelect[lead.id]}
+                        className="px-4 py-2 rounded-lg bg-[#1B2A45] text-white text-xs font-semibold hover:bg-[#2D4070] disabled:opacity-40 transition-colors"
                       >
-                        {patching === lead.id ? '저장 중...' : '배정'}
-                      </button>
-                      <button
-                        onClick={() => moveToHankyung(lead.id)}
-                        disabled={patching === lead.id}
-                        className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium disabled:opacity-40 transition-colors"
-                      >
-                        한경연DB로 이동
+                        {patching === lead.id ? '배정 중...' : '배정'}
                       </button>
                       <button
                         onClick={() => handleDelete(lead.id, lead.name)}
@@ -1218,12 +1154,15 @@ function LeadDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
 // SECTION 3 — 계약 배정 대기
 // ════════════════════════════════════════════════════════════════════════════
 
+const CONTRACT_DEFAULT_LIMIT = 5
+
 function ContractAssignSection({ opsUsers }: { opsUsers: OpsUser[] }) {
   const [contracts, setContracts] = useState<Contract[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedOps, setSelectedOps] = useState<Record<string, string>>({})
   const [assigning, setAssigning] = useState<string | null>(null)
+  const [showAll, setShowAll] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1282,43 +1221,38 @@ function ContractAssignSection({ opsUsers }: { opsUsers: OpsUser[] }) {
       ) : contracts.length === 0 ? (
         <EmptyBlock message="배정 대기 중인 계약이 없습니다." />
       ) : (
-        <div className="space-y-3">
-          {contracts.map(c => (
-            <div key={c.id} className="bg-white rounded-xl border border-[#E8E2D4] p-5">
-              <div className="flex items-start justify-between gap-4 flex-wrap">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                    <span className="font-semibold text-[#1B2A45]">{c.customers?.name}</span>
-                    {c.customers?.company && (
-                      <span className="text-xs text-[#1B2A45]/50">{c.customers.company}</span>
-                    )}
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-[#C5A258]/15 text-[#C5A258] font-medium">
-                      배정 대기
+        <div className="space-y-2">
+          {(showAll ? contracts : contracts.slice(0, CONTRACT_DEFAULT_LIMIT)).map(c => (
+            <div key={c.id} className="bg-white rounded-xl border border-[#E8E2D4] px-4 py-3">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                {/* 왼쪽: 고객 정보 */}
+                <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+                  <span className="text-xs text-[#1B2A45]/35 shrink-0">{fmtDate(c.created_at)}</span>
+                  <span className="text-sm font-semibold text-[#1B2A45] truncate">{c.customers?.name}</span>
+                  {c.customers?.company && (
+                    <span className="text-xs text-[#1B2A45]/45 truncate hidden sm:inline">{c.customers.company}</span>
+                  )}
+                  {c.customers?.phone && (
+                    <span className="text-xs text-[#1B2A45]/40 hidden md:inline">{c.customers.phone}</span>
+                  )}
+                  {c.contract_amount > 0 && (
+                    <span className="text-xs text-[#C5A258] font-semibold shrink-0">
+                      {c.contract_amount.toLocaleString()}원
                     </span>
-                  </div>
-                  <div className="flex flex-wrap gap-3 text-xs text-[#1B2A45]/50">
-                    {c.customers?.phone && <span>{c.customers.phone}</span>}
-                    {c.contract_amount > 0 && (
-                      <span className="text-[#1B2A45]/70 font-medium">
-                        {c.contract_amount.toLocaleString()}원
-                      </span>
-                    )}
-                    <span>영업: {c.sales_user_name}</span>
-                    <span>{fmtDate(c.created_at)}</span>
-                  </div>
+                  )}
+                  <span className="text-xs text-[#1B2A45]/40 shrink-0">영업: {c.sales_user_name}</span>
                   {c.memo && (
-                    <p className="text-xs text-[#1B2A45]/50 mt-2 bg-[#FAF8F3] px-3 py-2 rounded-lg border border-[#E8E2D4]">
-                      {c.memo}
-                    </p>
+                    <span className="text-xs text-[#1B2A45]/40 truncate max-w-[140px] hidden lg:inline">{c.memo}</span>
                   )}
                 </div>
+                {/* 오른쪽: 배정 */}
                 <div className="flex items-center gap-2 shrink-0">
                   <select
                     value={selectedOps[c.id] || ''}
                     onChange={e => setSelectedOps(prev => ({ ...prev, [c.id]: e.target.value }))}
-                    className={inputCls + ' min-w-[120px]'}
+                    className="border border-[#E8E2D4] rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#C5A258]/40 min-w-[110px] bg-white text-[#1B2A45]"
                   >
-                    <option value="">담당자 선택</option>
+                    <option value="">관리팀 선택</option>
                     {opsUsers.map(u => (
                       <option key={u.id} value={u.id}>{u.name}</option>
                     ))}
@@ -1326,14 +1260,25 @@ function ContractAssignSection({ opsUsers }: { opsUsers: OpsUser[] }) {
                   <button
                     onClick={() => assign(c.id)}
                     disabled={assigning === c.id || !selectedOps[c.id]}
-                    className="px-4 py-2 rounded-lg bg-[#C5A258] hover:bg-[#C5A258]/90 disabled:opacity-40 text-white text-xs font-semibold transition-colors"
+                    className="px-3 py-1.5 rounded-lg bg-[#C5A258] hover:bg-[#C5A258]/90 disabled:opacity-40 text-white text-xs font-semibold transition-colors shrink-0"
                   >
-                    {assigning === c.id ? '배정 중...' : '배정'}
+                    {assigning === c.id ? '...' : '배정'}
                   </button>
                 </div>
               </div>
             </div>
           ))}
+          {/* 더보기 / 접기 */}
+          {contracts.length > CONTRACT_DEFAULT_LIMIT && (
+            <button
+              onClick={() => setShowAll(v => !v)}
+              className="w-full py-2 text-xs font-semibold text-[#1B2A45]/50 hover:text-[#C5A258] border border-dashed border-[#E8E2D4] rounded-xl hover:border-[#C5A258]/40 transition-colors"
+            >
+              {showAll
+                ? '▲ 접기'
+                : `▼ 더 보기 (+${contracts.length - CONTRACT_DEFAULT_LIMIT}건)`}
+            </button>
+          )}
         </div>
       )}
     </div>
