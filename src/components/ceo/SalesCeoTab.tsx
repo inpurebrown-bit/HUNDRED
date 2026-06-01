@@ -636,6 +636,7 @@ function SalesDiaryView({ customers }: { customers: Customer[] }) {
                     const directPay = live ? Math.max(Number(e.direct_payment || 0), live.direct) : Number(e.direct_payment || 0)
                     const total = supplyPay + directPay
                     const supplyRate = supplyCount > 0 ? (supplyPay / supplyCount * 100) : null
+                    const totalRate  = supplyCount > 0 ? (total / supplyCount * 100) : null
                     const achievePct = Number(e.target) > 0 ? Math.round(total / Number(e.target) * 100) : 0
                     const daysArr = Object.entries(ds).filter(([, v]) => Number(v) > 0)
 
@@ -664,8 +665,12 @@ function SalesDiaryView({ customers }: { customers: Customer[] }) {
                             <p className="text-sm font-black text-emerald-700">{total % 1 === 0 ? total : total.toFixed(1)}</p>
                           </div>
                           <div className="bg-white rounded-lg py-1.5">
-                            <p className="text-[8px] text-gray-400">공급결제율</p>
-                            <p className="text-sm font-black text-blue-700">{supplyRate !== null ? supplyRate.toFixed(1) + '%' : '—'}</p>
+                            <p className="text-[8px] text-gray-400">총결제율</p>
+                            <p className={`text-sm font-black ${
+                              totalRate === null ? 'text-gray-300' :
+                              totalRate >= 17 ? 'text-emerald-600' :
+                              totalRate >= 13 ? 'text-amber-500' : 'text-red-500'
+                            }`}>{totalRate !== null ? totalRate.toFixed(1) + '%' : '—'}</p>
                             {isCurrent && live && <p className="text-[7px] text-blue-400 mt-0.5">실시간</p>}
                           </div>
                           <div className="bg-white rounded-lg py-1.5">
