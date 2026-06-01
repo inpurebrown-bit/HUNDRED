@@ -25,12 +25,12 @@ export async function POST(req: NextRequest) {
       .insert({
         name: name.trim(),
         phone: phone.trim(),
-        status: 'lead',
+        status: 'active',          // DB 컬럼은 'active'|'contracted'만 허용
         source: 'lead_form',
         owner_id: CEO_USER_ID,
         memo: notes,
         details: {
-          sub_status: 'lead',
+          sub_status: 'lead',      // normalizeCustomer가 이걸 status로 변환
           company: (company || '').trim(),
           region: (region || '').trim(),
           tax_status: taxStatus || '없음',

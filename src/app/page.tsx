@@ -357,14 +357,18 @@ export default function HomePage() {
     e.preventDefault()
     setSubmitting(true)
     try {
-      await fetch('/api/leads', {
+      const res = await fetch('/api/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...formData, inquiryTypes }),
       })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || `서버 오류 (${res.status})`)
+      }
       setSubmitted(true)
-    } catch {
-      alert('전송 중 오류가 발생했습니다. 전화로 문의해주세요.')
+    } catch (err: any) {
+      alert(`전송 중 오류가 발생했습니다. 전화로 문의해주세요.\n(${err.message})`)
     }
     setSubmitting(false)
   }
