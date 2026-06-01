@@ -970,7 +970,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
     contracted: personCustomers.filter(c => c.status === 'contracted').length,
     emotional:  personCustomers.filter(c => c.status === 'emotional').length,
     trash:      personCustomers.filter(c => c.status === 'trash').length,
-  }), [personCustomers])
+  }), [personCustomers, thisMonthStr])
 
   async function updateCustomer(id: string, patch: Record<string, any>) {
     const existing = customers.find(c => c.id === id)

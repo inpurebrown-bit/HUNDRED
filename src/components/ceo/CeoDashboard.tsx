@@ -21,6 +21,7 @@ import DbManageTab from './DbManageTab'
 import PersonalFinanceTab from './PersonalFinanceTab'
 import PullToRefresh from '@/components/ui/PullToRefresh'
 import SplitView from '@/components/shared/SplitView'
+import TabErrorBoundary from '@/components/shared/TabErrorBoundary'
 
 // ── 공통 서브탭 바 컴포넌트 ────────────────────────────────────
 function SubTabBar<T extends string>({ tabs, active, onChange }: {
@@ -407,8 +408,8 @@ export default function CeoDashboard() {
           }
         }} />}
         {activeTab === 'assign'         && <AssignBoard />}
-        {activeTab === 'sales'          && <SalesCeoTab initialView={salesInitialView} initialStatusTab={salesInitialStatusTab} />}
-        {activeTab === 'ops'            && <OpsCeoTab />}
+        {activeTab === 'sales'          && <TabErrorBoundary tabName="영업팀"><SalesCeoTab initialView={salesInitialView} initialStatusTab={salesInitialStatusTab} /></TabErrorBoundary>}
+        {activeTab === 'ops'            && <TabErrorBoundary tabName="관리팀"><OpsCeoTab /></TabErrorBoundary>}
         {activeTab === 'analytics'      && <AnalyticsTab />}
         {activeTab === 'staffmanage'    && <StaffManageTab />}
         {activeTab === 'minutesreports' && <MinutesReportsTab />}
