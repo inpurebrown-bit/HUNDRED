@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       .insert({
         name: name.trim(),
         phone: phone.trim(),
-        status: 'active',
+        status: 'lead',
         source: 'lead_form',
         owner_id: CEO_USER_ID,
         memo: notes,

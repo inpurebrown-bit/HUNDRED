@@ -1194,19 +1194,7 @@ export default function HomePage() {
               ))}
             </div>
 
-            {/* SNS 링크 — 링크 연결 예정 */}
-            <div className="flex flex-wrap gap-2 pt-1">
-              {[
-                { l: '카카오톡', e: '💬', href: 'https://open.kakao.com/' }, // TODO: 실제 카카오톡 링크로 변경
-                { l: '인스타그램', e: '📸', href: 'https://instagram.com/' }, // TODO: 실제 인스타그램 링크로 변경
-                { l: '유튜브', e: '▶️', href: 'https://youtube.com/' }, // TODO: 실제 유튜브 링크로 변경
-              ].map(s => (
-                <a key={s.l} href={s.href} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 border border-[#E8E2D4] hover:border-[#C5A258]/40 rounded-lg px-3 py-2 text-xs text-[#1B2A45]/50 hover:text-[#C5A258] transition-all">
-                  {s.e} {s.l}
-                </a>
-              ))}
-            </div>
+            {/* SNS 링크 — 추후 추가 예정 */}
           </Reveal>
 
           <Reveal from="right">
