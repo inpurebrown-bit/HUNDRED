@@ -333,8 +333,21 @@ export default function HomePage() {
     }
   }
 
-  // 슬라이드 자동재생 제거 — 폼 작성 중 페이지 흔들림 방지
-  // 수동 화살표 버튼으로만 이동
+  // 성공사례 자동 슬라이드 (4초)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCaseIdx(i => (i + 1) % successCases.length)
+    }, 4000)
+    return () => clearInterval(timer)
+  }, [])
+
+  // 후기 자동 슬라이드 (5초, 엇갈리게)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setReviewIdx(i => (i + 1) % reviews.length)
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [])
 
   function toggleInquiry(type: string) {
     setInquiryTypes(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type])
@@ -1227,9 +1240,7 @@ export default function HomePage() {
                 <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 flex items-start gap-2.5 text-left">
                   <span className="text-base mt-0.5 shrink-0">⚠️</span>
                   <p className="text-xs text-red-600 leading-relaxed font-medium">
-                    <span className="font-black">헌드레드 사칭에 주의하세요.</span><br />
-                    저희는 먼저 입금·카드 결제를 요구하거나<br />
-                    출처 불명의 링크를 보내지 않습니다.
+                    <span className="font-black">헌드레드 사칭에 주의하세요.</span>
                   </p>
                 </div>
 
