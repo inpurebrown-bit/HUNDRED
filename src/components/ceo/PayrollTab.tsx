@@ -284,6 +284,7 @@ export default function PayrollTab() {
   ])
   const [costs, setCosts]     = useState<OtherCosts>(defaultCosts())
   const [revTotals, setRevTotals] = useState<{ sales: number; ops: number; opsContract: number } | null>(null)
+  const [perPersonSupply, setPerPersonSupply] = useState<{ name: string; count: number }[]>([])
 
   // 개인재무에서 자동 산출 (대출이자 + 구독료)
   // DB 미저장 시 PersonalFinanceTab DEFAULT_LOANS + DEFAULT_SUBS 합계를 기본값으로 사용
@@ -412,15 +413,20 @@ export default function PayrollTab() {
         const prRes  = await fetch(`/api/payrate?year_month=${yearMonth}`)
         const prData = await prRes.json()
         if (prData.record?.employee_details) {
-          const totalSupply = (prData.record.employee_details as any[]).reduce((s: number, emp: any) => {
-            const fromDaily = emp.daily_supplies
-              ? Object.values(emp.daily_supplies).reduce((ss: number, v: any) => ss + Number(v || 0), 0)
-              : 0
-            return s + (fromDaily > 0 ? fromDaily : Number(emp.supply_count || 0))
-          }, 0)
+          const details = prData.record.employee_details as any[]
+          const perPerson = details
+            .filter((e: any) => e.name && e.name !== 'sales-tester')
+            .map((e: any) => {
+              const fromDaily = e.daily_supplies
+                ? Object.values(e.daily_supplies).reduce((ss: number, v: any) => ss + Number(v || 0), 0)
+                : 0
+              return { name: String(e.name), count: fromDaily > 0 ? fromDaily : Number(e.supply_count || 0) }
+            })
+          const totalSupply = perPerson.reduce((s: number, p: { count: number }) => s + p.count, 0)
           if (totalSupply > 0) {
             newCosts = { ...costs, db_count: totalSupply }
             setCosts(newCosts)
+            setPerPersonSupply(perPerson)
           }
         }
       } catch {
@@ -445,8 +451,30 @@ export default function PayrollTab() {
     setLoading(true)
     setMsg('')
     didInitLoad.current = false
-    const res  = await fetch(`/api/payroll?year_month=${yearMonth}`)
+    const [res, prRes] = await Promise.all([
+      fetch(`/api/payroll?year_month=${yearMonth}`),
+      fetch(`/api/payrate?year_month=${yearMonth}`),
+    ])
     const json = await res.json()
+    // payrate 에서 인별 공급수 로드
+    try {
+      const prData = await prRes.json()
+      if (prData.record?.employee_details) {
+        const details = prData.record.employee_details as any[]
+        const perPerson = details
+          .filter((e: any) => e.name && e.name !== 'sales-tester')
+          .map((e: any) => {
+            const fromDaily = e.daily_supplies
+              ? Object.values(e.daily_supplies).reduce((ss: number, v: any) => ss + Number(v || 0), 0)
+              : 0
+            return { name: String(e.name), count: fromDaily > 0 ? fromDaily : Number(e.supply_count || 0) }
+          })
+        setPerPersonSupply(perPerson)
+      } else {
+        setPerPersonSupply([])
+      }
+    } catch { setPerPersonSupply([]) }
+
     if (json.record?.employees) {
       const d = json.record.employees
       if (d.ops_employees)    setOpsEmps(d.ops_employees)
@@ -673,21 +701,33 @@ export default function PayrollTab() {
               <p className="text-[10px] font-bold text-[#1B2A45]/40 uppercase tracking-widest mb-2">운영비</p>
 
               {/* DB — 갯수 잠금, 단가만 편집 */}
-              <div className="flex items-center justify-between py-2 border-b border-gray-50 gap-2">
-                <span className="text-xs text-gray-500 shrink-0">DB 공급비용</span>
-                <div className="flex items-center gap-1 text-xs shrink-0 flex-wrap justify-end">
-                  <span className="flex items-center gap-1 bg-gray-100 text-gray-500 rounded px-1.5 py-1 font-mono whitespace-nowrap">
-                    <span className="font-bold text-gray-700">{costs.db_count}</span>개
-                  </span>
-                  <span className="text-gray-300">×</span>
-                  <div className="flex items-center gap-0.5 whitespace-nowrap">
-                    <input type="text" inputMode="numeric" value={fmtInput(costs.db_unit_price)} placeholder="40,000"
-                      onChange={e => setCosts(p => ({ ...p, db_unit_price: parseInput(e.target.value) }))}
-                      className="w-18 text-center border border-gray-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400" />
-                    <span className="text-gray-400 ml-0.5">원</span>
+              <div className="py-2 border-b border-gray-50">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-gray-500 shrink-0">DB 공급비용</span>
+                  <div className="flex items-center gap-1 text-xs shrink-0 flex-wrap justify-end">
+                    <span className="flex items-center gap-1 bg-gray-100 text-gray-500 rounded px-1.5 py-1 font-mono whitespace-nowrap">
+                      <span className="font-bold text-gray-700">{costs.db_count}</span>개
+                    </span>
+                    <span className="text-gray-300">×</span>
+                    <div className="flex items-center gap-0.5 whitespace-nowrap">
+                      <input type="text" inputMode="numeric" value={fmtInput(costs.db_unit_price)} placeholder="40,000"
+                        onChange={e => setCosts(p => ({ ...p, db_unit_price: parseInput(e.target.value) }))}
+                        className="w-18 text-center border border-gray-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                      <span className="text-gray-400 ml-0.5">원</span>
+                    </div>
+                    <span className="font-bold text-gray-700 whitespace-nowrap">{dbCost > 0 ? '= ' + dbCost.toLocaleString('ko-KR') + '원' : '-'}</span>
                   </div>
-                  <span className="font-bold text-gray-700 whitespace-nowrap">{dbCost > 0 ? '= ' + dbCost.toLocaleString('ko-KR') + '원' : '-'}</span>
                 </div>
+                {/* 인별 공급수 */}
+                {perPersonSupply.length > 0 && (
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                    {perPersonSupply.filter(p => p.count > 0).map(p => (
+                      <span key={p.name} className="text-[10px] bg-sky-50 text-sky-700 border border-sky-100 rounded-full px-2 py-0.5 font-medium">
+                        {p.name.replace(/\s*(수석팀장|팀장|팀원|대리|과장|부장|차장|이사|수석|매니저|주임|사원).*/g, '')} {p.count}개
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* 임대료 / 관리비 */}
