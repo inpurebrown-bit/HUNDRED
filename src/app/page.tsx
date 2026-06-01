@@ -1199,11 +1199,45 @@ export default function HomePage() {
 
           <Reveal from="right">
             {submitted ? (
-              <div className="bg-[#FAF8F3] border border-[#C5A258]/30 rounded-2xl p-10 text-center">
-                <div className="text-4xl mb-4">✅</div>
-                <h3 className="text-lg font-bold text-[#1B2A45] mb-2">상담 신청이 완료됐습니다!</h3>
-                <p className="text-sm text-[#1B2A45]/50">담당자가 빠른 시간 내에 연락드리겠습니다.</p>
-                <p className="text-xs text-[#C5A258] mt-4">📞 급하신 분은 1844-2599로 바로 연락주세요</p>
+              <div className="bg-[#FAF8F3] border border-[#C5A258]/30 rounded-2xl p-8 text-center space-y-5">
+                {/* 아이콘 */}
+                <div className="w-16 h-16 rounded-full bg-[#C5A258]/10 flex items-center justify-center mx-auto text-3xl">🤝</div>
+
+                {/* 메인 타이틀 */}
+                <div>
+                  <p className="text-xs font-bold text-[#C5A258] tracking-widest uppercase mb-2">신청 접수 완료</p>
+                  <h3 className="text-xl font-black text-[#1B2A45] leading-snug">
+                    고민 잘 남겨주셨습니다.
+                  </h3>
+                </div>
+
+                {/* 본문 */}
+                <div className="bg-white rounded-xl px-5 py-4 text-left space-y-3 border border-[#E8E2D4]">
+                  <p className="text-sm text-[#1B2A45]/75 leading-relaxed">
+                    무한경쟁 속 버텨내고 있는 대표님의 고민,<br />
+                    가볍게 여기지 않겠습니다.
+                  </p>
+                  <p className="text-sm text-[#1B2A45]/75 leading-relaxed">
+                    현재 문의가 많아 검증된 전담 컨설턴트가<br />
+                    <span className="font-bold text-[#1B2A45]">익일 영업일 내로 직접 연락드립니다.</span>
+                  </p>
+                </div>
+
+                {/* 사칭 주의 경고 */}
+                <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 flex items-start gap-2.5 text-left">
+                  <span className="text-base mt-0.5 shrink-0">⚠️</span>
+                  <p className="text-xs text-red-600 leading-relaxed font-medium">
+                    <span className="font-black">헌드레드 사칭에 주의하세요.</span><br />
+                    저희는 먼저 입금·카드 결제를 요구하거나<br />
+                    출처 불명의 링크를 보내지 않습니다.
+                  </p>
+                </div>
+
+                {/* 전화 */}
+                <p className="text-xs text-[#1B2A45]/40">
+                  급하신 분은 직접 연락주세요&nbsp;
+                  <a href="tel:18442599" className="font-bold text-[#C5A258] hover:underline">📞 1844-2599</a>
+                </p>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="bg-[#FAF8F3] border border-[#E8E2D4] rounded-2xl p-6 space-y-4">
