@@ -977,15 +977,18 @@ function LeadDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '불러오기 실패')
       const all: LeadCustomer[] = data.customers || []
-      // 홈페이지 문의 유입만 표시 (source='lead_form' 또는 details.db_source='홈페이지문의')
-      setLeads(all.filter(c =>
-        c.status === 'lead' && (
+      // 홈페이지 문의 유입만 표시
+      // 제외: 한경연(db_source='한경연'), CEO공급(db_source='ceo_supply')
+      const EXCLUDED_SOURCES = ['한경연', 'ceo_supply']
+      setLeads(all.filter(c => {
+        if (c.status !== 'lead') return false
+        const dbSrc = (c as any).details?.db_source
+        if (EXCLUDED_SOURCES.includes(dbSrc)) return false
+        // 홈페이지문의 명시 / source=lead_form(구버전) / db_source 없는 lead
+        return dbSrc === '홈페이지문의' ||
           (c as any).source === 'lead_form' ||
-          (c as any).details?.db_source === '홈페이지문의' ||
-          // 기존 데이터 호환: db_source가 없는 lead는 일단 포함
-          !(c as any).details?.db_source
-        )
-      ))
+          !dbSrc
+      }))
     } catch (e: any) {
       setError(e.message)
     } finally {

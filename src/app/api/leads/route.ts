@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
         name: name.trim(),
         phone: phone.trim(),
         status: 'active',          // DB 컬럼은 'active'|'contracted'만 허용
-        source: 'lead_form',
+        source: 'lead',            // DB CHECK 제약: 'self'|'lead'만 허용
         owner_id: CEO_USER_ID,
         memo: notes,
         details: {
