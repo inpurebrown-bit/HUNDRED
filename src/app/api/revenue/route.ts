@@ -189,11 +189,16 @@ export async function GET(req: NextRequest) {
     opsByUser[id].count++
   })
 
-  // ── 이달 내역 ────────────────────────────────────────────────────────
+  // ── 이달 / 지난달 내역 ──────────────────────────────────────────────
   const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const lastMonthDate2 = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const lastMonthKey  = `${lastMonthDate2.getFullYear()}-${String(lastMonthDate2.getMonth() + 1).padStart(2, '0')}`
+
   const thisMonthSales         = salesEntries.filter(e => e.date?.startsWith(thisMonthKey))
   const thisMonthOps           = opsEntries.filter(e => e.date?.startsWith(thisMonthKey))
   const thisMonthOpsContracts  = opsContractEntries.filter(e => e.date?.startsWith(thisMonthKey))
+  const lastMonthOps           = opsEntries.filter(e => e.date?.startsWith(lastMonthKey))
+  const lastMonthOpsContracts  = opsContractEntries.filter(e => e.date?.startsWith(lastMonthKey))
 
   const totalSales = salesEntries.reduce((s, e) => s + e.amount, 0)
   const totalOps   = opsEntries.reduce((s, e) => s + e.amount, 0)
@@ -208,6 +213,8 @@ export async function GET(req: NextRequest) {
     thisMonthSales,
     thisMonthOps,
     thisMonthOpsContracts,
+    lastMonthOps,
+    lastMonthOpsContracts,
     thisMonthKey,
   })
 }

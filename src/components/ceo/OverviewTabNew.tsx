@@ -37,6 +37,8 @@ interface RevenueData {
   total: number
   thisMonthOps?: { ops_user_name: string; amount: number }[]
   thisMonthOpsContracts?: { ops_user_name: string; amount: number }[]
+  lastMonthOps?: { ops_user_name: string; amount: number }[]
+  lastMonthOpsContracts?: { ops_user_name: string; amount: number }[]
 }
 
 interface Contract {
@@ -173,8 +175,8 @@ function EmployeeTable({ rows, loading }: { rows: EmployeeRow[]; loading: boolea
               <span className="text-[#1B2A45]/30 text-xs">—</span>
             )}
           </div>
-          {/* 목표 · 결제수 · 예상마감 */}
-          <div className="grid grid-cols-3 gap-1 text-center">
+          {/* 목표 · 결제수 · 예상마감 · 총결제율 */}
+          <div className="grid grid-cols-4 gap-1 text-center">
             <div className="bg-white/60 rounded-lg py-1.5 px-1">
               <p className="text-[9px] text-[#1B2A45]/40 mb-0.5 font-medium">목표</p>
               <p className="text-xs font-semibold text-[#1B2A45]/70">
@@ -196,6 +198,16 @@ function EmployeeTable({ rows, loading }: { rows: EmployeeRow[]; loading: boolea
                 {row.projected !== null
                   ? (row.projected % 1 === 0 ? row.projected : row.projected.toFixed(1)) + '건'
                   : '-'}
+              </p>
+            </div>
+            <div className="bg-white/60 rounded-lg py-1.5 px-1">
+              <p className="text-[9px] text-[#1B2A45]/40 mb-0.5 font-medium">총결제율</p>
+              <p className={`text-xs font-bold leading-none ${
+                row.totalRate == null ? 'text-[#1B2A45]/30' :
+                row.totalRate >= 17 ? 'text-emerald-600' :
+                row.totalRate >= 13 ? 'text-amber-500' : 'text-red-500'
+              }`}>
+                {row.totalRate != null ? row.totalRate.toFixed(1) + '%' : '—'}
               </p>
             </div>
           </div>
@@ -384,7 +396,8 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
   const [salesGoals, setSalesGoals] = useState<SalesGoal[]>([])
   const [lastMonthGoals, setLastMonthGoals] = useState<SalesGoal[]>([])
   const [supplyConfigMap, setSupplyConfigMap] = useState<Record<string, { base?: number }>>({})
-  const [payRateEmps, setPayRateEmps] = useState<{ name: string; target: number }[]>([])
+  const [payRateEmps, setPayRateEmps] = useState<{ name: string; target: number; supplyCount?: number; supplyPayment?: number; directPayment?: number }[]>([])
+  const [lastPayRateEmps, setLastPayRateEmps] = useState<{ name: string; target: number; supplyCount?: number; supplyPayment?: number; directPayment?: number }[]>([])
 
   // Section refs for scroll-to
   const chartRef = useRef<HTMLDivElement>(null)
@@ -423,6 +436,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           lastGoalsRes,
           supplyRes,
           payRateRes,
+          lastPayRateRes,
           expensesRes,
         ] = await Promise.all([
           fetch('/api/revenue').catch(() => null),
@@ -436,6 +450,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           fetch(`/api/sales-goals?year_month=${lastMonthStr}`).catch(() => null),
           fetch('/api/supply-config').catch(() => null),
           fetch(`/api/payrate?year_month=${thisMonthStr}`).catch(() => null),
+          fetch(`/api/payrate?year_month=${lastMonthStr}`).catch(() => null),
           fetch('/api/settings?key=monthly_expenses').catch(() => null),
         ])
 
@@ -451,6 +466,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           lastGoalsData,
           supplyData,
           payRateData,
+          lastPayRateData,
           expensesData,
         ] = await Promise.all([
           revRes?.json().catch(() => ({})) ?? {},
@@ -464,6 +480,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           lastGoalsRes?.json().catch(() => ({})) ?? {},
           supplyRes?.json().catch(() => ({})) ?? {},
           payRateRes?.json().catch(() => ({})) ?? {},
+          lastPayRateRes?.json().catch(() => ({})) ?? {},
           expensesRes?.json().catch(() => ({})) ?? {},
         ])
 
@@ -481,9 +498,24 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
         setLastMonthGoals(a(lastGoalsData).sales_goals ?? a(lastGoalsData).goals ?? [])
         // config 형식: { month, people: { 이름: { goal, base, supplied } } }
         setSupplyConfigMap(a(supplyData).config?.people ?? a(supplyData).config ?? {})
-        // payrate 직원별 목표 개수
+        // payrate 직원별 목표 개수 + 공급 현황 (이번달)
         const empDetails: any[] = a(payRateData).record?.employee_details ?? []
-        setPayRateEmps(empDetails.map((e: any) => ({ name: String(e.name || ''), target: Number(e.target || 0) })))
+        setPayRateEmps(empDetails.map((e: any) => ({
+          name: String(e.name || ''),
+          target: Number(e.target || 0),
+          supplyCount: Number(e.supply_count || 0),
+          supplyPayment: Number(e.supply_payment || 0),
+          directPayment: Number(e.direct_payment || 0),
+        })))
+        // payrate 직원별 목표 개수 + 공급 현황 (지난달)
+        const lastEmpDetails: any[] = a(lastPayRateData).record?.employee_details ?? []
+        setLastPayRateEmps(lastEmpDetails.map((e: any) => ({
+          name: String(e.name || ''),
+          target: Number(e.target || 0),
+          supplyCount: Number(e.supply_count || 0),
+          supplyPayment: Number(e.supply_payment || 0),
+          directPayment: Number(e.direct_payment || 0),
+        })))
       } catch {
         // silently ignore
       } finally {
@@ -601,7 +633,8 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
     elapsed: number,
     remaining: number,
     addBase = false,
-    supplyStatsArg: { name: string; rate: number; supplied: number; totalContracted: number }[] = []
+    supplyStatsArg: { name: string; rate: number; supplied: number; totalContracted: number }[] = [],
+    payRateEmpsArg: typeof payRateEmps = payRateEmps
   ): EmployeeRow[] {
     const userMap: Record<string, { name: string; count: number }> = {}
     for (const c of contracts) {
@@ -618,7 +651,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
     return Object.values(userMap).map(u => {
       const goalEntry = goals.find(g => g.user_name === u.name)
       // payrate employee_details에서 직원별 목표 개수 가져오기 (salesGoals 없을 시 폴백)
-      const payRateEntry = payRateEmps.find(
+      const payRateEntry = payRateEmpsArg.find(
         e => e.name === u.name || stripTitle(e.name) === stripTitle(u.name)
       )
       const goal = goalEntry
@@ -635,11 +668,15 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           ? Math.ceil((goal - contracted) / remaining)
           : null
 
-      // supplyStats에서 해당 사람의 rate 가져오기
+      // 총결제율: supplyStats(이번달) 또는 payRateEntry(지난달 저장값) 기준
       const supStat = supplyStatsArg.find(s => s.name === u.name)
+      const supplyCount = supStat?.supplied ?? payRateEntry?.supplyCount ?? 0
       const supplyRate = supStat && supStat.supplied > 0 ? supStat.rate : null
-      const totalRate = supStat && supStat.supplied > 0
-        ? Math.floor(contracted / supStat.supplied * 10000) / 100
+      const totalPayments = payRateEntry
+        ? (payRateEntry.supplyPayment ?? 0) + (payRateEntry.directPayment ?? 0)
+        : contracted
+      const totalRate = supplyCount > 0
+        ? Math.floor(totalPayments / supplyCount * 10000) / 100
         : null
 
       return {
@@ -674,8 +711,8 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
     return { name, rate, totalContracted, recommended, supplied }
   })
 
-  const thisMonthRows = buildRows(thisMonthContracts, salesGoals, thisElapsed, thisRemaining, true, supplyStats)
-  const lastMonthRows = buildRows(lastMonthContracts, lastMonthGoals, lastElapsed, lastRemaining, false)
+  const thisMonthRows = buildRows(thisMonthContracts, salesGoals, thisElapsed, thisRemaining, true, supplyStats, payRateEmps)
+  const lastMonthRows = buildRows(lastMonthContracts, lastMonthGoals, lastElapsed, lastRemaining, false, [], lastPayRateEmps)
 
   // ── 관리팀 이달 직원별 집계 ───────────────────────────────
   function buildOpsUserRows(
@@ -699,6 +736,10 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
   const thisMonthOpsUserRows = buildOpsUserRows(
     revenueData?.thisMonthOps ?? [],
     revenueData?.thisMonthOpsContracts ?? []
+  )
+  const lastMonthOpsUserRows = buildOpsUserRows(
+    revenueData?.lastMonthOps ?? [],
+    revenueData?.lastMonthOpsContracts ?? []
   )
 
   // ── Scroll helpers ───────────────────────────────────────
@@ -789,6 +830,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           employeeRows={lastMonthRows}
           salesRevenueAmount={lastMonthSalesRaw}
           opsRevenueAmount={lastMonthOpsRaw}
+          opsUserRows={lastMonthOpsUserRows}
         />
       </div>
 
