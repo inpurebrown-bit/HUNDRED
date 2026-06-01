@@ -498,12 +498,19 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
         setLastMonthGoals(a(lastGoalsData).sales_goals ?? a(lastGoalsData).goals ?? [])
         // config 형식: { month, people: { 이름: { goal, base, supplied } } }
         setSupplyConfigMap(a(supplyData).config?.people ?? a(supplyData).config ?? {})
+        // payrate 직원별 공급수: daily_supplies 합계 우선, 없으면 supply_count (급여손익과 동일 로직)
+        const calcSupplyCount = (e: any): number => {
+          const fromDaily = e.daily_supplies
+            ? Object.values(e.daily_supplies).reduce((s: number, v: any) => s + Number(v || 0), 0)
+            : 0
+          return fromDaily > 0 ? fromDaily : Number(e.supply_count || 0)
+        }
         // payrate 직원별 목표 개수 + 공급 현황 (이번달)
         const empDetails: any[] = a(payRateData).record?.employee_details ?? []
         setPayRateEmps(empDetails.map((e: any) => ({
           name: String(e.name || ''),
           target: Number(e.target || 0),
-          supplyCount: Number(e.supply_count || 0),
+          supplyCount: calcSupplyCount(e),
           supplyPayment: Number(e.supply_payment || 0),
           directPayment: Number(e.direct_payment || 0),
         })))
@@ -512,7 +519,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
         setLastPayRateEmps(lastEmpDetails.map((e: any) => ({
           name: String(e.name || ''),
           target: Number(e.target || 0),
-          supplyCount: Number(e.supply_count || 0),
+          supplyCount: calcSupplyCount(e),
           supplyPayment: Number(e.supply_payment || 0),
           directPayment: Number(e.direct_payment || 0),
         })))
@@ -668,14 +675,14 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           ? Math.ceil((goal - contracted) / remaining)
           : null
 
-      // 총결제율 = 결제수(DB기준, 표시값과 일치) / 공급수(supply config)
+      // 총결제율 = 결제수(DB기준, 표시값과 일치) / 공급수
       // - 분자: contracted (표에 보이는 결제수와 동일)
-      // - 분모: supply config의 supplied (월 공급수)
+      // - 분모: 이달 → supply config supplied / 지난달 → payrate 기록의 실제 공급수
       const supStat = supplyStatsArg.find(s => s.name === u.name)
       const supplyRate = supStat && supStat.supplied > 0 ? supStat.rate : null
-      // supply config에서 공급수 가져오기 (이달/지난달 동일 config 사용)
       const configSupplied = (supplyConfigMap[u.name] as any)?.supplied ?? 0
-      const supplyCount = supStat?.supplied ?? configSupplied
+      // 이달: supplyStats의 supplied / 지난달: payrate 기록의 daily_supplies 합계 공급수
+      const supplyCount = supStat?.supplied ?? payRateEntry?.supplyCount ?? configSupplied
       const totalRate = supplyCount > 0
         ? Math.floor(contracted / supplyCount * 10000) / 100
         : null
