@@ -668,15 +668,16 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           ? Math.ceil((goal - contracted) / remaining)
           : null
 
-      // 총결제율: supplyStats(이번달) 또는 payRateEntry(지난달 저장값) 기준
+      // 총결제율 = 결제수(DB기준, 표시값과 일치) / 공급수(supply config)
+      // - 분자: contracted (표에 보이는 결제수와 동일)
+      // - 분모: supply config의 supplied (월 공급수)
       const supStat = supplyStatsArg.find(s => s.name === u.name)
-      const supplyCount = supStat?.supplied ?? payRateEntry?.supplyCount ?? 0
       const supplyRate = supStat && supStat.supplied > 0 ? supStat.rate : null
-      const totalPayments = payRateEntry
-        ? (payRateEntry.supplyPayment ?? 0) + (payRateEntry.directPayment ?? 0)
-        : contracted
+      // supply config에서 공급수 가져오기 (이달/지난달 동일 config 사용)
+      const configSupplied = (supplyConfigMap[u.name] as any)?.supplied ?? 0
+      const supplyCount = supStat?.supplied ?? configSupplied
       const totalRate = supplyCount > 0
-        ? Math.floor(totalPayments / supplyCount * 10000) / 100
+        ? Math.floor(contracted / supplyCount * 10000) / 100
         : null
 
       return {
@@ -689,7 +690,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
         dailyNeeded,
         supplyRate,
         totalRate,
-        supplyCount: supStat?.supplied,
+        supplyCount,
       }
     })
   }
