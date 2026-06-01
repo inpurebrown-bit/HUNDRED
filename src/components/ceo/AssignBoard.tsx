@@ -1072,6 +1072,24 @@ function LeadDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
     }
   }
 
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`"${name}" 리드를 삭제하시겠습니까?\n삭제 후 복구가 불가능합니다.`)) return
+    setPatching(id)
+    try {
+      const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || '삭제 실패')
+      }
+      toast_('삭제 완료')
+      load()
+    } catch (e: any) {
+      alert('오류: ' + e.message)
+    } finally {
+      setPatching(null)
+    }
+  }
+
   return (
     <div>
       {toast && (
@@ -1176,6 +1194,13 @@ function LeadDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
                         className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium disabled:opacity-40 transition-colors"
                       >
                         한경연DB로 이동
+                      </button>
+                      <button
+                        onClick={() => handleDelete(lead.id, lead.name)}
+                        disabled={patching === lead.id}
+                        className="px-4 py-2 rounded-lg border border-red-200 text-red-500 text-xs font-medium hover:bg-red-50 disabled:opacity-40 transition-colors"
+                      >
+                        삭제
                       </button>
                     </div>
                   </div>
