@@ -1154,7 +1154,7 @@ function LeadDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
 // SECTION 3 — 계약 배정 대기
 // ════════════════════════════════════════════════════════════════════════════
 
-const CONTRACT_DEFAULT_LIMIT = 5
+const CONTRACT_PAGE_SIZE = 5
 
 function ContractAssignSection({ opsUsers }: { opsUsers: OpsUser[] }) {
   const [contracts, setContracts] = useState<Contract[]>([])
@@ -1162,7 +1162,7 @@ function ContractAssignSection({ opsUsers }: { opsUsers: OpsUser[] }) {
   const [error, setError] = useState<string | null>(null)
   const [selectedOps, setSelectedOps] = useState<Record<string, string>>({})
   const [assigning, setAssigning] = useState<string | null>(null)
-  const [showAll, setShowAll] = useState(false)
+  const [page, setPage] = useState(0)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1222,7 +1222,7 @@ function ContractAssignSection({ opsUsers }: { opsUsers: OpsUser[] }) {
         <EmptyBlock message="배정 대기 중인 계약이 없습니다." />
       ) : (
         <div className="space-y-2">
-          {(showAll ? contracts : contracts.slice(0, CONTRACT_DEFAULT_LIMIT)).map(c => (
+          {contracts.slice(page * CONTRACT_PAGE_SIZE, (page + 1) * CONTRACT_PAGE_SIZE).map(c => (
             <div key={c.id} className="bg-white rounded-xl border border-[#E8E2D4] px-4 py-3">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 {/* 왼쪽: 고객 정보 */}
@@ -1268,16 +1268,26 @@ function ContractAssignSection({ opsUsers }: { opsUsers: OpsUser[] }) {
               </div>
             </div>
           ))}
-          {/* 더보기 / 접기 */}
-          {contracts.length > CONTRACT_DEFAULT_LIMIT && (
-            <button
-              onClick={() => setShowAll(v => !v)}
-              className="w-full py-2 text-xs font-semibold text-[#1B2A45]/50 hover:text-[#C5A258] border border-dashed border-[#E8E2D4] rounded-xl hover:border-[#C5A258]/40 transition-colors"
-            >
-              {showAll
-                ? '▲ 접기'
-                : `▼ 더 보기 (+${contracts.length - CONTRACT_DEFAULT_LIMIT}건)`}
-            </button>
+          {/* 페이지 버튼 */}
+          {contracts.length > CONTRACT_PAGE_SIZE && (
+            <div className="flex items-center justify-center gap-1.5 pt-1">
+              {Array.from({ length: Math.ceil(contracts.length / CONTRACT_PAGE_SIZE) }, (_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setPage(i)}
+                  className={`w-7 h-7 rounded-lg text-xs font-bold transition-colors ${
+                    page === i
+                      ? 'bg-[#1B2A45] text-white'
+                      : 'bg-[#F8F6F1] text-[#1B2A45]/50 hover:bg-[#E8E2D4] hover:text-[#1B2A45]'
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+              <span className="text-[10px] text-[#1B2A45]/30 ml-1">
+                {page * CONTRACT_PAGE_SIZE + 1}–{Math.min((page + 1) * CONTRACT_PAGE_SIZE, contracts.length)} / {contracts.length}건
+              </span>
+            </div>
           )}
         </div>
       )}
