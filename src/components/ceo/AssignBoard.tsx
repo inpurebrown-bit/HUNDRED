@@ -176,27 +176,38 @@ const EMPTY_HK = {
 }
 
 function parsePastedRow(text: string): Partial<typeof EMPTY_HK> {
-  const cols = text.split('\t')
-  if (cols.length < 2) return {}
-  // cols[1]: 접수일시 "2024-03-15 09:30" → "2024-03-15"
-  const rawDate = (cols[1] || '').trim()
-  const dateMatch = rawDate.match(/(\d{4}-\d{2}-\d{2})/)
-  const dateOnly = dateMatch ? dateMatch[1] : today()
-  return {
-    date: dateOnly,
-    phone: (cols[2] || '').trim(),
-    business_no: (cols[3] || '').trim(),
-    company: (cols[4] || '').trim(),
-    name: (cols[5] || '').trim(),
-    industry: (cols[6] || '').trim(),
-    region: (cols[7] || '').trim(),
-    // cols[8]: 희망서비스 → skip
-    revenue: (cols[9] || '').trim(),
-    loan: (cols[10] || '').trim(),
-    required_funds: (cols[11] || '').trim(),
-    tax_status: (cols[12] || '').trim(),
-    credit: (cols[13] || '').trim(),
-  }
+  const cols = text.split('\t').map(c => c.trim())
+  if (cols.length < 5) return {}
+
+  const datePattern = /(\d{4}-\d{2}-\d{2})/
+
+  // 날짜(YYYY-MM-DD) 패턴이 있는 첫 번째 컬럼을 자동 감지
+  const dateColIdx = cols.findIndex(c => datePattern.test(c))
+  if (dateColIdx < 0) return {}
+
+  const dateOnly = cols[dateColIdx].match(datePattern)![1]
+
+  // 날짜 바로 다음 컬럼도 날짜/시간 형식이면 건너뜀
+  // (접수일 + 연락일시 두 컬럼이 연속으로 있는 포맷 대응)
+  let idx = dateColIdx + 1
+  if (idx < cols.length && datePattern.test(cols[idx])) idx++
+
+  const g = () => (cols[idx++] ?? '')
+
+  const phone        = g()  // 연락처
+  const business_no  = g()  // 사업자번호
+  const company      = g()  // 업체명
+  const name         = g()  // 대표명
+  const industry     = g()  // 업종
+  const region       = g()  // 지역
+  idx++                      // 희망서비스 skip
+  const revenue      = g()
+  const loan         = g()
+  const required_funds = g()
+  const tax_status   = g()
+  const credit       = g()
+
+  return { date: dateOnly, phone, business_no, company, name, industry, region, revenue, loan, required_funds, tax_status, credit }
 }
 
 function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
