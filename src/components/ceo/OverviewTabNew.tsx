@@ -228,6 +228,7 @@ interface MonthSectionProps {
   employeeRows: EmployeeRow[]
   salesRevenueAmount?: number
   opsRevenueAmount?: number
+  vatRevenue?: number  // 부가세 체크된 계약금액 합산 (발생 부가세 계산용)
   opsUserRows?: { name: string; feeAmount: number; contractAmount: number; contractCount: number }[]
 }
 
@@ -258,6 +259,7 @@ function MonthSection({
   employeeRows,
   salesRevenueAmount = 0,
   opsRevenueAmount = 0,
+  vatRevenue,
   opsUserRows = [],
 }: MonthSectionProps) {
 
@@ -348,8 +350,8 @@ function MonthSection({
             <div className="bg-orange-50 border border-orange-100 rounded-xl p-3">
               <p className="text-[9px] font-bold text-orange-400 mb-1.5">발생 부가세</p>
               <p className="text-sm font-black text-orange-500 leading-none">
-                {(salesRevenueAmount + opsRevenueAmount) > 0
-                  ? fmtKrw(Math.round((salesRevenueAmount + opsRevenueAmount) * 0.1))
+                {(vatRevenue ?? (salesRevenueAmount + opsRevenueAmount)) > 0
+                  ? fmtKrw(Math.round((vatRevenue ?? (salesRevenueAmount + opsRevenueAmount)) * 0.1))
                   : '-'}
               </p>
             </div>
@@ -623,6 +625,13 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
   const thisMonthSalesRaw = thisMonthRevEntry?.영업팀 ?? 0
   const thisMonthTax = Math.round(thisMonthRevRaw * 0.1)
   const lastMonthTax = Math.round(lastMonthRevRaw * 0.1)
+  // 발생 부가세: 부가세 체크된 계약금액만 합산 (vat_included !== false)
+  const thisVatRevenue = thisMonthContracts
+    .filter(c => c.vat_included !== false)
+    .reduce((s, c) => s + (c.contract_amount || 0), 0)
+  const lastVatRevenue = lastMonthContracts
+    .filter(c => c.vat_included !== false)
+    .reduce((s, c) => s + (c.contract_amount || 0), 0)
 
   // Business days — this month
   const thisTotalBiz = getMonthBusinessDays(thisYear, thisMonth)
@@ -824,6 +833,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           employeeRows={thisMonthRows}
           salesRevenueAmount={thisMonthSalesRaw}
           opsRevenueAmount={thisMonthOpsRaw}
+          vatRevenue={thisVatRevenue}
           opsUserRows={thisMonthOpsUserRows}
         />
       </div>
@@ -839,6 +849,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           employeeRows={lastMonthRows}
           salesRevenueAmount={lastMonthSalesRaw}
           opsRevenueAmount={lastMonthOpsRaw}
+          vatRevenue={lastVatRevenue}
           opsUserRows={lastMonthOpsUserRows}
         />
       </div>
