@@ -505,24 +505,53 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
             : 0
           return fromDaily > 0 ? fromDaily : Number(e.supply_count || 0)
         }
+
+        // ★ 공가/직가 결제 실시간 계산 (customers DB 기준 — payrate 저장값 대신 항상 최신)
+        const cleanNameFn = (s: string) => s.replace(/\s*(수석팀장|팀장|팀원|대리|과장|부장|차장|이사|수석|매니저|주임|사원).*/g, '').trim()
+        const allCusts: any[] = a(customersData).customers ?? []
+        function buildPayMap(monthStr: string) {
+          const supplyMap: Record<string, number> = {}
+          const directMap: Record<string, number> = {}
+          allCusts.forEach((c: any) => {
+            const name = (c.details?.sales_user_name || c.sales_user_name || '').trim()
+            if (!name) return
+            const contractMonth = (c.details?.contract_date || c.created_at || '').slice(0, 7)
+            if (c.status !== 'contracted' || contractMonth !== monthStr) return
+            const isDirectType = c.status === 'db010' || !!c.details?.db010_month || !!c.details?.is_direct
+            const w = contractWeight(c.details?.payment_amount, c.details?.vat_included)
+            const key = cleanNameFn(name)
+            if (isDirectType) directMap[key] = (directMap[key] || 0) + w
+            else               supplyMap[key] = (supplyMap[key] || 0) + w
+          })
+          return { supplyMap, directMap }
+        }
+        const { supplyMap: thisSupplyMap, directMap: thisDirectMap } = buildPayMap(thisMonthStr)
+        const { supplyMap: lastSupplyMap, directMap: lastDirectMap } = buildPayMap(lastMonthStr)
+
         // payrate 직원별 목표 개수 + 공급 현황 (이번달)
         const empDetails: any[] = a(payRateData).record?.employee_details ?? []
-        setPayRateEmps(empDetails.map((e: any) => ({
-          name: String(e.name || ''),
-          target: Number(e.target || 0),
-          supplyCount: calcSupplyCount(e),
-          supplyPayment: Number(e.supply_payment || 0),
-          directPayment: Number(e.direct_payment || 0),
-        })))
+        setPayRateEmps(empDetails.map((e: any) => {
+          const key = cleanNameFn(String(e.name || ''))
+          return {
+            name: String(e.name || ''),
+            target: Number(e.target || 0),
+            supplyCount: calcSupplyCount(e),
+            supplyPayment: thisSupplyMap[key] ?? Number(e.supply_payment || 0),
+            directPayment: thisDirectMap[key] ?? Number(e.direct_payment || 0),
+          }
+        }))
         // payrate 직원별 목표 개수 + 공급 현황 (지난달)
         const lastEmpDetails: any[] = a(lastPayRateData).record?.employee_details ?? []
-        setLastPayRateEmps(lastEmpDetails.map((e: any) => ({
-          name: String(e.name || ''),
-          target: Number(e.target || 0),
-          supplyCount: calcSupplyCount(e),
-          supplyPayment: Number(e.supply_payment || 0),
-          directPayment: Number(e.direct_payment || 0),
-        })))
+        setLastPayRateEmps(lastEmpDetails.map((e: any) => {
+          const key = cleanNameFn(String(e.name || ''))
+          return {
+            name: String(e.name || ''),
+            target: Number(e.target || 0),
+            supplyCount: calcSupplyCount(e),
+            supplyPayment: lastSupplyMap[key] ?? Number(e.supply_payment || 0),
+            directPayment: lastDirectMap[key] ?? Number(e.direct_payment || 0),
+          }
+        }))
       } catch {
         // silently ignore
       } finally {
