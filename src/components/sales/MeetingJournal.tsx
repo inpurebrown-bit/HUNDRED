@@ -116,8 +116,8 @@ export default function MeetingJournal({ customer, onClose }: MeetingJournalProp
         @media print {
           html, body { margin: 0 !important; padding: 0 !important; }
           body > * { display: none !important; }
-          #mj-print-body { display: block !important; }
-          @page { size: A4 portrait; margin: 7mm 7mm; }
+          #mj-print-body { display: block !important; zoom: 0.78; }
+          @page { size: A4 portrait; margin: 5mm 5mm; }
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
           #mj-print-body table { table-layout: fixed !important; width: 100% !important; }
           #mj-print-body td, #mj-print-body th { overflow: hidden !important; max-width: 1px !important; }
