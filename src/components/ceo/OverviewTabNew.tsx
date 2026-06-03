@@ -532,24 +532,29 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
         const empDetails: any[] = a(payRateData).record?.employee_details ?? []
         setPayRateEmps(empDetails.map((e: any) => {
           const key = cleanNameFn(String(e.name || ''))
+          const savedSupply = Number(e.supply_payment || 0)
+          const savedDirect = Number(e.direct_payment || 0)
           return {
             name: String(e.name || ''),
             target: Number(e.target || 0),
             supplyCount: calcSupplyCount(e),
-            supplyPayment: thisSupplyMap[key] ?? Number(e.supply_payment || 0),
-            directPayment: thisDirectMap[key] ?? Number(e.direct_payment || 0),
+            // 저장값이 있으면 유지, 0일 때만 live 집계로 채움 (미저장 방어)
+            supplyPayment: savedSupply > 0 ? savedSupply : (thisSupplyMap[key] ?? 0),
+            directPayment: savedDirect > 0 ? savedDirect : (thisDirectMap[key] ?? 0),
           }
         }))
         // payrate 직원별 목표 개수 + 공급 현황 (지난달)
         const lastEmpDetails: any[] = a(lastPayRateData).record?.employee_details ?? []
         setLastPayRateEmps(lastEmpDetails.map((e: any) => {
           const key = cleanNameFn(String(e.name || ''))
+          const savedSupply = Number(e.supply_payment || 0)
+          const savedDirect = Number(e.direct_payment || 0)
           return {
             name: String(e.name || ''),
             target: Number(e.target || 0),
             supplyCount: calcSupplyCount(e),
-            supplyPayment: lastSupplyMap[key] ?? Number(e.supply_payment || 0),
-            directPayment: lastDirectMap[key] ?? Number(e.direct_payment || 0),
+            supplyPayment: savedSupply > 0 ? savedSupply : (lastSupplyMap[key] ?? 0),
+            directPayment: savedDirect > 0 ? savedDirect : (lastDirectMap[key] ?? 0),
           }
         }))
       } catch {
