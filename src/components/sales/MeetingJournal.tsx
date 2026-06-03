@@ -30,8 +30,10 @@ function Opt({ label, checked }: { label: string; checked?: boolean }) {
       border: `1px solid ${checked ? '#1a2a40' : '#bbb'}`,
       background: checked ? '#1a2a40' : '#fff',
       color: checked ? '#fff' : '#444',
-      borderRadius: 3, padding: '0 5px', fontSize: '0.88em',
-      fontWeight: checked ? 700 : 400, marginRight: 3,
+      borderRadius: 2, padding: '0 3px', fontSize: '0.82em',
+      fontWeight: checked ? 700 : 400, marginRight: 2,
+      whiteSpace: 'nowrap', verticalAlign: 'middle',
+      WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' as any,
     }}>{label}</span>
   )
 }
@@ -110,10 +112,13 @@ export default function MeetingJournal({ customer, onClose }: MeetingJournalProp
       <style dangerouslySetInnerHTML={{ __html: `
         #mj-print-body { display: none; }
         @media print {
+          html, body { margin: 0 !important; padding: 0 !important; height: auto !important; }
           body > * { display: none !important; }
           #mj-print-body { display: block !important; }
-          @page { size: A4 portrait; margin: 8mm 9mm; }
-          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          @page { size: A4 portrait; margin: 10mm 8mm; }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+          #mj-print-body table { table-layout: fixed !important; width: 100% !important; }
+          #mj-print-body td, #mj-print-body th { overflow: hidden !important; word-break: break-word !important; }
         }
       `}} />
 
@@ -152,8 +157,8 @@ export default function MeetingJournal({ customer, onClose }: MeetingJournalProp
       {mounted && createPortal(
         <div id="mj-print-body" style={{
           fontFamily: '"Malgun Gothic","Apple SD Gothic Neo",sans-serif',
-          background: '#fff', padding: '0',
-          fontSize: 8.5, lineHeight: 1.4,
+          background: '#fff', padding: '0', margin: '0',
+          fontSize: 7.8, lineHeight: 1.35,
         }}>
           <JournalBody {...props} isPrint={true} />
         </div>,
@@ -185,9 +190,8 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, isPrint }: Bo
     <div style={{
       fontFamily: 'inherit',
       ...(isPrint ? {
-        display: 'flex', flexDirection: 'column',
-        height: 'calc(297mm - 16mm)',
-        overflow: 'hidden',
+        display: 'block',
+        width: '100%',
       } : {}),
     }}>
 
@@ -489,7 +493,7 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, isPrint }: Bo
 
       {/* ━━ 미팅 메모 (빈 필기란) ━━ */}
       <div style={{
-        ...(isPrint ? { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' } : { minHeight: 80 }),
+        minHeight: isPrint ? 0 : 80,
         border: `1px solid ${GB}`, marginTop: -1, padding: '5px 8px',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
@@ -503,13 +507,12 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, isPrint }: Bo
             ))}
           </div>
         </div>
-        <div style={{ ...(isPrint ? { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-around' } : {}) }}>
-          {Array.from({ length: isPrint ? 9 : 5 }).map((_, i) => (
+        <div>
+          {Array.from({ length: isPrint ? 10 : 5 }).map((_, i) => (
             <div key={i} style={{
               borderBottom: '1px solid #ddd',
-              ...(isPrint
-                ? { flex: 1, maxHeight: '7mm', minHeight: '4mm' }
-                : { height: 18, marginBottom: 4 }),
+              height: isPrint ? '9mm' : 18,
+              marginBottom: isPrint ? 0 : 4,
             }} />
           ))}
         </div>
