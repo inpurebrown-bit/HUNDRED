@@ -349,7 +349,7 @@ function MonthSection({
               <p className="text-[9px] font-bold text-orange-400 mb-1.5">발생 부가세</p>
               <p className="text-sm font-black text-orange-500 leading-none">
                 {(salesRevenueAmount + opsRevenueAmount) > 0
-                  ? fmtKrw(Math.round((salesRevenueAmount + opsRevenueAmount) / 11))
+                  ? fmtKrw(Math.round((salesRevenueAmount + opsRevenueAmount) * 0.1))
                   : '-'}
               </p>
             </div>
@@ -506,57 +506,24 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           return fromDaily > 0 ? fromDaily : Number(e.supply_count || 0)
         }
 
-        // ★ 공가/직가 결제 실시간 계산 (customers DB 기준 — payrate 저장값 대신 항상 최신)
-        const cleanNameFn = (s: string) => s.replace(/\s*(수석팀장|팀장|팀원|대리|과장|부장|차장|이사|수석|매니저|주임|사원).*/g, '').trim()
-        const allCusts: any[] = a(customersData).customers ?? []
-        function buildPayMap(monthStr: string) {
-          const supplyMap: Record<string, number> = {}
-          const directMap: Record<string, number> = {}
-          allCusts.forEach((c: any) => {
-            const name = (c.details?.sales_user_name || c.sales_user_name || '').trim()
-            if (!name) return
-            const contractMonth = (c.details?.contract_date || c.created_at || '').slice(0, 7)
-            if (c.status !== 'contracted' || contractMonth !== monthStr) return
-            const isDirectType = c.status === 'db010' || !!c.details?.db010_month || !!c.details?.is_direct
-            const w = contractWeight(c.details?.payment_amount, c.details?.vat_included)
-            const key = cleanNameFn(name)
-            if (isDirectType) directMap[key] = (directMap[key] || 0) + w
-            else               supplyMap[key] = (supplyMap[key] || 0) + w
-          })
-          return { supplyMap, directMap }
-        }
-        const { supplyMap: thisSupplyMap, directMap: thisDirectMap } = buildPayMap(thisMonthStr)
-        const { supplyMap: lastSupplyMap, directMap: lastDirectMap } = buildPayMap(lastMonthStr)
-
         // payrate 직원별 목표 개수 + 공급 현황 (이번달)
         const empDetails: any[] = a(payRateData).record?.employee_details ?? []
-        setPayRateEmps(empDetails.map((e: any) => {
-          const key = cleanNameFn(String(e.name || ''))
-          const savedSupply = Number(e.supply_payment || 0)
-          const savedDirect = Number(e.direct_payment || 0)
-          return {
-            name: String(e.name || ''),
-            target: Number(e.target || 0),
-            supplyCount: calcSupplyCount(e),
-            // 저장값이 있으면 유지, 0일 때만 live 집계로 채움 (미저장 방어)
-            supplyPayment: savedSupply > 0 ? savedSupply : (thisSupplyMap[key] ?? 0),
-            directPayment: savedDirect > 0 ? savedDirect : (thisDirectMap[key] ?? 0),
-          }
-        }))
+        setPayRateEmps(empDetails.map((e: any) => ({
+          name: String(e.name || ''),
+          target: Number(e.target || 0),
+          supplyCount: calcSupplyCount(e),
+          supplyPayment: Number(e.supply_payment || 0),
+          directPayment: Number(e.direct_payment || 0),
+        })))
         // payrate 직원별 목표 개수 + 공급 현황 (지난달)
         const lastEmpDetails: any[] = a(lastPayRateData).record?.employee_details ?? []
-        setLastPayRateEmps(lastEmpDetails.map((e: any) => {
-          const key = cleanNameFn(String(e.name || ''))
-          const savedSupply = Number(e.supply_payment || 0)
-          const savedDirect = Number(e.direct_payment || 0)
-          return {
-            name: String(e.name || ''),
-            target: Number(e.target || 0),
-            supplyCount: calcSupplyCount(e),
-            supplyPayment: savedSupply > 0 ? savedSupply : (lastSupplyMap[key] ?? 0),
-            directPayment: savedDirect > 0 ? savedDirect : (lastDirectMap[key] ?? 0),
-          }
-        }))
+        setLastPayRateEmps(lastEmpDetails.map((e: any) => ({
+          name: String(e.name || ''),
+          target: Number(e.target || 0),
+          supplyCount: calcSupplyCount(e),
+          supplyPayment: Number(e.supply_payment || 0),
+          directPayment: Number(e.direct_payment || 0),
+        })))
       } catch {
         // silently ignore
       } finally {
@@ -709,20 +676,15 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           ? Math.ceil((goal - contracted) / remaining)
           : null
 
-      // 총결제율 = (공급결제 + 직접결제) / 공급수 × 100 — payrate 위젯과 동일 공식
-      // - 분자: payrate 저장값 (supply_payment + direct_payment)
+      // 총결제율 = 결제수(contracted) / 공급수 × 100
+      // - 분자: contracts 데이터 기반 contracted (결제수 표시값과 동일 소스)
       // - 분모: payrate의 daily_supplies 합산 공급수 (없으면 supply config)
       const supStat = supplyStatsArg.find(s => s.name === u.name)
       const supplyRate = supStat && supStat.supplied > 0 ? supStat.rate : null
       const configSupplied = (supplyConfigMap[u.name] as any)?.supplied ?? 0
       const supplyCount = supStat?.supplied ?? payRateEntry?.supplyCount ?? configSupplied
-      // 이달: supplyStats의 rate 그대로 / 지난달: payrate 저장 결제수 사용
-      const payRatePayments = payRateEntry
-        ? (payRateEntry.supplyPayment ?? 0) + (payRateEntry.directPayment ?? 0)
-        : null
-      const totalRate = supplyCount > 0 && payRatePayments !== null
-        ? Math.floor(payRatePayments / supplyCount * 10000) / 100
-        : supplyCount > 0 && supStat
+      // 결제수(contracted)와 동일 소스로 총결제율 계산 → 표시값 불일치 방지
+      const totalRate = supplyCount > 0
         ? Math.floor(contracted / supplyCount * 10000) / 100
         : null
 
