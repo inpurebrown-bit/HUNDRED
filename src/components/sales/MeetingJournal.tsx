@@ -75,12 +75,12 @@ function TD(bc: string, p: string, extra: CS = {}): CS {
 }
 
 /* 섹션 구분 배너 */
-function SectBanner({ bg, bc, color, children }: { bg: string; bc: string; color: string; children: React.ReactNode }) {
+function SectBanner({ bg, bc, color, children, isPrint = false }: { bg: string; bc: string; color: string; children: React.ReactNode; isPrint?: boolean }) {
   return (
     <tr>
       <td colSpan={13} style={{
         background: bg, border: `1px solid ${bc}`, color,
-        fontWeight: 700, fontSize: '0.9em', padding: '3px 7px',
+        fontWeight: 700, fontSize: '0.88em', padding: isPrint ? '1px 5px' : '3px 7px',
         letterSpacing: '0.3px',
         WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' as any,
       }}>{children}</td>
@@ -112,13 +112,14 @@ export default function MeetingJournal({ customer, onClose }: MeetingJournalProp
       <style dangerouslySetInnerHTML={{ __html: `
         #mj-print-body { display: none; }
         @media print {
-          html, body { margin: 0 !important; padding: 0 !important; height: auto !important; }
+          html, body { margin: 0 !important; padding: 0 !important; height: auto !important; overflow: visible !important; }
           body > * { display: none !important; }
-          #mj-print-body { display: block !important; }
-          @page { size: A4 portrait; margin: 10mm 8mm; }
+          #mj-print-body { display: block !important; position: absolute; top: 0; left: 0; width: 100%; }
+          @page { size: A4 portrait; margin: 7mm 7mm; }
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
-          #mj-print-body table { table-layout: fixed !important; width: 100% !important; }
-          #mj-print-body td, #mj-print-body th { overflow: hidden !important; word-break: break-word !important; }
+          #mj-print-body table { table-layout: fixed !important; width: 100% !important; border-collapse: collapse !important; }
+          #mj-print-body td, #mj-print-body th { overflow: hidden !important; word-break: break-word !important; max-width: 0; }
+          #mj-print-body * { page-break-inside: avoid; }
         }
       `}} />
 
@@ -158,7 +159,7 @@ export default function MeetingJournal({ customer, onClose }: MeetingJournalProp
         <div id="mj-print-body" style={{
           fontFamily: '"Malgun Gothic","Apple SD Gothic Neo",sans-serif',
           background: '#fff', padding: '0', margin: '0',
-          fontSize: 7.8, lineHeight: 1.35,
+          fontSize: 7, lineHeight: 1.3,
         }}>
           <JournalBody {...props} isPrint={true} />
         </div>,
@@ -182,7 +183,7 @@ interface BodyProps {
 }
 
 function JournalBody({ d, company, name, phone, dateStr, corpType, isPrint }: BodyProps) {
-  const p  = isPrint ? '3px 5px'  : '4px 6px'    // 셀 패딩
+  const p  = isPrint ? '2px 3px'  : '4px 6px'    // 셀 패딩
   const th = (bg: string, bc: string, extra: CS = {}) => TH(bg, bc, p, extra)
   const td = (bc: string, extra: CS = {}) => TD(bc, p, extra)
 
@@ -199,25 +200,25 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, isPrint }: Bo
       <div style={{
         background: '#1a2a40',
         borderRadius: isPrint ? 0 : 8,
-        padding: isPrint ? '8px 12px 10px' : '12px 16px 14px',
-        marginBottom: 8,
+        padding: isPrint ? '5px 8px 6px' : '12px 16px 14px',
+        marginBottom: isPrint ? 4 : 8,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' as any,
       }}>
         {/* 로고 */}
         <img src="/images/logo.png" alt="HUNDRED"
-          style={{ height: isPrint ? 28 : 36, objectFit: 'contain', filter: 'brightness(0) invert(1)', opacity: 0.9 }} />
+          style={{ height: isPrint ? 20 : 36, objectFit: 'contain', filter: 'brightness(0) invert(1)', opacity: 0.9 }} />
 
         {/* 업체명 */}
-        <div style={{ flex: 1, textAlign: 'center', padding: '0 12px' }}>
-          <div style={{ fontSize: isPrint ? '1.85em' : '2em', fontWeight: 900, color: '#ffffff', letterSpacing: 2, textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
+        <div style={{ flex: 1, textAlign: 'center', padding: '0 8px' }}>
+          <div style={{ fontSize: isPrint ? '1.6em' : '2em', fontWeight: 900, color: '#ffffff', letterSpacing: 2, textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
             {company || <span style={{ opacity: 0.4 }}>업체명</span>}
           </div>
-          <div style={{ fontSize: '0.8em', color: 'rgba(255,255,255,0.55)', marginTop: 2, letterSpacing: 1 }}>MEETING JOURNAL</div>
+          <div style={{ fontSize: '0.75em', color: 'rgba(255,255,255,0.55)', marginTop: 1, letterSpacing: 1 }}>MEETING JOURNAL</div>
         </div>
 
         {/* 일시 / 대표자 / 연락처 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: isPrint ? 3 : 4, minWidth: 160 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: isPrint ? 2 : 4, minWidth: isPrint ? 130 : 160 }}>
           {[['일시', dateStr], ['대표자', name], ['연락처', phone]].map(([lb, val]) => (
             <div key={lb} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.8em', fontWeight: 700, width: 38, flexShrink: 0 }}>{lb}</span>
@@ -392,7 +393,7 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, isPrint }: Bo
           </tr>
 
           {/* ━━ 제조 (주황) ━━ */}
-          <SectBanner bg="#fff3e0" bc={OB} color="#7a3000">▶ 제조업 해당 시 작성</SectBanner>
+          <SectBanner bg="#fff3e0" bc={OB} color="#7a3000" isPrint={isPrint}>▶ 제조업 해당 시 작성</SectBanner>
           <tr>
             <td rowSpan={3} style={th(O, OB, { fontSize: '0.9em' })}>제조</td>
             <td style={th(O, OB)}>제작 방식</td>
@@ -421,7 +422,7 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, isPrint }: Bo
           </tr>
 
           {/* ━━ 정보통신 (파랑) ━━ */}
-          <SectBanner bg="#e8f2ff" bc={BB} color="#0a2a5a">▶ 정보통신업 해당 시 작성</SectBanner>
+          <SectBanner bg="#e8f2ff" bc={BB} color="#0a2a5a" isPrint={isPrint}>▶ 정보통신업 해당 시 작성</SectBanner>
           <tr>
             <td rowSpan={2} style={th(B, BB, { fontSize: '0.9em' })}>정보<br />통신</td>
             <td style={th(B, BB)}>개발 단계</td>
@@ -444,7 +445,7 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, isPrint }: Bo
           </tr>
 
           {/* ━━ 법인 (보라) ━━ */}
-          <SectBanner bg="#f3eeff" bc={PB} color="#2e0870">▶ 법인 해당 시 작성</SectBanner>
+          <SectBanner bg="#f3eeff" bc={PB} color="#2e0870" isPrint={isPrint}>▶ 법인 해당 시 작성</SectBanner>
           <tr>
             <td rowSpan={5} style={th(P, PB, { fontSize: '0.9em' })}>법인</td>
             <td style={th(P, PB)}>실제경영자</td>
@@ -508,10 +509,10 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, isPrint }: Bo
           </div>
         </div>
         <div>
-          {Array.from({ length: isPrint ? 10 : 5 }).map((_, i) => (
+          {Array.from({ length: isPrint ? 7 : 5 }).map((_, i) => (
             <div key={i} style={{
               borderBottom: '1px solid #ddd',
-              height: isPrint ? '9mm' : 18,
+              height: isPrint ? '7mm' : 18,
               marginBottom: isPrint ? 0 : 4,
             }} />
           ))}
