@@ -120,7 +120,7 @@ export default function MeetingJournal({ customer, onClose }: MeetingJournalProp
           @page { size: A4 portrait; margin: 5mm 5mm; }
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
           #mj-print-body table { table-layout: fixed !important; width: 100% !important; }
-          #mj-print-body td, #mj-print-body th { overflow: hidden !important; max-width: 1px !important; }
+          #mj-print-body td, #mj-print-body th { overflow: hidden !important; }
         }
       `}} />
 
