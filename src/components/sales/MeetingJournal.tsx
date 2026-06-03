@@ -51,7 +51,7 @@ function L({ children }: { children: React.ReactNode }) {
 /* 인콜에서 채워진 값 */
 function Val({ v }: { v?: string | null }) {
   return v && String(v).trim()
-    ? <span style={{ color: '#1a2a40', fontWeight: 700 }}>{v}</span>
+    ? <span style={{ color: '#1a2a40', fontWeight: 700, display: 'block', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{v}</span>
     : <span style={{ color: '#ccc', fontSize: '0.8em' }}>—</span>
 }
 
@@ -61,6 +61,7 @@ function TH(bg: string, bc: string, p: string, extra: CS = {}): CS {
     background: bg, border: `1px solid ${bc}`, padding: p,
     fontSize: 'inherit', fontWeight: 700, color: '#1a2a40',
     textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap',
+    overflow: 'hidden',
     WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' as any,
     ...extra,
   }
@@ -70,6 +71,7 @@ function TD(bc: string, p: string, extra: CS = {}): CS {
   return {
     border: `1px solid ${bc}`, padding: p,
     fontSize: 'inherit', color: '#222', verticalAlign: 'middle',
+    overflow: 'hidden',
     ...extra,
   }
 }
@@ -112,14 +114,13 @@ export default function MeetingJournal({ customer, onClose }: MeetingJournalProp
       <style dangerouslySetInnerHTML={{ __html: `
         #mj-print-body { display: none; }
         @media print {
-          html, body { margin: 0 !important; padding: 0 !important; height: auto !important; overflow: visible !important; }
+          html, body { margin: 0 !important; padding: 0 !important; }
           body > * { display: none !important; }
-          #mj-print-body { display: block !important; position: absolute; top: 0; left: 0; width: 100%; }
+          #mj-print-body { display: block !important; }
           @page { size: A4 portrait; margin: 7mm 7mm; }
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
-          #mj-print-body table { table-layout: fixed !important; width: 100% !important; border-collapse: collapse !important; }
-          #mj-print-body td, #mj-print-body th { overflow: hidden !important; word-break: break-word !important; max-width: 0; }
-          #mj-print-body * { page-break-inside: avoid; }
+          #mj-print-body table { table-layout: fixed !important; width: 100% !important; }
+          #mj-print-body td, #mj-print-body th { overflow: hidden !important; max-width: 1px !important; }
         }
       `}} />
 
