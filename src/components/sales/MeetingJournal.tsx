@@ -116,8 +116,8 @@ export default function MeetingJournal({ customer, onClose }: MeetingJournalProp
         @media print {
           html, body { margin: 0 !important; padding: 0 !important; }
           body > * { display: none !important; }
-          #mj-print-body { display: block !important; zoom: 0.78; }
-          @page { size: A4 portrait; margin: 5mm 5mm; }
+          #mj-print-body { display: block !important; width: 194mm !important; font-size: 6pt !important; }
+          @page { size: A4 portrait; margin: 8mm; }
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
           #mj-print-body table { table-layout: fixed !important; width: 100% !important; }
           #mj-print-body td, #mj-print-body th { overflow: hidden !important; }
@@ -160,7 +160,7 @@ export default function MeetingJournal({ customer, onClose }: MeetingJournalProp
         <div id="mj-print-body" style={{
           fontFamily: '"Malgun Gothic","Apple SD Gothic Neo",sans-serif',
           background: '#fff', padding: '0', margin: '0',
-          fontSize: 7, lineHeight: 1.3,
+          lineHeight: 1.3,
         }}>
           <JournalBody {...props} isPrint={true} />
         </div>,
@@ -184,7 +184,7 @@ interface BodyProps {
 }
 
 function JournalBody({ d, company, name, phone, dateStr, corpType, isPrint }: BodyProps) {
-  const p  = isPrint ? '2px 3px'  : '4px 6px'    // 셀 패딩
+  const p  = isPrint ? '1pt 2pt'  : '4px 6px'    // 셀 패딩
   const th = (bg: string, bc: string, extra: CS = {}) => TH(bg, bc, p, extra)
   const td = (bc: string, extra: CS = {}) => TD(bc, p, extra)
 
@@ -201,7 +201,7 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, isPrint }: Bo
       <div style={{
         background: '#1a2a40',
         borderRadius: isPrint ? 0 : 8,
-        padding: isPrint ? '5px 8px 6px' : '12px 16px 14px',
+        padding: isPrint ? '3pt 6pt' : '12px 16px 14px',
         marginBottom: isPrint ? 4 : 8,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' as any,
@@ -513,7 +513,7 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, isPrint }: Bo
           {Array.from({ length: isPrint ? 7 : 5 }).map((_, i) => (
             <div key={i} style={{
               borderBottom: '1px solid #ddd',
-              height: isPrint ? '7mm' : 18,
+              height: isPrint ? '6mm' : 18,
               marginBottom: isPrint ? 0 : 4,
             }} />
           ))}

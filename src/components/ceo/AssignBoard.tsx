@@ -1372,6 +1372,9 @@ export default function AssignBoard() {
 
       <Divider />
 
+      {/* Section 3: 계약 배정 대기 */}
+      <ContractAssignSection opsUsers={usersLoading ? [] : opsUsers} />
+
     </div>
   )
 }
