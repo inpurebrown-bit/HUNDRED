@@ -24,9 +24,24 @@ function toDbPatch(body: Record<string, any>) {
     if (body[k] !== undefined) patch[k] = body[k]
   }
   // 프론트 alias 처리
-  if (body.progress_stage !== undefined) patch.stage = body.progress_stage
+  if (body.progress_stage !== undefined) {
+    patch.stage = body.progress_stage
+    // stage 변경 시 is_refund / is_completed 플래그 자동 동기화
+    const s = body.progress_stage
+    const isRefundStage    = s === '환불' || s === 'refunded'
+    const isCompletedStage = s === '종료' || s === '완료' || s === 'completed'
+    patch.is_refund    = isRefundStage
+    patch.is_completed = isCompletedStage
+  }
   if (body.progress_memo  !== undefined) patch.memo  = body.progress_memo
-  if (body.stage          !== undefined) patch.stage = body.stage
+  if (body.stage          !== undefined) {
+    patch.stage = body.stage
+    const s = body.stage
+    const isRefundStage    = s === '환불' || s === 'refunded'
+    const isCompletedStage = s === '종료' || s === '완료' || s === 'completed'
+    patch.is_refund    = isRefundStage
+    patch.is_completed = isCompletedStage
+  }
   return patch
 }
 
