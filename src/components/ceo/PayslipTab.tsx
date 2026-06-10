@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { contractWeight } from '@/lib/supplyRules'
 
 // ─── 타입 ─────────────────────────────────────────────────
 
@@ -467,41 +468,71 @@ export default function PayslipTab() {
   }, [employees])
 
   // 급여계산기(payroll) 에서 자동 불러오기
+  // ★ 계약 데이터는 저장된 payroll이 아닌 customers DB 실시간값 사용 (저장 시점 무관)
   async function handleLoad() {
     setLoading(true); setMsg('')
     try {
-      const res = await fetch(`/api/payroll?year_month=${yearMonth}`)
-      const json = await res.json()
+      const [payRes, custRes] = await Promise.all([
+        fetch(`/api/payroll?year_month=${yearMonth}`),
+        fetch('/api/customers'),
+      ])
+      const [json, custJson] = await Promise.all([payRes.json(), custRes.json()])
+
       const emps = json.record?.employees
-      if (!emps) {
-        setMsg('해당 월 급여대장 데이터 없음 — 급여계산기에서 먼저 저장하세요')
-        return
-      }
+      const opsList: any[] = emps?.ops_employees || []
 
-      const salesList: any[] = emps.sales_employees || []
-      const opsList: any[]   = emps.ops_employees   || []
+      // ── 해당 월 계약 실시간 집계 (contractWeight 기준) ──
+      const parseMon = (v: any) => parseInt(String(v || '0').replace(/[^0-9]/g, ''), 10) || 0
+      const liveByName: Record<string, { revenue: number; count: number }> = {}
+      ;(custJson.customers || []).forEach((c: any) => {
+        if (c.status !== 'contracted') return
+        const contractMonth = (c.details?.contract_date || c.created_at || '').slice(0, 7)
+        if (contractMonth !== yearMonth) return
+        const name = (c.details?.sales_user_name || c.sales_user_name || '').trim()
+        if (!name) return
+        const rev = parseMon(c.details?.my_revenue)
+        const w   = contractWeight(c.details?.payment_amount, c.details?.vat_included)
+        if (!liveByName[name]) liveByName[name] = { revenue: 0, count: 0 }
+        liveByName[name].revenue += rev
+        liveByName[name].count   += w > 0 ? w : 1
+      })
+
       const updates: Record<string, Partial<EmpFinancial>> = {}
-
       for (const emp of employees) {
         const nameMatch = (a: string, b: string) =>
           a === b || a.includes(b) || b.includes(a)
 
         if (emp.team === 'sales') {
-          const match = salesList.find(e => nameMatch(emp.name, e.name || ''))
-          if (match) {
-            const count = Number(match.contract_count || 0)
-            const rev   = Number(match.contract_revenue || 0)
+          // 실시간 계약 데이터 우선 — 저장된 payroll은 awards/성과급 보조용으로만 사용
+          const liveKey    = Object.keys(liveByName).find(k => nameMatch(emp.name, k))
+          const savedMatch = (emps?.sales_employees || []).find((e: any) => nameMatch(emp.name, e.name || ''))
+
+          if (liveKey) {
+            const live  = liveByName[liveKey]
+            const count = live.count
             updates[emp.id] = {
-              contract_revenue: rev,
-              contract_count: count,
-              // ⚡ 급여·손익탭에 직접 입력한 성과급 그대로 사용 (재계산 금지)
-              performance_bonus: Number(match.performance_bonus || 0),
+              contract_revenue:  live.revenue,
+              contract_count:    count,
+              // 성과급: 저장된 값 유지 (수동 조정 가능), 12건 이상이면 자동 계산
+              performance_bonus: count >= 12
+                ? Math.round(live.revenue * 0.05)
+                : Number(savedMatch?.performance_bonus || 0),
+              promo:  getPromo(count),
+              awards: savedMatch?.awards || [],
+            }
+          } else if (savedMatch) {
+            // 해당 월 계약 없으면 저장된 payroll 사용
+            const count = Number(savedMatch.contract_count || 0)
+            const rev   = Number(savedMatch.contract_revenue || 0)
+            updates[emp.id] = {
+              contract_revenue:  rev,
+              contract_count:    count,
+              performance_bonus: Number(savedMatch.performance_bonus || 0),
               promo: getPromo(count),
-              awards: match.awards || [],
+              awards: savedMatch.awards || [],
             }
           }
         } else {
-          // 관리팀: 프리랜서 관리대장에 team='ops'로 추가하면 자동으로 명세서 생성 가능
           const match = opsList.find((e: any) => nameMatch(emp.name, e.name || ''))
           if (match) {
             updates[emp.id] = {
@@ -522,7 +553,7 @@ export default function PayslipTab() {
         return next
       })
       const loaded = Object.keys(updates).length
-      setMsg(loaded > 0 ? `${loaded}명 급여 데이터 불러오기 완료` : '이름이 일치하는 직원이 없습니다')
+      setMsg(loaded > 0 ? `${loaded}명 데이터 불러오기 완료 (실시간 계약 반영)` : '이름이 일치하는 직원이 없습니다')
     } catch { setMsg('불러오기 실패') }
     finally { setLoading(false) }
   }

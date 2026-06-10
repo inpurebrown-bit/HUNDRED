@@ -484,7 +484,13 @@ export default function PayrollTab() {
       if (d.sales_employees)  setSalesEmps(d.sales_employees)
       if (d.other_costs)      setCosts({ ...defaultCosts(), ...d.other_costs })
       if (d.revenue_totals)   setRevTotals(d.revenue_totals)
-      setMsg('불러오기 완료')
+      // 현재 월이면 저장된 레코드 로드 후 자동으로 최신 계약 데이터 반영
+      if (yearMonth === thisMonth()) {
+        setMsg('불러오기 완료 — 최신 계약 자동 반영 중…')
+        await autoLoad()
+      } else {
+        setMsg('불러오기 완료')
+      }
     } else {
       if (yearMonth === thisMonth()) await autoLoad()
       else setMsg('저장된 데이터 없음')
