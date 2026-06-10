@@ -668,6 +668,14 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                   전달화면
                 </button>
               )}
+              {/* 흡수완료 — 스테이지 무관하게 항상 표시 (이미 absorbed/completed 제외) */}
+              {!['absorbed','completed','종료','완료','환불','refunded'].includes(local.progress_stage) && (
+                <button type="button"
+                  onClick={() => field('progress_stage', 'absorbed')}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-[10px] font-bold transition-colors whitespace-nowrap shadow-sm">
+                  ✅ 흡수완료
+                </button>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-x-2 gap-y-2">
               <div>
