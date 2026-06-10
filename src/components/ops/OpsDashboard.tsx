@@ -1651,12 +1651,25 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
               <div><label className={lbl}>계약금(VAT미포함)</label><input type="text" value={d.contract_amount_vat || ''} onChange={e => detailField('contract_amount_vat', e.target.value)} className={inp} placeholder="0원" /></div>
               <div><label className={lbl}>입금액(VAT포함)</label><input type="text" value={d.deposit_amount_vat || ''} onChange={e => detailField('deposit_amount_vat', e.target.value)} className={inp} placeholder="0원" /></div>
               <div><label className={lbl}>미입금액(VAT미포함)</label><input type="text" value={d.unpaid_amount || ''} onChange={e => detailField('unpaid_amount', e.target.value)} className={inp} placeholder="0원" /></div>
-              <div><label className={lbl}>세금계산서</label>
+              <div><label className={lbl}>착수금 세금계산서 희망</label>
                 <select value={d.tax_invoice || ''} onChange={e => detailField('tax_invoice', e.target.value)} className={inp}>
-                  <option value="">— 선택 —</option>
-                  <option value="발급">발급</option>
-                  <option value="미발급">미발급</option>
+                  <option value="">— 미정 —</option>
+                  <option value="희망">희망</option>
+                  <option value="미희망">미희망</option>
                 </select>
+              </div>
+              <div><label className={lbl}>착수금 세금계산서 발급 완료</label>
+                <button
+                  type="button"
+                  onClick={() => detailField('tax_invoice_completed', !d.tax_invoice_completed)}
+                  className={`w-full rounded-lg px-3 py-2 text-xs font-bold border transition-colors ${
+                    d.tax_invoice_completed
+                      ? 'bg-emerald-500 text-white border-emerald-500'
+                      : 'bg-white text-gray-500 border-gray-300 hover:border-emerald-400 hover:text-emerald-600'
+                  }`}
+                >
+                  {d.tax_invoice_completed ? '🧾 발급 완료 ✓' : '🧾 발급 완료 처리'}
+                </button>
               </div>
               <div><label className={lbl}>수수료율</label>
                 <div className="relative">

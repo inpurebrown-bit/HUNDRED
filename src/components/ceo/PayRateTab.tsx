@@ -606,9 +606,22 @@ function PayRateSubView() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [today])
 
+  // unmount 시 타이머 정리 (좀비 저장 방지)
+  useEffect(() => {
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current) }
+  }, [])
+
   function scheduleAutoSave() {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
-    autoSaveTimer.current = setTimeout(() => doSave(true), 2000)
+    autoSaveTimer.current = setTimeout(() => {
+      // 빈 상태(목표=0 + 공급일별입력=없음) 이면 자동저장 스킵 — 기존 데이터 덮어쓰기 방지
+      const s = latestState.current
+      const hasData = s.employees.some(
+        r => Number(r.target) > 0 || Object.keys(r.daily_supplies || {}).length > 0
+      )
+      if (!hasData) return
+      doSave(true)
+    }, 2000)
   }
 
   // 영업일 기준 계산
@@ -644,6 +657,37 @@ function PayRateSubView() {
   }
 
   async function handleSave() { await doSave(false) }
+
+  // 전월 목표 복사 (이번달 모든 target이 0일 때 전월 record에서 복사)
+  const [copyingPrev, setCopyingPrev] = useState(false)
+  async function copyPrevMonthTargets() {
+    setCopyingPrev(true)
+    try {
+      const prevMonth = new Date(month + '-01')
+      prevMonth.setMonth(prevMonth.getMonth() - 1)
+      const ym = prevMonth.toISOString().slice(0, 7)
+      const res  = await fetch(`/api/payrate?year_month=${ym}`)
+      const data = await res.json()
+      if (!data.record?.employee_details?.length) {
+        setSaveMsg('전월 데이터 없음')
+        setTimeout(() => setSaveMsg(''), 3000)
+        return
+      }
+      const prevDetails: EmployeeRow[] = data.record.employee_details
+      setEmployees(prev => prev.map(row => {
+        const match = prevDetails.find(p => cleanName(p.name) === cleanName(row.name))
+        if (!match) return row
+        return { ...row, target: match.target, daily_supplies: {} }
+      }))
+      setSaveMsg('전월 목표 복사 완료 ✓')
+      setTimeout(() => { setSaveMsg(''); scheduleAutoSave() }, 500)
+    } catch {
+      setSaveMsg('복사 실패')
+    } finally {
+      setCopyingPrev(false)
+      setTimeout(() => setSaveMsg(''), 3000)
+    }
+  }
 
   const handleReload = useCallback(async () => {
     setReloading(true)
@@ -771,7 +815,20 @@ function PayRateSubView() {
 
       {/* ─── 👥 직원별 현황 (영업일기준보다 먼저) ─── */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-        <h3 className="text-sm font-bold text-gray-800 mb-4">직원별 현황</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-bold text-gray-800">직원별 현황
+            <span className="ml-2 text-[10px] text-gray-400 font-normal">{month}</span>
+          </h3>
+          {employees.length > 0 && employees.every(r => Number(r.target) === 0) && (
+            <button
+              onClick={copyPrevMonthTargets}
+              disabled={copyingPrev}
+              className="text-[11px] font-bold bg-amber-50 hover:bg-amber-100 disabled:opacity-40 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              {copyingPrev ? '복사 중…' : '📋 전월 목표 복사'}
+            </button>
+          )}
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {employees.filter(r => r.name !== TESTER).map((row, i) => (
             <EmpCard
