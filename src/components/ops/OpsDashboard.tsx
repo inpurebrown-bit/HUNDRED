@@ -1690,6 +1690,9 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
     c.details?.handling_mindless   && '무지성',
   ].filter(Boolean) as string[]
 
+  // 착수금 세금계산서 발급 요망 여부 (희망했는데 아직 발급 안 된 경우)
+  const needsTaxInvoice = c.details?.tax_invoice === '희망' && !c.details?.tax_invoice_completed
+
   return (
     <div
       className={`bg-white border rounded-xl p-2 cursor-pointer hover:shadow-md transition-all relative flex flex-col ${
@@ -1697,6 +1700,13 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
       }`}
       onClick={() => onToggle(c.id)}
     >
+      {/* 세금계산서 발급 요망 뱃지 (우측 상단 절대위치) */}
+      {needsTaxInvoice && (
+        <span className="absolute top-1 right-1 z-10 text-[7px] font-bold bg-red-500 text-white px-1 py-0.5 rounded leading-tight pointer-events-none">
+          🧾발급요망
+        </span>
+      )}
+
       {/* ① 담당자명 — 좌측 최상단, 조그맣게 */}
       <div className="h-[14px] flex items-center mb-0.5">
         <span className="text-[8px] text-gray-400 font-medium truncate">{opsUser || '—'}</span>
