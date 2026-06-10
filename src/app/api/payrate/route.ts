@@ -27,7 +27,6 @@ export async function GET(req: NextRequest) {
       const nonempty = (allRecords || []).find(r => {
         const details = (r.employee_details || []) as any[]
         return details.some((e: any) =>
-          Number(e.target) > 0 ||
           Object.keys(e.daily_supplies || {}).length > 0
         )
       })

@@ -519,8 +519,6 @@ function PayRateSubView() {
             .filter((row: EmployeeRow) => !row.name || salesNameSet.has(cleanName(row.name)))
             .map(syncRow)
           setEmployees(synced)
-          // 탭 열릴 때마다 최신 계약 데이터로 자동저장 (하루하루 갱신)
-          setTimeout(() => scheduleAutoSave(), 500)
         } else {
           // DB 레코드 없으면 localStorage 폴백 시도
           try {
@@ -545,7 +543,6 @@ function PayRateSubView() {
                   }
                 })
               setEmployees(synced)
-              setTimeout(() => scheduleAutoSave(), 500)
             } else {
               setEmployees(people.map(mkRow))
             }
@@ -616,12 +613,12 @@ function PayRateSubView() {
   function scheduleAutoSave() {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
     autoSaveTimer.current = setTimeout(() => {
-      // 빈 상태(목표=0 + 공급일별입력=없음) 이면 자동저장 스킵 — 기존 데이터 덮어쓰기 방지
+      // daily_supplies 입력이 하나라도 있어야만 자동저장 — target만 있는 빈 상태로 덮어쓰기 방지
       const s = latestState.current
-      const hasData = s.employees.some(
-        r => Number(r.target) > 0 || Object.keys(r.daily_supplies || {}).length > 0
+      const hasSupplies = s.employees.some(
+        r => Object.keys(r.daily_supplies || {}).length > 0
       )
-      if (!hasData) return
+      if (!hasSupplies) return
       doSave(true)
     }, 2000)
   }
