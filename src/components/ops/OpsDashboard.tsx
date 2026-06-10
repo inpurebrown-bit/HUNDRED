@@ -668,6 +668,18 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                   전달화면
                 </button>
               )}
+              {/* 컨설팅 자료 전송 */}
+              {!['종료','완료','환불','refunded','completed'].includes(local.progress_stage) && (
+                <button type="button"
+                  onClick={() => detailField('consulting_sent', !d.consulting_sent)}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors whitespace-nowrap shadow-sm border ${
+                    d.consulting_sent
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
+                      : 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500'
+                  }`}>
+                  {d.consulting_sent ? '📋 자료전송 ✓' : '📋 컨설팅 자료전송'}
+                </button>
+              )}
               {/* 흡수완료 — 스테이지 무관하게 항상 표시 (이미 absorbed/completed 제외) */}
               {!['absorbed','completed','종료','완료','환불','refunded'].includes(local.progress_stage) && (
                 <button type="button"
@@ -1700,6 +1712,9 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
 
   // 착수금 세금계산서 발급 요망 여부 (희망했는데 아직 발급 안 된 경우)
   const needsTaxInvoice = c.details?.tax_invoice === '희망' && !c.details?.tax_invoice_completed
+  // 컨설팅 자료 미전송 여부 (종료/완료/환불 제외한 활성 케이스)
+  const needsConsulting = !c.details?.consulting_sent &&
+    !['종료','완료','환불','refunded','completed'].includes(c.progress_stage)
 
   return (
     <div
@@ -1708,11 +1723,20 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
       }`}
       onClick={() => onToggle(c.id)}
     >
-      {/* 세금계산서 발급 요망 뱃지 (우측 상단 절대위치) */}
-      {needsTaxInvoice && (
-        <span className="absolute top-1 right-1 z-10 text-[7px] font-bold bg-red-500 text-white px-1 py-0.5 rounded leading-tight pointer-events-none">
-          🧾발급요망
-        </span>
+      {/* 경고 뱃지 묶음 (우측 상단 절대위치) */}
+      {(needsTaxInvoice || needsConsulting) && (
+        <div className="absolute top-1 right-1 z-10 flex flex-col items-end gap-0.5 pointer-events-none">
+          {needsTaxInvoice && (
+            <span className="text-[7px] font-bold bg-red-500 text-white px-1 py-0.5 rounded leading-tight">
+              🧾발급요망
+            </span>
+          )}
+          {needsConsulting && (
+            <span className="text-[7px] font-bold bg-amber-500 text-white px-1 py-0.5 rounded leading-tight">
+              📋자료미전송
+            </span>
+          )}
+        </div>
       )}
 
       {/* ① 담당자명 — 좌측 최상단, 조그맣게 */}
