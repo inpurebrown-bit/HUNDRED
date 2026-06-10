@@ -156,12 +156,12 @@ function EmpCard({
   const dailySupplies = row.daily_supplies || {}
   const supplyCount   = Object.values(dailySupplies).reduce((s, v) => s + Number(v || 0), 0)
 
-  // 수동 입력값 (저장된 값 사용, DB자동값은 참고용)
-  const supplyPayment    = Number(row.supply_payment)
-  const directCountRaw   = Number(row.direct_count)
+  // 자동집계값 우선 사용 — DB 저장값이 0이면 API 실시간값으로 보완 (DB 초기화 복구)
+  const supplyPayment    = Math.max(Number(row.supply_payment),  autoData.supply_payment)
+  const directCountRaw   = Math.max(Number(row.direct_count),    autoData.direct_count)
   const directAdjustment = Number(row.direct_adjustment ?? 0)  // 대표 수동 차감 (음수)
   const directCount      = Math.max(0, directCountRaw + directAdjustment)
-  const directPayment    = Number(row.direct_payment)
+  const directPayment    = Math.max(Number(row.direct_payment),  autoData.direct_payment)
 
   const total       = supplyPayment + directPayment
   const supplyRate  = supplyCount > 0 ? (supplyPayment / supplyCount * 100) : null
@@ -504,12 +504,14 @@ function PayRateSubView() {
           const syncRow = (row: EmployeeRow) => {
             const key  = cleanName(row.name)
             const auto = aMap[key]
+            // auto가 없어도 기존 저장값 유지 (이름 매칭 실패 시 방어)
+            // auto가 있으면 항상 최신 API값으로 덮어씀 (DB 초기화 복구 포함)
             if (!auto) return row
             return {
               ...row,
-              supply_payment: auto.supply_payment,
-              direct_count:   auto.direct_count,
-              direct_payment: auto.direct_payment,
+              supply_payment: Math.max(Number(row.supply_payment),  auto.supply_payment),
+              direct_count:   Math.max(Number(row.direct_count),    auto.direct_count),
+              direct_payment: Math.max(Number(row.direct_payment),  auto.direct_payment),
             }
           }
           // 영업팀만 포함 (저장된 rows에 관리팀 직원 행 섞인 경우 제거)
@@ -757,7 +759,12 @@ function PayRateSubView() {
           const key  = cleanName(row.name)
           const auto = aMap[key]
           if (!auto) return row
-          return { ...row, supply_payment: auto.supply_payment, direct_count: auto.direct_count, direct_payment: auto.direct_payment }
+          return {
+            ...row,
+            supply_payment: Math.max(Number(row.supply_payment), auto.supply_payment),
+            direct_count:   Math.max(Number(row.direct_count),   auto.direct_count),
+            direct_payment: Math.max(Number(row.direct_payment), auto.direct_payment),
+          }
         })
       )
       scheduleAutoSave()
