@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { contractWeight } from '@/lib/supplyRules'
 
 // ─── 타입 ─────────────────────────────────────────────────
 
@@ -370,7 +371,9 @@ export default function PayrollTab() {
         if (!name) continue
         if (!salesByName[name]) salesByName[name] = { amount: 0, count: 0 }
         salesByName[name].amount += e.amount || 0
-        salesByName[name].count++
+        // contractWeight 기준 가중치 적용 (50만이하=0.5, 31~99만=1, 100만~=2,3,4...)
+        const w = contractWeight((e as any).payment_amount, (e as any).vat_included)
+        salesByName[name].count += w > 0 ? w : 1  // payment_amount 없으면 1로 폴백
       }
       const newSalesEmps = salesEmps.map(emp => {
         if (!emp.name) return emp

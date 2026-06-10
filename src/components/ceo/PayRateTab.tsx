@@ -388,6 +388,7 @@ function PayRateSubView() {
   const { total: tw, elapsed: we } = calcWorkingDays(today)
 
   const [saving,        setSaving]       = useState(false)
+  const [reloading,     setReloading]    = useState(false)
   const [saveMsg,       setSaveMsg]      = useState('')
   const [autoStats,     setAutoStats]    = useState<{ name: string; contracted: number }[]>([])
   const [targetCount,   setTargetCount]  = useState(0)
@@ -516,6 +517,8 @@ function PayRateSubView() {
             .filter((row: EmployeeRow) => !row.name || salesNameSet.has(cleanName(row.name)))
             .map(syncRow)
           setEmployees(synced)
+          // 탭 열릴 때마다 최신 계약 데이터로 자동저장 (하루하루 갱신)
+          setTimeout(() => scheduleAutoSave(), 500)
         } else {
           // DB 레코드 없으면 localStorage 폴백 시도
           try {
@@ -540,6 +543,7 @@ function PayRateSubView() {
                   }
                 })
               setEmployees(synced)
+              setTimeout(() => scheduleAutoSave(), 500)
             } else {
               setEmployees(people.map(mkRow))
             }
@@ -640,6 +644,88 @@ function PayRateSubView() {
   }
 
   async function handleSave() { await doSave(false) }
+
+  const handleReload = useCallback(async () => {
+    setReloading(true)
+    setSaveMsg('')
+    try {
+      const [custRes, userRes] = await Promise.all([
+        fetch('/api/customers'),
+        fetch('/api/users?role=sales'),
+      ])
+      const [custJson, userJson] = await Promise.all([
+        custRes.json(), userRes.json(),
+      ])
+
+      const people: string[] = (userJson.users || [])
+        .filter((u: any) => u.name && u.name !== TESTER)
+        .map((u: any) => u.name as string)
+      const salesNameSet = new Set(people.map(cleanName))
+
+      const supplyPayMap: Record<string, number> = {}
+      const directPayMap: Record<string, number> = {}
+      const directCntMap: Record<string, number> = {}
+      const byPerson: Record<string, number> = {}
+
+      ;(custJson.customers || []).forEach((c: any) => {
+        const name = (c.details?.sales_user_name || c.sales_user_name || '').trim()
+        if (!name || name === TESTER) return
+        const contractMonth  = (c.details?.contract_date || c.created_at || '').slice(0, 7)
+        const receptionMonth = (c.details?.db010_month || c.created_at || '').slice(0, 7)
+        const isDirectType   = c.status === 'db010' || !!c.details?.db010_month || !!c.details?.is_direct
+
+        if (c.status === 'contracted' && contractMonth === month) {
+          const w = contractWeight(c.details?.payment_amount, c.details?.vat_included)
+          byPerson[name] = (byPerson[name] || 0) + w
+          if (isDirectType) directPayMap[name] = (directPayMap[name] || 0) + w
+          else              supplyPayMap[name]  = (supplyPayMap[name] || 0) + w
+        }
+        const isDirectMonth = isDirectType && receptionMonth === month
+        const isVoided = c.details?.direct_count_voided === true
+        if (isDirectMonth && !isVoided) {
+          directCntMap[name] = (directCntMap[name] || 0) + 1
+        }
+      })
+
+      const allNames = new Set([
+        ...Object.keys(supplyPayMap),
+        ...Object.keys(directPayMap),
+        ...Object.keys(directCntMap),
+      ])
+      const aMap: Record<string, AutoEmpData> = {}
+      allNames.forEach(n => {
+        const clean = cleanName(n)
+        aMap[clean] = {
+          supply_payment: (supplyPayMap[n] || 0) + (aMap[clean]?.supply_payment || 0),
+          direct_count:   (directCntMap[n] || 0) + (aMap[clean]?.direct_count   || 0),
+          direct_payment: (directPayMap[n] || 0) + (aMap[clean]?.direct_payment  || 0),
+        }
+      })
+
+      const stats = Object.entries(byPerson).map(([name, contracted]) => ({ name, contracted }))
+      setAutoStats(stats)
+      setPaymentCount(stats.reduce((s, v) => s + v.contracted, 0))
+      setAutoByPerson(aMap)
+
+      setEmployees(prev => prev
+        .filter(row => !row.name || salesNameSet.has(cleanName(row.name)))
+        .map(row => {
+          const key  = cleanName(row.name)
+          const auto = aMap[key]
+          if (!auto) return row
+          return { ...row, supply_payment: auto.supply_payment, direct_count: auto.direct_count, direct_payment: auto.direct_payment }
+        })
+      )
+      scheduleAutoSave()
+      setSaveMsg('불러오기 완료 ✓')
+      setTimeout(() => setSaveMsg(''), 3000)
+    } catch {
+      setSaveMsg('불러오기 실패')
+    } finally {
+      setReloading(false)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [month])
 
   const totTarget   = employees.reduce((s, r) => s + Number(r.target), 0)
   // 직원 카드 표시값 기준 합산 (auto-sync 이미 반영된 row 값 직접 사용)
@@ -939,10 +1025,15 @@ function PayRateSubView() {
       {/* ─── 저장 ─── */}
       <div className="flex items-center justify-end gap-3">
         {saveMsg && (
-          <span className={`text-sm font-medium ${saveMsg.includes('저장 완료') ? 'text-emerald-600' : 'text-red-500'}`}>
+          <span className={`text-sm font-medium ${saveMsg.includes('완료') ? 'text-emerald-600' : 'text-red-500'}`}>
             {saveMsg}
           </span>
         )}
+        <button onClick={handleReload} disabled={reloading || saving}
+          className="bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white
+            px-5 py-2.5 rounded-2xl text-sm font-bold shadow-sm transition-colors">
+          {reloading ? '불러오는 중…' : '🔄 DB 불러오기'}
+        </button>
         <button onClick={handleSave} disabled={saving}
           className="bg-[#1B2A45] hover:bg-[#263d66] disabled:opacity-40 text-white
             px-7 py-2.5 rounded-2xl text-sm font-bold shadow-sm transition-colors">

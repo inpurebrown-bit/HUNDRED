@@ -60,9 +60,11 @@ export async function GET(req: NextRequest) {
         sales_user_id: c.owner_id || '',
         sales_user_name: c.details?.sales_user_name || '',
         company: c.details?.company || c.name || '',
+        payment_amount: c.details?.payment_amount,
+        vat_included: c.details?.vat_included,
       }
     })
-    .filter(Boolean) as { id: string; amount: number; date: string; sales_user_id: string; sales_user_name: string; company: string }[]
+    .filter(Boolean) as { id: string; amount: number; date: string; sales_user_id: string; sales_user_name: string; company: string; payment_amount?: any; vat_included?: boolean }[]
 
   type OpsEntry = { id: string; amount: number; date: string; ops_user_id: string; ops_user_name: string; company: string }
 
