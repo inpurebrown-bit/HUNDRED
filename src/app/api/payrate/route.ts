@@ -15,6 +15,24 @@ export async function GET(req: NextRequest) {
 
   // year_month → 해당 월의 가장 최신 레코드 반환 (날짜 무관)
   if (year_month) {
+    const find_nonempty = req.nextUrl.searchParams.get('find_nonempty')
+    if (find_nonempty === 'true') {
+      // 데이터가 있는(daily_supplies 또는 target이 0이 아닌) 레코드를 최신순으로 탐색
+      const { data: allRecords } = await supabaseAdmin
+        .from('payrate_records')
+        .select('*')
+        .eq('year_month', year_month)
+        .order('record_date', { ascending: false })
+        .limit(60)
+      const nonempty = (allRecords || []).find(r => {
+        const details = (r.employee_details || []) as any[]
+        return details.some((e: any) =>
+          Number(e.target) > 0 ||
+          Object.keys(e.daily_supplies || {}).length > 0
+        )
+      })
+      return NextResponse.json({ record: nonempty ?? null })
+    }
     const { data } = await supabaseAdmin
       .from('payrate_records')
       .select('*')

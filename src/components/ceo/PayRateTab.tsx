@@ -660,6 +660,41 @@ function PayRateSubView() {
 
   async function handleSave() { await doSave(false) }
 
+  // 이전 기록 복구 — daily_supplies/target이 있는 가장 최근 레코드를 찾아 복구
+  const [recovering, setRecovering] = useState(false)
+  async function recoverFromPrevRecord() {
+    setRecovering(true)
+    setSaveMsg('')
+    try {
+      const res  = await fetch(`/api/payrate?year_month=${month}&find_nonempty=true`)
+      const data = await res.json()
+      if (!data.record?.employee_details?.length) {
+        setSaveMsg('복구 가능한 이전 기록 없음')
+        setTimeout(() => setSaveMsg(''), 3000)
+        return
+      }
+      const prevDetails: EmployeeRow[] = data.record.employee_details
+      const prevDate = data.record.record_date || '?'
+      setEmployees(prev => prev.map(row => {
+        const match = prevDetails.find(p => cleanName(p.name) === cleanName(row.name))
+        if (!match) return row
+        return {
+          ...row,
+          target:        match.target        || row.target,
+          daily_supplies: match.daily_supplies || row.daily_supplies,
+          direct_adjustment: match.direct_adjustment ?? row.direct_adjustment,
+        }
+      }))
+      setSaveMsg(`✅ ${prevDate} 기록에서 복구 완료`)
+      setTimeout(() => { setSaveMsg(''); scheduleAutoSave() }, 800)
+    } catch {
+      setSaveMsg('복구 실패')
+    } finally {
+      setRecovering(false)
+      setTimeout(() => setSaveMsg(''), 4000)
+    }
+  }
+
   // 전월 목표 복사 (이번달 모든 target이 0일 때 전월 record에서 복사)
   const [copyingPrev, setCopyingPrev] = useState(false)
   async function copyPrevMonthTargets() {
@@ -826,15 +861,30 @@ function PayRateSubView() {
           <h3 className="text-sm font-bold text-gray-800">직원별 현황
             <span className="ml-2 text-[10px] text-gray-400 font-normal">{month}</span>
           </h3>
-          {employees.length > 0 && employees.every(r => Number(r.target) === 0) && (
-            <button
-              onClick={copyPrevMonthTargets}
-              disabled={copyingPrev}
-              className="text-[11px] font-bold bg-amber-50 hover:bg-amber-100 disabled:opacity-40 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              {copyingPrev ? '복사 중…' : '📋 전월 목표 복사'}
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* 이전 기록 복구 버튼 — 공급수/목표가 날아갔을 때 */}
+            {employees.length > 0 && employees.every(r =>
+              Number(r.target) === 0 && Object.keys(r.daily_supplies || {}).length === 0
+            ) && (
+              <button
+                onClick={recoverFromPrevRecord}
+                disabled={recovering}
+                className="text-[11px] font-bold bg-rose-50 hover:bg-rose-100 disabled:opacity-40 text-rose-700 border border-rose-200 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                {recovering ? '복구 중…' : '🔁 이전 기록 복구'}
+              </button>
+            )}
+            {/* 전월 목표 복사 — 목표만 0일 때 */}
+            {employees.length > 0 && employees.every(r => Number(r.target) === 0) && (
+              <button
+                onClick={copyPrevMonthTargets}
+                disabled={copyingPrev}
+                className="text-[11px] font-bold bg-amber-50 hover:bg-amber-100 disabled:opacity-40 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                {copyingPrev ? '복사 중…' : '📋 전월 목표 복사'}
+              </button>
+            )}
+          </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {employees.filter(r => r.name !== TESTER).map((row, i) => (
