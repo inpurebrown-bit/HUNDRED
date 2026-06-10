@@ -149,6 +149,7 @@ function EmpCard({
   onChange: (i: number, f: string, v: number | string | Record<string, number>) => void
   onRemove: (i: number) => void
   autoData: AutoEmpData
+  // target은 supply-config에서 읽어온 값이 row.target에 반영되어 있음 (읽기전용)
 }) {
   const [showDaily, setShowDaily] = useState(false)
 
@@ -240,16 +241,12 @@ function EmpCard({
 
       {/* ── 5개 수치 ── */}
       <div className="grid grid-cols-5 gap-1.5 pb-3">
-        {/* 목표 */}
+        {/* 목표 — 직원이 본인 대시보드에서 설정한 값 (읽기전용) */}
         <div className="flex flex-col items-center gap-0.5">
           <p className="text-[9px] text-gray-400 font-medium">목표</p>
-          <input
-            type="number" min={0} value={row.target}
-            onChange={e => onChange(idx, 'target', Number(e.target.value))}
-            className="w-full text-center text-sm font-bold text-gray-800 bg-white rounded-xl
-              border border-gray-200 px-1 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300
-              [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-          />
+          <div className="w-full text-center text-sm font-bold text-gray-800 bg-gray-50 rounded-xl border border-gray-200 px-1 py-2">
+            {Number(row.target) || '—'}
+          </div>
         </div>
         {/* 공급수 - 일별 합산 자동 */}
         <div className="flex flex-col items-center gap-0.5">
@@ -409,16 +406,23 @@ function PayRateSubView() {
   useEffect(() => {
     async function load() {
       try {
-        const [payRes, custRes, userRes, revRes, casesRes] = await Promise.all([
+        const [payRes, custRes, userRes, revRes, casesRes, scRes] = await Promise.all([
           fetch(`/api/payrate?year_month=${month}`),
           fetch('/api/customers'),
           fetch('/api/users?role=sales'),
           fetch('/api/revenue'),
           fetch('/api/ops-cases'),
+          fetch('/api/supply-config'),
         ])
-        const [payJson, custJson, userJson, revJson, casesJson] = await Promise.all([
-          payRes.json(), custRes.json(), userRes.json(), revRes.json(), casesRes.json()
+        const [payJson, custJson, userJson, revJson, casesJson, scJson] = await Promise.all([
+          payRes.json(), custRes.json(), userRes.json(), revRes.json(), casesRes.json(), scRes.json()
         ])
+        // 직원별 목표 (supply-config.people[이름].goal)
+        const goalMap: Record<string, number> = {}
+        const scPeople = scJson?.config?.people || {}
+        Object.entries(scPeople).forEach(([name, cfg]: [string, any]) => {
+          goalMap[cleanName(name)] = Number(cfg.goal) || 0
+        })
         setOpsCases(casesJson.cases || [])
 
         // 관리팀 이번달 매출 집계
@@ -504,15 +508,15 @@ function PayRateSubView() {
           const syncRow = (row: EmployeeRow) => {
             const key  = cleanName(row.name)
             const auto = aMap[key]
-            // auto가 없어도 기존 저장값 유지 (이름 매칭 실패 시 방어)
-            // auto가 있으면 항상 최신 API값으로 덮어씀 (DB 초기화 복구 포함)
-            if (!auto) return row
-            return {
+            const goal = goalMap[key]   // supply-config에서 가져온 직원 목표
+            const synced = auto ? {
               ...row,
               supply_payment: Math.max(Number(row.supply_payment),  auto.supply_payment),
               direct_count:   Math.max(Number(row.direct_count),    auto.direct_count),
               direct_payment: Math.max(Number(row.direct_payment),  auto.direct_payment),
-            }
+            } : row
+            // supply-config goal이 있으면 target을 항상 그 값으로 덮어씀 (읽기전용)
+            return goal > 0 ? { ...synced, target: goal } : synced
           }
           // 영업팀만 포함 (저장된 rows에 관리팀 직원 행 섞인 경우 제거)
           const synced = baseRows
@@ -534,20 +538,24 @@ function PayRateSubView() {
                 .map((row: EmployeeRow) => {
                   const key  = cleanName(row.name)
                   const auto = aMap[key]
-                  if (!auto) return row
-                  return {
+                  const goal = goalMap[key]
+                  const r2 = auto ? {
                     ...row,
                     supply_payment: auto.supply_payment,
                     direct_count:   auto.direct_count,
                     direct_payment: auto.direct_payment,
-                  }
+                  } : row
+                  return goal > 0 ? { ...r2, target: goal } : r2
                 })
               setEmployees(synced)
             } else {
               setEmployees(people.map(mkRow))
             }
           } catch {
-            setEmployees(people.map(mkRow))
+            setEmployees(people.map(n => {
+              const goal = goalMap[cleanName(n)]
+              return { ...mkRow(n), target: goal > 0 ? goal : 0 }
+            }))
           }
         }
       } catch {}
@@ -920,7 +928,7 @@ function PayRateSubView() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
           <NumInput label="인원수"   value={employeeCount} color="gray"     auto unit="명" />
-          <NumInput label="목표개수" value={targetCount}   color="editable" unit="개" onChange={v => setTargetCountAndSave(v)} />
+          <NumInput label="목표개수" value={totTarget || targetCount} color="blue" auto unit="개" />
           <NumInput label="결제개수" value={paymentCount % 1 === 0 ? paymentCount : Number(paymentCount.toFixed(1))}
             color="green" auto unit="개" />
           <div className="bg-slate-50 rounded-2xl px-3 py-2.5 flex flex-col items-center gap-0.5">
