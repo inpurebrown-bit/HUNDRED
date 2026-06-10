@@ -598,6 +598,50 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
         </div>
       )}
 
+      {/* ── 신규 배정 배너: 탭 바깥 상단에 항상 노출 ── */}
+      {local.progress_stage === 'assigned' && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3.5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-indigo-800">📋 신규 배정 업체</p>
+              <p className="text-xs text-indigo-600 mt-0.5">고객과 첫 통화 후 흡수 처리해주세요</p>
+              {d.first_call_done && d.first_call_at && (
+                <p className="text-[10px] text-emerald-600 mt-1.5 font-semibold">
+                  📞 첫 통화: {new Date(d.first_call_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </p>
+              )}
+            </div>
+            <div className="flex flex-col gap-1.5 items-end shrink-0">
+              {/* 첫 통화 완료 */}
+              <button type="button"
+                onClick={() => {
+                  const isNowDone = !d.first_call_done
+                  const newDetails = {
+                    ...(local.details || {}),
+                    first_call_done: isNowDone,
+                    ...(isNowDone ? { first_call_at: new Date().toISOString() } : {}),
+                  }
+                  setLocal({ ...local, details: newDetails })
+                  schedule({ details: newDetails })
+                }}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${
+                  d.first_call_done
+                    ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                    : 'bg-white text-indigo-600 border-indigo-300 hover:bg-indigo-50'
+                }`}>
+                📞 첫 통화 완료{d.first_call_done ? ' ✓' : ''}
+              </button>
+              {/* 흡수 완료 */}
+              <button type="button"
+                onClick={() => field('progress_stage', 'absorbed')}
+                className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-[11px] font-bold transition-colors shadow-sm">
+                ✅ 흡수완료
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 탭 네비게이션 */}
       <div className="flex border-b border-gray-100 overflow-x-auto">
         {DETAIL_TABS.map(tab => (
@@ -613,19 +657,6 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
       {/* ── 진행현황 ── */}
       {activeDetailTab === '진행현황' && (
         <div className="space-y-4">
-          {local.progress_stage === 'assigned' && (
-            <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-bold text-indigo-800">신규 배정 업체</p>
-                <p className="text-xs text-indigo-600 mt-0.5">내용 확인 및 고객과 통화 후 흡수 처리해주세요</p>
-              </div>
-              <button type="button" onClick={() => field('progress_stage', 'absorbed')}
-                className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">
-                흡수 완료
-              </button>
-            </div>
-          )}
-
           {/* 진행 현황 — 전체 단계 + 계약날짜 */}
           <div>
             <div className="flex items-center gap-1.5 mb-2">
