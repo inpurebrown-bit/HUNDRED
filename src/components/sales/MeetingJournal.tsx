@@ -112,13 +112,38 @@ export default function MeetingJournal({ customer, onClose }: MeetingJournalProp
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: `
+        /* 화면에서는 숨김 */
         #mj-print-body { display: none; }
+
         @media print {
-          html, body { margin: 0 !important; padding: 0 !important; }
-          body > * { display: none !important; }
-          #mj-print-body { display: block !important; width: 194mm !important; font-size: 6pt !important; }
+          /* ① 페이지 여백 */
           @page { size: A4 portrait; margin: 8mm; }
-          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+
+          /* ② 스크롤/레이아웃과 무관하게 다른 모든 요소 숨기기 */
+          html, body { margin: 0 !important; padding: 0 !important; }
+          body * { visibility: hidden !important; }
+
+          /* ③ 인쇄 본문만 표시 — position:fixed로 스크롤 위치·해상도 영향 차단 */
+          #mj-print-body {
+            display: block !important;
+            visibility: visible !important;
+            position: fixed !important;
+            top: 0 !important; left: 0 !important;
+            width: 100% !important;
+            font-size: 6pt !important;
+            background: #fff !important;
+            margin: 0 !important; padding: 0 !important;
+          }
+
+          /* ④ 하위 요소 전부 표시 + 색상 강제 출력 */
+          #mj-print-body * {
+            visibility: visible !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            box-sizing: border-box !important;
+          }
+
+          /* ⑤ 테이블 레이아웃 고정 */
           #mj-print-body table { table-layout: fixed !important; width: 100% !important; }
           #mj-print-body td, #mj-print-body th { overflow: hidden !important; }
         }
@@ -155,11 +180,10 @@ export default function MeetingJournal({ customer, onClose }: MeetingJournalProp
         </div>
       </div>
 
-      {/* ── 프린트 Portal (body 직속) ── */}
+      {/* ── 프린트 Portal (body 직속, position:fixed로 스크롤 영향 없음) ── */}
       {mounted && createPortal(
         <div id="mj-print-body" style={{
           fontFamily: '"Malgun Gothic","Apple SD Gothic Neo",sans-serif',
-          background: '#fff', padding: '0', margin: '0',
           lineHeight: 1.3,
         }}>
           <JournalBody {...props} isPrint={true} />
