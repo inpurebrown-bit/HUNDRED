@@ -1327,27 +1327,6 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                         )}
                       </div>
                     )}
-                    {/* ── 세금계산서 발행 완료 버튼 (잠금 상태에서 빠르게 처리) ── */}
-                    {!d.tax_invoice_issued && d.fee_amount && (
-                      <div className="col-span-2 mt-2 flex justify-end">
-                        <button type="button"
-                          onClick={async () => {
-                            const mergedDetails = { ...(local.details || {}), tax_invoice_issued: true }
-                            setLocal({ ...local, details: mergedDetails })
-                            try {
-                              await fetch(`/api/ops-cases/${c.id}`, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ details: mergedDetails }),
-                              })
-                              onSave(c.id, { details: mergedDetails })
-                            } catch { alert('저장 실패') }
-                          }}
-                          className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-amber-400 hover:bg-amber-500 text-white transition-colors shadow-sm">
-                          🧾 세금계산서 발행 완료
-                        </button>
-                      </div>
-                    )}
                   </div>
                 ) : (
                   /* 편집 상태 */
@@ -1549,7 +1528,8 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                         }} className={inp} placeholder="0원" />
                       )}
                     </div>
-                    {/* 세금계산서 발행 여부 */}
+                    {/* 세금계산서 발행 여부 — 잠금+미체크 시 숨김 */}
+                    {(!entryLocked || entry.tax_invoice_issued) && (
                     <div className="col-span-2">
                       <label className="flex items-center gap-2 cursor-pointer select-none">
                         <input type="checkbox"
@@ -1565,6 +1545,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                         {entry.tax_invoice_issued && <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-bold">발행</span>}
                       </label>
                     </div>
+                    )}
                     {/* 실제입금액 */}
                     {entry.fee_amount && (
                       <div className="col-span-2 bg-white rounded-lg p-2 border border-gray-200 space-y-1">
@@ -1590,29 +1571,6 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                             <span className="font-black text-gray-700 text-sm">{formatComma(entry.fee_amount)}원</span>
                           </div>
                         )}
-                      </div>
-                    )}
-                    {/* ── 세금계산서 발행 완료 버튼 (잠금 상태에서 빠르게 처리) ── */}
-                    {entryLocked && !entry.tax_invoice_issued && entry.fee_amount && (
-                      <div className="col-span-2 mt-2 flex justify-end">
-                        <button type="button"
-                          onClick={async () => {
-                            const entries: any[] = [...(d.payment_entries || [])]
-                            entries[idx] = { ...entries[idx], tax_invoice_issued: true }
-                            const mergedDetails2 = { ...(local.details || {}), payment_entries: entries }
-                            setLocal({ ...local, details: mergedDetails2 })
-                            try {
-                              await fetch(`/api/ops-cases/${c.id}`, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ details: mergedDetails2 }),
-                              })
-                              onSave(c.id, { details: mergedDetails2 })
-                            } catch { alert('저장 실패') }
-                          }}
-                          className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-amber-400 hover:bg-amber-500 text-white transition-colors shadow-sm">
-                          🧾 세금계산서 발행 완료
-                        </button>
                       </div>
                     )}
                   </div>
