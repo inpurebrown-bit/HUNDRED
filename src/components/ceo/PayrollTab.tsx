@@ -345,6 +345,74 @@ export default function PayrollTab() {
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
   }, [opsEmps, salesEmps, costs, revTotals]) // eslint-disable-line
 
+  // ── 전월 불러오기: 고객 DB 실시간 집계 (이달이 아닐 때 사용) ─────────────
+  const prevMonthLoad = useCallback(async () => {
+    setAutoLoading(true)
+    setMsg('')
+    try {
+      const parseMon = (v: any) => parseInt(String(v || '0').replace(/[^0-9]/g, ''), 10) || 0
+      const [custRes, prRes] = await Promise.all([
+        fetch('/api/customers'),
+        fetch(`/api/payrate?year_month=${yearMonth}`),
+      ])
+      const [custJson, prData] = await Promise.all([custRes.json(), prRes.json()])
+
+      // 해당 월 계약 실시간 집계 (contractWeight 기준)
+      const salesByName: Record<string, { amount: number; count: number }> = {}
+      ;(custJson.customers || []).forEach((c: any) => {
+        if (c.status !== 'contracted') return
+        const contractMonth = (c.details?.contract_date || c.created_at || '').slice(0, 7)
+        if (contractMonth !== yearMonth) return
+        const name = (c.details?.sales_user_name || c.sales_user_name || '').trim()
+        if (!name) return
+        // my_revenue 없으면 payment_amount 폴백 (미입력 계약 누락 방지)
+        const rev = parseMon(c.details?.my_revenue) || parseMon(c.details?.payment_amount)
+        const w = contractWeight(c.details?.payment_amount, c.details?.vat_included)
+        if (!salesByName[name]) salesByName[name] = { amount: 0, count: 0 }
+        salesByName[name].amount += rev
+        salesByName[name].count  += w > 0 ? w : 1
+      })
+
+      const newSalesEmps = salesEmps.map(emp => {
+        if (!emp.name) return emp
+        const key = Object.keys(salesByName).find(k =>
+          k === emp.name || k.includes(emp.name) || emp.name.includes(k))
+        if (!key) return emp
+        const data = salesByName[key]
+        const autoPerf = data.count >= 12 ? Math.round(data.amount * 0.05) : 0
+        return { ...emp, contract_revenue: data.amount, contract_count: data.count, performance_bonus: autoPerf }
+      })
+      setSalesEmps(newSalesEmps)
+
+      // payrate에서 인별 공급수 로드
+      try {
+        if (prData.record?.employee_details) {
+          const details = prData.record.employee_details as any[]
+          const perPerson = details
+            .filter((e: any) => e.name && e.name !== 'sales-tester')
+            .map((e: any) => {
+              const fromDaily = e.daily_supplies
+                ? Object.values(e.daily_supplies).reduce((ss: number, v: any) => ss + Number(v || 0), 0)
+                : 0
+              return { name: String(e.name), count: fromDaily > 0 ? fromDaily : Number(e.supply_count || 0) }
+            })
+          setPerPersonSupply(perPerson)
+        }
+      } catch { /* payrate 실패해도 계속 */ }
+
+      // 저장
+      await doSave(opsEmps, newSalesEmps, costs, revTotals)
+
+      const ts = nowTimestamp()
+      setLastUpdated(ts)
+      setMsg('불러오기 완료')
+    } catch {
+      setMsg('불러오기 실패')
+    } finally {
+      setAutoLoading(false)
+    }
+  }, [yearMonth, salesEmps, opsEmps, costs, revTotals]) // eslint-disable-line
+
   // ── 자동 반영 ─────────────────────────────────────────────
   const autoLoad = useCallback(async () => {
     setAutoLoading(true)
@@ -558,12 +626,12 @@ export default function PayrollTab() {
         <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)}
           className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
 
-        {isCurrentMonth && (
-          <button onClick={autoLoad} disabled={autoLoading}
-            className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 disabled:opacity-40 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
-            {autoLoading ? '반영 중...' : '이달 매출 자동 반영'}
-          </button>
-        )}
+        <button
+          onClick={isCurrentMonth ? autoLoad : prevMonthLoad}
+          disabled={autoLoading}
+          className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 disabled:opacity-40 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
+          {autoLoading ? '반영 중...' : isCurrentMonth ? '이달 매출 자동 반영' : '불러오기'}
+        </button>
 
         <button
           onClick={async () => {

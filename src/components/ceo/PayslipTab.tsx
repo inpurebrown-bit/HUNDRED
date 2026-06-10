@@ -490,7 +490,8 @@ export default function PayslipTab() {
         if (contractMonth !== yearMonth) return
         const name = (c.details?.sales_user_name || c.sales_user_name || '').trim()
         if (!name) return
-        const rev = parseMon(c.details?.my_revenue)
+        // my_revenue 없으면 payment_amount 로 폴백 (미입력 계약 누락 방지)
+        const rev = parseMon(c.details?.my_revenue) || parseMon(c.details?.payment_amount)
         const w   = contractWeight(c.details?.payment_amount, c.details?.vat_included)
         if (!liveByName[name]) liveByName[name] = { revenue: 0, count: 0 }
         liveByName[name].revenue += rev
