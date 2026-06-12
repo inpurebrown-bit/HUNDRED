@@ -680,8 +680,12 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                   {d.consulting_sent ? '📋 자료전송 ✓' : '📋 컨설팅 자료전송'}
                 </button>
               )}
-              {/* 흡수완료 — 스테이지 무관하게 항상 표시 (이미 absorbed/completed 제외) */}
-              {!['absorbed','completed','종료','완료','환불','refunded'].includes(local.progress_stage) && (
+              {/* 흡수완료 버튼 or 완료 표시 */}
+              {['absorbed','completed'].includes(local.progress_stage) ? (
+                <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-[10px] font-bold border border-emerald-300 whitespace-nowrap">
+                  ✅ 흡수완료
+                </span>
+              ) : !['종료','완료','환불','refunded'].includes(local.progress_stage) && (
                 <button type="button"
                   onClick={() => field('progress_stage', 'absorbed')}
                   className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-[10px] font-bold transition-colors whitespace-nowrap shadow-sm">
@@ -1610,10 +1614,10 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
             </div>
           </div>
 
-          {/* 기타 재무 */}
+          {/* 착수금 */}
           <div>
             <div className="flex items-center gap-1.5 mb-2">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">기타 재무</span>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">착수금</span>
               <div className="flex-1 h-px bg-gray-100" />
             </div>
 
@@ -1710,11 +1714,21 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
     c.details?.handling_mindless   && '무지성',
   ].filter(Boolean) as string[]
 
-  // 착수금 세금계산서 발급 요망 여부 (희망했는데 아직 발급 안 된 경우)
-  const needsTaxInvoice = c.details?.tax_invoice === '희망' && !c.details?.tax_invoice_completed
+  const isAbsorbed = ['absorbed','completed','종료','완료','환불','refunded'].includes(c.progress_stage)
+  // 흡수 필요 여부
+  const needsAbsorb = !isAbsorbed
+  // 착수금 세금계산서 미발급
+  const needsTaxInvoiceDown = c.details?.tax_invoice === '희망' && !c.details?.tax_invoice_completed
+  // 수수료 세금계산서 미발급 (저장된 입금 항목 중 하나라도 tax_invoice_issued 없는 경우)
+  const feeEntries: any[] = c.details?.payment_entries || []
+  const hasSavedFeeEntry = !!c.details?.fee_amount || feeEntries.some((e: any) => !!e.fee_amount)
+  const needsTaxInvoiceFee = hasSavedFeeEntry && (
+    (!c.details?.tax_invoice_issued) ||
+    feeEntries.some((e: any) => !!e.fee_amount && !e.tax_invoice_issued)
+  )
+  const needsTaxInvoiceBadge = needsTaxInvoiceDown || needsTaxInvoiceFee
   // 컨설팅 자료 미전송 여부 (종료/완료/환불 제외한 활성 케이스)
-  const needsConsulting = !c.details?.consulting_sent &&
-    !['종료','완료','환불','refunded','completed'].includes(c.progress_stage)
+  const needsConsulting = !c.details?.consulting_sent && !isAbsorbed
 
   return (
     <div
@@ -1723,25 +1737,24 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
       }`}
       onClick={() => onToggle(c.id)}
     >
-      {/* 경고 뱃지 묶음 (우측 상단 절대위치) */}
-      {(needsTaxInvoice || needsConsulting) && (
-        <div className="absolute top-1 right-1 z-10 flex flex-col items-end gap-0.5 pointer-events-none">
-          {needsTaxInvoice && (
-            <span className="text-[7px] font-bold bg-red-500 text-white px-1 py-0.5 rounded leading-tight">
-              🧾발급요망
-            </span>
-          )}
-          {needsConsulting && (
-            <span className="text-[7px] font-bold bg-amber-500 text-white px-1 py-0.5 rounded leading-tight">
-              📋자료미전송
-            </span>
-          )}
+      {/* 우측 상단 — 컨설팅 자료 미전송 뱃지만 */}
+      {needsConsulting && (
+        <div className="absolute top-1 right-1 z-10 pointer-events-none">
+          <span className="text-[7px] font-bold bg-amber-500 text-white px-1 py-0.5 rounded leading-tight">
+            📋자료미전송
+          </span>
         </div>
       )}
 
-      {/* ① 담당자명 — 좌측 최상단, 조그맣게 */}
-      <div className="h-[14px] flex items-center mb-0.5">
-        <span className="text-[8px] text-gray-400 font-medium truncate">{opsUser || '—'}</span>
+      {/* ① 담당자명 + 흡수필요/세금계산서 인라인 뱃지 */}
+      <div className="flex items-center gap-1 mb-0.5 min-h-[14px]">
+        <span className="text-[8px] text-gray-400 font-medium truncate shrink-0">{opsUser || '—'}</span>
+        {needsAbsorb && (
+          <span className="text-[7px] font-bold bg-indigo-500 text-white px-1 py-0.5 rounded leading-tight whitespace-nowrap shrink-0">흡수필요</span>
+        )}
+        {needsTaxInvoiceBadge && (
+          <span className="text-[7px] font-bold bg-red-500 text-white px-1 py-0.5 rounded leading-tight whitespace-nowrap shrink-0">계산서필요</span>
+        )}
       </div>
 
       {/* ② 업체명 — 네모 박스 */}
