@@ -133,10 +133,10 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
       <div className="h-[14px] flex items-center gap-1 mb-0.5 overflow-hidden">
         <span className="text-[8px] text-gray-400 font-medium truncate shrink-0 max-w-[50%]">{opsUser || '—'}</span>
         {needsAbsorb && (
-          <span className="text-[7px] font-bold bg-indigo-500 text-white px-1 rounded leading-tight shrink-0">흡수필요</span>
+          <span className="text-[7px] font-bold bg-indigo-500 text-white px-1 rounded leading-tight shrink-0">흡수</span>
         )}
         {needsTaxInvoiceBadge && (
-          <span className="text-[7px] font-bold bg-red-500 text-white px-1 rounded leading-tight shrink-0">계산서필요</span>
+          <span className="text-[7px] font-bold bg-red-500 text-white px-1 rounded leading-tight shrink-0">계산서</span>
         )}
       </div>
 
