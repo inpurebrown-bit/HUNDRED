@@ -684,16 +684,16 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
               )}
               {/* 흡수완료 버튼 or 완료 표시 */}
               {['absorbed','completed'].includes(local.progress_stage) ? (
-                <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-[10px] font-bold border border-emerald-300 whitespace-nowrap">
-                  ✅ 흡수완료
+                <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500 text-white text-[10px] font-bold whitespace-nowrap shadow-sm">
+                  ✅ 흡수완료 ✓
                 </span>
-              ) : !['종료','완료','환불','refunded'].includes(local.progress_stage) && (
+              ) : !['종료','완료','환불','refunded'].includes(local.progress_stage) ? (
                 <button type="button"
                   onClick={() => field('progress_stage', 'absorbed')}
                   className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-[10px] font-bold transition-colors whitespace-nowrap shadow-sm">
-                  ✅ 흡수완료
+                  흡수완료
                 </button>
-              )}
+              ) : null}
             </div>
             <div className="grid grid-cols-2 gap-x-2 gap-y-2">
               <div>
@@ -1748,16 +1748,21 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
         </div>
       )}
 
-      {/* ① 담당자명 + 흡수필요/세금계산서 인라인 뱃지 */}
-      <div className="flex items-center gap-1 mb-0.5 min-h-[14px]">
-        <span className="text-[8px] text-gray-400 font-medium truncate shrink-0">{opsUser || '—'}</span>
-        {needsAbsorb && (
-          <span className="text-[7px] font-bold bg-indigo-500 text-white px-1 py-0.5 rounded leading-tight whitespace-nowrap shrink-0">흡수필요</span>
-        )}
-        {needsTaxInvoiceBadge && (
-          <span className="text-[7px] font-bold bg-red-500 text-white px-1 py-0.5 rounded leading-tight whitespace-nowrap shrink-0">계산서필요</span>
-        )}
+      {/* ① 담당자명 */}
+      <div className="mb-0.5 min-h-[14px]">
+        <span className="text-[8px] text-gray-400 font-medium truncate block">{opsUser || '—'}</span>
       </div>
+      {/* 흡수필요 / 계산서필요 뱃지 — 별도 행 */}
+      {(needsAbsorb || needsTaxInvoiceBadge) && (
+        <div className="flex gap-0.5 flex-wrap mb-0.5">
+          {needsAbsorb && (
+            <span className="text-[7px] font-bold bg-indigo-500 text-white px-1 py-0.5 rounded leading-tight">흡수필요</span>
+          )}
+          {needsTaxInvoiceBadge && (
+            <span className="text-[7px] font-bold bg-red-500 text-white px-1 py-0.5 rounded leading-tight">계산서필요</span>
+          )}
+        </div>
+      )}
 
       {/* ② 업체명 — 네모 박스 */}
       <div className="h-[34px] flex items-center justify-center border border-gray-300 rounded-lg bg-gray-50 px-1.5 mt-0.5">
@@ -1778,19 +1783,28 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
       </div>
 
       {/* ⑤ 전체 진행현황 — 1줄 고정 */}
-      <div className="h-[20px] flex items-center justify-center mt-1">
-        {overallStage ? (
-          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold text-white ${overallStage.color}`}>
-            {overallStage.label}
-          </span>
-        ) : c.progress_stage ? (
-          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold text-white bg-gray-400">
-            {c.progress_stage}
-          </span>
-        ) : (
-          <span className="text-[9px] text-gray-200">—</span>
-        )}
-      </div>
+      {/* 영문 key → 한글 label 직접 매핑 (OVERALL_STAGES 조회 실패 방어) */}
+      {(() => {
+        const LABEL_MAP: Record<string, { label: string; color: string }> = {
+          absorbed:  { label: '흡수완료', color: 'bg-emerald-500' },
+          completed: { label: '완료',     color: 'bg-emerald-700' },
+          assigned:  { label: '신규배정', color: 'bg-sky-500' },
+        }
+        const stage = overallStage
+          ? { label: overallStage.label, color: overallStage.color }
+          : LABEL_MAP[c.progress_stage] ?? (c.progress_stage ? { label: c.progress_stage, color: 'bg-gray-400' } : null)
+        return (
+        <div className="h-[20px] flex items-center justify-center mt-1">
+            {stage ? (
+              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold text-white ${stage.color}`}>
+                {stage.label}
+              </span>
+            ) : (
+              <span className="text-[9px] text-gray-200">—</span>
+            )}
+          </div>
+        )
+      })()}
 
       {/* ⑥ 직접대출 기관 : 현황 — 1줄 고정 */}
       <div className="h-[18px] flex items-center justify-center gap-1 mt-1">
