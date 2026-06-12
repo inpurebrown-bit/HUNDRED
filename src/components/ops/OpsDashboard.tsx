@@ -1748,21 +1748,16 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
         </div>
       )}
 
-      {/* ① 담당자명 */}
-      <div className="mb-0.5 min-h-[14px]">
-        <span className="text-[8px] text-gray-400 font-medium truncate block">{opsUser || '—'}</span>
+      {/* ① 담당자명 + 뱃지 — 고정 높이 1줄 */}
+      <div className="h-[14px] flex items-center gap-1 mb-0.5 overflow-hidden">
+        <span className="text-[8px] text-gray-400 font-medium truncate shrink-0 max-w-[50%]">{opsUser || '—'}</span>
+        {needsAbsorb && (
+          <span className="text-[7px] font-bold bg-indigo-500 text-white px-1 rounded leading-tight shrink-0">흡수필요</span>
+        )}
+        {needsTaxInvoiceBadge && (
+          <span className="text-[7px] font-bold bg-red-500 text-white px-1 rounded leading-tight shrink-0">계산서필요</span>
+        )}
       </div>
-      {/* 흡수필요 / 계산서필요 뱃지 — 별도 행 */}
-      {(needsAbsorb || needsTaxInvoiceBadge) && (
-        <div className="flex gap-0.5 flex-wrap mb-0.5">
-          {needsAbsorb && (
-            <span className="text-[7px] font-bold bg-indigo-500 text-white px-1 py-0.5 rounded leading-tight">흡수필요</span>
-          )}
-          {needsTaxInvoiceBadge && (
-            <span className="text-[7px] font-bold bg-red-500 text-white px-1 py-0.5 rounded leading-tight">계산서필요</span>
-          )}
-        </div>
-      )}
 
       {/* ② 업체명 — 네모 박스 */}
       <div className="h-[34px] flex items-center justify-center border border-gray-300 rounded-lg bg-gray-50 px-1.5 mt-0.5">
