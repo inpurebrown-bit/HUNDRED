@@ -690,8 +690,8 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
               ) : !['종료','완료','환불','refunded'].includes(local.progress_stage) ? (
                 <button type="button"
                   onClick={() => field('progress_stage', 'absorbed')}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-[10px] font-bold transition-colors whitespace-nowrap shadow-sm">
-                  흡수완료
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-500 hover:bg-red-600 text-white text-[10px] font-bold transition-colors whitespace-nowrap shadow-sm">
+                  흡수 전
                 </button>
               ) : null}
             </div>
