@@ -25,9 +25,12 @@ const PIPELINE_STAGES = [
   { key: '종료예정',   label: '종료예정',   color: 'bg-orange-400'  },
 ]
 const OVERALL_STAGES = [
-  { key: '서류받는중', label: '서류받는중', color: 'bg-gray-500'  },
-  { key: '진행중',     label: '진행중',     color: 'bg-blue-500'  },
-  { key: '홀딩',       label: '홀딩',       color: 'bg-slate-400' },
+  { key: '서류받는중', label: '서류받는중', color: 'bg-gray-500'    },
+  { key: '진행중',     label: '진행중',     color: 'bg-blue-500'    },
+  { key: '홀딩',       label: '홀딩',       color: 'bg-slate-400'   },
+  { key: 'absorbed',   label: '흡수완료',   color: 'bg-emerald-500' },
+  { key: 'completed',  label: '완료',       color: 'bg-emerald-700' },
+  { key: 'assigned',   label: '신규배정',   color: 'bg-sky-500'     },
 ]
 const INST_DIRECT    = ['중진공','소진공(혁신)','소진공(신취)','소진공(재도전)','서민금융(미소)']
 const INST_INDIRECT  = ['기보','신보','재단']
@@ -108,6 +111,17 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
     c.details?.handling_mindless   && '🔄무지성',
   ].filter(Boolean) as string[]
 
+  const isAbsorbed = ['absorbed','completed','종료','완료','환불','refunded'].includes(c.progress_stage)
+  const needsAbsorb = !isAbsorbed
+  const needsTaxInvoiceDown = c.details?.tax_invoice === '희망' && !c.details?.tax_invoice_completed
+  const feeEntries: any[] = c.details?.payment_entries || []
+  const hasSavedFeeEntry = !!c.details?.fee_amount || feeEntries.some((e: any) => !!e.fee_amount)
+  const needsTaxInvoiceFee = hasSavedFeeEntry && (
+    !c.details?.tax_invoice_issued ||
+    feeEntries.some((e: any) => !!e.fee_amount && !e.tax_invoice_issued)
+  )
+  const needsTaxInvoiceBadge = needsTaxInvoiceDown || needsTaxInvoiceFee
+
   return (
     <div
       onClick={() => onToggle(c.id)}
@@ -115,10 +129,21 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
         isOpen ? 'ring-2 ring-violet-400 border-violet-300' : 'border-gray-200 hover:border-violet-300'
       }`}
     >
-      {/* ① 담당자명 — 좌측 최상단 */}
-      <div className="h-[14px] flex items-center mb-0.5">
-        <span className="text-[8px] text-gray-400 font-medium truncate">{opsUser || '—'}</span>
+      {/* ① 담당자명 */}
+      <div className="mb-0.5 min-h-[14px]">
+        <span className="text-[8px] text-gray-400 font-medium truncate block">{opsUser || '—'}</span>
       </div>
+      {/* 흡수필요 / 계산서필요 뱃지 */}
+      {(needsAbsorb || needsTaxInvoiceBadge) && (
+        <div className="flex gap-0.5 flex-wrap mb-0.5">
+          {needsAbsorb && (
+            <span className="text-[7px] font-bold bg-indigo-500 text-white px-1 py-0.5 rounded leading-tight">흡수필요</span>
+          )}
+          {needsTaxInvoiceBadge && (
+            <span className="text-[7px] font-bold bg-red-500 text-white px-1 py-0.5 rounded leading-tight">계산서필요</span>
+          )}
+        </div>
+      )}
 
       {/* ② 업체명 — 네모 박스 */}
       <div className="h-[34px] flex items-center justify-center border border-gray-300 rounded-lg bg-gray-50 px-1.5 mt-0.5">
