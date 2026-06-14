@@ -1739,23 +1739,17 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
       }`}
       onClick={() => onToggle(c.id)}
     >
-      {/* 우측 상단 — 컨설팅 자료 미전송 뱃지만 */}
-      {needsConsulting && (
-        <div className="absolute top-1 right-1 z-10 pointer-events-none">
-          <span className="text-[7px] font-bold bg-amber-500 text-white px-1 py-0.5 rounded leading-tight">
-            📋자료미전송
-          </span>
-        </div>
-      )}
-
       {/* ① 담당자명 + 뱃지 — 고정 높이 1줄 */}
       <div className="h-[14px] flex items-center gap-1 mb-0.5 overflow-hidden">
-        <span className="text-[8px] text-gray-400 font-medium truncate shrink-0 max-w-[50%]">{opsUser || '—'}</span>
+        <span className="text-[8px] text-gray-400 font-medium truncate shrink-0 max-w-[40%]">{opsUser || '—'}</span>
         {needsAbsorb && (
           <span className="text-[7px] font-bold bg-indigo-500 text-white px-1 rounded leading-tight shrink-0">흡수</span>
         )}
         {needsTaxInvoiceBadge && (
           <span className="text-[7px] font-bold bg-red-500 text-white px-1 rounded leading-tight shrink-0">계산서</span>
+        )}
+        {needsConsulting && (
+          <span className="text-[7px] font-bold bg-amber-500 text-white px-1 rounded leading-tight shrink-0">자료</span>
         )}
       </div>
 

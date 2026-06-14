@@ -113,6 +113,7 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
 
   const isAbsorbed = ['absorbed','completed','종료','완료','환불','refunded'].includes(c.progress_stage)
   const needsAbsorb = !isAbsorbed
+  const needsConsulting = !c.details?.consulting_sent && !isAbsorbed
   const needsTaxInvoiceDown = c.details?.tax_invoice === '희망' && !c.details?.tax_invoice_completed
   const feeEntries: any[] = c.details?.payment_entries || []
   const hasSavedFeeEntry = !!c.details?.fee_amount || feeEntries.some((e: any) => !!e.fee_amount)
@@ -131,12 +132,15 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
     >
       {/* ① 담당자명 + 뱃지 — 고정 높이 1줄 */}
       <div className="h-[14px] flex items-center gap-1 mb-0.5 overflow-hidden">
-        <span className="text-[8px] text-gray-400 font-medium truncate shrink-0 max-w-[50%]">{opsUser || '—'}</span>
+        <span className="text-[8px] text-gray-400 font-medium truncate shrink-0 max-w-[40%]">{opsUser || '—'}</span>
         {needsAbsorb && (
           <span className="text-[7px] font-bold bg-indigo-500 text-white px-1 rounded leading-tight shrink-0">흡수</span>
         )}
         {needsTaxInvoiceBadge && (
           <span className="text-[7px] font-bold bg-red-500 text-white px-1 rounded leading-tight shrink-0">계산서</span>
+        )}
+        {needsConsulting && (
+          <span className="text-[7px] font-bold bg-amber-500 text-white px-1 rounded leading-tight shrink-0">자료</span>
         )}
       </div>
 
