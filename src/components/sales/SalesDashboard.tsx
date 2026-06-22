@@ -1024,7 +1024,10 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                       <p className="text-[11px] text-white/50 font-medium uppercase tracking-widest mb-0.5">이번달 공급 현황</p>
                       <div className="flex items-baseline gap-2">
                         <span className="text-3xl font-black text-white">{fmtV(total)}</span>
-                        <span className="text-sm text-white/50">/ {target}개 목표</span>
+                        <button
+                          onClick={() => { setGoalEditValue(String(target)); setGoalEditOpen(true) }}
+                          className="text-sm text-white/50 hover:text-white/80 hover:underline transition-colors"
+                        >/ {target}개 목표 ✏️</button>
                         <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${achievePct >= 100 ? 'bg-emerald-400/20 text-emerald-300' : achievePct >= 60 ? 'bg-blue-400/20 text-blue-300' : 'bg-amber-400/20 text-amber-300'}`}>
                           {achievePct}%
                         </span>
@@ -1692,6 +1695,37 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
               <path d="M9 1L1 9M9 5L5 9M9 9" stroke="#f59e0b" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
+          </div>
+        </div>
+      )}
+
+      {/* 목표 개수 수정 모달 */}
+      {goalEditOpen && (
+        <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4" onClick={() => setGoalEditOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="font-bold text-[#1B2A45] text-base mb-1">이번달 목표 개수 설정</h3>
+            <p className="text-xs text-gray-400 mb-4">본인의 이번달 공급 목표 개수를 입력하세요</p>
+            <input
+              type="number"
+              value={goalEditValue}
+              onChange={e => setGoalEditValue(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && saveGoal()}
+              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-lg font-bold text-center focus:outline-none focus:border-violet-400"
+              placeholder="예: 30"
+              autoFocus
+              min={0}
+            />
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => setGoalEditOpen(false)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 text-sm font-medium hover:bg-gray-50"
+              >취소</button>
+              <button
+                onClick={saveGoal}
+                disabled={goalSaving}
+                className="flex-1 py-2.5 rounded-xl bg-[#1B2A45] text-white text-sm font-bold hover:bg-[#1B2A45]/90 disabled:opacity-50"
+              >{goalSaving ? '저장중...' : '저장'}</button>
+            </div>
           </div>
         </div>
       )}
