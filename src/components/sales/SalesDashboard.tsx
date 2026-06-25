@@ -1192,22 +1192,25 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   evMap[d.meeting_date].push({ type: 'meeting', company, time: d.meeting_time })
                 }
               }
-              // KST 기준 14일 배열
+              // 오늘의 KST 요일 (0=일)
+              const todayDow = new Date(todayS + 'T00:00:00+09:00').getDay()
+              // 이번 주 일요일 (오늘이 목요일이면 4일 전 일요일부터 시작)
+              const weekSundayTs = Date.now() - todayDow * 86400000
+              // 2주 = 14일 (일요일부터 시작해 요일 헤더와 정렬)
               const days = Array.from({ length: 14 }, (_, i) => {
-                const d = new Date(Date.now() + i * 86400000)
-                // KST 날짜 문자열
+                const d = new Date(weekSundayTs + i * 86400000)
                 const s = d.toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(0, 10)
-                // KST 요일: new Date(YYYY-MM-DDT00:00:00+09:00)
                 const dow = new Date(s + 'T00:00:00+09:00').getDay()
                 const day = parseInt(s.slice(8, 10), 10)
-                return { s, day, dow }
+                const isPast = s < todayS
+                return { s, day, dow, isPast }
               })
               const week1 = days.slice(0, 7)
               const week2 = days.slice(7, 14)
               function WeekRow({ week }: { week: typeof days }) {
                 return (
                   <div className="grid grid-cols-7 gap-1 px-2 py-2">
-                    {week.map(({ s, day, dow }) => {
+                    {week.map(({ s, day, dow, isPast }) => {
                       const isToday = s === todayS
                       const evs = (evMap[s] || []).sort((a, b) => (a.time || '').localeCompare(b.time || ''))
                       const shown = evs.slice(0, 2)
@@ -1215,8 +1218,8 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                       return (
                         <div key={s} onClick={() => setActiveTab('schedule')}
                           className={`rounded-lg p-1 cursor-pointer min-h-[56px] transition-colors ${
-                            isToday ? 'bg-[#1B2A45]/5 ring-1 ring-[#1B2A45]/20' : evs.length > 0 ? 'hover:bg-gray-50' : 'hover:bg-gray-50/50'
-                          }`}>
+                            isToday ? 'bg-[#1B2A45]/5 ring-1 ring-[#1B2A45]/20' : isPast ? '' : evs.length > 0 ? 'hover:bg-gray-50' : 'hover:bg-gray-50/50'
+                          } ${isPast ? 'opacity-35' : ''}`}>
                           <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black mb-0.5 mx-auto ${
                             isToday ? 'bg-[#1B2A45] text-white' :
                             dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-gray-600'
