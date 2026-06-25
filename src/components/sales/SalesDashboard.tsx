@@ -1168,6 +1168,89 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               )
             })()}
 
+            {/* 2주 달력 (2줄 × 7일 그리드) */}
+            {(() => {
+              const todayD = new Date()
+              const todayS = todayD.toISOString().slice(0, 10)
+              const myCustomers = customers.filter(c => {
+                const d = (c as any).details || {}
+                return d.sales_user_name === userName || (c as any).sales_user_name === userName
+              })
+              const evMap: Record<string, { type: 'recall' | 'meeting'; company: string; time?: string }[]> = {}
+              for (const c of myCustomers) {
+                const d = (c as any).details || {}
+                const company = d.company || c.name || '—'
+                const recallDate = d.callback_date || d.follow_up_date
+                const recallTime = d.callback_time || d.follow_up_time
+                if (recallDate) {
+                  if (!evMap[recallDate]) evMap[recallDate] = []
+                  evMap[recallDate].push({ type: 'recall', company, time: recallTime })
+                }
+                if (d.meeting_date) {
+                  if (!evMap[d.meeting_date]) evMap[d.meeting_date] = []
+                  evMap[d.meeting_date].push({ type: 'meeting', company, time: d.meeting_time })
+                }
+              }
+              const days = Array.from({ length: 14 }, (_, i) => {
+                const d = new Date(Date.now() + i * 86400000)
+                const s = d.toISOString().slice(0, 10)
+                return { s, day: d.getDate(), dow: d.getDay() }
+              })
+              const week1 = days.slice(0, 7)
+              const week2 = days.slice(7, 14)
+              function WeekRow({ week }: { week: typeof days }) {
+                return (
+                  <div className="grid grid-cols-7 gap-1 px-2 py-2">
+                    {week.map(({ s, day, dow }) => {
+                      const isToday = s === todayS
+                      const evs = (evMap[s] || []).sort((a, b) => (a.time || '').localeCompare(b.time || ''))
+                      const shown = evs.slice(0, 2)
+                      const extra = evs.length - shown.length
+                      return (
+                        <div key={s} onClick={() => setActiveTab('schedule')}
+                          className={`rounded-lg p-1 cursor-pointer min-h-[56px] transition-colors ${
+                            isToday ? 'bg-[#1B2A45]/5 ring-1 ring-[#1B2A45]/20' : evs.length > 0 ? 'hover:bg-gray-50' : 'hover:bg-gray-50/50'
+                          }`}>
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black mb-0.5 mx-auto ${
+                            isToday ? 'bg-[#1B2A45] text-white' :
+                            dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-gray-600'
+                          }`}>{day}</div>
+                          <div className="space-y-0.5">
+                            {shown.map((e, i) => (
+                              <div key={i} className={`rounded px-0.5 py-0.5 leading-tight ${
+                                e.type === 'recall' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'
+                              }`}>
+                                <p className="text-[8px] font-bold truncate">{e.company}</p>
+                                {e.time && <p className="text-[7px] opacity-70">{e.time}</p>}
+                              </div>
+                            ))}
+                            {extra > 0 && <p className="text-[7px] text-gray-400 text-center">+{extra}</p>}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              }
+              return (
+                <div className="bg-white border border-[#E8E2D4] rounded-xl overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-[#E8E2D4]">
+                    <h3 className="text-sm font-bold text-[#1B2A45]">📅 2주 일정</h3>
+                    <button onClick={() => setActiveTab('schedule')} className="text-[11px] text-violet-500 font-semibold hover:underline">전체보기</button>
+                  </div>
+                  {/* 요일 헤더 */}
+                  <div className="grid grid-cols-7 px-2 pt-2 pb-0">
+                    {['일','월','화','수','목','금','토'].map((d, i) => (
+                      <div key={d} className={`text-center text-[9px] font-bold py-0.5 ${i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-gray-300'}`}>{d}</div>
+                    ))}
+                  </div>
+                  <WeekRow week={week1} />
+                  <div className="border-t border-gray-100" />
+                  <WeekRow week={week2} />
+                </div>
+              )
+            })()}
+
             {/* 공지사항 */}
             {(() => {
               const ntTeamColor = (t: string) => t === 'sales' ? 'bg-blue-100 text-blue-700' : t === 'ops' ? 'bg-violet-100 text-violet-700' : 'bg-gray-100 text-gray-600'
@@ -1187,7 +1270,6 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                       const isExpanded = expandedNoticeId === n.id
                       return (
                         <div key={n.id} className={isImportant ? 'bg-amber-50' : 'bg-white'}>
-                          {/* 제목 행 - 클릭으로 펼치기 */}
                           <button
                             type="button"
                             onClick={() => setExpandedNoticeId(isExpanded ? null : n.id)}
@@ -1203,11 +1285,10 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                               {n.title}
                             </span>
                             <span className="text-[10px] text-gray-300 shrink-0">{ntFmtDate(n.created_at)}</span>
-                            <span className={`text-[10px] ml-1 shrink-0 transition-transform ${isExpanded ? 'text-gray-500' : 'text-gray-300'}`}>
+                            <span className={`text-[10px] ml-1 shrink-0 ${isExpanded ? 'text-gray-500' : 'text-gray-300'}`}>
                               {isExpanded ? '▲' : '▼'}
                             </span>
                           </button>
-                          {/* 펼쳐진 내용 */}
                           {isExpanded && n.content && (
                             <div className={`px-4 pb-4 border-t ${isImportant ? 'border-amber-100' : 'border-gray-50'}`}>
                               <div className={`mt-3 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed rounded-xl p-4 border ${isImportant ? 'bg-white border-amber-100' : 'bg-[#FAFAF8] border-gray-100'}`}>
@@ -1223,92 +1304,6 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               ) : (
                 <div className="bg-white border border-[#E8E2D4] rounded-xl p-6 text-center text-gray-400 text-sm">
                   공지사항 없음
-                </div>
-              )
-            })()}
-
-            {/* 2주 달력 스트립 */}
-            {(() => {
-              const todayD = new Date()
-              const todayS = todayD.toISOString().slice(0, 10)
-              const myCustomers = customers.filter(c => {
-                const d = (c as any).details || {}
-                return d.sales_user_name === userName || (c as any).sales_user_name === userName
-              })
-              // 이벤트 맵 생성
-              const evMap: Record<string, { type: 'recall' | 'meeting'; company: string; time?: string }[]> = {}
-              for (const c of myCustomers) {
-                const d = (c as any).details || {}
-                const company = d.company || c.name || '—'
-                const recallDate = d.callback_date || d.follow_up_date
-                const recallTime = d.callback_time || d.follow_up_time
-                if (recallDate) {
-                  if (!evMap[recallDate]) evMap[recallDate] = []
-                  evMap[recallDate].push({ type: 'recall', company, time: recallTime })
-                }
-                if (d.meeting_date) {
-                  if (!evMap[d.meeting_date]) evMap[d.meeting_date] = []
-                  evMap[d.meeting_date].push({ type: 'meeting', company, time: d.meeting_time })
-                }
-              }
-              // 14일 배열
-              const days = Array.from({ length: 14 }, (_, i) => {
-                const d = new Date(Date.now() + i * 86400000)
-                const s = d.toISOString().slice(0, 10)
-                const dow = d.getDay()
-                return { s, day: d.getDate(), dow }
-              })
-              const hasAny = days.some(d => (evMap[d.s] || []).length > 0)
-              return (
-                <div className="bg-white border border-[#E8E2D4] rounded-xl overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-[#E8E2D4]">
-                    <h3 className="text-sm font-bold text-[#1B2A45]">📅 2주 일정</h3>
-                    <button onClick={() => setActiveTab('schedule')} className="text-[11px] text-violet-500 font-semibold hover:underline">캘린더 전체보기</button>
-                  </div>
-                  {!hasAny ? (
-                    <p className="text-xs text-gray-400 text-center py-5">2주 이내 일정 없음</p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <div className="flex min-w-max px-2 py-3 gap-1.5">
-                        {days.map(({ s, day, dow }) => {
-                          const isToday = s === todayS
-                          const evs = (evMap[s] || []).sort((a, b) => (a.time || '').localeCompare(b.time || ''))
-                          const shown = evs.slice(0, 3)
-                          const extra = evs.length - shown.length
-                          return (
-                            <div key={s}
-                              onClick={() => setActiveTab('schedule')}
-                              className={`w-[72px] rounded-xl p-1.5 cursor-pointer transition-colors shrink-0 ${
-                                isToday ? 'bg-[#1B2A45]/5 ring-1 ring-[#1B2A45]/20' : evs.length > 0 ? 'bg-gray-50' : ''
-                              }`}>
-                              {/* 날짜 헤더 */}
-                              <div className="flex items-center gap-1 mb-1.5">
-                                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
-                                  isToday ? 'bg-[#1B2A45] text-white' :
-                                  dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-gray-700'
-                                }`}>{day}</span>
-                                <span className={`text-[9px] font-semibold ${
-                                  dow === 0 ? 'text-red-400' : dow === 6 ? 'text-blue-400' : 'text-gray-400'
-                                }`}>{'일월화수목금토'[dow]}</span>
-                              </div>
-                              {/* 이벤트 칩 */}
-                              <div className="space-y-0.5">
-                                {shown.map((e, i) => (
-                                  <div key={i} className={`rounded px-1 py-0.5 leading-tight ${
-                                    e.type === 'recall' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'
-                                  }`}>
-                                    <p className="text-[9px] font-bold truncate">{e.company}</p>
-                                    {e.time && <p className="text-[8px] opacity-70">{e.time}</p>}
-                                  </div>
-                                ))}
-                                {extra > 0 && <p className="text-[8px] text-gray-400 pl-0.5">+{extra}</p>}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
                 </div>
               )
             })()}
