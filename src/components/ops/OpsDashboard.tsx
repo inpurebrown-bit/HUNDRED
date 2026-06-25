@@ -391,6 +391,12 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
     setLocal(next)
     schedule({ details: { ...(local.details || {}), [key]: val } })
   }
+  // 여러 detail 필드를 한 번에 업데이트 (두 번 호출 시 덮어씌움 방지)
+  function detailFields(patch: Record<string, any>) {
+    const merged = { ...(local.details || {}), ...patch }
+    setLocal(prev => ({ ...prev, details: merged }))
+    schedule({ details: merged })
+  }
   function toggleDetail(key: string) {
     detailField(key, !local.details?.[key])
   }
@@ -1487,7 +1493,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                           희망
                         </button>
                         <button type="button"
-                          onClick={() => { detailField('tax_invoice_requested', false); detailField('tax_invoice_issued', false) }}
+                          onClick={() => detailFields({ tax_invoice_requested: false, tax_invoice_issued: false })}
                           className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
                             d.tax_invoice_requested === false
                               ? 'bg-gray-500 text-white border-gray-500'
@@ -1693,7 +1699,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                               onClick={() => {
                                 const entries: any[] = [...(d.payment_entries || [])]
                                 entries[idx] = { ...entries[idx], tax_invoice_requested: false, tax_invoice_issued: false }
-                                detailField('payment_entries', entries)
+                                detailField('payment_entries', entries)  // entries는 객체라 단일 호출로 OK
                               }}
                               className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
                                 entry.tax_invoice_requested === false
