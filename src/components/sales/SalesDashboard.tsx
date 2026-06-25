@@ -1205,32 +1205,52 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               )
             })()}
 
-            {/* 2주 일정 미리보기 */}
-            {upcomingEvents.length > 0 && (
-              <div className="bg-white border border-[#E8E2D4] rounded-xl overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-[#E8E2D4]">
-                  <h3 className="text-sm font-bold text-[#1B2A45]">📅 2주 이내 일정</h3>
-                  <button onClick={() => setActiveTab('schedule')} className="text-[11px] text-violet-500 font-semibold hover:underline">전체보기</button>
-                </div>
-                <div className="divide-y divide-gray-50">
-                  {upcomingEvents.slice(0, 5).map((e: any) => (
-                    <div key={e.id} className="flex items-center gap-3 px-4 py-2.5">
-                      <span className={`shrink-0 text-[9px] font-bold text-white px-1.5 py-0.5 rounded ${
-                        e.event_type === 'recall' ? 'bg-blue-500' : e.event_type === 'meeting' ? 'bg-violet-500' : 'bg-gray-400'
-                      }`}>
-                        {e.event_type === 'recall' ? '재통화' : e.event_type === 'meeting' ? '미팅' : '기타'}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-800 truncate">{e.title}</p>
+            {/* 2주 일정 미리보기 (customer 기반 callback/meeting) */}
+            {(() => {
+              const todayD = new Date()
+              const todayS = todayD.toISOString().slice(0, 10)
+              const twoWeeksS = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)
+              const myCustomers = customers.filter(c => {
+                const d = (c as any).details || {}
+                return d.sales_user_name === userName || (c as any).sales_user_name === userName
+              })
+              const upcoming: { date: string; time?: string; type: 'recall' | 'meeting'; company: string }[] = []
+              for (const c of myCustomers) {
+                const d = (c as any).details || {}
+                const company = d.company || c.name || '—'
+                if (d.callback_date && d.callback_date >= todayS && d.callback_date <= twoWeeksS) {
+                  upcoming.push({ date: d.callback_date, time: d.callback_time, type: 'recall', company })
+                }
+                if (d.meeting_date && d.meeting_date >= todayS && d.meeting_date <= twoWeeksS) {
+                  upcoming.push({ date: d.meeting_date, time: d.meeting_time, type: 'meeting', company })
+                }
+              }
+              upcoming.sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')))
+              if (upcoming.length === 0) return null
+              return (
+                <div className="bg-white border border-[#E8E2D4] rounded-xl overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-[#E8E2D4]">
+                    <h3 className="text-sm font-bold text-[#1B2A45]">📅 2주 이내 일정</h3>
+                    <button onClick={() => setActiveTab('schedule')} className="text-[11px] text-violet-500 font-semibold hover:underline">전체보기</button>
+                  </div>
+                  <div className="divide-y divide-gray-50">
+                    {upcoming.slice(0, 5).map((e, i) => (
+                      <div key={i} className="flex items-center gap-3 px-4 py-2.5">
+                        <span className={`shrink-0 text-[9px] font-bold text-white px-1.5 py-0.5 rounded ${
+                          e.type === 'recall' ? 'bg-blue-500' : 'bg-violet-500'
+                        }`}>
+                          {e.type === 'recall' ? '재통화' : '미팅'}
+                        </span>
+                        <p className="flex-1 text-sm font-medium text-gray-800 truncate">{e.company}</p>
+                        <span className="text-[11px] text-gray-400 shrink-0">
+                          {e.date.slice(5).replace('-', '/')}{e.time ? ' ' + e.time : ''}
+                        </span>
                       </div>
-                      <span className="text-[11px] text-gray-400 shrink-0">
-                        {e.start_date.slice(5).replace('-', '/')} {e.start_time || ''}
-                      </span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )
+            })()}
           </div>
         )}
 
@@ -1605,7 +1625,10 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
 
         {/* ══════════ 일정관리 ══════════ */}
         {activeTab === 'schedule' && (
-          <SalesScheduleTab userName={userName} />
+          <SalesScheduleTab customers={customers.filter(c => {
+            const d = (c as any).details || {}
+            return d.sales_user_name === userName || (c as any).sales_user_name === userName
+          })} />
         )}
 
         {/* ══════════ 사원정보 ══════════ */}

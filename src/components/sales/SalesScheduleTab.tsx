@@ -1,282 +1,231 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 
-interface ScheduleEvent {
-  id: string
-  title: string
-  start_date: string
-  start_time?: string | null
-  description?: string
-  color?: string
-  created_by?: string
-  event_type?: string
+interface CalendarEvent {
+  date: string        // YYYY-MM-DD
+  time?: string       // HH:MM
+  type: 'recall' | 'meeting'
+  company: string
+  memo?: string
+  customerId?: string
 }
 
-const TYPE_COLORS: Record<string, { bg: string; text: string; badge: string }> = {
-  recall:  { bg: 'bg-blue-50',   text: 'text-blue-700',   badge: 'bg-blue-500' },
-  meeting: { bg: 'bg-violet-50', text: 'text-violet-700', badge: 'bg-violet-500' },
-  etc:     { bg: 'bg-gray-50',   text: 'text-gray-700',   badge: 'bg-gray-400' },
+const TYPE_STYLE = {
+  recall:  { dot: 'bg-blue-400',   badge: 'bg-blue-100 text-blue-700',   label: '재통화' },
+  meeting: { dot: 'bg-violet-400', badge: 'bg-violet-100 text-violet-700', label: '미팅' },
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  recall: '재통화', meeting: '미팅', etc: '기타',
+function getDaysInMonth(year: number, month: number) {
+  return new Date(year, month + 1, 0).getDate()
+}
+function getFirstDayOfWeek(year: number, month: number) {
+  return new Date(year, month, 1).getDay() // 0=일
 }
 
-function todayKST() {
-  return new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' })
-    .replace(/\. /g, '-').replace('.', '').trim()
-}
+export default function SalesScheduleTab({
+  customers,
+}: {
+  customers: any[]
+}) {
+  const today = new Date()
+  const [viewYear, setViewYear] = useState(today.getFullYear())
+  const [viewMonth, setViewMonth] = useState(today.getMonth()) // 0-indexed
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
-function dateLabel(dateStr: string) {
-  const today = new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })
-  const d = new Date(dateStr + 'T00:00:00')
-  const label = d.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })
-  const todayDate = new Date().toISOString().slice(0, 10)
-  if (dateStr === todayDate) return `오늘 · ${label}`
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
-  if (dateStr === tomorrow) return `내일 · ${label}`
-  return label
-}
-
-export default function SalesScheduleTab({ userName }: { userName: string }) {
-  const [events, setEvents] = useState<ScheduleEvent[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({
-    event_type: 'recall',
-    title: '',
-    start_date: new Date().toISOString().slice(0, 10),
-    start_time: '',
-    description: '',
-  })
-  const [saving, setSaving] = useState(false)
-
-  async function load() {
-    setLoading(true)
-    try {
-      // 현재+다음달 조회
-      const now = new Date()
-      const [res1, res2] = await Promise.all([
-        fetch(`/api/events?year=${now.getFullYear()}&month=${now.getMonth() + 1}`),
-        fetch(`/api/events?year=${now.getFullYear()}&month=${now.getMonth() + 2 > 12 ? 1 : now.getMonth() + 2}`),
-      ])
-      const [d1, d2] = await Promise.all([res1.json(), res2.json()])
-      const all: ScheduleEvent[] = [...(d1.events || []), ...(d2.events || [])]
-      // 본인 + 미래 기준 정렬
-      const myEvents = all
-        .filter(e => e.created_by === userName)
-        .sort((a, b) => {
-          const da = a.start_date + (a.start_time || '00:00')
-          const db = b.start_date + (b.start_time || '00:00')
-          return da.localeCompare(db)
+  // 고객 데이터에서 이벤트 추출
+  const events = useMemo<CalendarEvent[]>(() => {
+    const list: CalendarEvent[] = []
+    for (const c of customers) {
+      const d = c.details || {}
+      const company = d.company || c.name || '—'
+      // 재통화
+      if (d.callback_date) {
+        list.push({
+          date: d.callback_date,
+          time: d.callback_time || undefined,
+          type: 'recall',
+          company,
+          customerId: c.id,
         })
-      setEvents(myEvents)
-    } catch {}
-    setLoading(false)
+      }
+      // 미팅
+      if (d.meeting_date) {
+        list.push({
+          date: d.meeting_date,
+          time: d.meeting_time || undefined,
+          type: 'meeting',
+          company,
+          memo: d.meeting_memo || undefined,
+          customerId: c.id,
+        })
+      }
+    }
+    return list.sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')))
+  }, [customers])
+
+  // 날짜별 이벤트 맵
+  const eventMap = useMemo(() => {
+    const map: Record<string, CalendarEvent[]> = {}
+    for (const e of events) {
+      if (!map[e.date]) map[e.date] = []
+      map[e.date].push(e)
+    }
+    return map
+  }, [events])
+
+  const daysInMonth = getDaysInMonth(viewYear, viewMonth)
+  const firstDow = getFirstDayOfWeek(viewYear, viewMonth)
+  const todayStr = today.toISOString().slice(0, 10)
+
+  function prevMonth() {
+    if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11) }
+    else setViewMonth(m => m - 1)
+    setSelectedDate(null)
+  }
+  function nextMonth() {
+    if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0) }
+    else setViewMonth(m => m + 1)
+    setSelectedDate(null)
+  }
+  function toToday() {
+    setViewYear(today.getFullYear())
+    setViewMonth(today.getMonth())
+    setSelectedDate(todayStr)
   }
 
-  useEffect(() => { load() }, [userName])
+  const selectedEvents = selectedDate ? (eventMap[selectedDate] || []) : []
 
-  async function handleSave() {
-    if (!form.title.trim() || !form.start_date) return
-    setSaving(true)
-    try {
-      await fetch('/api/events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: form.title,
-          start_date: form.start_date,
-          start_time: form.start_time || null,
-          description: form.description,
-          color: form.event_type === 'recall' ? 'blue' : form.event_type === 'meeting' ? 'violet' : 'gray',
-          event_type: form.event_type,
-          is_allday: !form.start_time,
-        }),
-      })
-      setForm({ event_type: 'recall', title: '', start_date: new Date().toISOString().slice(0, 10), start_time: '', description: '' })
-      setShowForm(false)
-      await load()
-    } catch {}
-    setSaving(false)
-  }
-
-  async function handleDelete(id: string) {
-    await fetch('/api/events', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-    setEvents(prev => prev.filter(e => e.id !== id))
-  }
-
-  const today = new Date().toISOString().slice(0, 10)
-  const twoWeeksLater = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)
-
-  const upcoming = events.filter(e => e.start_date >= today)
-  const past = events.filter(e => e.start_date < today).reverse()
-
-  // 날짜별 그룹
-  const grouped: Record<string, ScheduleEvent[]> = {}
-  upcoming.forEach(e => {
-    if (!grouped[e.start_date]) grouped[e.start_date] = []
-    grouped[e.start_date].push(e)
-  })
+  // 이번달 이벤트 수
+  const monthKey = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`
+  const monthEvents = events.filter(e => e.date.startsWith(monthKey))
 
   return (
-    <div className="space-y-4 pb-8">
+    <div className="space-y-3 pb-8">
       {/* 헤더 */}
-      <div className="bg-gradient-to-r from-[#1B2A45] to-sky-700 rounded-xl px-5 py-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-sm font-bold text-white">일정관리</h2>
-          <p className="text-white/50 text-[11px] mt-0.5">재통화 · 미팅 · 기타 일정</p>
+      <div className="bg-gradient-to-r from-[#1B2A45] to-sky-700 rounded-xl px-5 py-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-white">일정 캘린더</h2>
+            <p className="text-white/50 text-[11px] mt-0.5">
+              이번달 재통화 {monthEvents.filter(e => e.type === 'recall').length}건 · 미팅 {monthEvents.filter(e => e.type === 'meeting').length}건
+            </p>
+          </div>
+          <button onClick={toToday} className="text-xs bg-white/15 hover:bg-white/25 text-white px-3 py-1.5 rounded-lg transition-colors">오늘</button>
         </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="bg-[#C5A258] text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-[#b8934a] transition-colors"
-        >
-          + 일정 추가
-        </button>
       </div>
 
-      {/* 일정 추가 폼 */}
-      {showForm && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-bold text-sm text-[#1B2A45]">새 일정</h3>
-            <button onClick={() => setShowForm(false)} className="text-gray-400 text-lg leading-none">✕</button>
+      {/* 캘린더 */}
+      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
+        {/* 월 네비게이션 */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <button onClick={prevMonth} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">‹</button>
+          <span className="font-bold text-[#1B2A45] text-sm">{viewYear}년 {viewMonth + 1}월</span>
+          <button onClick={nextMonth} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">›</button>
+        </div>
+
+        {/* 요일 헤더 */}
+        <div className="grid grid-cols-7 border-b border-gray-100">
+          {['일','월','화','수','목','금','토'].map((d, i) => (
+            <div key={d} className={`text-center text-[11px] font-bold py-2 ${i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-gray-400'}`}>{d}</div>
+          ))}
+        </div>
+
+        {/* 날짜 그리드 */}
+        <div className="grid grid-cols-7">
+          {/* 앞 빈칸 */}
+          {Array.from({ length: firstDow }).map((_, i) => (
+            <div key={`empty-${i}`} className="h-14 border-b border-r border-gray-50" />
+          ))}
+          {/* 날짜 셀 */}
+          {Array.from({ length: daysInMonth }).map((_, i) => {
+            const day = i + 1
+            const dow = (firstDow + i) % 7
+            const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+            const isToday = dateStr === todayStr
+            const isSelected = dateStr === selectedDate
+            const dayEvents = eventMap[dateStr] || []
+            const hasRecall = dayEvents.some(e => e.type === 'recall')
+            const hasMeeting = dayEvents.some(e => e.type === 'meeting')
+
+            return (
+              <div
+                key={day}
+                onClick={() => setSelectedDate(isSelected ? null : dateStr)}
+                className={`h-14 border-b border-r border-gray-50 p-1 cursor-pointer transition-colors ${
+                  isSelected ? 'bg-violet-50' : 'hover:bg-gray-50'
+                }`}
+              >
+                <div className={`w-6 h-6 flex items-center justify-center rounded-full text-[12px] font-bold mb-0.5 mx-auto ${
+                  isToday ? 'bg-[#1B2A45] text-white' :
+                  dow === 0 ? 'text-red-400' : dow === 6 ? 'text-blue-400' : 'text-gray-700'
+                }`}>{day}</div>
+                {/* 이벤트 도트 */}
+                <div className="flex justify-center gap-0.5">
+                  {hasRecall && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />}
+                  {hasMeeting && <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" />}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* 선택된 날짜 이벤트 */}
+      {selectedDate && (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <p className="text-sm font-bold text-[#1B2A45]">
+              {new Date(selectedDate + 'T00:00:00').toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}
+            </p>
+            <button onClick={() => setSelectedDate(null)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
           </div>
-          <div className="space-y-3">
-            {/* 유형 */}
-            <div className="flex gap-2">
-              {(['recall', 'meeting', 'etc'] as const).map(t => (
-                <button key={t}
-                  onClick={() => setForm(p => ({ ...p, event_type: t }))}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                    form.event_type === t ? `${TYPE_COLORS[t].badge} text-white` : 'bg-gray-100 text-gray-500'
-                  }`}
-                >{TYPE_LABELS[t]}</button>
-              ))}
+          {selectedEvents.length === 0 ? (
+            <div className="px-4 py-6 text-center text-sm text-gray-400">이 날 일정이 없습니다</div>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {selectedEvents
+                .sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'))
+                .map((e, i) => {
+                const s = TYPE_STYLE[e.type]
+                return (
+                  <div key={i} className="flex items-start gap-3 px-4 py-3">
+                    <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full mt-0.5 ${s.badge}`}>{s.label}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{e.company}</p>
+                      {e.memo && <p className="text-[11px] text-gray-400 mt-0.5 truncate">{e.memo}</p>}
+                    </div>
+                    {e.time && <span className="shrink-0 text-[11px] font-bold text-gray-500">{e.time}</span>}
+                  </div>
+                )
+              })}
             </div>
-            {/* 제목 */}
-            <input
-              type="text"
-              placeholder={form.event_type === 'recall' ? '업체명 또는 메모' : form.event_type === 'meeting' ? '미팅 상대 / 장소' : '일정 제목'}
-              value={form.title}
-              onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-400"
-            />
-            {/* 날짜 + 시간 */}
-            <div className="flex gap-2">
-              <input
-                type="date"
-                value={form.start_date}
-                onChange={e => setForm(p => ({ ...p, start_date: e.target.value }))}
-                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-400"
-              />
-              <input
-                type="time"
-                value={form.start_time}
-                onChange={e => setForm(p => ({ ...p, start_time: e.target.value }))}
-                className="w-28 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-400"
-              />
-            </div>
-            {/* 메모 */}
-            <textarea
-              placeholder="메모 (선택)"
-              value={form.description}
-              onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-              rows={2}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-violet-400"
-            />
-            <button
-              onClick={handleSave}
-              disabled={saving || !form.title.trim()}
-              className="w-full py-2.5 bg-[#1B2A45] text-white text-sm font-bold rounded-lg hover:bg-[#1B2A45]/90 disabled:opacity-50 transition-colors"
-            >{saving ? '저장중...' : '저장'}</button>
-          </div>
+          )}
         </div>
       )}
 
-      {loading ? (
-        <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
-      ) : upcoming.length === 0 && past.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
-          <p className="text-2xl mb-2">📅</p>
-          <p>등록된 일정이 없습니다</p>
-          <p className="text-xs mt-1">재통화·미팅 일정을 추가해보세요</p>
-        </div>
-      ) : (
-        <>
-          {/* 예정 일정 */}
-          {upcoming.length > 0 && (
-            <div className="space-y-3">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">예정 일정</p>
-              {Object.entries(grouped).map(([date, items]) => (
-                <div key={date}>
-                  <div className="flex items-center gap-2 mb-1.5 px-1">
-                    <span className={`text-[10px] font-bold ${date === today ? 'text-red-500' : 'text-gray-500'}`}>
-                      {dateLabel(date)}
-                    </span>
-                    {date <= twoWeeksLater && date !== today && (
-                      <span className="text-[9px] bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded font-bold">2주 이내</span>
-                    )}
-                  </div>
-                  <div className="space-y-1.5">
-                    {items.map(e => {
-                      const c = TYPE_COLORS[e.event_type || 'etc'] || TYPE_COLORS.etc
-                      return (
-                        <div key={e.id} className={`${c.bg} border border-transparent rounded-xl px-4 py-3 flex items-start justify-between gap-2`}>
-                          <div className="flex items-start gap-2.5 min-w-0">
-                            <span className={`shrink-0 text-[9px] font-bold text-white px-1.5 py-0.5 rounded mt-0.5 ${c.badge}`}>
-                              {TYPE_LABELS[e.event_type || 'etc']}
-                            </span>
-                            <div className="min-w-0">
-                              <p className={`text-sm font-bold ${c.text} truncate`}>{e.title}</p>
-                              {e.start_time && (
-                                <p className="text-[11px] text-gray-400 mt-0.5">{e.start_time}</p>
-                              )}
-                              {e.description && (
-                                <p className="text-[11px] text-gray-400 mt-0.5 line-clamp-2">{e.description}</p>
-                              )}
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handleDelete(e.id)}
-                            className="shrink-0 text-gray-300 hover:text-red-400 text-sm transition-colors mt-0.5"
-                          >✕</button>
-                        </div>
-                      )
-                    })}
-                  </div>
+      {/* 이번달 전체 일정 목록 */}
+      {monthEvents.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <p className="text-xs font-bold text-gray-500">{viewMonth + 1}월 전체 일정</p>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {monthEvents.map((e, i) => {
+              const s = TYPE_STYLE[e.type]
+              return (
+                <div key={i}
+                  onClick={() => setSelectedDate(e.date)}
+                  className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors">
+                  <span className="shrink-0 text-[11px] font-bold text-gray-400 w-10">{e.date.slice(5).replace('-', '/')}</span>
+                  <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${s.badge}`}>{s.label}</span>
+                  <p className="flex-1 text-sm text-gray-700 truncate">{e.company}</p>
+                  {e.time && <span className="text-[11px] text-gray-400 shrink-0">{e.time}</span>}
                 </div>
-              ))}
-            </div>
-          )}
-
-          {/* 지난 일정 */}
-          {past.length > 0 && (
-            <details className="group">
-              <summary className="text-xs font-bold text-gray-400 cursor-pointer hover:text-gray-600 px-1 list-none flex items-center gap-1">
-                <span className="group-open:rotate-90 transition-transform inline-block">▶</span>
-                지난 일정 {past.length}건
-              </summary>
-              <div className="mt-2 space-y-1.5">
-                {past.map(e => {
-                  const c = TYPE_COLORS[e.event_type || 'etc'] || TYPE_COLORS.etc
-                  return (
-                    <div key={e.id} className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 flex items-center justify-between gap-2 opacity-60">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="shrink-0 text-[9px] font-bold text-white px-1.5 py-0.5 rounded bg-gray-400">
-                          {TYPE_LABELS[e.event_type || 'etc']}
-                        </span>
-                        <p className="text-xs text-gray-500 truncate">{e.start_date} {e.start_time || ''} · {e.title}</p>
-                      </div>
-                      <button onClick={() => handleDelete(e.id)} className="shrink-0 text-gray-300 hover:text-red-400 text-xs">✕</button>
-                    </div>
-                  )
-                })}
-              </div>
-            </details>
-          )}
-        </>
+              )
+            })}
+          </div>
+        </div>
       )}
     </div>
   )

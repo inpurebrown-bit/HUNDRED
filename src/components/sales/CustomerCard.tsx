@@ -30,6 +30,9 @@ export interface CustomerDetails {
   progress_status?: string
   callback_date?: string
   callback_time?: string
+  meeting_date?: string
+  meeting_time?: string
+  meeting_memo?: string
   contract_fee?: string
   payment_amount?: string
   unpaid_amount?: string
@@ -499,6 +502,26 @@ export default function CustomerCard({
                         className="w-28 border border-gray-200 rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-violet-400" />
                     </div>
                   </div>
+                )}
+              </div>
+            </section>
+
+            {/* 미팅 일정 */}
+            <section>
+              <h3 className="text-xs font-bold text-gray-500 mb-3">미팅 일정</h3>
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input type="date" value={details.meeting_date ?? ''} onChange={e => setDetailField('meeting_date', e.target.value)}
+                    placeholder="날짜" className={`${inp} flex-1`} />
+                  <input type="time" value={details.meeting_time ?? ''} onChange={e => setDetailField('meeting_time', e.target.value)}
+                    className="w-28 border border-gray-200 rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-violet-400" />
+                </div>
+                <input type="text" value={details.meeting_memo ?? ''} onChange={e => setDetailField('meeting_memo', e.target.value)}
+                  placeholder="미팅 메모 (장소, 내용 등)" className={inp} />
+                {details.meeting_date && (
+                  <button type="button"
+                    onClick={() => { setDetailField('meeting_date', ''); setDetailField('meeting_time', ''); setDetailField('meeting_memo', '') }}
+                    className="text-[10px] text-red-400 hover:text-red-600">미팅 일정 삭제</button>
                 )}
               </div>
             </section>
