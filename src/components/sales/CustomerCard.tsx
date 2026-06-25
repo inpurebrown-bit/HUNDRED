@@ -486,45 +486,46 @@ export default function CustomerCard({
           )}
 
           {tabType === 'lead' && (
-            <section>
-              <h3 className="text-xs font-bold text-gray-500 mb-3">진행현황</h3>
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  {['클로징대기', '재통화예정', '고민중', '부재', 'A/S요청', '거절', '자체거절', '계약결정'].map(label => leadProgressChip(label))}
-                </div>
-                {details.progress_status === '재통화예정' && (
-                  <div>
-                    <label className={lbl}>재통화 예정일·시간</label>
-                    <div className="flex gap-2">
-                      <input type="date" value={details.callback_date ?? ''} onChange={e => setDetailField('callback_date', e.target.value)}
-                        className={`${inp} flex-1`} />
-                      <input type="time" value={details.callback_time ?? ''} onChange={e => setDetailField('callback_time', e.target.value)}
-                        className="w-28 border border-gray-200 rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-violet-400" />
-                    </div>
+            <>
+              <section>
+                <h3 className="text-xs font-bold text-gray-500 mb-3">진행현황</h3>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    {['클로징대기', '재통화예정', '고민중', '부재', 'A/S요청', '거절', '자체거절', '계약결정'].map(label => leadProgressChip(label))}
                   </div>
-                )}
-              </div>
-            </section>
-
-            {/* 미팅 일정 */}
-            <section>
-              <h3 className="text-xs font-bold text-gray-500 mb-3">미팅 일정</h3>
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <input type="date" value={details.meeting_date ?? ''} onChange={e => setDetailField('meeting_date', e.target.value)}
-                    placeholder="날짜" className={`${inp} flex-1`} />
-                  <input type="time" value={details.meeting_time ?? ''} onChange={e => setDetailField('meeting_time', e.target.value)}
-                    className="w-28 border border-gray-200 rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-violet-400" />
+                  {details.progress_status === '재통화예정' && (
+                    <div>
+                      <label className={lbl}>재통화 예정일·시간</label>
+                      <div className="flex gap-2">
+                        <input type="date" value={details.callback_date ?? ''} onChange={e => setDetailField('callback_date', e.target.value)}
+                          className={`${inp} flex-1`} />
+                        <input type="time" value={details.callback_time ?? ''} onChange={e => setDetailField('callback_time', e.target.value)}
+                          className="w-28 border border-gray-200 rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-violet-400" />
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <input type="text" value={details.meeting_memo ?? ''} onChange={e => setDetailField('meeting_memo', e.target.value)}
-                  placeholder="미팅 메모 (장소, 내용 등)" className={inp} />
-                {details.meeting_date && (
-                  <button type="button"
-                    onClick={() => { setDetailField('meeting_date', ''); setDetailField('meeting_time', ''); setDetailField('meeting_memo', '') }}
-                    className="text-[10px] text-red-400 hover:text-red-600">미팅 일정 삭제</button>
-                )}
-              </div>
-            </section>
+              </section>
+
+              <section>
+                <h3 className="text-xs font-bold text-gray-500 mb-3">미팅 일정</h3>
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <input type="date" value={details.meeting_date ?? ''} onChange={e => setDetailField('meeting_date', e.target.value)}
+                      placeholder="날짜" className={`${inp} flex-1`} />
+                    <input type="time" value={details.meeting_time ?? ''} onChange={e => setDetailField('meeting_time', e.target.value)}
+                      className="w-28 border border-gray-200 rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-violet-400" />
+                  </div>
+                  <input type="text" value={details.meeting_memo ?? ''} onChange={e => setDetailField('meeting_memo', e.target.value)}
+                    placeholder="미팅 메모 (장소, 내용 등)" className={inp} />
+                  {details.meeting_date && (
+                    <button type="button"
+                      onClick={() => { setDetailField('meeting_date', ''); setDetailField('meeting_time', ''); setDetailField('meeting_memo', '') }}
+                      className="text-[10px] text-red-400 hover:text-red-600">미팅 일정 삭제</button>
+                  )}
+                </div>
+              </section>
+            </>
           )}
 
           {tabType === 'contracted' && (
