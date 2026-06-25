@@ -1475,13 +1475,28 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                     </div>
                     {/* 세금계산서 */}
                     <div className="col-span-2 space-y-1.5">
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <input type="checkbox" checked={!!d.tax_invoice_requested}
-                          onChange={e => detailField('tax_invoice_requested', e.target.checked)}
-                          className="w-3.5 h-3.5 accent-amber-500" />
-                        <span className="text-xs font-semibold text-gray-700">세금계산서 희망</span>
-                      </label>
-                      {d.tax_invoice_requested && (
+                      <p className="text-[10px] text-gray-500 font-medium mb-1">세금계산서</p>
+                      <div className="flex gap-1.5">
+                        <button type="button"
+                          onClick={() => detailField('tax_invoice_requested', true)}
+                          className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+                            d.tax_invoice_requested === true
+                              ? 'bg-amber-500 text-white border-amber-500'
+                              : 'bg-white text-gray-500 border-gray-300 hover:border-amber-400 hover:text-amber-600'
+                          }`}>
+                          희망
+                        </button>
+                        <button type="button"
+                          onClick={() => { detailField('tax_invoice_requested', false); detailField('tax_invoice_issued', false) }}
+                          className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+                            d.tax_invoice_requested === false
+                              ? 'bg-gray-500 text-white border-gray-500'
+                              : 'bg-white text-gray-500 border-gray-300 hover:border-gray-500 hover:text-gray-700'
+                          }`}>
+                          미희망
+                        </button>
+                      </div>
+                      {d.tax_invoice_requested === true && (
                         <label className="flex items-center gap-2 cursor-pointer select-none pl-1">
                           <input type="checkbox" checked={!!d.tax_invoice_issued}
                             onChange={e => detailField('tax_invoice_issued', e.target.checked)}
@@ -1659,19 +1674,37 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                       ) : (
                         /* 편집 상태: 체크박스 */
                         <>
-                          <label className="flex items-center gap-2 cursor-pointer select-none">
-                            <input type="checkbox"
-                              checked={!!entry.tax_invoice_requested}
-                              onChange={e => {
+                          <p className="text-[10px] text-gray-500 font-medium mb-1">세금계산서</p>
+                          <div className="flex gap-1.5">
+                            <button type="button"
+                              onClick={() => {
                                 const entries: any[] = [...(d.payment_entries || [])]
-                                entries[idx] = { ...entries[idx], tax_invoice_requested: e.target.checked }
+                                entries[idx] = { ...entries[idx], tax_invoice_requested: true }
                                 detailField('payment_entries', entries)
                               }}
-                              className="w-3.5 h-3.5 accent-amber-500" />
-                            <span className="text-xs font-semibold text-gray-700">세금계산서 희망</span>
-                          </label>
-                          {entry.tax_invoice_requested && (
-                            <label className="flex items-center gap-2 cursor-pointer select-none pl-1">
+                              className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+                                entry.tax_invoice_requested === true
+                                  ? 'bg-amber-500 text-white border-amber-500'
+                                  : 'bg-white text-gray-500 border-gray-300 hover:border-amber-400 hover:text-amber-600'
+                              }`}>
+                              희망
+                            </button>
+                            <button type="button"
+                              onClick={() => {
+                                const entries: any[] = [...(d.payment_entries || [])]
+                                entries[idx] = { ...entries[idx], tax_invoice_requested: false, tax_invoice_issued: false }
+                                detailField('payment_entries', entries)
+                              }}
+                              className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+                                entry.tax_invoice_requested === false
+                                  ? 'bg-gray-500 text-white border-gray-500'
+                                  : 'bg-white text-gray-500 border-gray-300 hover:border-gray-500 hover:text-gray-700'
+                              }`}>
+                              미희망
+                            </button>
+                          </div>
+                          {entry.tax_invoice_requested === true && (
+                            <label className="flex items-center gap-2 cursor-pointer select-none pl-1 mt-1">
                               <input type="checkbox"
                                 checked={!!entry.tax_invoice_issued}
                                 onChange={e => {
@@ -1835,10 +1868,10 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
   const feeEntries: any[] = c.details?.payment_entries || []
   const hasSavedFeeEntry = (!!c.details?.fee_locked && !!c.details?.fee_amount) ||
     feeEntries.some((e: any) => !!e.fee_amount && !!e.fee_locked)
-  // 희망=true && 발급=false 일 때만 뱃지 표시
+  // 희망===true && 미발급 일 때만 뱃지 (null/false/미희망 모두 뱃지 없음)
   const needsTaxInvoiceFee = hasSavedFeeEntry && (
-    (!!c.details?.fee_locked && !!c.details?.tax_invoice_requested && !c.details?.tax_invoice_issued) ||
-    feeEntries.some((e: any) => !!e.fee_amount && !!e.fee_locked && !!e.tax_invoice_requested && !e.tax_invoice_issued)
+    (!!c.details?.fee_locked && c.details?.tax_invoice_requested === true && !c.details?.tax_invoice_issued) ||
+    feeEntries.some((e: any) => !!e.fee_amount && !!e.fee_locked && e.tax_invoice_requested === true && !e.tax_invoice_issued)
   )
   const needsTaxInvoiceBadge = needsTaxInvoiceDown || needsTaxInvoiceFee
   // 컨설팅 자료 미전송 — 종료/완료/환불만 제외 (absorbed는 아직 자료 미전송일 수 있음)
