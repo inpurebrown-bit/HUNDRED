@@ -1725,9 +1725,12 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
   const feeEntries: any[] = c.details?.payment_entries || []
   const hasSavedFeeEntry = (!!c.details?.fee_locked && !!c.details?.fee_amount) ||
     feeEntries.some((e: any) => !!e.fee_amount && !!e.fee_locked)
+  // tax_invoice_issued == null: 아직 결정 안 됨 → 뱃지
+  // tax_invoice_issued === false: 명시적으로 체크 해제(불필요) → 뱃지 없음
+  // tax_invoice_issued === true: 발행 완료 → 뱃지 없음
   const needsTaxInvoiceFee = hasSavedFeeEntry && (
-    (!!c.details?.fee_locked && !c.details?.tax_invoice_issued) ||
-    feeEntries.some((e: any) => !!e.fee_amount && !!e.fee_locked && !e.tax_invoice_issued)
+    (!!c.details?.fee_locked && c.details?.tax_invoice_issued == null) ||
+    feeEntries.some((e: any) => !!e.fee_amount && !!e.fee_locked && e.tax_invoice_issued == null)
   )
   const needsTaxInvoiceBadge = needsTaxInvoiceDown || needsTaxInvoiceFee
   // 컨설팅 자료 미전송 — 종료/완료/환불만 제외 (absorbed는 아직 자료 미전송일 수 있음)
