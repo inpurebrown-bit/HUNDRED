@@ -477,6 +477,8 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
     // deposit_date가 없으면 오늘로 자동 세팅 (revenue API date fallback 보장)
     const baseDetails = { ...(local.details || {}) }
     if (!baseDetails.deposit_date) baseDetails.deposit_date = todayStr
+    // tax_invoice_issued가 null이면 false로 명시적 저장 (체크 안 함 = 불필요)
+    if (baseDetails.tax_invoice_issued == null) baseDetails.tax_invoice_issued = false
     const mergedDetails = { ...baseDetails, fee_locked: true }
     const next = { ...local, details: mergedDetails }
     setLocal(next)
@@ -1449,6 +1451,8 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                   const entries: any[] = [...(d.payment_entries || [])]
                   // deposit_date 없으면 오늘로 세팅
                   if (!entries[idx].date) entries[idx] = { ...entries[idx], date: todayStr2 }
+                  // tax_invoice_issued가 null이면 false로 명시적 저장
+                  if (entries[idx].tax_invoice_issued == null) entries[idx].tax_invoice_issued = false
                   entries[idx] = { ...entries[idx], fee_locked: true }
                   const mergedDetails2 = { ...(local.details || {}), payment_entries: entries }
                   const next2 = { ...local, details: mergedDetails2 }
