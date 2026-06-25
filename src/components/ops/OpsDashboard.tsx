@@ -477,7 +477,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
     // deposit_date가 없으면 오늘로 자동 세팅 (revenue API date fallback 보장)
     const baseDetails = { ...(local.details || {}) }
     if (!baseDetails.deposit_date) baseDetails.deposit_date = todayStr
-    // tax_invoice_issued가 null이면 false로 명시적 저장 (체크 안 함 = 불필요)
+    if (baseDetails.tax_invoice_requested == null) baseDetails.tax_invoice_requested = false
     if (baseDetails.tax_invoice_issued == null) baseDetails.tax_invoice_issued = false
     const mergedDetails = { ...baseDetails, fee_locked: true }
     const next = { ...local, details: mergedDetails }
@@ -1334,25 +1334,31 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                           <span className="text-gray-400 text-[10px]">매출액(공급가액)</span>
                           <span className="font-bold text-emerald-700 text-sm">{formatComma(d.fee_amount)}원</span>
                         </div>
-                        {d.tax_invoice_issued && (
-                          <>
-                            <div className="flex items-center justify-between">
-                              <span className="text-gray-400 text-[10px]">부가세(10%)</span>
-                              <span className="font-semibold text-orange-500 text-xs">{formatComma(Math.round(parseComma(String(d.fee_amount)) * 0.1))}원</span>
-                            </div>
-                            <div className="flex items-center justify-between border-t border-gray-100 pt-1">
-                              <span className="text-gray-500 text-[10px] font-bold">실제입금액</span>
-                              <span className="font-black text-gray-700 text-sm">{formatComma(Math.round(parseComma(String(d.fee_amount)) * 1.1))}원</span>
-                            </div>
-                            <div className="text-[9px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-bold inline-block">세금계산서 발행</div>
-                          </>
-                        )}
-                        {!d.tax_invoice_issued && (
-                          <div className="flex items-center justify-between border-t border-gray-100 pt-1">
-                            <span className="text-gray-500 text-[10px] font-bold">실제입금액</span>
-                            <span className="font-black text-gray-700 text-sm">{formatComma(d.fee_amount)}원</span>
+                        {d.tax_invoice_requested && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-400 text-[10px]">부가세(10%)</span>
+                            <span className="font-semibold text-orange-500 text-xs">{formatComma(Math.round(parseComma(String(d.fee_amount)) * 0.1))}원</span>
                           </div>
                         )}
+                        <div className="flex items-center justify-between border-t border-gray-100 pt-1">
+                          <span className="text-gray-500 text-[10px] font-bold">실제입금액</span>
+                          <span className="font-black text-gray-700 text-sm">
+                            {formatComma(d.tax_invoice_requested
+                              ? Math.round(parseComma(String(d.fee_amount)) * 1.1)
+                              : parseComma(String(d.fee_amount)))}원
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 pt-0.5">
+                          {d.tax_invoice_requested
+                            ? <span className="text-[9px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded font-bold">계산서 희망</span>
+                            : <span className="text-[9px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded font-bold">계산서 불필요</span>
+                          }
+                          {d.tax_invoice_requested && (
+                            d.tax_invoice_issued
+                              ? <span className="text-[9px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-bold">발급 완료</span>
+                              : <span className="text-[9px] bg-red-50 text-red-500 px-1.5 py-0.5 rounded font-bold">발급 대기</span>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1398,28 +1404,36 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                         <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-emerald-500 text-[10px] font-semibold">원</span>
                       </div>
                     </div>
-                    {/* 세금계산서 발행 여부 */}
-                    <div className="col-span-2">
+                    {/* 세금계산서 */}
+                    <div className="col-span-2 space-y-1.5">
                       <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <input type="checkbox" checked={!!d.tax_invoice_issued}
-                          onChange={e => detailField('tax_invoice_issued', e.target.checked)}
-                          className="w-3.5 h-3.5 accent-emerald-500" />
-                        <span className="text-xs font-semibold text-gray-700">세금계산서 발행</span>
+                        <input type="checkbox" checked={!!d.tax_invoice_requested}
+                          onChange={e => detailField('tax_invoice_requested', e.target.checked)}
+                          className="w-3.5 h-3.5 accent-amber-500" />
+                        <span className="text-xs font-semibold text-gray-700">세금계산서 희망</span>
                       </label>
+                      {d.tax_invoice_requested && (
+                        <label className="flex items-center gap-2 cursor-pointer select-none pl-1">
+                          <input type="checkbox" checked={!!d.tax_invoice_issued}
+                            onChange={e => detailField('tax_invoice_issued', e.target.checked)}
+                            className="w-3.5 h-3.5 accent-emerald-500" />
+                          <span className="text-xs font-semibold text-emerald-700">발급 완료</span>
+                        </label>
+                      )}
                     </div>
                     {/* 실제입금액 */}
                     <div className="col-span-2">
-                      <label className={lbl}>실제입금액 <span className="text-gray-400 font-normal">{d.tax_invoice_issued ? '(매출액 + 부가세10%)' : '(부가세 없음)'}</span></label>
+                      <label className={lbl}>실제입금액 <span className="text-gray-400 font-normal">{d.tax_invoice_requested ? '(매출액 + 부가세10%)' : '(부가세 없음)'}</span></label>
                       <div className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-xs font-bold text-gray-700 cursor-default">
                         {d.fee_amount
-                          ? formatComma(d.tax_invoice_issued
+                          ? formatComma(d.tax_invoice_requested
                               ? Math.round(parseComma(String(d.fee_amount)) * 1.1)
                               : parseComma(String(d.fee_amount))) + '원'
                           : '—'}
                       </div>
-                      {d.tax_invoice_issued && d.fee_amount && (
-                        <div className="mt-1.5 bg-white border border-emerald-200 rounded-lg px-3 py-1.5 text-[11px] text-gray-500 space-y-0.5">
-                          <p className="font-semibold text-emerald-700">부가세 내역</p>
+                      {d.tax_invoice_requested && d.fee_amount && (
+                        <div className="mt-1.5 bg-white border border-amber-200 rounded-lg px-3 py-1.5 text-[11px] text-gray-500 space-y-0.5">
+                          <p className="font-semibold text-amber-700">부가세 내역</p>
                           <p>매출액(공급가액): {formatComma(parseComma(String(d.fee_amount)))}원</p>
                           <p>부가세(10%): {formatComma(Math.round(parseComma(String(d.fee_amount)) * 0.1))}원</p>
                           <p>실제입금액 합계: {formatComma(Math.round(parseComma(String(d.fee_amount)) * 1.1))}원</p>
@@ -1451,7 +1465,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                   const entries: any[] = [...(d.payment_entries || [])]
                   // deposit_date 없으면 오늘로 세팅
                   if (!entries[idx].date) entries[idx] = { ...entries[idx], date: todayStr2 }
-                  // tax_invoice_issued가 null이면 false로 명시적 저장
+                  if (entries[idx].tax_invoice_requested == null) entries[idx].tax_invoice_requested = false
                   if (entries[idx].tax_invoice_issued == null) entries[idx].tax_invoice_issued = false
                   entries[idx] = { ...entries[idx], fee_locked: true }
                   const mergedDetails2 = { ...(local.details || {}), payment_entries: entries }
@@ -1558,24 +1572,51 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                         }} className={inp} placeholder="0원" />
                       )}
                     </div>
-                    {/* 세금계산서 발행 여부 — 잠금+미체크 시 숨김 */}
-                    {(!entryLocked || entry.tax_invoice_issued) && (
-                    <div className="col-span-2">
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <input type="checkbox"
-                          checked={!!entry.tax_invoice_issued}
-                          disabled={entryLocked}
-                          onChange={e => {
-                            const entries: any[] = [...(d.payment_entries || [])]
-                            entries[idx] = { ...entries[idx], tax_invoice_issued: e.target.checked }
-                            detailField('payment_entries', entries)
-                          }}
-                          className="w-3.5 h-3.5 accent-blue-500" />
-                        <span className={`text-xs font-semibold ${entryLocked ? 'text-gray-400' : 'text-gray-700'}`}>세금계산서 발행</span>
-                        {entry.tax_invoice_issued && <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-bold">발행</span>}
-                      </label>
+                    {/* 세금계산서 */}
+                    <div className="col-span-2 space-y-1.5">
+                      {entryLocked ? (
+                        /* 잠금 상태: 읽기전용 표시 */
+                        <div className="flex items-center gap-1.5">
+                          {entry.tax_invoice_requested
+                            ? <span className="text-[9px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded font-bold">계산서 희망</span>
+                            : <span className="text-[9px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded font-bold">계산서 불필요</span>
+                          }
+                          {entry.tax_invoice_requested && (
+                            entry.tax_invoice_issued
+                              ? <span className="text-[9px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-bold">발급 완료</span>
+                              : <span className="text-[9px] bg-red-50 text-red-500 px-1.5 py-0.5 rounded font-bold">발급 대기</span>
+                          )}
+                        </div>
+                      ) : (
+                        /* 편집 상태: 체크박스 */
+                        <>
+                          <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox"
+                              checked={!!entry.tax_invoice_requested}
+                              onChange={e => {
+                                const entries: any[] = [...(d.payment_entries || [])]
+                                entries[idx] = { ...entries[idx], tax_invoice_requested: e.target.checked }
+                                detailField('payment_entries', entries)
+                              }}
+                              className="w-3.5 h-3.5 accent-amber-500" />
+                            <span className="text-xs font-semibold text-gray-700">세금계산서 희망</span>
+                          </label>
+                          {entry.tax_invoice_requested && (
+                            <label className="flex items-center gap-2 cursor-pointer select-none pl-1">
+                              <input type="checkbox"
+                                checked={!!entry.tax_invoice_issued}
+                                onChange={e => {
+                                  const entries: any[] = [...(d.payment_entries || [])]
+                                  entries[idx] = { ...entries[idx], tax_invoice_issued: e.target.checked }
+                                  detailField('payment_entries', entries)
+                                }}
+                                className="w-3.5 h-3.5 accent-emerald-500" />
+                              <span className="text-xs font-semibold text-emerald-700">발급 완료</span>
+                            </label>
+                          )}
+                        </>
+                      )}
                     </div>
-                    )}
                     {/* 실제입금액 */}
                     {entry.fee_amount && (
                       <div className="col-span-2 bg-white rounded-lg p-2 border border-gray-200 space-y-1">
@@ -1583,24 +1624,20 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                           <span className="text-gray-400 text-[10px]">매출액(공급가액)</span>
                           <span className="font-bold text-blue-700 text-sm">{formatComma(entry.fee_amount)}원</span>
                         </div>
-                        {entry.tax_invoice_issued && (
-                          <>
-                            <div className="flex items-center justify-between">
-                              <span className="text-gray-400 text-[10px]">부가세(10%)</span>
-                              <span className="font-semibold text-orange-500 text-xs">{formatComma(Math.round(parseComma(String(entry.fee_amount)) * 0.1))}원</span>
-                            </div>
-                            <div className="flex items-center justify-between border-t border-gray-100 pt-1">
-                              <span className="text-gray-500 text-[10px] font-bold">실제입금액</span>
-                              <span className="font-black text-gray-700 text-sm">{formatComma(Math.round(parseComma(String(entry.fee_amount)) * 1.1))}원</span>
-                            </div>
-                          </>
-                        )}
-                        {!entry.tax_invoice_issued && (
-                          <div className="flex items-center justify-between border-t border-gray-100 pt-1">
-                            <span className="text-gray-500 text-[10px] font-bold">실제입금액</span>
-                            <span className="font-black text-gray-700 text-sm">{formatComma(entry.fee_amount)}원</span>
+                        {entry.tax_invoice_requested && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-400 text-[10px]">부가세(10%)</span>
+                            <span className="font-semibold text-orange-500 text-xs">{formatComma(Math.round(parseComma(String(entry.fee_amount)) * 0.1))}원</span>
                           </div>
                         )}
+                        <div className="flex items-center justify-between border-t border-gray-100 pt-1">
+                          <span className="text-gray-500 text-[10px] font-bold">실제입금액</span>
+                          <span className="font-black text-gray-700 text-sm">
+                            {formatComma(entry.tax_invoice_requested
+                              ? Math.round(parseComma(String(entry.fee_amount)) * 1.1)
+                              : parseComma(String(entry.fee_amount)))}원
+                          </span>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1729,12 +1766,10 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
   const feeEntries: any[] = c.details?.payment_entries || []
   const hasSavedFeeEntry = (!!c.details?.fee_locked && !!c.details?.fee_amount) ||
     feeEntries.some((e: any) => !!e.fee_amount && !!e.fee_locked)
-  // tax_invoice_issued == null: 아직 결정 안 됨 → 뱃지
-  // tax_invoice_issued === false: 명시적으로 체크 해제(불필요) → 뱃지 없음
-  // tax_invoice_issued === true: 발행 완료 → 뱃지 없음
+  // 희망=true && 발급=false 일 때만 뱃지 표시
   const needsTaxInvoiceFee = hasSavedFeeEntry && (
-    (!!c.details?.fee_locked && c.details?.tax_invoice_issued == null) ||
-    feeEntries.some((e: any) => !!e.fee_amount && !!e.fee_locked && e.tax_invoice_issued == null)
+    (!!c.details?.fee_locked && !!c.details?.tax_invoice_requested && !c.details?.tax_invoice_issued) ||
+    feeEntries.some((e: any) => !!e.fee_amount && !!e.fee_locked && !!e.tax_invoice_requested && !e.tax_invoice_issued)
   )
   const needsTaxInvoiceBadge = needsTaxInvoiceDown || needsTaxInvoiceFee
   // 컨설팅 자료 미전송 — 종료/완료/환불만 제외 (absorbed는 아직 자료 미전송일 수 있음)
