@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
   const user = session.user as any
   const body = await req.json()
-  const { title, start_date, end_date, start_time, end_time, description, color, is_allday } = body
+  const { title, start_date, end_date, start_time, end_time, description, color, is_allday, event_type } = body
 
   if (!title || !start_date) return NextResponse.json({ error: '제목과 날짜는 필수' }, { status: 400 })
 
@@ -48,6 +48,7 @@ export async function POST(req: NextRequest) {
       description: description || '',
       color: color || 'blue',
       is_allday: is_allday ?? true,
+      event_type: event_type || 'etc',
       source: 'local',
       created_by: user.name,
     })

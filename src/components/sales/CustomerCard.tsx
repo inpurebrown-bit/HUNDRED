@@ -490,9 +490,13 @@ export default function CustomerCard({
                 </div>
                 {details.progress_status === '재통화예정' && (
                   <div>
-                    <label className={lbl}>재통화 예정일</label>
-                    <input type="date" value={details.callback_date ?? ''} onChange={e => setDetailField('callback_date', e.target.value)}
-                      className={inp} />
+                    <label className={lbl}>재통화 예정일·시간</label>
+                    <div className="flex gap-2">
+                      <input type="date" value={details.callback_date ?? ''} onChange={e => setDetailField('callback_date', e.target.value)}
+                        className={`${inp} flex-1`} />
+                      <input type="time" value={details.callback_time ?? ''} onChange={e => setDetailField('callback_time', e.target.value)}
+                        className="w-28 border border-gray-200 rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-violet-400" />
+                    </div>
                   </div>
                 )}
               </div>

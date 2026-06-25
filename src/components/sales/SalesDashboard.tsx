@@ -17,6 +17,7 @@ import {
   getRemainingBusinessDays,
 } from '@/lib/businessDays'
 import { SUPPLY_RATE_TABLE, calcRecommendedSupply, isActiveRow, contractWeight } from '@/lib/supplyRules'
+import SalesScheduleTab from './SalesScheduleTab'
 
 // ── Types ──────────────────────────────────────────────────────────────
 interface Contract {
@@ -52,7 +53,7 @@ const MONTHLY_GOALS: Record<string, number> = {
 // All sales users for assignee dropdown (legacy — replaced by dynamic salesUserNames)
 const SALES_USERS: string[] = []
 
-type SalesTab = 'board' | 'db010' | 'customers' | 'contracted' | 'emotional' | 'trash' | 'revenue' | 'report' | 'profile'
+type SalesTab = 'board' | 'db010' | 'customers' | 'contracted' | 'emotional' | 'trash' | 'revenue' | 'report' | 'schedule' | 'profile'
 
 // ── Component ──────────────────────────────────────────────────────────
 export default function SalesDashboard({ userId, userName, username }: Props) {
@@ -130,6 +131,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const [goalEditOpen, setGoalEditOpen] = useState(false)
   const [goalEditValue, setGoalEditValue] = useState('')
   const [goalSaving, setGoalSaving] = useState(false)
+  const [upcomingEvents, setUpcomingEvents] = useState<any[]>([])
 
   async function saveGoal() {
     const num = parseInt(goalEditValue)
@@ -232,6 +234,19 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
     } else {
       setOpsStatusMap({})
     }
+
+    // 2주 일정 미리보기 로드
+    try {
+      const now = new Date()
+      const evRes = await fetch(`/api/events?year=${now.getFullYear()}&month=${now.getMonth() + 1}`)
+      const evData = await evRes.json()
+      const today = now.toISOString().slice(0, 10)
+      const twoWeeks = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)
+      const mine = (evData.events || [])
+        .filter((e: any) => e.created_by === userName && e.start_date >= today && e.start_date <= twoWeeks)
+        .sort((a: any, b: any) => (a.start_date + (a.start_time || '')).localeCompare(b.start_date + (b.start_time || '')))
+      setUpcomingEvents(mine)
+    } catch {}
 
     setLoading(false)
   }
@@ -583,7 +598,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const myDbContracted = thisMonthContracted.reduce(
     (sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0
   )
-  const myTotalContracted = mySupplyCfg ? mySupplyCfg.base + myDbContracted : myDbContracted
+  const myTotalContracted = mySupplyCfg ? (Number(mySupplyCfg.base) || 0) + myDbContracted : myDbContracted
 
   // 월 목표: supply_config.goal 우선, 없으면 MONTHLY_GOALS 폴백
   const monthlyGoal = mySupplyCfg?.goal ?? MONTHLY_GOALS[username] ?? 30
@@ -722,6 +737,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
     { key: 'trash',      label: '자체거절',    count: trashCustomers.length },
     { key: 'revenue',    label: '매출',        count: revenueCustomers.length },
     { key: 'report',     label: '보고' },
+    { key: 'schedule',   label: '일정' },
     { key: 'profile',    label: '사원정보' },
   ]
 
@@ -1188,6 +1204,33 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 </div>
               )
             })()}
+
+            {/* 2주 일정 미리보기 */}
+            {upcomingEvents.length > 0 && (
+              <div className="bg-white border border-[#E8E2D4] rounded-xl overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-[#E8E2D4]">
+                  <h3 className="text-sm font-bold text-[#1B2A45]">📅 2주 이내 일정</h3>
+                  <button onClick={() => setActiveTab('schedule')} className="text-[11px] text-violet-500 font-semibold hover:underline">전체보기</button>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {upcomingEvents.slice(0, 5).map((e: any) => (
+                    <div key={e.id} className="flex items-center gap-3 px-4 py-2.5">
+                      <span className={`shrink-0 text-[9px] font-bold text-white px-1.5 py-0.5 rounded ${
+                        e.event_type === 'recall' ? 'bg-blue-500' : e.event_type === 'meeting' ? 'bg-violet-500' : 'bg-gray-400'
+                      }`}>
+                        {e.event_type === 'recall' ? '재통화' : e.event_type === 'meeting' ? '미팅' : '기타'}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-800 truncate">{e.title}</p>
+                      </div>
+                      <span className="text-[11px] text-gray-400 shrink-0">
+                        {e.start_date.slice(5).replace('-', '/')} {e.start_time || ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1558,6 +1601,11 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         {/* ══════════ 보고 ══════════ */}
         {activeTab === 'report' && (
           <ReportTab userId={userId} userName={userName} />
+        )}
+
+        {/* ══════════ 일정관리 ══════════ */}
+        {activeTab === 'schedule' && (
+          <SalesScheduleTab userName={userName} />
         )}
 
         {/* ══════════ 사원정보 ══════════ */}

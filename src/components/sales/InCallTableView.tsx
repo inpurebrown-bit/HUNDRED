@@ -171,6 +171,10 @@ function getOpsStageStyle(stage: string): { bg: string; label: string } {
   if (stage === '종료예정') return { bg: 'bg-orange-400 text-white', label: '종료예정' }
   if (stage === '종료' || stage === '완료') return { bg: 'bg-gray-400 text-white', label: stage }
   if (stage === '승인')     return { bg: 'bg-emerald-500 text-white', label: '승인' }
+  if (stage === 'absorbed')  return { bg: 'bg-emerald-500 text-white', label: '흡수완료' }
+  if (stage === 'completed') return { bg: 'bg-emerald-700 text-white', label: '완료' }
+  if (stage === 'assigned')  return { bg: 'bg-sky-500 text-white',     label: '신규배정' }
+  if (stage === 'refunded')  return { bg: 'bg-rose-600 text-white',    label: '환불' }
   if (['서류받는중', '접수전'].includes(stage)) return { bg: 'bg-gray-400 text-white', label: stage }
   return { bg: 'bg-blue-500 text-white', label: stage }
 }
