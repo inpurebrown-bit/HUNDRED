@@ -29,6 +29,7 @@ export interface CustomerDetails {
   sensitivity?: '상' | '중' | '하'
   progress_status?: string
   callback_date?: string
+  callback_time?: string
   contract_fee?: string
   payment_amount?: string
   unpaid_amount?: string
