@@ -668,6 +668,7 @@ export default function ReportTab({ userId, userName }: Props) {
             <Section
               title="금일 신규 공급DB 상담결과"
               isEmpty={daily.supply_db === null}
+              itemCount={daily.supply_db?.length ?? 0}
               onToggleEmpty={() => setDaily(p => ({ ...p, supply_db: p.supply_db === null ? [] : null }))}
               onAdd={() => addItem('supply_db', { company: '', content: '', status: '' as ConsultStatus })}
             >
@@ -685,6 +686,7 @@ export default function ReportTab({ userId, userName }: Props) {
             <Section
               title="금일 신규 아웃바운딩 상담결과"
               isEmpty={daily.outbound === null}
+              itemCount={daily.outbound?.length ?? 0}
               onToggleEmpty={() => setDaily(p => ({ ...p, outbound: p.outbound === null ? [] : null }))}
               onAdd={() => addItem('outbound', { company: '', content: '', status: '' as ConsultStatus })}
             >
@@ -702,6 +704,7 @@ export default function ReportTab({ userId, userName }: Props) {
             <Section
               title="고민관리업체"
               isEmpty={daily.worried === null}
+              itemCount={daily.worried?.length ?? 0}
               onToggleEmpty={() => setDaily(p => ({ ...p, worried: p.worried === null ? [] : null }))}
               onAdd={() => addItem('worried', { company: '', content: '', reason: '', probability: '' })}
             >
@@ -718,6 +721,7 @@ export default function ReportTab({ userId, userName }: Props) {
             <Section
               title="결정업체"
               isEmpty={daily.decided === null}
+              itemCount={daily.decided?.length ?? 0}
               onToggleEmpty={() => setDaily(p => ({ ...p, decided: p.decided === null ? [] : null }))}
               onAdd={() => addItem('decided', { company: '', content: '', current_progress: '', next_action: '' })}
             >
@@ -734,6 +738,7 @@ export default function ReportTab({ userId, userName }: Props) {
             <Section
               title="미팅업체"
               isEmpty={daily.meetings === null}
+              itemCount={daily.meetings?.length ?? 0}
               onToggleEmpty={() => setDaily(p => ({ ...p, meetings: p.meetings === null ? [] : null }))}
               onAdd={() => addItem('meetings', { company: '', date: '', time: '', location: '' })}
             >
@@ -750,6 +755,7 @@ export default function ReportTab({ userId, userName }: Props) {
             <Section
               title="입금대기 업체"
               isEmpty={daily.payment_waiting === null}
+              itemCount={daily.payment_waiting?.length ?? 0}
               onToggleEmpty={() => setDaily(p => ({ ...p, payment_waiting: p.payment_waiting === null ? [] : null }))}
               onAdd={() => addItem('payment_waiting', { first_call_date: '', company: '', ceo_name: '', phone: '' })}
             >
@@ -766,18 +772,26 @@ export default function ReportTab({ userId, userName }: Props) {
             <div className="bg-white rounded-xl border border-gray-100 p-5">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-semibold text-gray-800 text-sm">내일도 계속</h4>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
                   <button type="button"
-                    onClick={() => setDaily(p => ({ ...p, continue_tomorrow: p.continue_tomorrow === null ? [] : null }))}
+                    onClick={() => {
+                      const isEmpty = daily.continue_tomorrow === null
+                      if (!isEmpty && (daily.continue_tomorrow?.length ?? 0) > 0) {
+                        if (!window.confirm(`입력한 ${daily.continue_tomorrow?.length}개 항목이 모두 삭제됩니다.\n"없음"으로 처리할까요?`)) return
+                      }
+                      setDaily(p => ({ ...p, continue_tomorrow: p.continue_tomorrow === null ? [] : null }))
+                    }}
                     className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors border ${
                       daily.continue_tomorrow === null
                         ? 'bg-gray-900 text-white border-gray-900'
-                        : 'text-gray-500 border-gray-200 hover:bg-gray-50'
+                        : (daily.continue_tomorrow?.length ?? 0) > 0
+                          ? 'text-gray-300 border-gray-100 hover:text-gray-500 hover:border-gray-200'
+                          : 'text-gray-500 border-gray-200 hover:bg-gray-50'
                     }`}>없음</button>
                   {daily.continue_tomorrow !== null && (
                     <button type="button"
                       onClick={() => setDaily(p => ({ ...p, continue_tomorrow: [...(p.continue_tomorrow || []), ''] }))}
-                      className="text-xs px-3 py-1.5 rounded-lg font-medium bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100 transition-colors">
+                      className="text-xs px-4 py-1.5 rounded-lg font-semibold bg-blue-500 text-white border border-blue-500 hover:bg-blue-600 transition-colors">
                       + 추가
                     </button>
                   )}
@@ -875,27 +889,42 @@ export default function ReportTab({ userId, userName }: Props) {
 }
 
 // ── 섹션 래퍼 ────────────────────────────────────────────
-function Section({ title, isEmpty, onToggleEmpty, onAdd, children }: {
+function Section({ title, isEmpty, onToggleEmpty, onAdd, children, itemCount = 0 }: {
   title: string
   isEmpty: boolean
   onToggleEmpty: () => void
   onAdd: () => void
   children: ReactNode
+  itemCount?: number
 }) {
+  function handleToggleEmpty() {
+    // 이미 없음 상태면 그냥 토글
+    if (isEmpty) { onToggleEmpty(); return }
+    // 항목이 있으면 확인 후 삭제
+    if (itemCount > 0) {
+      if (!window.confirm(`입력한 ${itemCount}개 항목이 모두 삭제됩니다.\n"없음"으로 처리할까요?`)) return
+    }
+    onToggleEmpty()
+  }
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-5">
       <div className="flex items-center justify-between mb-3">
         <h4 className="font-semibold text-gray-800 text-sm">{title}</h4>
-        <div className="flex gap-2">
-          <button type="button" onClick={onToggleEmpty}
+        <div className="flex items-center gap-2">
+          {/* 없음 버튼: 항목 있을 때는 흐리게 표시해 구분 */}
+          <button type="button" onClick={handleToggleEmpty}
             className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors border ${
-              isEmpty ? 'bg-gray-900 text-white border-gray-900' : 'text-gray-500 border-gray-200 hover:bg-gray-50'
+              isEmpty
+                ? 'bg-gray-900 text-white border-gray-900'
+                : itemCount > 0
+                  ? 'text-gray-300 border-gray-100 hover:text-gray-500 hover:border-gray-200'
+                  : 'text-gray-500 border-gray-200 hover:bg-gray-50'
             }`}>
             없음
           </button>
           {!isEmpty && (
             <button type="button" onClick={onAdd}
-              className="text-xs px-3 py-1.5 rounded-lg font-medium bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100 transition-colors">
+              className="text-xs px-4 py-1.5 rounded-lg font-semibold bg-blue-500 text-white border border-blue-500 hover:bg-blue-600 transition-colors">
               + 추가
             </button>
           )}
