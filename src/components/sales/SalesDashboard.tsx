@@ -991,7 +991,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 .reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0)
               const dirCnt    = dirCntAuto  // DB 실시간
               const dirPay    = dirPayAuto  // DB 실시간
-              const target    = Number(pr?.target ?? monthlyGoal)
+              const target    = Number(monthlyGoal)
               const total     = supPay + dirPay
               const supRate   = supCnt > 0 ? (supPay / supCnt * 100) : null
               const dirRate   = dirCnt > 0 ? (dirPay / dirCnt * 100) : null
