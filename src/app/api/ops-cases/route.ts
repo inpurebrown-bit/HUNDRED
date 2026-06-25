@@ -145,6 +145,15 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // refund_month 필터: 급여명세서에서 해당 월 환불완료 케이스만 조회
+  const refundMonth = req.nextUrl.searchParams.get('refund_month')
+  if (refundMonth) {
+    cases = cases.filter(c =>
+      c.details?.refund_completed === true &&
+      c.details?.refund_completed_at === refundMonth
+    )
+  }
+
   // 전화번호 목록으로 customers 테이블 일괄 조회
   const phones = [...new Set(cases.map((c: any) => c.phone).filter(Boolean))]
   let customerMap: Record<string, any> = {}

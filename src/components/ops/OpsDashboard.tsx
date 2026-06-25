@@ -7,6 +7,7 @@ import Link from 'next/link'
 import MyProfileTab from '@/components/MyProfileTab'
 import PullToRefresh from '@/components/ui/PullToRefresh'
 import SplitView from '@/components/shared/SplitView'
+import { contractWeight } from '@/lib/supplyRules'
 // ── KST Utils ──────────────────────────────────────────────────────────
 function nowKST() {
   return new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(' ', 'T') + '+09:00'
@@ -468,6 +469,48 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
   function handleCeoReject() {
     handleStageChange('서류받는중')
   }
+
+  async function handleRefundComplete() {
+    const company = d.company || c.customers?.details?.company || c.customers?.name || '—'
+    const feeAmt  = parseFloat(String(d.fee_amount || '0').replace(/[^0-9.]/g, '')) || 0
+    const dedCnt  = contractWeight(feeAmt, false) // fee_amount는 공급가액(VAT제외)
+    const fmtFee  = feeAmt > 0 ? feeAmt.toLocaleString('ko-KR') + '원' : '—'
+    const ok = window.confirm(
+      `[환불완료 처리]\n\n업체: ${company}\n수수료 환수금액: ${fmtFee}\n공제 건수: -${dedCnt}개\n\n환불완료 처리하시겠습니까?`
+    )
+    if (!ok) return
+
+    const kstMonth = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(0, 7)
+    const opsUser  = c.ops_user_name || userName || ''
+    const salesUser = d.sales_user_name || ''
+
+    const patch = {
+      progress_stage: 'refunded',
+      details: {
+        ...(local.details || {}),
+        refund_completed: true,
+        refund_completed_at: kstMonth,
+        refund_deduction_count: dedCnt,
+        refund_deduction_amount: feeAmt,
+        refund_ops_user: opsUser,
+        refund_sales_user: salesUser,
+      },
+    }
+
+    try {
+      const res = await fetch(`/api/ops-cases/${c.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      })
+      if (!res.ok) { alert('저장 실패'); return }
+      setLocal(prev => ({ ...prev, ...patch, details: patch.details }))
+      onSave(c.id, patch)
+    } catch {
+      alert('네트워크 오류')
+    }
+  }
+
   async function handleFeeSave() {
     // 진행 중인 자동저장 타이머 취소 (race condition 방지)
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
@@ -721,6 +764,32 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                 <input type="text" value={d.contract_notes || ''} onChange={e => detailField('contract_notes', e.target.value)} className={inp} placeholder="계약 관련 특이사항" />
               </div>
             </div>
+
+            {/* ── 환불완료 버튼 (환불 단계일 때만 표시) ── */}
+            {local.progress_stage === '환불' && !d.refund_completed && (
+              <div className="mt-2 bg-rose-50 border border-rose-200 rounded-xl p-3">
+                <p className="text-xs font-bold text-rose-700 mb-1">환불 처리</p>
+                <p className="text-[11px] text-rose-600 mb-2">
+                  수수료 환수금: <b>{d.fee_amount ? Number(d.fee_amount).toLocaleString('ko-KR') + '원' : '—'}</b>
+                  {d.fee_amount ? ` (공제 ${contractWeight(parseFloat(String(d.fee_amount)), false)}개)` : ''}
+                </p>
+                <button type="button"
+                  onClick={handleRefundComplete}
+                  className="w-full py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors">
+                  환불완료 처리
+                </button>
+              </div>
+            )}
+            {d.refund_completed && (
+              <div className="mt-2 bg-gray-50 border border-gray-200 rounded-xl p-3 text-center">
+                <span className="text-[11px] font-bold text-gray-500">환불완료 {d.refund_completed_at && `(${d.refund_completed_at})`}</span>
+                {d.refund_deduction_amount > 0 && (
+                  <p className="text-[10px] text-gray-400 mt-0.5">
+                    환수금 {Number(d.refund_deduction_amount).toLocaleString('ko-KR')}원 · 공제 {d.refund_deduction_count}개
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* ── 핸들링 섹션 ── */}

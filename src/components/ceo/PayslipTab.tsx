@@ -100,7 +100,7 @@ function PayslipDocument({ emp, financial, yearMonth }: {
   const tdN = 'border border-gray-400 px-2 py-1 text-xs text-right'
 
   const refundNames = financial.refund_companies?.trim()
-    ? financial.refund_companies.split(',').map(s => s.trim()).filter(Boolean)
+    ? financial.refund_companies.split('|').map(s => s.trim()).filter(Boolean)
     : []
 
   // ── 영업팀 계산 ──
@@ -472,11 +472,12 @@ export default function PayslipTab() {
   async function handleLoad() {
     setLoading(true); setMsg('')
     try {
-      const [payRes, custRes] = await Promise.all([
+      const [payRes, custRes, refundRes] = await Promise.all([
         fetch(`/api/payroll?year_month=${yearMonth}`),
         fetch('/api/customers'),
+        fetch(`/api/ops-cases?refund_month=${yearMonth}`),
       ])
-      const [json, custJson] = await Promise.all([payRes.json(), custRes.json()])
+      const [json, custJson, refundJson] = await Promise.all([payRes.json(), custRes.json(), refundRes.json()])
 
       const emps = json.record?.employees
       const opsList: any[] = emps?.ops_employees || []
@@ -546,6 +547,65 @@ export default function PayslipTab() {
         }
       }
 
+      // ── 환불 공제 자동 집계 ──────────────────────────────────
+      // ops-cases 중 해당 월 환불완료 건 → 담당자별 공제금액/업체명 수집
+      const refundCaseList: any[] = refundJson.cases || []
+      const refundByOpsUser: Record<string, { totalAmt: number; companies: string[] }> = {}
+      const refundBySalesUser: Record<string, { totalCount: number; totalRevenue: number; companies: string[] }> = {}
+
+      for (const rc of refundCaseList) {
+        const rd = rc.details || {}
+        if (rd.refund_completed_at !== yearMonth) continue
+
+        const opsUser   = (rd.refund_ops_user   || rc.ops_user_name || '').trim()
+        const salesUser = (rd.refund_sales_user || rd.sales_user_name || '').trim()
+        const company   = rd.company || rc.customers?.details?.company || rc.customers?.name || '—'
+        const dedAmt    = Number(rd.refund_deduction_amount || 0)
+        const dedCnt    = Number(rd.refund_deduction_count  || 0)
+
+        if (opsUser) {
+          if (!refundByOpsUser[opsUser]) refundByOpsUser[opsUser] = { totalAmt: 0, companies: [] }
+          refundByOpsUser[opsUser].totalAmt += dedAmt
+          refundByOpsUser[opsUser].companies.push(`${company}(${dedAmt.toLocaleString('ko-KR')}원)`)
+        }
+        if (salesUser) {
+          if (!refundBySalesUser[salesUser]) refundBySalesUser[salesUser] = { totalCount: 0, totalRevenue: 0, companies: [] }
+          refundBySalesUser[salesUser].totalCount   += dedCnt
+          refundBySalesUser[salesUser].totalRevenue += dedAmt
+          refundBySalesUser[salesUser].companies.push(`${company}(-${dedCnt}개)`)
+        }
+      }
+
+      // 환불 공제를 updates에 반영
+      for (const emp of employees) {
+        const nameMatch = (a: string, b: string) => a === b || a.includes(b) || b.includes(a)
+
+        if (emp.team === 'ops') {
+          const key = Object.keys(refundByOpsUser).find(k => nameMatch(emp.name, k))
+          if (key) {
+            const r = refundByOpsUser[key]
+            updates[emp.id] = {
+              ...(updates[emp.id] || {}),
+              deduction:        r.totalAmt,
+              refund_companies: r.companies.join(' | '),
+            }
+          }
+        } else {
+          const key = Object.keys(refundBySalesUser).find(k => nameMatch(emp.name, k))
+          if (key) {
+            const r = refundBySalesUser[key]
+            const cur = updates[emp.id] || {}
+            updates[emp.id] = {
+              ...cur,
+              contract_count:   Math.max(0, (Number(cur.contract_count)   || 0) - r.totalCount),
+              contract_revenue: Math.max(0, (Number(cur.contract_revenue) || 0) - r.totalRevenue),
+              deduction:        r.totalRevenue,
+              refund_companies: r.companies.join(' | '),
+            }
+          }
+        }
+      }
+
       setFinancials(prev => {
         const next = { ...prev }
         for (const [id, patch] of Object.entries(updates)) {
@@ -554,7 +614,11 @@ export default function PayslipTab() {
         return next
       })
       const loaded = Object.keys(updates).length
-      setMsg(loaded > 0 ? `${loaded}명 데이터 불러오기 완료 (실시간 계약 반영)` : '이름이 일치하는 직원이 없습니다')
+      const refundLoaded = refundCaseList.length
+      setMsg(loaded > 0
+        ? `${loaded}명 데이터 불러오기 완료${refundLoaded > 0 ? ` (환불 ${refundLoaded}건 반영)` : ''}`
+        : '이름이 일치하는 직원이 없습니다'
+      )
     } catch { setMsg('불러오기 실패') }
     finally { setLoading(false) }
   }
