@@ -1122,8 +1122,12 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                     {/* 통합 요약 */}
                     <div className="border border-[#C5A258]/30 bg-gradient-to-r from-[#1B2A45]/5 to-[#C5A258]/5 rounded-xl p-3 grid grid-cols-3 divide-x divide-[#C5A258]/20 text-center">
                       <div className="pr-3">
-                        <p className="text-[9px] text-gray-400 font-semibold mb-0.5">총결제</p>
-                        <p className="text-lg font-black text-gray-800">{fmtV(total)}</p>
+                        <p className="text-[9px] text-[#C5A258] font-bold mb-0.5 tracking-wide">총결제</p>
+                        <p className={`text-2xl font-black ${
+                          total >= target ? 'text-emerald-500' :
+                          achievePct >= 60 ? 'text-[#C5A258]' : 'text-orange-500'
+                        }`}>{fmtV(total)}</p>
+                        <p className="text-[8px] text-gray-400 mt-0.5">/ {target}개 목표</p>
                       </div>
                       <div className="px-3">
                         <p className="text-[9px] text-teal-500 font-semibold mb-0.5">총결제율</p>
