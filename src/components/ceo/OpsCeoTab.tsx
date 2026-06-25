@@ -113,13 +113,15 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
 
   const isAbsorbed = ['absorbed','completed','종료','완료','환불','refunded'].includes(c.progress_stage)
   const needsAbsorb = !isAbsorbed
-  const needsConsulting = !c.details?.consulting_sent && !isAbsorbed
+  const needsConsulting = !c.details?.consulting_sent &&
+    !['종료','완료','환불','refunded','completed'].includes(c.progress_stage)
   const needsTaxInvoiceDown = c.details?.tax_invoice === '희망' && !c.details?.tax_invoice_completed
   const feeEntries: any[] = c.details?.payment_entries || []
-  const hasSavedFeeEntry = !!c.details?.fee_amount || feeEntries.some((e: any) => !!e.fee_amount)
+  const hasSavedFeeEntry = (!!c.details?.fee_locked && !!c.details?.fee_amount) ||
+    feeEntries.some((e: any) => !!e.fee_amount && !!e.fee_locked)
   const needsTaxInvoiceFee = hasSavedFeeEntry && (
-    !c.details?.tax_invoice_issued ||
-    feeEntries.some((e: any) => !!e.fee_amount && !e.tax_invoice_issued)
+    (!!c.details?.fee_locked && !c.details?.tax_invoice_issued) ||
+    feeEntries.some((e: any) => !!e.fee_amount && !!e.fee_locked && !e.tax_invoice_issued)
   )
   const needsTaxInvoiceBadge = needsTaxInvoiceDown || needsTaxInvoiceFee
 

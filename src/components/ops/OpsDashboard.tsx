@@ -1721,16 +1721,18 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
   const needsAbsorb = !isAbsorbed
   // 착수금 세금계산서 미발급
   const needsTaxInvoiceDown = c.details?.tax_invoice === '희망' && !c.details?.tax_invoice_completed
-  // 수수료 세금계산서 미발급 (저장된 입금 항목 중 하나라도 tax_invoice_issued 없는 경우)
+  // 수수료 세금계산서 미발급 (잠금된 항목에 한해서만 체크)
   const feeEntries: any[] = c.details?.payment_entries || []
-  const hasSavedFeeEntry = !!c.details?.fee_amount || feeEntries.some((e: any) => !!e.fee_amount)
+  const hasSavedFeeEntry = (!!c.details?.fee_locked && !!c.details?.fee_amount) ||
+    feeEntries.some((e: any) => !!e.fee_amount && !!e.fee_locked)
   const needsTaxInvoiceFee = hasSavedFeeEntry && (
-    (!c.details?.tax_invoice_issued) ||
-    feeEntries.some((e: any) => !!e.fee_amount && !e.tax_invoice_issued)
+    (!!c.details?.fee_locked && !c.details?.tax_invoice_issued) ||
+    feeEntries.some((e: any) => !!e.fee_amount && !!e.fee_locked && !e.tax_invoice_issued)
   )
   const needsTaxInvoiceBadge = needsTaxInvoiceDown || needsTaxInvoiceFee
-  // 컨설팅 자료 미전송 여부 (종료/완료/환불 제외한 활성 케이스)
-  const needsConsulting = !c.details?.consulting_sent && !isAbsorbed
+  // 컨설팅 자료 미전송 — 종료/완료/환불만 제외 (absorbed는 아직 자료 미전송일 수 있음)
+  const needsConsulting = !c.details?.consulting_sent &&
+    !['종료','완료','환불','refunded','completed'].includes(c.progress_stage)
 
   return (
     <div
