@@ -1868,12 +1868,51 @@ function CustomerCard({
                   {/* 재통화 일정 */}
                   <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                     <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">재통화 일정</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="date"
+                        value={c.details?.follow_up_date || ''}
+                        onChange={e => onUpdate(c.id, { details: { follow_up_date: e.target.value } })}
+                        className="flex-1 border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50 text-gray-800"
+                      />
+                      <input
+                        type="time"
+                        value={c.details?.follow_up_time || ''}
+                        onChange={e => onUpdate(c.id, { details: { follow_up_time: e.target.value } })}
+                        className="w-28 border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50 text-gray-800"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 미팅 일정 */}
+                  <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                    <label className="text-[10px] text-violet-700 mb-1.5 block font-bold">미팅 일정</label>
+                    <div className="flex gap-2 mb-2">
+                      <input
+                        type="date"
+                        value={c.details?.meeting_date || ''}
+                        onChange={e => onUpdate(c.id, { details: { meeting_date: e.target.value } })}
+                        className="flex-1 border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400/50 text-gray-800"
+                      />
+                      <input
+                        type="time"
+                        value={c.details?.meeting_time || ''}
+                        onChange={e => onUpdate(c.id, { details: { meeting_time: e.target.value } })}
+                        className="w-28 border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400/50 text-gray-800"
+                      />
+                    </div>
                     <input
-                      type="date"
-                      value={c.details?.follow_up_date || ''}
-                      onChange={e => onUpdate(c.id, { details: { follow_up_date: e.target.value } })}
-                      className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50 text-gray-800"
+                      type="text"
+                      value={c.details?.meeting_memo || ''}
+                      onChange={e => onUpdate(c.id, { details: { meeting_memo: e.target.value } })}
+                      placeholder="메모 (장소, 내용 등)"
+                      className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400/50 text-gray-800"
                     />
+                    {c.details?.meeting_date && (
+                      <button type="button"
+                        onClick={() => onUpdate(c.id, { details: { meeting_date: '', meeting_time: '', meeting_memo: '' } })}
+                        className="text-[10px] text-red-400 hover:text-red-600 mt-1.5">미팅 일정 삭제</button>
+                    )}
                   </div>
 
                   {/* A/S 요청 + 심사 요청 */}

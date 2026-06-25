@@ -1218,8 +1218,10 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               for (const c of myCustomers) {
                 const d = (c as any).details || {}
                 const company = d.company || c.name || '—'
-                if (d.callback_date && d.callback_date >= todayS && d.callback_date <= twoWeeksS) {
-                  upcoming.push({ date: d.callback_date, time: d.callback_time, type: 'recall', company })
+                const recallDate = d.callback_date || d.follow_up_date
+                const recallTime = d.callback_time || d.follow_up_time
+                if (recallDate && recallDate >= todayS && recallDate <= twoWeeksS) {
+                  upcoming.push({ date: recallDate, time: recallTime, type: 'recall', company })
                 }
                 if (d.meeting_date && d.meeting_date >= todayS && d.meeting_date <= twoWeeksS) {
                   upcoming.push({ date: d.meeting_date, time: d.meeting_time, type: 'meeting', company })

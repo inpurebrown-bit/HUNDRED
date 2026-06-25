@@ -39,11 +39,13 @@ export default function SalesScheduleTab({
     for (const c of customers) {
       const d = c.details || {}
       const company = d.company || c.name || '—'
-      // 재통화
-      if (d.callback_date) {
+      // 재통화 (callback_date: CustomerCard 저장, follow_up_date: InCallTableView 저장)
+      const recallDate = d.callback_date || d.follow_up_date
+      const recallTime = d.callback_time || d.follow_up_time
+      if (recallDate) {
         list.push({
-          date: d.callback_date,
-          time: d.callback_time || undefined,
+          date: recallDate,
+          time: recallTime || undefined,
           type: 'recall',
           company,
           customerId: c.id,
