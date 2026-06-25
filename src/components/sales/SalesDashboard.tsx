@@ -1170,8 +1170,9 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
 
             {/* 2주 달력 (2줄 × 7일 그리드) */}
             {(() => {
-              const todayD = new Date()
-              const todayS = todayD.toISOString().slice(0, 10)
+              // KST 기준 오늘 날짜
+              const kstNow = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' })
+              const todayS = kstNow.slice(0, 10)
               const myCustomers = customers.filter(c => {
                 const d = (c as any).details || {}
                 return d.sales_user_name === userName || (c as any).sales_user_name === userName
@@ -1191,10 +1192,15 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   evMap[d.meeting_date].push({ type: 'meeting', company, time: d.meeting_time })
                 }
               }
+              // KST 기준 14일 배열
               const days = Array.from({ length: 14 }, (_, i) => {
                 const d = new Date(Date.now() + i * 86400000)
-                const s = d.toISOString().slice(0, 10)
-                return { s, day: d.getDate(), dow: d.getDay() }
+                // KST 날짜 문자열
+                const s = d.toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(0, 10)
+                // KST 요일: new Date(YYYY-MM-DDT00:00:00+09:00)
+                const dow = new Date(s + 'T00:00:00+09:00').getDay()
+                const day = parseInt(s.slice(8, 10), 10)
+                return { s, day, dow }
               })
               const week1 = days.slice(0, 7)
               const week2 = days.slice(7, 14)

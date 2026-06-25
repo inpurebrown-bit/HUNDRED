@@ -57,7 +57,8 @@ export default function SalesScheduleTab({ customers }: { customers: any[] }) {
 
   const daysInMonth = getDaysInMonth(viewYear, viewMonth)
   const firstDow = getFirstDayOfWeek(viewYear, viewMonth)
-  const todayStr = today.toISOString().slice(0, 10)
+  // KST 기준 오늘 날짜
+  const todayStr = today.toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(0, 10)
   const monthKey = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`
   const monthEvents = events.filter(e => e.date.startsWith(monthKey))
 
