@@ -1133,12 +1133,34 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                         </p>
                       </div>
                       <div className="pl-3">
-                        <p className={`text-[9px] font-semibold mb-0.5 ${supStopped ? 'text-red-400' : 'text-amber-500'}`}>
-                          내일 공급예정
-                        </p>
-                        <p className={`text-lg font-black ${supStopped ? 'text-red-600' : 'text-amber-700'}`}>
-                          {supRate === null ? '—' : supStopped ? '중단' : `${dailyRec}개`}
-                        </p>
+                        {(() => {
+                          // 직접결제율 기준으로 목표 달성에 필요한 직가 가망 수
+                          if (total >= target) {
+                            return (
+                              <>
+                                <p className="text-[9px] text-emerald-500 font-semibold mb-0.5">직가 목표달성</p>
+                                <p className="text-lg font-black text-emerald-600">완료</p>
+                              </>
+                            )
+                          }
+                          if (dirRate === null || dirRate <= 0) {
+                            return (
+                              <>
+                                <p className="text-[9px] text-gray-400 font-semibold mb-0.5">직가 추가필요</p>
+                                <p className="text-lg font-black text-gray-400">—</p>
+                                <p className="text-[8px] text-gray-300">직접결제율 없음</p>
+                              </>
+                            )
+                          }
+                          const needMore = Math.ceil(needed / (dirRate / 100))
+                          return (
+                            <>
+                              <p className="text-[9px] text-violet-500 font-semibold mb-0.5">직가 추가필요</p>
+                              <p className="text-lg font-black text-violet-700">{needMore}개</p>
+                              <p className="text-[8px] text-violet-400">{fmtP(dirRate)} 기준</p>
+                            </>
+                          )
+                        })()}
                       </div>
                     </div>
                   </div>
