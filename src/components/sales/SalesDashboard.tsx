@@ -1205,51 +1205,88 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               )
             })()}
 
-            {/* 2주 일정 미리보기 (customer 기반 callback/meeting) */}
+            {/* 2주 달력 스트립 */}
             {(() => {
               const todayD = new Date()
               const todayS = todayD.toISOString().slice(0, 10)
-              const twoWeeksS = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)
               const myCustomers = customers.filter(c => {
                 const d = (c as any).details || {}
                 return d.sales_user_name === userName || (c as any).sales_user_name === userName
               })
-              const upcoming: { date: string; time?: string; type: 'recall' | 'meeting'; company: string }[] = []
+              // 이벤트 맵 생성
+              const evMap: Record<string, { type: 'recall' | 'meeting'; company: string; time?: string }[]> = {}
               for (const c of myCustomers) {
                 const d = (c as any).details || {}
                 const company = d.company || c.name || '—'
                 const recallDate = d.callback_date || d.follow_up_date
                 const recallTime = d.callback_time || d.follow_up_time
-                if (recallDate && recallDate >= todayS && recallDate <= twoWeeksS) {
-                  upcoming.push({ date: recallDate, time: recallTime, type: 'recall', company })
+                if (recallDate) {
+                  if (!evMap[recallDate]) evMap[recallDate] = []
+                  evMap[recallDate].push({ type: 'recall', company, time: recallTime })
                 }
-                if (d.meeting_date && d.meeting_date >= todayS && d.meeting_date <= twoWeeksS) {
-                  upcoming.push({ date: d.meeting_date, time: d.meeting_time, type: 'meeting', company })
+                if (d.meeting_date) {
+                  if (!evMap[d.meeting_date]) evMap[d.meeting_date] = []
+                  evMap[d.meeting_date].push({ type: 'meeting', company, time: d.meeting_time })
                 }
               }
-              upcoming.sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')))
-              if (upcoming.length === 0) return null
+              // 14일 배열
+              const days = Array.from({ length: 14 }, (_, i) => {
+                const d = new Date(Date.now() + i * 86400000)
+                const s = d.toISOString().slice(0, 10)
+                const dow = d.getDay()
+                return { s, day: d.getDate(), dow }
+              })
+              const hasAny = days.some(d => (evMap[d.s] || []).length > 0)
               return (
                 <div className="bg-white border border-[#E8E2D4] rounded-xl overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-[#E8E2D4]">
-                    <h3 className="text-sm font-bold text-[#1B2A45]">📅 2주 이내 일정</h3>
-                    <button onClick={() => setActiveTab('schedule')} className="text-[11px] text-violet-500 font-semibold hover:underline">전체보기</button>
+                    <h3 className="text-sm font-bold text-[#1B2A45]">📅 2주 일정</h3>
+                    <button onClick={() => setActiveTab('schedule')} className="text-[11px] text-violet-500 font-semibold hover:underline">캘린더 전체보기</button>
                   </div>
-                  <div className="divide-y divide-gray-50">
-                    {upcoming.slice(0, 5).map((e, i) => (
-                      <div key={i} className="flex items-center gap-3 px-4 py-2.5">
-                        <span className={`shrink-0 text-[9px] font-bold text-white px-1.5 py-0.5 rounded ${
-                          e.type === 'recall' ? 'bg-blue-500' : 'bg-violet-500'
-                        }`}>
-                          {e.type === 'recall' ? '재통화' : '미팅'}
-                        </span>
-                        <p className="flex-1 text-sm font-medium text-gray-800 truncate">{e.company}</p>
-                        <span className="text-[11px] text-gray-400 shrink-0">
-                          {e.date.slice(5).replace('-', '/')}{e.time ? ' ' + e.time : ''}
-                        </span>
+                  {!hasAny ? (
+                    <p className="text-xs text-gray-400 text-center py-5">2주 이내 일정 없음</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <div className="flex min-w-max px-2 py-3 gap-1.5">
+                        {days.map(({ s, day, dow }) => {
+                          const isToday = s === todayS
+                          const evs = (evMap[s] || []).sort((a, b) => (a.time || '').localeCompare(b.time || ''))
+                          const shown = evs.slice(0, 3)
+                          const extra = evs.length - shown.length
+                          return (
+                            <div key={s}
+                              onClick={() => setActiveTab('schedule')}
+                              className={`w-[72px] rounded-xl p-1.5 cursor-pointer transition-colors shrink-0 ${
+                                isToday ? 'bg-[#1B2A45]/5 ring-1 ring-[#1B2A45]/20' : evs.length > 0 ? 'bg-gray-50' : ''
+                              }`}>
+                              {/* 날짜 헤더 */}
+                              <div className="flex items-center gap-1 mb-1.5">
+                                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
+                                  isToday ? 'bg-[#1B2A45] text-white' :
+                                  dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-gray-700'
+                                }`}>{day}</span>
+                                <span className={`text-[9px] font-semibold ${
+                                  dow === 0 ? 'text-red-400' : dow === 6 ? 'text-blue-400' : 'text-gray-400'
+                                }`}>{'일월화수목금토'[dow]}</span>
+                              </div>
+                              {/* 이벤트 칩 */}
+                              <div className="space-y-0.5">
+                                {shown.map((e, i) => (
+                                  <div key={i} className={`rounded px-1 py-0.5 leading-tight ${
+                                    e.type === 'recall' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'
+                                  }`}>
+                                    <p className="text-[9px] font-bold truncate">{e.company}</p>
+                                    {e.time && <p className="text-[8px] opacity-70">{e.time}</p>}
+                                  </div>
+                                ))}
+                                {extra > 0 && <p className="text-[8px] text-gray-400 pl-0.5">+{extra}</p>}
+                              </div>
+                            </div>
+                          )
+                        })}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  )}
                 </div>
               )
             })()}
