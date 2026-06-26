@@ -1880,6 +1880,10 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
     feeEntries.some((e: any) => !!e.fee_amount && !!e.fee_locked && e.tax_invoice_requested === true && !e.tax_invoice_issued)
   )
   const needsTaxInvoiceBadge = needsTaxInvoiceDown || needsTaxInvoiceFee
+  // 뱃지 구분용
+  const taxInvoiceBadgeLabel = needsTaxInvoiceDown && needsTaxInvoiceFee ? '계산서(2)'
+    : needsTaxInvoiceDown ? '착수계산서'
+    : '수수료계산서'
   // 컨설팅 자료 미전송 — 종료/완료/환불만 제외 (absorbed는 아직 자료 미전송일 수 있음)
   const needsConsulting = !c.details?.consulting_sent &&
     !['종료','완료','환불','refunded','completed'].includes(c.progress_stage)
@@ -1898,7 +1902,7 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
           <span className="text-[7px] font-bold bg-indigo-500 text-white px-1 rounded leading-tight shrink-0">흡수</span>
         )}
         {needsTaxInvoiceBadge && (
-          <span className="text-[7px] font-bold bg-red-500 text-white px-1 rounded leading-tight shrink-0">계산서</span>
+          <span className="text-[7px] font-bold bg-red-500 text-white px-1 rounded leading-tight shrink-0">{taxInvoiceBadgeLabel}</span>
         )}
         {needsConsulting && (
           <span className="text-[7px] font-bold bg-amber-500 text-white px-1 rounded leading-tight shrink-0">자료</span>
