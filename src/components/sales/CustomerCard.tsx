@@ -38,6 +38,8 @@ export interface CustomerDetails {
   unpaid_amount?: string
   tax_invoice?: string
   commission_rate?: string
+  has_cash?: boolean
+  has_card?: boolean
   ops_transferred?: boolean
   is_cancelled?: boolean
 }
