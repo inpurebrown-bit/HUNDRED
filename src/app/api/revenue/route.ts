@@ -209,11 +209,11 @@ export async function GET(req: NextRequest) {
     if (month >= currH1Start && month <= currH1End) vatCurrH1.sales_vat += vat
   })
 
-  // 관리팀 수수료 VAT (tax_invoice_requested=true → fee_amount*0.1)
+  // 관리팀 수수료 VAT: tax_invoice_requested=false로 명시된 것만 제외, 나머지(true/undefined) 포함
   ;(opsCases || []).forEach((c: any) => {
     const d = c.details || {}
     // 1차 수수료
-    if (d.tax_invoice_requested) {
+    if (d.tax_invoice_requested !== false) {
       const feeAmt = parseMoney(d.fee_amount)
       if (feeAmt > 0) {
         const vat = Math.round(feeAmt * 0.1)
@@ -224,7 +224,7 @@ export async function GET(req: NextRequest) {
     }
     // payment_entries 수수료
     for (const pe of (d.payment_entries || [])) {
-      if (!pe.tax_invoice_requested) continue
+      if (pe.tax_invoice_requested === false) continue
       const feeAmt = parseMoney(pe.fee_amount)
       if (feeAmt <= 0) continue
       const vat = Math.round(feeAmt * 0.1)
