@@ -51,7 +51,10 @@ export async function GET(req: NextRequest) {
   // ── 영업팀 계약 리스트 변환 ──────────────────────────────────────────
   const salesEntries = (custContracted || [])
     .map((c: any) => {
-      const rev = parseMoney(c.details?.my_revenue) || parseMoney(c.details?.payment_amount)
+      const payAmt = parseMoney(c.details?.payment_amount)
+      // vat_included=true이면 공급가액(부가세제외)을 매출로 사용
+      const supplyAmt = c.details?.vat_included ? Math.round(payAmt / 1.1) : payAmt
+      const rev = parseMoney(c.details?.my_revenue) || supplyAmt
       if (rev === 0) return null
       return {
         id: c.id,
