@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
   // ── 영업팀 계약 리스트 변환 ──────────────────────────────────────────
   const salesEntries = (custContracted || [])
     .map((c: any) => {
-      const rev = parseMoney(c.details?.my_revenue)
+      const rev = parseMoney(c.details?.my_revenue) || parseMoney(c.details?.payment_amount)
       if (rev === 0) return null
       return {
         id: c.id,

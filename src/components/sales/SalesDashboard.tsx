@@ -425,6 +425,12 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         timeline: salesTimeline.length > 0 ? salesTimeline : undefined,
         customer_id: customer.id,
         details: {
+          // 영업팀 세금계산서/결제방식 → 관리팀 착수금 섹션으로 직접 반영
+          tax_invoice: anyDetails.tax_invoice === '발급' ? '희망' : anyDetails.tax_invoice === '미발급' ? '미희망' : undefined,
+          has_cash: anyDetails.has_cash || false,
+          has_card: anyDetails.has_card || false,
+          // 카드결제는 자동신고 → 착수금 세금계산서 발급완료 자동 처리
+          ...(anyDetails.has_card ? { tax_invoice_completed: true } : {}),
           sales_customer_info: {
             customer_id:      customer.id,
             company:          (anyDetails.company as string) || customer.company || customer.name || '',

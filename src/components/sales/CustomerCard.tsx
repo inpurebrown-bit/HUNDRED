@@ -172,6 +172,14 @@ export default function CustomerCard({
     })
     triggerAutosave()
   }
+  function setDetailFields(patch: Partial<CustomerDetails>) {
+    setDetails(prev => {
+      const next = { ...prev, ...patch }
+      latestStateRef.current = { ...latestStateRef.current, details: next }
+      return next
+    })
+    triggerAutosave()
+  }
 
   function handleNameChange(v: string) { setName(v); latestStateRef.current = { ...latestStateRef.current, name: v }; triggerAutosave() }
   function handlePhoneChange(v: string) { setPhone(v); latestStateRef.current = { ...latestStateRef.current, phone: v }; triggerAutosave() }
@@ -570,21 +578,46 @@ export default function CustomerCard({
                   </div>
                 </div>
 
-                {/* 세금계산서 */}
-                <div>
-                  <label className={lbl}>세금계산서발급</label>
-                  <div className="flex gap-2">
-                    {(['발급', '미발급'] as const).map(opt => (
-                      <button key={opt}
-                        onClick={() => setDetailField('tax_invoice', opt)}
-                        className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                          details.tax_invoice === opt
-                            ? opt === '발급' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-gray-500 text-white border-gray-500'
-                            : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                        }`}>
-                        {opt}
-                      </button>
-                    ))}
+                {/* 세금계산서 + 결제방식 */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={lbl}>세금계산서발급</label>
+                    <div className="flex gap-2 mt-1">
+                      {(['발급', '미발급'] as const).map(opt => (
+                        <button key={opt}
+                          onClick={() => setDetailField('tax_invoice', opt)}
+                          className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                            details.tax_invoice === opt
+                              ? opt === '발급' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-gray-500 text-white border-gray-500'
+                              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                          }`}>
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className={lbl}>결제방식</label>
+                    <div className="flex gap-2 mt-1">
+                      {([{ key: 'has_cash', label: '현금' }, { key: 'has_card', label: '카드' }] as const).map(opt => (
+                        <button key={opt.key}
+                          onClick={() => {
+                            const newVal = !details[opt.key]
+                            if (opt.key === 'has_card' && newVal) {
+                              setDetailFields({ has_card: true, tax_invoice: '발급' } as any)
+                            } else {
+                              setDetailField(opt.key, newVal)
+                            }
+                          }}
+                          className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                            details[opt.key]
+                              ? 'bg-blue-500 text-white border-blue-500'
+                              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                          }`}>
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 

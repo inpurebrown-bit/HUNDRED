@@ -286,6 +286,7 @@ export default function PayrollTab() {
   const [costs, setCosts]     = useState<OtherCosts>(defaultCosts())
   const [revTotals, setRevTotals] = useState<{ sales: number; ops: number; opsContract: number } | null>(null)
   const [perPersonSupply, setPerPersonSupply] = useState<{ name: string; count: number }[]>([])
+  const [salesContractMap, setSalesContractMap] = useState<Record<string, Array<{ company: string; amount: number; weight: number; date: string }>>>({})
 
   // 개인재무에서 자동 산출 (대출이자 + 구독료)
   // DB 미저장 시 PersonalFinanceTab DEFAULT_LOANS + DEFAULT_SUBS 합계를 기본값으로 사용
@@ -434,6 +435,7 @@ export default function PayrollTab() {
 
       // 영업팀
       const salesByName: Record<string, { amount: number; count: number }> = {}
+      const contractDetails: Record<string, Array<{ company: string; amount: number; weight: number; date: string }>> = {}
       for (const e of salesEntries) {
         const name = (e.sales_user_name || '').trim()
         if (!name) continue
@@ -442,7 +444,15 @@ export default function PayrollTab() {
         // contractWeight 기준 가중치 적용 (50만이하=0.5, 31~99만=1, 100만~=2,3,4...)
         const w = contractWeight((e as any).payment_amount, (e as any).vat_included)
         salesByName[name].count += w > 0 ? w : 1  // payment_amount 없으면 1로 폴백
+        if (!contractDetails[name]) contractDetails[name] = []
+        contractDetails[name].push({
+          company: (e as any).company || '(업체명 없음)',
+          amount: e.amount || 0,
+          weight: w > 0 ? w : 1,
+          date: (e as any).date || '',
+        })
       }
+      setSalesContractMap(contractDetails)
       const newSalesEmps = salesEmps.map(emp => {
         if (!emp.name) return emp
         const key = Object.keys(salesByName).find(k => k === emp.name || k.includes(emp.name) || emp.name.includes(k))
@@ -680,11 +690,41 @@ export default function PayrollTab() {
             )}
           </div>
 
-          {salesEmps.map((emp, i) => (
-            <SalesCard key={i} emp={emp} idx={i}
-              onChange={updateSales} onRemove={removeSales}
-              onAddAward={addAward} onUpdateAward={updateAward} onRemoveAward={removeAward} />
-          ))}
+          {salesEmps.map((emp, i) => {
+            const empName = emp.name.trim()
+            const matched = empName
+              ? Object.keys(salesContractMap).find(k => k === empName || k.includes(empName) || empName.includes(k))
+              : undefined
+            const contracts: Array<{ company: string; amount: number; weight: number; date: string }> = matched ? salesContractMap[matched] : []
+            return (
+              <div key={i}>
+                <SalesCard emp={emp} idx={i}
+                  onChange={updateSales} onRemove={removeSales}
+                  onAddAward={addAward} onUpdateAward={updateAward} onRemoveAward={removeAward} />
+                {empName && (
+                  <details className="mt-1 bg-amber-50 border border-amber-100 rounded-xl overflow-hidden">
+                    <summary className="px-3 py-1.5 text-[10px] font-semibold text-amber-700 cursor-pointer select-none">
+                      집계된 계약 {contracts.length}건 ({contracts.reduce((s, c) => s + c.weight, 0)}개) — 클릭해서 확인
+                    </summary>
+                    <div className="px-3 pb-2 space-y-0.5">
+                      {contracts.length === 0 ? (
+                        <p className="text-[10px] text-gray-400 py-1">자동반영 후 목록이 표시됩니다</p>
+                      ) : contracts.map((c, ci) => (
+                        <div key={ci} className="flex items-center justify-between text-[10px] py-0.5 border-b border-amber-100 last:border-0">
+                          <span className="text-gray-700 font-medium">{c.company}</span>
+                          <div className="flex items-center gap-3 text-gray-400">
+                            <span>{c.date.slice(0, 10)}</span>
+                            <span className="text-amber-600 font-semibold">{c.weight}개</span>
+                            <span>{c.amount > 0 ? c.amount.toLocaleString('ko-KR') + '원' : '—'}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+            )
+          })}
 
           <button onClick={() => setSalesEmps(prev => [...prev, defaultSales()])}
             className="w-full py-2 border border-dashed border-gray-300 rounded-xl text-xs text-gray-400 hover:border-[#C5A258]/60 hover:text-[#C5A258]/80 transition-colors">

@@ -1818,7 +1818,14 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
             <label className={lbl}>결제방식</label>
             <div className="flex gap-2 mt-1">
               {[{ key: 'has_cash', label: '현금' }, { key: 'has_card', label: '카드' }].map(opt => (
-                <button key={opt.key} type="button" onClick={() => toggleDetail(opt.key)}
+                <button key={opt.key} type="button" onClick={() => {
+                  const newVal = !local.details?.[opt.key]
+                  if (opt.key === 'has_card' && newVal) {
+                    detailFields({ has_card: true, tax_invoice: '희망', tax_invoice_completed: true })
+                  } else {
+                    toggleDetail(opt.key)
+                  }
+                }}
                   className={`px-3 py-1 rounded text-xs font-medium border transition-colors ${
                     d[opt.key] ? 'bg-violet-500 text-white border-violet-500' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
                   }`}>{opt.label}</button>

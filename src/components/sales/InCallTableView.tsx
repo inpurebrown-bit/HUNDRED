@@ -508,8 +508,8 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
       vat_included:        vatIncluded,
       vat_amount:          vat > 0 ? formatNumber(vat) : '0',
       unpaid_amount:       unpaid > 0 ? formatNumber(unpaid) : '0',
-      // 부가세 체크 여부 → 자금팀 세금계산서 자동 설정
-      tax_invoice:         vatIncluded ? '발급' : '미발급',
+      // 카드결제는 자동신고 → 무조건 발급 / 아니면 부가세 포함 여부로 결정
+      tax_invoice:         paymentMethod === '카드' || vatIncluded ? '발급' : '미발급',
       my_revenue:          formatNumber(myRevNum),
       cumulative_revenue:  formatNumber(cumulative),
       payment_method:      paymentMethod,
