@@ -1012,6 +1012,8 @@ function RevenueTab() {
   const [loading, setLoading] = useState(true)
   const [salesOpen, setSalesOpen] = useState(false)
   const [opsOpen, setOpsOpen] = useState(false)
+  const [taxSettings, setTaxSettings] = useState<Record<string, number>>({})
+  const [taxInputs, setTaxInputs] = useState<Record<string, string>>({})
   const [pnlMonth, setPnlMonth] = useState<string>(() => {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -1023,10 +1025,14 @@ function RevenueTab() {
     Promise.all([
       fetch('/api/revenue').then(r => r.json()),
       fetch('/api/customers').then(r => r.json()),
-    ]).then(([revData, custData]) => {
+      fetch('/api/settings?key=tax_settings').then(r => r.json()),
+    ]).then(([revData, custData, taxData]) => {
       setData(revData)
       setCustomers(custData.customers || [])
       setLoading(false)
+      const saved = taxData.settings || {}
+      setTaxSettings(saved)
+      setTaxInputs(Object.fromEntries(Object.entries(saved).map(([k, v]) => [k, String(v)])))
     })
   }, [])
 
@@ -1200,6 +1206,126 @@ function RevenueTab() {
           )}
         </div>
       </div>
+
+      {/* ── 세금 현황 ── */}
+      {data && (() => {
+        const lastYr: number = data.lastYear ?? (new Date().getFullYear() - 1)
+        const thisYr: number = data.thisYear ?? new Date().getFullYear()
+        const annualRev = data.annualRevenue || {}
+        const prevH2 = data.vatPrevH2 || {}
+        const currH1 = data.vatCurrH1 || {}
+
+        function saveTax(key: string, raw: string) {
+          const val = parseInt(raw.replace(/[^0-9]/g, ''), 10) || 0
+          const next = { ...taxSettings, [key]: val }
+          setTaxSettings(next)
+          fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ _key: 'tax_settings', ...next }),
+          })
+        }
+
+        const rows = [
+          { key: `tax_${lastYr}`, label: `${lastYr}년 종소세`, year: lastYr },
+          { key: `tax_${thisYr}`, label: `${thisYr}년 종소세`, year: thisYr },
+        ]
+
+        return (
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-gray-700">세금 현황</h3>
+
+            {/* 종합소득세 */}
+            <div className="bg-white rounded-xl border border-orange-100 overflow-hidden">
+              <div className="px-4 py-2.5 bg-orange-50 border-b border-orange-100">
+                <p className="text-xs font-bold text-orange-800">종합소득세 (종소세)</p>
+                <p className="text-[10px] text-orange-500 mt-0.5">실제 납부액 입력 → 매출 대비 비율 확인</p>
+              </div>
+              <div className="divide-y divide-gray-50">
+                {rows.map(({ key, label, year }) => {
+                  const annual = annualRev[String(year)] || { sales: 0, ops: 0, total: 0 }
+                  const taxAmt = taxSettings[key] || 0
+                  const pct = annual.total > 0 ? ((taxAmt / annual.total) * 100).toFixed(1) : null
+                  const isCurrentYear = year === thisYr
+                  return (
+                    <div key={key} className="px-4 py-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-gray-700">{label}</span>
+                        {isCurrentYear && <span className="text-[10px] text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">신고연도 {thisYr + 1}년 5월</span>}
+                        {!isCurrentYear && <span className="text-[10px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded">신고연도 {year + 1}년 5월</span>}
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-[11px] mb-2">
+                        <div>
+                          <p className="text-gray-400 mb-0.5">영업팀 매출</p>
+                          <p className="font-semibold text-gray-700">{fmt(annual.sales)}원</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400 mb-0.5">관리팀 매출</p>
+                          <p className="font-semibold text-gray-700">{fmt(annual.ops)}원</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400 mb-0.5">합산 매출</p>
+                          <p className="font-bold text-gray-900">{fmt(annual.total)}원</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-gray-500 whitespace-nowrap">납부 종소세</span>
+                        <input
+                          type="text"
+                          value={taxInputs[key] || ''}
+                          onChange={e => setTaxInputs(prev => ({ ...prev, [key]: e.target.value }))}
+                          onBlur={e => saveTax(key, e.target.value)}
+                          placeholder="금액 입력"
+                          className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-right focus:outline-none focus:border-orange-400"
+                        />
+                        <span className="text-[11px] text-gray-400">원</span>
+                        {taxAmt > 0 && pct && (
+                          <span className="text-[11px] font-bold text-orange-600 whitespace-nowrap">매출의 {pct}%</span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* 부가세 */}
+            <div className="bg-white rounded-xl border border-teal-100 overflow-hidden">
+              <div className="px-4 py-2.5 bg-teal-50 border-b border-teal-100">
+                <p className="text-xs font-bold text-teal-800">부가세 (VAT 10%)</p>
+                <p className="text-[10px] text-teal-500 mt-0.5">세금계산서 발행 건 / 영업착수금(부가세포함) + 관리팀수수료(계산서요청) 합산</p>
+              </div>
+              <div className="divide-y divide-gray-50">
+                {[
+                  { label: prevH2.period || `${lastYr}년 7~12월`, d: prevH2, subLabel: '2기 확정 신고 (다음년 1월 25일)' },
+                  { label: currH1.period || `${thisYr}년 1~6월`, d: currH1, subLabel: '1기 확정 신고 (7월 25일)' },
+                ].map(({ label, d, subLabel }) => (
+                  <div key={label} className="px-4 py-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-gray-700">{label}</span>
+                      <span className="text-[10px] text-gray-400">{subLabel}</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-[11px]">
+                      <div>
+                        <p className="text-gray-400 mb-0.5">영업팀 착수금</p>
+                        <p className="font-semibold text-teal-700">{fmt(d.sales_vat || 0)}원</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400 mb-0.5">관리팀 수수료</p>
+                        <p className="font-semibold text-teal-700">{fmt(d.ops_vat || 0)}원</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400 mb-0.5">합계 부가세</p>
+                        <p className="font-bold text-teal-900 text-sm">{fmt(d.total_vat || 0)}원</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* 이번 달 성과 */}
       <div>
