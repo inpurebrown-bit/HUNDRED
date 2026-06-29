@@ -391,6 +391,12 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
     setLocal(next)
     schedule({ details: { ...(local.details || {}), [key]: val } })
   }
+  // 즉시 저장 (배지 등 상위 컴포넌트 상태도 즉시 반영)
+  function immediateDetailFields(patch: Record<string, any>) {
+    const merged = { ...(local.details || {}), ...patch }
+    setLocal(prev => ({ ...prev, details: merged }))
+    onSave(c.id, { details: merged })
+  }
   // 여러 detail 필드를 한 번에 업데이트 (두 번 호출 시 덮어씌움 방지)
   function detailFields(patch: Record<string, any>) {
     const merged = { ...(local.details || {}), ...patch }
@@ -1794,7 +1800,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
               <div><label className={lbl}>착수금 세금계산서 발급 완료</label>
                 <button
                   type="button"
-                  onClick={() => detailField('tax_invoice_completed', !d.tax_invoice_completed)}
+                  onClick={() => immediateDetailFields({ tax_invoice_completed: !d.tax_invoice_completed })}
                   className={`w-full rounded-lg px-3 py-2 text-xs font-bold border transition-colors ${
                     d.tax_invoice_completed
                       ? 'bg-emerald-500 text-white border-emerald-500'
@@ -1821,7 +1827,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                 <button key={opt.key} type="button" onClick={() => {
                   const newVal = !local.details?.[opt.key]
                   if (opt.key === 'has_card' && newVal) {
-                    detailFields({ has_card: true, tax_invoice: '희망', tax_invoice_completed: true })
+                    immediateDetailFields({ has_card: true, tax_invoice: '희망', tax_invoice_completed: true })
                   } else {
                     toggleDetail(opt.key)
                   }
