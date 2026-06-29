@@ -1010,6 +1010,8 @@ function RevenueTab() {
   const [data, setData] = useState<any>(null)
   const [customers, setCustomers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [salesOpen, setSalesOpen] = useState(false)
+  const [opsOpen, setOpsOpen] = useState(false)
   const [pnlMonth, setPnlMonth] = useState<string>(() => {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -1137,46 +1139,64 @@ function RevenueTab() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* 영업팀 이달 계약 */}
         <div className="bg-white rounded-xl border border-blue-100 overflow-hidden">
-          <div className="px-4 py-3 bg-blue-50 border-b border-blue-100 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setSalesOpen(v => !v)}
+            className="w-full px-4 py-3 bg-blue-50 border-b border-blue-100 flex items-center justify-between hover:bg-blue-100 transition-colors"
+          >
             <p className="text-xs font-bold text-blue-800">영업팀 이달 계약 매출</p>
-            <span className="text-[10px] text-blue-600">{thisMonthSales.length}건 · {fmt(thisMonthSalesTotal)}원</span>
-          </div>
-          {thisMonthSales.length === 0 ? (
-            <p className="text-xs text-gray-400 text-center py-6">이달 계약 없음</p>
-          ) : (
-            <div className="divide-y divide-gray-50">
-              {thisMonthSales.map((e: any) => (
-                <div key={e.id} className="px-4 py-2.5 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-semibold text-gray-800">{e.company}</p>
-                    <p className="text-[10px] text-gray-400">{e.sales_user_name} · {e.date?.slice(0, 10)}</p>
-                  </div>
-                  <span className="text-sm font-black text-blue-600">{fmt(e.amount)}원</span>
-                </div>
-              ))}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-blue-600">{thisMonthSales.length}건 · {fmt(thisMonthSalesTotal)}원</span>
+              <span className="text-[10px] text-blue-400">{salesOpen ? '▲' : '▼'}</span>
             </div>
+          </button>
+          {salesOpen && (
+            thisMonthSales.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-6">이달 계약 없음</p>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {thisMonthSales.map((e: any) => (
+                  <div key={e.id} className="px-4 py-2 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-800">{e.company}</p>
+                      <p className="text-[10px] text-gray-400">{e.sales_user_name} · {e.date?.slice(0, 10)}</p>
+                    </div>
+                    <span className="text-sm font-black text-blue-600">{fmt(e.amount)}원</span>
+                  </div>
+                ))}
+              </div>
+            )
           )}
         </div>
         {/* 관리팀 이달 수수료 */}
         <div className="bg-white rounded-xl border border-violet-100 overflow-hidden">
-          <div className="px-4 py-3 bg-violet-50 border-b border-violet-100 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setOpsOpen(v => !v)}
+            className="w-full px-4 py-3 bg-violet-50 border-b border-violet-100 flex items-center justify-between hover:bg-violet-100 transition-colors"
+          >
             <p className="text-xs font-bold text-violet-800">관리팀 이달 수수료 매출</p>
-            <span className="text-[10px] text-violet-600">{thisMonthOps.length}건 · {fmt(thisMonthOpsTotal)}원</span>
-          </div>
-          {thisMonthOps.length === 0 ? (
-            <p className="text-xs text-gray-400 text-center py-6">이달 수수료 없음</p>
-          ) : (
-            <div className="divide-y divide-gray-50">
-              {thisMonthOps.map((e: any) => (
-                <div key={e.id} className="px-4 py-2.5 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-semibold text-gray-800">{e.company}</p>
-                    <p className="text-[10px] text-gray-400">{e.ops_user_name} · {e.date?.slice(0, 10)}</p>
-                  </div>
-                  <span className="text-sm font-black text-violet-600">{fmt(e.amount)}원</span>
-                </div>
-              ))}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-violet-600">{thisMonthOps.length}건 · {fmt(thisMonthOpsTotal)}원</span>
+              <span className="text-[10px] text-violet-400">{opsOpen ? '▲' : '▼'}</span>
             </div>
+          </button>
+          {opsOpen && (
+            thisMonthOps.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-6">이달 수수료 없음</p>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {thisMonthOps.map((e: any) => (
+                  <div key={e.id} className="px-4 py-2 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-800">{e.company}</p>
+                      <p className="text-[10px] text-gray-400">{e.ops_user_name} · {e.date?.slice(0, 10)}</p>
+                    </div>
+                    <span className="text-sm font-black text-violet-600">{fmt(e.amount)}원</span>
+                  </div>
+                ))}
+              </div>
+            )
           )}
         </div>
       </div>
