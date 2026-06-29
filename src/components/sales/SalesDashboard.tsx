@@ -431,6 +431,8 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
           has_card: anyDetails.has_card || false,
           // 카드결제는 자동신고 → 착수금 세금계산서 발급완료 자동 처리
           ...(anyDetails.has_card ? { tax_invoice_completed: true } : {}),
+          // 영업팀 계약날짜 → 관리팀 계약날짜로 전달
+          ...(anyDetails.contract_date ? { contract_date: anyDetails.contract_date } : {}),
           sales_customer_info: {
             customer_id:      customer.id,
             company:          (anyDetails.company as string) || customer.company || customer.name || '',
