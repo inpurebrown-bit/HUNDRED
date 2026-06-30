@@ -391,8 +391,9 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
     setLocal(next)
     schedule({ details: { ...(local.details || {}), [key]: val } })
   }
-  // 즉시 저장 (배지 등 상위 컴포넌트 상태도 즉시 반영)
+  // 즉시 저장 (배지 등 상위 컴포넌트 상태도 즉시 반영, 기존 schedule 타이머 취소)
   function immediateDetailFields(patch: Record<string, any>) {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
     const merged = { ...(local.details || {}), ...patch }
     setLocal(prev => ({ ...prev, details: merged }))
     onSave(c.id, { details: merged })
@@ -1791,7 +1792,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
               <div><label className={lbl}>입금액(VAT포함)</label><input type="text" value={d.deposit_amount_vat || ''} onChange={e => detailField('deposit_amount_vat', e.target.value)} className={inp} placeholder="0원" /></div>
               <div><label className={lbl}>미입금액(VAT미포함)</label><input type="text" value={d.unpaid_amount || ''} onChange={e => detailField('unpaid_amount', e.target.value)} className={inp} placeholder="0원" /></div>
               <div><label className={lbl}>착수금 세금계산서 희망</label>
-                <select value={d.tax_invoice || ''} onChange={e => detailField('tax_invoice', e.target.value)} className={inp}>
+                <select value={d.tax_invoice || ''} onChange={e => immediateDetailFields({ tax_invoice: e.target.value })} className={inp}>
                   <option value="">— 미정 —</option>
                   <option value="희망">희망</option>
                   <option value="미희망">미희망</option>
