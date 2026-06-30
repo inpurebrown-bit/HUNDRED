@@ -530,8 +530,15 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
     setFeeSaving(true)
     const nowIso = new Date().toISOString()
     const todayStr = nowIso.slice(0, 10)
+    // c.details(서버 최신) 위에 local.details(로컬 편집) 병합
+    // → stale한 local 초기값이 서버에 저장된 최신값(예: tax_invoice_completed)을 덮어씌우지 않도록
+    const localDetails = local.details || {}
+    const serverDetails = c.details || {}
+    const baseDetails: Record<string, any> = { ...serverDetails }
+    for (const [k, v] of Object.entries(localDetails)) {
+      if (v !== null && v !== undefined) baseDetails[k] = v
+    }
     // deposit_date가 없으면 오늘로 자동 세팅 (revenue API date fallback 보장)
-    const baseDetails = { ...(local.details || {}) }
     if (!baseDetails.deposit_date) baseDetails.deposit_date = todayStr
     if (baseDetails.tax_invoice_requested == null) baseDetails.tax_invoice_requested = false
     if (baseDetails.tax_invoice_issued == null) baseDetails.tax_invoice_issued = false
