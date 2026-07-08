@@ -317,6 +317,8 @@ export default function PayrollTab() {
   // 자동저장 디바운스
   const saveTimer   = useRef<ReturnType<typeof setTimeout> | null>(null)
   const didInitLoad = useRef(false)
+  // handleLoad와 prevMonthLoad 간 race condition 방지 토큰
+  const loadToken   = useRef(0)
 
   // ── 저장 (내부용) ────────────────────────────────────────
   async function doSave(
@@ -348,6 +350,7 @@ export default function PayrollTab() {
 
   // ── 전월 불러오기: 고객 DB 실시간 집계 (이달이 아닐 때 사용) ─────────────
   const prevMonthLoad = useCallback(async () => {
+    ++loadToken.current  // handleLoad가 진행 중이면 결과 무시하도록 토큰 무효화
     setAutoLoading(true)
     setMsg('')
     try {
@@ -529,6 +532,7 @@ export default function PayrollTab() {
 
   // ── 불러오기 ──────────────────────────────────────────────
   async function handleLoad() {
+    const token = ++loadToken.current
     setLoading(true)
     setMsg('')
     didInitLoad.current = false
@@ -555,6 +559,9 @@ export default function PayrollTab() {
         setPerPersonSupply([])
       }
     } catch { setPerPersonSupply([]) }
+
+    // prevMonthLoad가 먼저 실행된 경우 handleLoad 결과 무시 (race condition 방지)
+    if (token !== loadToken.current) { setLoading(false); return }
 
     if (json.record?.employees) {
       const d = json.record.employees
