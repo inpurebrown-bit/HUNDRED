@@ -418,7 +418,15 @@ export default function PayrollTab() {
   }, [yearMonth, salesEmps, opsEmps, costs, revTotals]) // eslint-disable-line
 
   // ── 자동 반영 ─────────────────────────────────────────────
-  const autoLoad = useCallback(async () => {
+  // baseOps/baseSales/baseCosts: handleLoad에서 호출 시 새로 로드한 값 전달 (stale closure 방지)
+  const autoLoad = useCallback(async (
+    baseOps?: OpsEmployee[],
+    baseSales?: SalesEmployee[],
+    baseCosts?: OtherCosts
+  ) => {
+    const currentOps   = baseOps   || opsEmps
+    const currentSales = baseSales || salesEmps
+    const currentCosts = baseCosts || costs
     setAutoLoading(true)
     setMsg('')
     try {
@@ -456,7 +464,7 @@ export default function PayrollTab() {
         })
       }
       setSalesContractMap(contractDetails)
-      const newSalesEmps = salesEmps.map(emp => {
+      const newSalesEmps = currentSales.map(emp => {
         if (!emp.name) return emp
         const key = Object.keys(salesByName).find(k => k === emp.name || k.includes(emp.name) || emp.name.includes(k))
         if (!key) return emp
@@ -479,7 +487,7 @@ export default function PayrollTab() {
         if (!name) continue
         opsPutoByName[name] = (opsPutoByName[name] || 0) + (e.amount || 0)
       }
-      const newOpsEmps = opsEmps.map(emp => {
+      const newOpsEmps = currentOps.map(emp => {
         if (!emp.name) return emp
         const key  = Object.keys(opsFeeByName).find(k => k === emp.name || k.includes(emp.name) || emp.name.includes(k))
         const pKey = Object.keys(opsPutoByName).find(k => k === emp.name || k.includes(emp.name) || emp.name.includes(k))
@@ -492,7 +500,7 @@ export default function PayrollTab() {
       setOpsEmps(newOpsEmps)
 
       // DB 공급 갯수 자동 반영
-      let newCosts = costs
+      let newCosts = currentCosts
       try {
         const prRes  = await fetch(`/api/payrate?year_month=${yearMonth}`)
         const prData = await prRes.json()
@@ -508,7 +516,7 @@ export default function PayrollTab() {
             })
           const totalSupply = perPerson.reduce((s: number, p: { count: number }) => s + p.count, 0)
           if (totalSupply > 0) {
-            newCosts = { ...costs, db_count: totalSupply }
+            newCosts = { ...currentCosts, db_count: totalSupply }
             setCosts(newCosts)
             setPerPersonSupply(perPerson)
           }
@@ -565,14 +573,18 @@ export default function PayrollTab() {
 
     if (json.record?.employees) {
       const d = json.record.employees
-      if (d.ops_employees)    setOpsEmps(d.ops_employees)
-      if (d.sales_employees)  setSalesEmps(d.sales_employees)
-      if (d.other_costs)      setCosts({ ...defaultCosts(), ...d.other_costs })
-      if (d.revenue_totals)   setRevTotals(d.revenue_totals)
+      // 새로 로드한 값을 변수에 먼저 저장 — autoLoad에 직접 전달해 stale closure 방지
+      const freshOps   = d.ops_employees  || opsEmps
+      const freshSales = d.sales_employees || salesEmps
+      const freshCosts = d.other_costs ? { ...defaultCosts(), ...d.other_costs } : costs
+      setOpsEmps(freshOps)
+      setSalesEmps(freshSales)
+      setCosts(freshCosts)
+      if (d.revenue_totals) setRevTotals(d.revenue_totals)
       // 현재 월이면 저장된 레코드 로드 후 자동으로 최신 계약 데이터 반영
       if (yearMonth === thisMonth()) {
         setMsg('불러오기 완료 — 최신 계약 자동 반영 중…')
-        await autoLoad()
+        await autoLoad(freshOps, freshSales, freshCosts)
       } else {
         setMsg('불러오기 완료')
       }
