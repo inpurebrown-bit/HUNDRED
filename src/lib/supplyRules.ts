@@ -25,12 +25,8 @@ export function isActiveRow(
 /**
  * 입금액 → 계약 가중치 (부가세미포함 기준)
  *
- * 부가세미포함 30만원 이하          → 0.5개
- * 부가세미포함 31만원 ~ 99만원 이하  → 1개
- * 부가세미포함 100만원 ~ 149만원 이하 → 2개
- * 부가세미포함 150만원 ~ 199만원 이하 → 3개
- * 부가세미포함 200만원 ~ 249만원 이하 → 4개
- * 이후 50만원 단위로 1씩 추가
+ * 10만원당 0.2개 (선형 계산)
+ * 예) 50만 → 1개, 100만 → 2개, 150만 → 3개, 500만 → 10개
  *
  * @param paymentAmount  실입금액(payment_amount) — 부가세 포함 또는 제외
  * @param vatIncluded    true: 부가세 포함 금액(÷1.1), false: 이미 부가세 제외, undefined: 부가세 포함으로 간주
@@ -45,8 +41,8 @@ export function contractWeight(
 
   // 부가세미포함 금액 산출
   const vatExcl = vatIncluded === false ? amt : Math.round(amt / 1.1)
+  if (vatExcl <= 0) return 0
 
-  if (vatExcl <= 300000) return 0.5                                        // ≤30만
-  if (vatExcl < 1000000) return 1                                          // 31만~99만
-  return Math.floor((vatExcl - 1000000) / 500000) + 2                     // 100만~: 2,3,4...
+  // 10만원당 0.2개 (소수점 1자리 반올림)
+  return Math.round(vatExcl / 100000 * 0.2 * 10) / 10
 }

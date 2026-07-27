@@ -1909,16 +1909,23 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
   const needsConsulting = !c.details?.consulting_sent &&
     !['종료','완료','환불','refunded','completed'].includes(c.progress_stage)
 
+  const isMonthlyCard = c.details?.contract_type === '월정기권'
+
   return (
     <div
-      className={`bg-white border rounded-xl p-2 cursor-pointer hover:shadow-md transition-all relative flex flex-col ${
-        isOpen ? 'ring-2 ring-violet-400 border-violet-300' : 'border-gray-200 hover:border-violet-300'
+      className={`border rounded-xl p-2 cursor-pointer hover:shadow-md transition-all relative flex flex-col ${
+        isMonthlyCard
+          ? isOpen ? 'bg-purple-50 ring-2 ring-purple-400 border-purple-300' : 'bg-purple-50 border-purple-200 hover:border-purple-400'
+          : isOpen ? 'bg-white ring-2 ring-violet-400 border-violet-300' : 'bg-white border-gray-200 hover:border-violet-300'
       }`}
       onClick={() => onToggle(c.id)}
     >
       {/* ① 담당자명 + 뱃지 — 고정 높이 1줄 */}
       <div className="h-[14px] flex items-center gap-1 mb-0.5 overflow-hidden">
         <span className="text-[8px] text-gray-400 font-medium truncate shrink-0 max-w-[40%]">{opsUser || '—'}</span>
+        {isMonthlyCard && (
+          <span className="text-[7px] font-bold bg-purple-500 text-white px-1 rounded leading-tight shrink-0">월정기</span>
+        )}
         {needsAbsorb && (
           <span className="text-[7px] font-bold bg-indigo-500 text-white px-1 rounded leading-tight shrink-0">흡수</span>
         )}
@@ -2904,25 +2911,38 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
             const { date } = formatKST(c.created_at || '')
             const isSelected = openId === c.id
             const isSelfAdded = c.details?.ops_user_name === userName && !c.details?.sales_customer_info
+            const isMonthly = c.details?.contract_type === '월정기권'
 
             return (
               <div key={c.id}
-                className={`bg-white border rounded-2xl overflow-hidden cursor-pointer hover:shadow-lg transition-all relative ${
-                  isSelected ? 'ring-2 ring-sky-400 border-sky-300 shadow-lg' : 'border-gray-200 hover:border-sky-300'
+                className={`border rounded-2xl overflow-hidden cursor-pointer hover:shadow-lg transition-all relative ${
+                  isMonthly
+                    ? isSelected ? 'bg-purple-50 ring-2 ring-purple-400 border-purple-300 shadow-lg' : 'bg-purple-50 border-purple-200 hover:border-purple-400'
+                    : isSelected ? 'bg-white ring-2 ring-sky-400 border-sky-300 shadow-lg' : 'bg-white border-gray-200 hover:border-sky-300'
                 }`}
                 onClick={() => setOpenId(id => id === c.id ? null : c.id)}
               >
                 {/* 상단 컬러바 */}
-                <div className={`h-1 w-full ${isSelfAdded ? 'bg-gradient-to-r from-emerald-400 to-teal-400' : 'bg-gradient-to-r from-sky-400 to-blue-500'}`} />
+                <div className={`h-1 w-full ${
+                  isMonthly ? 'bg-gradient-to-r from-purple-400 to-violet-600'
+                  : isSelfAdded ? 'bg-gradient-to-r from-emerald-400 to-teal-400'
+                  : 'bg-gradient-to-r from-sky-400 to-blue-500'
+                }`} />
 
                 <div className="p-3.5">
                   {/* 헤더 행: 뱃지 + 업체명 */}
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 mb-1">
+                        {isMonthly ? (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-purple-100 text-purple-700">
+                            월정기권
+                          </span>
+                        ) : (
                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold ${isSelfAdded ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'}`}>
                           {isSelfAdded ? '직접추가' : '배정'}
                         </span>
+                        )}
                         {solution && (
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700">
                             {solution.length > 8 ? solution.slice(0,8)+'…' : solution}
@@ -3016,12 +3036,18 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
       {openId && (() => {
         const c = cases.find(x => x.id === openId)
         if (!c) return null
+        const isMonthlyCase = c.details?.contract_type === '월정기권'
         return (
-          <div className="bg-white border border-sky-200 rounded-2xl p-4 shadow-lg">
+          <div className={`border rounded-2xl p-4 shadow-lg ${isMonthlyCase ? 'bg-purple-50 border-purple-200' : 'bg-white border-sky-200'}`}>
             <div className="flex items-center justify-between mb-3">
-              <span className="font-bold text-[#1B2A45] text-sm">
-                {c.customers?.details?.company || c.customers?.name}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-[#1B2A45] text-sm">
+                  {c.customers?.details?.company || c.customers?.name}
+                </span>
+                {isMonthlyCase && (
+                  <span className="text-[10px] font-bold bg-purple-600 text-white px-2 py-0.5 rounded-full">월정기권</span>
+                )}
+              </div>
               <div className="flex gap-2">
                 <button onClick={() => openContractModal(c)}
                   className="text-xs bg-sky-500 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-sky-600">
@@ -3030,6 +3056,26 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
                 <button onClick={() => setOpenId(null)} className="text-gray-400 hover:text-gray-600 text-sm">✕</button>
               </div>
             </div>
+            {isMonthlyCase && (
+              <div className="mb-3 bg-white border border-purple-200 rounded-xl px-4 py-3 flex items-center gap-6">
+                <div className="text-center">
+                  <p className="text-[9px] text-purple-400 font-medium">월 납입금</p>
+                  <p className="text-sm font-bold text-purple-700">10만원</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[9px] text-purple-400 font-medium">계약 기간</p>
+                  <p className="text-sm font-bold text-purple-700">12개월</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[9px] text-purple-400 font-medium">총 금액</p>
+                  <p className="text-sm font-bold text-purple-700">120만원 선결제</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[9px] text-purple-400 font-medium">수수료</p>
+                  <p className="text-sm font-bold text-gray-400">없음</p>
+                </div>
+              </div>
+            )}
             <OpsDetailPanel c={c} onSave={onSave} userRole="ops" userName={userName} />
           </div>
         )
@@ -4380,13 +4426,21 @@ export default function OpsDashboard({ userId, userName }: Props) {
         const isClosing = closingPanelIds.includes(id)
         return (
           <div key={id}
-            className={`fixed top-0 bottom-0 ${rightOffset} w-full md:w-[520px] bg-white shadow-2xl overflow-y-auto z-[100] transition-transform duration-300 ease-in-out ${isClosing ? 'translate-x-full' : 'translate-x-0'}`}
+            className={`fixed top-0 bottom-0 ${rightOffset} w-full md:w-[520px] shadow-2xl overflow-y-auto z-[100] transition-transform duration-300 ease-in-out ${isClosing ? 'translate-x-full' : 'translate-x-0'} ${c.details?.contract_type === '월정기권' ? 'bg-purple-50' : 'bg-white'}`}
             onClick={e => e.stopPropagation()}
           >
-            <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-3 flex items-center justify-between z-10">
+            <div className={`sticky top-0 border-b px-5 py-3 flex items-center justify-between z-10 ${c.details?.contract_type === '월정기권' ? 'bg-purple-50 border-purple-200' : 'bg-white border-gray-100'}`}>
               <div>
-                <p className="font-bold text-[#1B2A45] text-sm">{c.customers?.details?.company || c.customers?.name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-bold text-[#1B2A45] text-sm">{c.customers?.details?.company || c.customers?.name}</p>
+                  {c.details?.contract_type === '월정기권' && (
+                    <span className="text-[10px] font-bold bg-purple-600 text-white px-2 py-0.5 rounded-full">월정기권</span>
+                  )}
+                </div>
                 <p className="text-[10px] text-gray-400">{c.customers?.name} · {formatPhone(c.customers?.phone || '')}</p>
+                {c.details?.contract_type === '월정기권' && (
+                  <p className="text-[10px] text-purple-500 font-medium mt-0.5">월 10만원 × 12개월 = 120만원 선결제 · 수수료 없음</p>
+                )}
               </div>
               <button onClick={() => closePanel(id)} className="text-gray-400 hover:text-gray-600 text-xl leading-none px-1">✕</button>
             </div>

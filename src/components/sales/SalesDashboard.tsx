@@ -156,8 +156,8 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   // 관리팀 직원 목록 (전송 담당자 배정용)
   const [opsUserList, setOpsUserList] = useState<{ id: string; name: string }[]>([])
   // 자금팀 전송 모달 상태
-  const [opsTransferModal, setOpsTransferModal] = useState<{ customer: Customer | null; opsUserId: string; opsUserName: string }>({
-    customer: null, opsUserId: '', opsUserName: '',
+  const [opsTransferModal, setOpsTransferModal] = useState<{ customer: Customer | null; opsUserId: string; opsUserName: string; contractType: string }>({
+    customer: null, opsUserId: '', opsUserName: '', contractType: '일반',
   })
   const [installPrompt, setInstallPrompt] = useState<any>(null)
   const [installable, setInstallable] = useState(false)
@@ -391,7 +391,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   }, [patchCustomer])
 
   // 내부 실제 전송 함수 (owner_id 포함)
-  const doTransferToOps = useCallback(async (customer: Customer, opsUserId?: string, opsUserName?: string) => {
+  const doTransferToOps = useCallback(async (customer: Customer, opsUserId?: string, opsUserName?: string, contractType?: string) => {
     const details: any = customer.details || {}
     const memo = [
       details.company && `업체: ${details.company}`,
@@ -425,6 +425,9 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         timeline: salesTimeline.length > 0 ? salesTimeline : undefined,
         customer_id: customer.id,
         details: {
+          // 계약 타입
+          contract_type: contractType || '일반',
+          ...(contractType === '월정기권' ? { monthly_fee: 100000, monthly_months: 12, monthly_total: 1200000 } : {}),
           // 영업팀 세금계산서/결제방식 → 관리팀 착수금 섹션으로 직접 반영
           tax_invoice: anyDetails.tax_invoice === '발급' ? '희망' : anyDetails.tax_invoice === '미발급' ? '미희망' : undefined,
           has_cash: anyDetails.has_cash || false,
@@ -497,7 +500,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   // transferToOps — 관리팀 직원 목록이 있으면 담당자 선택 모달 표시
   const transferToOps = useCallback(async (customer: Customer) => {
     if (opsUserList.length > 0) {
-      setOpsTransferModal({ customer, opsUserId: '', opsUserName: '' })
+      setOpsTransferModal({ customer, opsUserId: '', opsUserName: '', contractType: '일반' })
     } else {
       // ops 직원 없으면 미배정으로 바로 전송
       await doTransferToOps(customer)
@@ -757,17 +760,37 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
       {/* ── 자금팀 전송 담당자 선택 모달 ── */}
       {opsTransferModal.customer && (
         <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4"
-          onClick={e => { if (e.target === e.currentTarget) setOpsTransferModal({ customer: null, opsUserId: '', opsUserName: '' }) }}>
+          onClick={e => { if (e.target === e.currentTarget) setOpsTransferModal({ customer: null, opsUserId: '', opsUserName: '', contractType: '일반' }) }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>
                 <h2 className="font-bold text-[#1B2A45] text-sm">관리팀 담당자 배정</h2>
                 <p className="text-[11px] text-gray-400 mt-0.5">{(opsTransferModal.customer as any).details?.company || opsTransferModal.customer.company || opsTransferModal.customer.name}</p>
               </div>
-              <button onClick={() => setOpsTransferModal({ customer: null, opsUserId: '', opsUserName: '' })}
+              <button onClick={() => setOpsTransferModal({ customer: null, opsUserId: '', opsUserName: '', contractType: '일반' })}
                 className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
             </div>
             <div className="px-5 py-4 space-y-3">
+              {/* 계약 타입 선택 */}
+              <div>
+                <p className="text-xs text-gray-500 font-medium mb-2">계약 타입</p>
+                <div className="flex gap-2">
+                  {(['일반', '월정기권'] as const).map(type => (
+                    <button key={type}
+                      onClick={() => setOpsTransferModal(p => ({ ...p, contractType: type }))}
+                      className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-colors ${
+                        opsTransferModal.contractType === type
+                          ? type === '월정기권'
+                            ? 'bg-purple-600 text-white border-purple-600'
+                            : 'bg-amber-500 text-white border-amber-500'
+                          : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'
+                      }`}>
+                      {type}
+                      {type === '월정기권' && <span className="block text-[10px] font-normal opacity-80">10만×12개월</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <p className="text-xs text-gray-500 font-medium">담당 관리팀 직원을 선택하세요</p>
               <div className="flex flex-wrap gap-2">
                 {opsUserList.filter(u => u.name !== 'ops-tester').map(u => (
@@ -787,16 +810,16 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               )}
             </div>
             <div className="px-5 pb-4 flex gap-2 relative">
-              <button onClick={() => setOpsTransferModal({ customer: null, opsUserId: '', opsUserName: '' })}
+              <button onClick={() => setOpsTransferModal({ customer: null, opsUserId: '', opsUserName: '', contractType: '일반' })}
                 className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50">
                 취소
               </button>
               <button
                 onClick={async () => {
-                  const { customer, opsUserId, opsUserName } = opsTransferModal
+                  const { customer, opsUserId, opsUserName, contractType } = opsTransferModal
                   if (!customer || !opsUserId) return
-                  setOpsTransferModal({ customer: null, opsUserId: '', opsUserName: '' })
-                  await doTransferToOps(customer, opsUserId, opsUserName)
+                  setOpsTransferModal({ customer: null, opsUserId: '', opsUserName: '', contractType: '일반' })
+                  await doTransferToOps(customer, opsUserId, opsUserName, contractType)
                   showToast('자금팀 전송 완료')
                 }}
                 disabled={!opsTransferModal.opsUserId}
