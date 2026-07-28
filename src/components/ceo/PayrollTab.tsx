@@ -656,7 +656,7 @@ export default function PayrollTab() {
           className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
 
         <button
-          onClick={isCurrentMonth ? autoLoad : prevMonthLoad}
+          onClick={isCurrentMonth ? () => autoLoad() : prevMonthLoad}
           disabled={autoLoading}
           className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 disabled:opacity-40 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
           {autoLoading ? '반영 중...' : isCurrentMonth ? '이달 매출 자동 반영' : '불러오기'}
