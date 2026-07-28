@@ -196,7 +196,8 @@ function SalesCard({
 }) {
   const c = calcSales(emp)
   const has12 = emp.contract_count >= 12
-  const promoLabel = emp.contract_count > 0 ? `${emp.contract_count}개` : '갯수 미정'
+  const fmtN = (n: number) => parseFloat(n.toFixed(2))
+  const promoLabel = emp.contract_count > 0 ? `${fmtN(emp.contract_count)}개` : '갯수 미정'
 
   return (
     <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
@@ -723,7 +724,7 @@ export default function PayrollTab() {
                 {empName && (
                   <details className="mt-1 bg-amber-50 border border-amber-100 rounded-xl overflow-hidden">
                     <summary className="px-3 py-1.5 text-[10px] font-semibold text-amber-700 cursor-pointer select-none">
-                      집계된 계약 {contracts.length}건 ({contracts.reduce((s, c) => s + c.weight, 0)}개) — 클릭해서 확인
+                      집계된 계약 {contracts.length}건 ({parseFloat(contracts.reduce((s, c) => s + c.weight, 0).toFixed(2))}개) — 클릭해서 확인
                     </summary>
                     <div className="px-3 pb-2 space-y-0.5">
                       {contracts.length === 0 ? (
@@ -733,7 +734,7 @@ export default function PayrollTab() {
                           <span className="text-gray-700 font-medium">{c.company}</span>
                           <div className="flex items-center gap-3 text-gray-400">
                             <span>{c.date.slice(0, 10)}</span>
-                            <span className="text-amber-600 font-semibold">{c.weight}개</span>
+                            <span className="text-amber-600 font-semibold">{parseFloat(Number(c.weight).toFixed(2))}개</span>
                             <span>{c.amount > 0 ? c.amount.toLocaleString('ko-KR') + '원' : '—'}</span>
                           </div>
                         </div>
@@ -859,7 +860,7 @@ export default function PayrollTab() {
                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                     {perPersonSupply.filter(p => p.count > 0).map(p => (
                       <span key={p.name} className="text-[10px] bg-sky-50 text-sky-700 border border-sky-100 rounded-full px-2 py-0.5 font-medium">
-                        {p.name.replace(/\s*(수석팀장|팀장|팀원|대리|과장|부장|차장|이사|수석|매니저|주임|사원).*/g, '')} {p.count}개
+                        {p.name.replace(/\s*(수석팀장|팀장|팀원|대리|과장|부장|차장|이사|수석|매니저|주임|사원).*/g, '')} {parseFloat(p.count.toFixed(2))}개
                       </span>
                     ))}
                   </div>

@@ -1685,7 +1685,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                                 <div className="flex items-center gap-1.5 shrink-0">
                                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                                     weight === 0.5 ? 'bg-amber-100 text-amber-700' : 'bg-sky-100 text-sky-700'
-                                  }`}>{weight}개</span>
+                                  }`}>{parseFloat(weight.toFixed(2))}개</span>
                                   {cancelled
                                     ? <span className="text-[10px] bg-red-100 text-red-600 font-semibold px-1.5 py-0.5 rounded-full">취소</span>
                                     : <span className="text-[10px] bg-emerald-100 text-emerald-700 font-semibold px-1.5 py-0.5 rounded-full">정상</span>
