@@ -481,6 +481,7 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
   const [groupChatInvited, setGroupChatInvited] = useState(false)
   const [coopRequestSent,  setCoopRequestSent]  = useState(false)
   const [saving, setSaving] = useState(false)
+  const [contractType, setContractType] = useState<'일반' | '월정기권'>('일반')
 
   const feeNum      = parseNumber(contractFee)
   const paidNum     = parseNumber(paidAmount)
@@ -514,8 +515,9 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
       cumulative_revenue:  formatNumber(cumulative),
       payment_method:      paymentMethod,
       approved_amount:     approvedNum > 0 ? formatNumber(approvedNum) : '',
-      commission_rate:     commissionRate,
-      commission_amount:   commAmount > 0 ? formatNumber(commAmount) : '',
+      commission_rate:     contractType === '월정기권' ? '' : commissionRate,
+      commission_amount:   contractType === '월정기권' ? '' : (commAmount > 0 ? formatNumber(commAmount) : ''),
+      contract_type:       contractType,
       result_memo:         opsMemo,
       no_refund:           noRefund,
       group_chat_invited:  groupChatInvited,
@@ -543,7 +545,29 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
         {/* Body */}
         <div className="px-5 py-4 space-y-3">
 
-          {/* ① 계약금 */}
+          {/* ① 계약 타입 */}
+          <div>
+            <label className="text-[10px] text-gray-500 mb-1.5 block font-bold">계약 타입</label>
+            <div className="flex gap-2">
+              {(['일반', '월정기권'] as const).map(type => (
+                <button key={type} type="button"
+                  onClick={() => setContractType(type)}
+                  className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-colors ${
+                    contractType === type
+                      ? type === '월정기권'
+                        ? 'bg-purple-600 text-white border-purple-600'
+                        : 'bg-[#1B2A45] text-white border-[#1B2A45]'
+                      : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
+                  }`}>
+                  {type}
+                  {type === '월정기권' && <span className="block text-[10px] font-normal opacity-80">120만원 · 수수료없음</span>}
+                  {type === '일반' && <span className="block text-[10px] font-normal opacity-80">착수금 + 성공보수</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ② 계약금 */}
           <div>
             <label className="text-[10px] text-blue-700 mb-1 block font-bold">
               계약금 <span className="text-gray-400 font-normal">(계약서 작성 시 기입한 금액, VAT 별도)</span>
@@ -580,8 +604,8 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
             </div>
           </div>
 
-          {/* 수수료율 */}
-          <div className="bg-violet-50 rounded-xl p-3 space-y-2.5 border border-violet-100">
+          {/* 수수료율 — 월정기권은 숨김 */}
+          {contractType !== '월정기권' && <div className="bg-violet-50 rounded-xl p-3 space-y-2.5 border border-violet-100">
             <p className="text-[10px] text-violet-700 font-bold">
               수수료율
             </p>
@@ -598,7 +622,7 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
                 <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
               </div>
             </div>
-          </div>
+          </div>}
 
           {/* ③ 자동계산 박스 */}
           <div className="bg-gray-50 rounded-xl px-4 py-3 space-y-2">
