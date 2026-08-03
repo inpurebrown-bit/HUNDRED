@@ -365,6 +365,7 @@ export default function PayrollTab() {
 
       // 해당 월 계약 실시간 집계 (contractWeight 기준)
       const salesByName: Record<string, { amount: number; count: number }> = {}
+      const contractDetails: Record<string, Array<{ company: string; amount: number; weight: number; date: string }>> = {}
       ;(custJson.customers || []).forEach((c: any) => {
         if (c.status !== 'contracted') return
         const contractMonth = (c.details?.contract_date || c.created_at || '').slice(0, 7)
@@ -377,7 +378,15 @@ export default function PayrollTab() {
         if (!salesByName[name]) salesByName[name] = { amount: 0, count: 0 }
         salesByName[name].amount += rev
         salesByName[name].count  += w > 0 ? w : 1
+        if (!contractDetails[name]) contractDetails[name] = []
+        contractDetails[name].push({
+          company: (c.details?.company || c.company || c.name || '(업체명 없음)'),
+          amount: rev,
+          weight: w > 0 ? w : 1,
+          date: c.details?.contract_date || c.created_at || '',
+        })
       })
+      setSalesContractMap(contractDetails)
 
       const newSalesEmps = salesEmps.map(emp => {
         if (!emp.name) return emp
