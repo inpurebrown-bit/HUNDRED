@@ -1366,6 +1366,16 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
       {/* ── 💰 입금/계약 ── */}
       {activeDetailTab === '입금/계약' && (
         <div className="space-y-4">
+          {/* 월정기권 안내 */}
+          {d.contract_type === '월정기권' && (
+            <div className="bg-purple-600 rounded-xl px-4 py-3 flex items-center gap-4">
+              <div className="text-2xl">🟣</div>
+              <div>
+                <p className="text-white font-bold text-sm">월정기권 계약</p>
+                <p className="text-purple-200 text-[11px] mt-0.5">월 10만원 × 12개월 = 120만원 선결제 · 수수료 없음</p>
+              </div>
+            </div>
+          )}
           {/* 영업팀 계약 정보 (읽기 전용) */}
           {local.progress_memo && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
@@ -2915,30 +2925,33 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
 
             return (
               <div key={c.id}
-                className={`border rounded-2xl overflow-hidden cursor-pointer hover:shadow-lg transition-all relative ${
+                className={`border-2 rounded-2xl overflow-hidden cursor-pointer hover:shadow-lg transition-all relative ${
                   isMonthly
-                    ? isSelected ? 'bg-purple-50 ring-2 ring-purple-400 border-purple-300 shadow-lg' : 'bg-purple-50 border-purple-200 hover:border-purple-400'
+                    ? isSelected ? 'bg-purple-100 ring-2 ring-purple-500 border-purple-500 shadow-lg' : 'bg-purple-100 border-purple-400 hover:border-purple-600'
                     : isSelected ? 'bg-white ring-2 ring-sky-400 border-sky-300 shadow-lg' : 'bg-white border-gray-200 hover:border-sky-300'
                 }`}
                 onClick={() => setOpenId(id => id === c.id ? null : c.id)}
               >
                 {/* 상단 컬러바 */}
-                <div className={`h-1 w-full ${
-                  isMonthly ? 'bg-gradient-to-r from-purple-400 to-violet-600'
-                  : isSelfAdded ? 'bg-gradient-to-r from-emerald-400 to-teal-400'
-                  : 'bg-gradient-to-r from-sky-400 to-blue-500'
-                }`} />
+                <div className={`w-full ${
+                  isMonthly ? 'h-7 bg-gradient-to-r from-purple-600 to-violet-700 flex items-center px-3 gap-1.5'
+                  : isSelfAdded ? 'h-1 bg-gradient-to-r from-emerald-400 to-teal-400'
+                  : 'h-1 bg-gradient-to-r from-sky-400 to-blue-500'
+                }`}>
+                  {isMonthly && (
+                    <>
+                      <span className="text-white text-[11px] font-bold tracking-wide">월정기권</span>
+                      <span className="text-purple-200 text-[10px]">· 월 10만 × 12개월 · 수수료 없음</span>
+                    </>
+                  )}
+                </div>
 
                 <div className="p-3.5">
                   {/* 헤더 행: 뱃지 + 업체명 */}
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 mb-1">
-                        {isMonthly ? (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-purple-100 text-purple-700">
-                            월정기권
-                          </span>
-                        ) : (
+                        {!isMonthly && (
                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold ${isSelfAdded ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'}`}>
                           {isSelfAdded ? '직접추가' : '배정'}
                         </span>
@@ -4429,17 +4442,17 @@ export default function OpsDashboard({ userId, userName }: Props) {
             className={`fixed top-0 bottom-0 ${rightOffset} w-full md:w-[520px] shadow-2xl overflow-y-auto z-[100] transition-transform duration-300 ease-in-out ${isClosing ? 'translate-x-full' : 'translate-x-0'} ${c.details?.contract_type === '월정기권' ? 'bg-purple-50' : 'bg-white'}`}
             onClick={e => e.stopPropagation()}
           >
-            <div className={`sticky top-0 border-b px-5 py-3 flex items-center justify-between z-10 ${c.details?.contract_type === '월정기권' ? 'bg-purple-50 border-purple-200' : 'bg-white border-gray-100'}`}>
+            <div className={`sticky top-0 border-b px-5 py-3 flex items-center justify-between z-10 ${c.details?.contract_type === '월정기권' ? 'bg-purple-600 border-purple-700' : 'bg-white border-gray-100'}`}>
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="font-bold text-[#1B2A45] text-sm">{c.customers?.details?.company || c.customers?.name}</p>
+                  <p className={`font-bold text-sm ${c.details?.contract_type === '월정기권' ? 'text-white' : 'text-[#1B2A45]'}`}>{c.customers?.details?.company || c.customers?.name}</p>
                   {c.details?.contract_type === '월정기권' && (
-                    <span className="text-[10px] font-bold bg-purple-600 text-white px-2 py-0.5 rounded-full">월정기권</span>
+                    <span className="text-[10px] font-bold bg-white text-purple-700 px-2 py-0.5 rounded-full">월정기권</span>
                   )}
                 </div>
-                <p className="text-[10px] text-gray-400">{c.customers?.name} · {formatPhone(c.customers?.phone || '')}</p>
+                <p className={`text-[10px] ${c.details?.contract_type === '월정기권' ? 'text-purple-200' : 'text-gray-400'}`}>{c.customers?.name} · {formatPhone(c.customers?.phone || '')}</p>
                 {c.details?.contract_type === '월정기권' && (
-                  <p className="text-[10px] text-purple-500 font-medium mt-0.5">월 10만원 × 12개월 = 120만원 선결제 · 수수료 없음</p>
+                  <p className="text-[10px] text-purple-200 mt-0.5">월 10만원 × 12개월 = 120만원 선결제 · 수수료 없음</p>
                 )}
               </div>
               <button onClick={() => closePanel(id)} className="text-gray-400 hover:text-gray-600 text-xl leading-none px-1">✕</button>
