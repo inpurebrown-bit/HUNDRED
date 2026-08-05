@@ -499,11 +499,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
 
   // transferToOps — 관리팀 직원 목록이 있으면 담당자 선택 모달 표시
   const transferToOps = useCallback(async (customer: Customer) => {
+    // 계약완료 모달에서 저장한 contract_type 자동 읽기 (없으면 '일반')
+    const savedType = (customer as any).details?.contract_type === '월정기권' ? '월정기권' : '일반'
     if (opsUserList.length > 0) {
-      setOpsTransferModal({ customer, opsUserId: '', opsUserName: '', contractType: '일반' })
+      setOpsTransferModal({ customer, opsUserId: '', opsUserName: '', contractType: savedType })
     } else {
       // ops 직원 없으면 미배정으로 바로 전송
-      await doTransferToOps(customer)
+      await doTransferToOps(customer, undefined, undefined, savedType)
     }
   }, [opsUserList, doTransferToOps])
 
