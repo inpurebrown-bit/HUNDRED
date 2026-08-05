@@ -47,7 +47,8 @@ function calcOps(e: OpsEmployee) {
 }
 
 function getPromo(n: number) {
-  if (n >= 40) return 1_500_000
+  if (n >= 40) return 2_000_000
+  if (n >= 35) return 1_500_000
   if (n >= 30) return 1_000_000
   if (n >= 25) return   700_000
   if (n >= 20) return   500_000
@@ -235,7 +236,7 @@ function SalesCard({
         <PayRow
           label={`프로모션(${promoLabel})`}
           value={c.promo}
-          sub={c.promo > 0 ? '' : '20/25/30/40개 기준'}
+          sub={c.promo > 0 ? '' : '15/20/25/30/35/40개 기준'}
         />
         {/* 시상금 */}
         <div className="py-1.5 border-b border-gray-50">

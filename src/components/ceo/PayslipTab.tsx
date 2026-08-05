@@ -61,7 +61,8 @@ const COMPANY = {
 
 // 승급프로모션 (PayrollTab과 동일)
 function getPromo(n: number): number {
-  if (n >= 40) return 1_500_000
+  if (n >= 40) return 2_000_000
+  if (n >= 35) return 1_500_000
   if (n >= 30) return 1_000_000
   if (n >= 25) return   700_000
   if (n >= 20) return   500_000
@@ -369,13 +370,15 @@ function PayslipDocument({ emp, financial, yearMonth }: {
             </tr>
             <tr>
               {[
+                { label: '15건 이상', amount: 250_000 },
                 { label: '20건 이상', amount: 500_000 },
                 { label: '25건 이상', amount: 700_000 },
                 { label: '30건 이상', amount: 1_000_000 },
-                { label: '40건 이상', amount: 1_500_000 },
+                { label: '35건 이상', amount: 1_500_000 },
+                { label: '40건 이상', amount: 2_000_000 },
               ].map(t => (
                 <th key={t.label}
-                  className={`border border-gray-400 px-2 py-1 text-center text-[10px] font-medium w-1/4 ${
+                  className={`border border-gray-400 px-2 py-1 text-center text-[10px] font-medium w-1/6 ${
                     financial.contract_count > 0 && getPromo(financial.contract_count) === t.amount
                       ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-50 text-gray-500'
                   }`}>
@@ -386,7 +389,7 @@ function PayslipDocument({ emp, financial, yearMonth }: {
           </thead>
           <tbody>
             <tr>
-              {[500_000, 700_000, 1_000_000, 1_500_000].map(amt => (
+              {[250_000, 500_000, 700_000, 1_000_000, 1_500_000, 2_000_000].map(amt => (
                 <td key={amt}
                   className={`border border-gray-400 px-2 py-1 text-center text-[10px] ${
                     financial.contract_count > 0 && getPromo(financial.contract_count) === amt
