@@ -65,6 +65,7 @@ function getPromo(n: number): number {
   if (n >= 30) return 1_000_000
   if (n >= 25) return   700_000
   if (n >= 20) return   500_000
+  if (n >= 15) return   250_000
   return 0
 }
 
