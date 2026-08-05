@@ -246,9 +246,9 @@ function PayslipDocument({ emp, financial, yearMonth }: {
               <tr>
                 <td className={tdL}>③ 프로모션</td>
                 <td className={tdV}>
-                  {financial.contract_count >= 20
+                  {financial.contract_count >= 15
                     ? <span className="text-emerald-700 font-medium">{financial.contract_count}건 구간</span>
-                    : <span className="text-gray-400">20건 미만</span>}
+                    : <span className="text-gray-400">15건 미만</span>}
                 </td>
                 <td className={tdN + (salesCalc.promo > 0 ? ' text-emerald-700 font-semibold' : '')}>
                   {salesCalc.promo > 0 ? fmt(salesCalc.promo) : '-'}
