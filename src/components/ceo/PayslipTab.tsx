@@ -360,48 +360,75 @@ function PayslipDocument({ emp, financial, yearMonth }: {
       </table>
 
       {/* 승급프로모션 안내 (영업팀만) */}
-      {isSales && (
-        <table className="border-collapse text-xs w-full mb-3">
-          <thead>
-            <tr>
-              <th colSpan={5} className="border border-gray-400 px-2 py-1 bg-gray-100 text-center font-bold">
-                프로모션 구간 안내
-              </th>
-            </tr>
-            <tr>
-              {[
-                { label: '15건 이상', amount: 250_000 },
-                { label: '20건 이상', amount: 500_000 },
-                { label: '25건 이상', amount: 700_000 },
-                { label: '30건 이상', amount: 1_000_000 },
-                { label: '35건 이상', amount: 1_500_000 },
-                { label: '40건 이상', amount: 2_000_000 },
-              ].map(t => (
-                <th key={t.label}
-                  className={`border border-gray-400 px-2 py-1 text-center text-[10px] font-medium w-1/6 ${
-                    financial.contract_count > 0 && getPromo(financial.contract_count) === t.amount
-                      ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-50 text-gray-500'
-                  }`}>
-                  {t.label}
+      {isSales && (() => {
+        const tiers = [
+          { label: '15건 이상', amount: 250_000 },
+          { label: '20건 이상', amount: 500_000 },
+          { label: '25건 이상', amount: 700_000 },
+          { label: '30건 이상', amount: 1_000_000 },
+          { label: '35건 이상', amount: 1_500_000 },
+          { label: '40건 이상', amount: 2_000_000 },
+        ]
+        const row1 = tiers.slice(0, 3)
+        const row2 = tiers.slice(3)
+        return (
+          <table className="border-collapse text-xs w-full mb-3">
+            <thead>
+              <tr>
+                <th colSpan={3} className="border border-gray-400 px-2 py-1 bg-gray-100 text-center font-bold">
+                  프로모션 구간 안내
                 </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              {[250_000, 500_000, 700_000, 1_000_000, 1_500_000, 2_000_000].map(amt => (
-                <td key={amt}
-                  className={`border border-gray-400 px-2 py-1 text-center text-[10px] ${
-                    financial.contract_count > 0 && getPromo(financial.contract_count) === amt
-                      ? 'bg-emerald-50 font-bold text-emerald-700' : 'text-gray-500'
-                  }`}>
-                  {(amt / 10000).toFixed(0)}만원
-                </td>
-              ))}
-            </tr>
-          </tbody>
-        </table>
-      )}
+              </tr>
+              <tr>
+                {row1.map(t => (
+                  <th key={t.label}
+                    className={`border border-gray-400 px-2 py-1 text-center text-[10px] font-medium w-1/3 ${
+                      financial.contract_count > 0 && getPromo(financial.contract_count) === t.amount
+                        ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-50 text-gray-500'
+                    }`}>
+                    {t.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                {row1.map(t => (
+                  <td key={t.amount}
+                    className={`border border-gray-400 px-2 py-1 text-center text-[10px] ${
+                      financial.contract_count > 0 && getPromo(financial.contract_count) === t.amount
+                        ? 'bg-emerald-50 font-bold text-emerald-700' : 'text-gray-500'
+                    }`}>
+                    {(t.amount / 10000).toFixed(0)}만원
+                  </td>
+                ))}
+              </tr>
+              <tr>
+                {row2.map(t => (
+                  <th key={t.label}
+                    className={`border border-gray-400 px-2 py-1 text-center text-[10px] font-medium ${
+                      financial.contract_count > 0 && getPromo(financial.contract_count) === t.amount
+                        ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-50 text-gray-500'
+                    }`}>
+                    {t.label}
+                  </th>
+                ))}
+              </tr>
+              <tr>
+                {row2.map(t => (
+                  <td key={t.amount}
+                    className={`border border-gray-400 px-2 py-1 text-center text-[10px] ${
+                      financial.contract_count > 0 && getPromo(financial.contract_count) === t.amount
+                        ? 'bg-emerald-50 font-bold text-emerald-700' : 'text-gray-500'
+                    }`}>
+                    {(t.amount / 10000).toFixed(0)}만원
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        )
+      })()}
 
       {/* 수급자 확인 */}
       <div className="mt-4 border-t border-gray-300 pt-4 text-xs text-gray-700 space-y-1">
