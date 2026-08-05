@@ -97,6 +97,7 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
   const directInfo    = allStages.find(s => s.key === directStage)
   const indirectInfo  = allStages.find(s => s.key === indirectStage)
   const scriptSent    = c.details?.script_sent || false
+  const isMonthly     = c.details?.contract_type === '월정기권'
   const opsUser       = c.ops_user_name || ''
   const allInstitutions = (c.institution || '').split(',').map((s: string) => s.trim()).filter(Boolean)
   const directInsts   = allInstitutions.filter(i => !INDIRECT_SET.has(i))
@@ -128,10 +129,18 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
   return (
     <div
       onClick={() => onToggle(c.id)}
-      className={`bg-white border rounded-xl p-2 cursor-pointer hover:shadow-md transition-all relative flex flex-col ${
-        isOpen ? 'ring-2 ring-violet-400 border-violet-300' : 'border-gray-200 hover:border-violet-300'
+      className={`border rounded-xl p-2 cursor-pointer hover:shadow-md transition-all relative flex flex-col ${
+        isMonthly
+          ? isOpen ? 'bg-purple-50 ring-2 ring-purple-500 border-purple-400' : 'bg-purple-50 border-purple-300 hover:border-purple-500'
+          : isOpen ? 'bg-white ring-2 ring-violet-400 border-violet-300' : 'bg-white border-gray-200 hover:border-violet-300'
       }`}
     >
+      {/* 월정기권 배너 */}
+      {isMonthly && (
+        <div className="bg-purple-600 -mx-2 -mt-2 mb-1.5 rounded-t-xl px-2 py-0.5 flex items-center justify-center gap-1">
+          <span className="text-white text-[8px] font-bold tracking-wide">🟣 월정기권</span>
+        </div>
+      )}
       {/* ① 담당자명 + 뱃지 — 고정 높이 1줄 */}
       <div className="h-[14px] flex items-center gap-1 mb-0.5 overflow-hidden">
         <span className="text-[8px] text-gray-400 font-medium truncate shrink-0 max-w-[40%]">{opsUser || '—'}</span>
@@ -147,7 +156,7 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
       </div>
 
       {/* ② 업체명 — 네모 박스 */}
-      <div className="h-[34px] flex items-center justify-center border border-gray-300 rounded-lg bg-gray-50 px-1.5 mt-0.5">
+      <div className={`h-[34px] flex items-center justify-center border rounded-lg px-1.5 mt-0.5 ${isMonthly ? 'border-purple-300 bg-purple-100' : 'border-gray-300 bg-gray-50'}`}>
         <p className="font-bold text-[#1B2A45] text-[11px] leading-tight text-center break-all line-clamp-2 w-full"
           style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
           {companyName}
