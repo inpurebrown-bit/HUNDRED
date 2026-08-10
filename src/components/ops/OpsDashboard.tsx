@@ -1905,16 +1905,11 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
   const feeEntries: any[] = c.details?.payment_entries || []
   const hasSavedFeeEntry = (!!c.details?.fee_locked && !!c.details?.fee_amount) ||
     feeEntries.some((e: any) => !!e.fee_amount && !!e.fee_locked)
-  // 희망===true && 미발급 일 때만 뱃지 (null/false/미희망 모두 뱃지 없음)
   const needsTaxInvoiceFee = hasSavedFeeEntry && (
-    (!!c.details?.fee_locked && c.details?.tax_invoice_requested === true && !c.details?.tax_invoice_issued) ||
-    feeEntries.some((e: any) => !!e.fee_amount && !!e.fee_locked && e.tax_invoice_requested === true && !e.tax_invoice_issued)
+    (!!c.details?.fee_locked && !c.details?.tax_invoice_issued) ||
+    feeEntries.some((e: any) => !!e.fee_amount && !!e.fee_locked && !e.tax_invoice_issued)
   )
   const needsTaxInvoiceBadge = needsTaxInvoiceDown || needsTaxInvoiceFee
-  // 뱃지 구분용
-  const taxInvoiceBadgeLabel = needsTaxInvoiceDown && needsTaxInvoiceFee ? '계산서(2)'
-    : needsTaxInvoiceDown ? '착수계산서'
-    : '수수료계산서'
   // 컨설팅 자료 미전송 — 종료/완료/환불만 제외 (absorbed는 아직 자료 미전송일 수 있음)
   const needsConsulting = !c.details?.consulting_sent &&
     !['종료','완료','환불','refunded','completed'].includes(c.progress_stage)
@@ -1940,7 +1935,7 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
           <span className="text-[7px] font-bold bg-indigo-500 text-white px-1 rounded leading-tight shrink-0">흡수</span>
         )}
         {needsTaxInvoiceBadge && (
-          <span className="text-[7px] font-bold bg-red-500 text-white px-1 rounded leading-tight shrink-0">{taxInvoiceBadgeLabel}</span>
+          <span className="text-[7px] font-bold bg-red-500 text-white px-1 rounded leading-tight shrink-0">계산서</span>
         )}
         {needsConsulting && (
           <span className="text-[7px] font-bold bg-amber-500 text-white px-1 rounded leading-tight shrink-0">자료</span>
@@ -2158,6 +2153,16 @@ function DashboardOverview({ cases }: { cases: OpsCase[] }) {
     return s + (isNaN(v) ? 0 : v)
   }, 0)
 
+  // 신취 예정 현황 (소진공 신취 포함 케이스)
+  const shintwiCases = activeCases.filter(c =>
+    (c.institution || '').split(',').map((s: string) => s.trim()).includes('소진공(신취)')
+  )
+  const shintwiByStage: Record<string, number> = {}
+  shintwiCases.forEach(c => {
+    const stage = c.details?.direct_stage || c.progress_stage || '진행중'
+    shintwiByStage[stage] = (shintwiByStage[stage] || 0) + 1
+  })
+
   // 기관별 분포
   const instMap: Record<string, number> = {}
   activeCases.forEach(c => {
@@ -2184,12 +2189,13 @@ function DashboardOverview({ cases }: { cases: OpsCase[] }) {
   return (
     <div className="space-y-4">
       {/* 통계 카드 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
         {[
           { label: '전체 케이스', value: cases.length, color: 'text-[#1B2A45]', bg: 'bg-[#1B2A45]/5' },
           { label: '진행중', value: activeCases.length, color: 'text-amber-600', bg: 'bg-amber-50' },
           { label: '이번달 종료', value: monthCases.length, color: 'text-emerald-600', bg: 'bg-emerald-50' },
           { label: '환불', value: refundCases.length, color: 'text-rose-500', bg: 'bg-rose-50' },
+          { label: '신취 진행', value: shintwiCases.length, color: 'text-sky-600', bg: 'bg-sky-50' },
         ].map(s => (
           <div key={s.label} className={`${s.bg} rounded-xl p-4 text-center`}>
             <p className={`text-3xl font-black ${s.color}`}>{s.value}</p>
@@ -2198,32 +2204,39 @@ function DashboardOverview({ cases }: { cases: OpsCase[] }) {
         ))}
       </div>
 
-      {/* 본인 매출 현황 */}
-      {(allMonthRevenue > 0 || totalAllRevenue > 0) && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-          <p className="text-[11px] font-bold text-emerald-700 mb-3">나의 매출 현황</p>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-white rounded-lg p-3 text-center border border-emerald-100">
-              <p className="text-[10px] text-gray-400 mb-1">이번달 입금</p>
-              <p className="text-lg font-black text-emerald-700">{fmt(allMonthRevenue)}원</p>
-              <p className="text-[9px] text-gray-400">{monthCases.length}건</p>
-            </div>
-            <div className="bg-white rounded-lg p-3 text-center border border-emerald-100">
-              <p className="text-[10px] text-gray-400 mb-1">과거 총 입금</p>
-              <p className="text-lg font-black text-[#1B2A45]">{fmt(totalAllRevenue)}원</p>
-              <p className="text-[9px] text-gray-400">{completedCases.length}건</p>
-            </div>
+      {/* 신취 예정 현황 */}
+      {shintwiCases.length > 0 && (
+        <div className="bg-sky-50 border border-sky-200 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[11px] font-bold text-sky-700">소진공 신취 진행 현황</p>
+            <span className="text-sky-600 font-black text-lg">{shintwiCases.length}건</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {Object.entries(shintwiByStage).sort((a, b) => b[1] - a[1]).map(([stage, cnt]) => (
+              <span key={stage} className="bg-white border border-sky-200 rounded-lg px-2.5 py-1 text-[10px] font-semibold text-sky-700">
+                {stage} <span className="text-sky-500 font-black">{cnt}</span>
+              </span>
+            ))}
           </div>
         </div>
       )}
 
-      {/* 이번달 매출 */}
-      {monthRevenue > 0 && (
-        <div className="bg-gradient-to-r from-violet-500 to-indigo-600 rounded-xl p-4 text-white">
-          <p className="text-xs text-white/60 mb-1">이번달 입금 합계</p>
-          <p className="text-2xl font-black">{fmt(monthRevenue)}원</p>
+      {/* 본인 매출 현황 */}
+      <div className="bg-gradient-to-r from-[#1B2A45] to-[#2d4a7a] rounded-xl p-4 text-white">
+        <p className="text-white/60 text-xs font-semibold mb-3">나의 매출 현황</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-white/10 rounded-lg px-3 py-2.5 text-center">
+            <p className="text-white/50 text-[9px] mb-0.5">이번달 입금</p>
+            <p className="text-emerald-300 font-black text-lg">{allMonthRevenue > 0 ? fmt(allMonthRevenue) + '원' : '—'}</p>
+            <p className="text-white/30 text-[9px] mt-0.5">{monthCases.length}건</p>
+          </div>
+          <div className="bg-white/10 rounded-lg px-3 py-2.5 text-center">
+            <p className="text-white/50 text-[9px] mb-0.5">총 누적 입금</p>
+            <p className="text-sky-300 font-black text-lg">{totalAllRevenue > 0 ? fmt(totalAllRevenue) + '원' : '—'}</p>
+            <p className="text-white/30 text-[9px] mt-0.5">{completedCases.length}건</p>
+          </div>
         </div>
-      )}
+      </div>
 
       {/* 기관별 분포 */}
       {instEntries.length > 0 && (
@@ -3463,7 +3476,7 @@ function OpsRevenueTab({ userName }: { userName: string }) {
   )
 }
 
-function OpsReportTab({ userId, userName }: { userId: string; userName: string }) {
+function OpsReportTab({ userId, userName, activeCases }: { userId: string; userName: string; activeCases: OpsCase[] }) {
   const todayStr = new Date().toISOString().slice(0, 10)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -3636,10 +3649,29 @@ function OpsReportTab({ userId, userName }: { userId: string; userName: string }
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="text-xs text-gray-400 mb-0.5 block">업체명</label>
-                        <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-violet-400"
-                          placeholder="업체명" value={item.company}
-                          onChange={e => updateProcessed(i, 'company', e.target.value)}
-                          onKeyDown={e => e.key === 'Enter' && item.company.trim() && (e.preventDefault(), updateProcessed(i, '_locked', true))} />
+                        {activeCases.length > 0 ? (
+                          <select
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-violet-400 bg-white"
+                            value={item.company}
+                            onChange={e => updateProcessed(i, 'company', e.target.value)}>
+                            <option value="">업체 선택</option>
+                            {activeCases.map(c => {
+                              const name = c.customers?.details?.company || c.customers?.name || '—'
+                              return <option key={c.id} value={name}>{name}</option>
+                            })}
+                            <option value="__direct__">직접 입력</option>
+                          </select>
+                        ) : (
+                          <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-violet-400"
+                            placeholder="업체명" value={item.company}
+                            onChange={e => updateProcessed(i, 'company', e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && item.company.trim() && (e.preventDefault(), updateProcessed(i, '_locked', true))} />
+                        )}
+                        {item.company === '__direct__' && (
+                          <input className="w-full border border-violet-300 rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-1 focus:ring-violet-400"
+                            placeholder="업체명 직접 입력" autoFocus
+                            onChange={e => updateProcessed(i, 'company', e.target.value)} />
+                        )}
                       </div>
                       <div>
                         <label className="text-xs text-gray-400 mb-0.5 block">처리 기관</label>
@@ -4324,7 +4356,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
 
         {/* ── 관리팀보고 ── */}
         {activeTab === 'report' && (
-          <OpsReportTab userId={userId} userName={userName} />
+          <OpsReportTab userId={userId} userName={userName} activeCases={activeCases} />
         )}
 
         {/* ── 매출 현황 ── */}
