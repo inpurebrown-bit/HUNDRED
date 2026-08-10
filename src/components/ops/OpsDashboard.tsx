@@ -132,7 +132,7 @@ const PENDING_DONE_KEYS    = new Set(['종료예정'])
 const NEWDB_STAGE_KEYS     = new Set(['new_db'])
 
 // ── 기관 목록 ──────────────────────────────────────────────────────────
-const INST_DIRECT   = ['중진공','소진공(혁신)','소진공(신취)','소진공(재도전)','서민금융(미소)']
+const INST_DIRECT   = ['중진공','소진공(혁신)','소진공(신취)','소진공(재도전)','소진공(일시적경영애로)','서민금융(미소)']
 const INST_INDIRECT = ['기보','신보','재단']
 const INDIRECT_SET  = new Set(INST_INDIRECT)
 const ALL_INST_ORDER = [...INST_DIRECT, ...INST_INDIRECT]
@@ -141,9 +141,10 @@ const ALL_INST_ORDER = [...INST_DIRECT, ...INST_INDIRECT]
 function abbrevInst(inst: string): string {
   const MAP: Record<string, string> = {
     '중진공':        '중진공',
-    '소진공(혁신)':  '소(혁신)',
-    '소진공(신취)':  '소(신취)',
-    '소진공(재도전)':'소(재)',
+    '소진공(혁신)':         '소(혁신)',
+    '소진공(신취)':         '소(신취)',
+    '소진공(재도전)':       '소(재도전)',
+    '소진공(일시적경영애로)':'소(일시)',
     '서민금융(미소)':'서(미소)',
     '기보':          '기보',
     '신보':          '신보',
@@ -1247,6 +1248,37 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                     )}
                   </div>
                 </div>
+
+                {/* ── 일시적경영애로자금 ── */}
+                {(() => {
+                  const ILTMP_TYPES = ['일반자금', '청년고용자금', '재기자금', '긴급경영안정자금']
+                  const iltmpVal: string = gv('iltmp_type', cd.iltmp_type || '')
+                  return (
+                    <div className="mb-0">
+                      <div className="bg-orange-600 px-3 py-1.5">
+                        <span className="text-[10px] font-bold text-white tracking-wide">일시적경영애로자금</span>
+                      </div>
+                      <div className="px-3 py-2 hover:bg-gray-50 transition-colors">
+                        <span className="text-[10px] text-gray-400 font-medium block mb-1">자금 종류</span>
+                        {incallEditing ? (
+                          <div className="flex flex-wrap gap-1">
+                            {ILTMP_TYPES.map(t => (
+                              <button key={t} type="button"
+                                onClick={() => incallField('iltmp_type', iltmpVal === t ? '' : t)}
+                                className={`px-2 py-0.5 rounded text-[10px] font-semibold border transition-colors ${
+                                  iltmpVal === t ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-gray-500 border-gray-300 hover:bg-orange-50'
+                                }`}>{t}</button>
+                            ))}
+                          </div>
+                        ) : (
+                          iltmpVal
+                            ? <span className="bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded text-[10px] font-semibold">{iltmpVal}</span>
+                            : <span className="text-xs font-semibold text-gray-300">—</span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })()}
 
                 {/* ── 통화 메모 ── */}
                 <div className="mb-0">
