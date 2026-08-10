@@ -2141,6 +2141,8 @@ function CaseCard({ c, onToggle, isOpen, cardType }: {
 // DashboardOverview
 // ──────────────────────────────────────────────────────────────────────
 function DashboardOverview({ cases }: { cases: OpsCase[] }) {
+  const [selectedInst, setSelectedInst] = useState<string | null>(null)
+
   const activeCases    = cases.filter(c => ACTIVE_STAGE_KEYS.has(c.progress_stage) || (!REFUND_STAGE_KEYS.has(c.progress_stage) && !COMPLETED_STAGE_KEYS.has(c.progress_stage) && !c.is_refund && !c.is_completed))
   const refundCases    = cases.filter(c => REFUND_STAGE_KEYS.has(c.progress_stage) || c.is_refund)
   const completedCases = cases.filter(c => COMPLETED_STAGE_KEYS.has(c.progress_stage) || c.is_completed)
@@ -2238,25 +2240,65 @@ function DashboardOverview({ cases }: { cases: OpsCase[] }) {
         </div>
       </div>
 
-      {/* 기관별 분포 */}
+      {/* 기관별 진행 현황 — 클릭하면 업체 목록 표시 */}
       {instEntries.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-xs font-bold text-gray-500 mb-3">기관별 진행 현황</p>
-          <div className="space-y-2">
+          <p className="text-xs font-bold text-gray-500 mb-3">기관별 진행 현황 <span className="font-normal text-gray-400">(버튼 누르면 업체 목록)</span></p>
+          <div className="flex flex-wrap gap-2 mb-3">
             {instEntries.map(({ inst, count }) => {
               const isIndirect = INDIRECT_SET.has(inst)
-              const pct = Math.round(count / activeCases.length * 100)
+              const isActive = selectedInst === inst
               return (
-                <div key={inst} className="flex items-center gap-2">
-                  <span className={`text-[10px] font-semibold w-24 shrink-0 ${isIndirect ? 'text-violet-600' : 'text-blue-600'}`}>{inst}</span>
-                  <div className="flex-1 bg-gray-100 rounded-full h-2">
-                    <div className={`h-2 rounded-full ${isIndirect ? 'bg-violet-400' : 'bg-blue-400'}`} style={{ width: `${pct}%` }} />
-                  </div>
-                  <span className="text-[10px] text-gray-500 w-8 text-right">{count}건</span>
-                </div>
+                <button
+                  key={inst}
+                  onClick={() => setSelectedInst(isActive ? null : inst)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    isActive
+                      ? isIndirect ? 'bg-violet-600 text-white border-violet-600' : 'bg-blue-600 text-white border-blue-600'
+                      : isIndirect ? 'bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100' : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                  }`}>
+                  <span>{inst}</span>
+                  <span className={`font-black text-[11px] px-1.5 py-0.5 rounded-full ${
+                    isActive ? 'bg-white/20' : isIndirect ? 'bg-violet-200 text-violet-800' : 'bg-blue-200 text-blue-800'
+                  }`}>{count}</span>
+                </button>
               )
             })}
           </div>
+
+          {/* 선택된 기관의 업체 목록 */}
+          {selectedInst && (() => {
+            const instCases = activeCases.filter(c =>
+              (c.institution || '').split(',').map((s: string) => s.trim()).includes(selectedInst)
+            )
+            return (
+              <div className="border-t border-gray-100 pt-3">
+                <p className="text-[11px] font-bold text-gray-600 mb-2">{selectedInst} 진행 업체 ({instCases.length}건)</p>
+                <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                  {instCases.map(c => {
+                    const company = c.customers?.details?.company || c.customers?.name || '—'
+                    const stage = c.details?.direct_stage || c.details?.indirect_stage || c.progress_stage || '—'
+                    const stageInfo = [...PIPELINE_STAGES, ...OVERALL_STAGES].find(s => s.key === stage)
+                    return (
+                      <div key={c.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                        <div>
+                          <p className="text-xs font-semibold text-[#1B2A45]">{company}</p>
+                          {c.customers?.representative && (
+                            <p className="text-[10px] text-gray-400 mt-0.5">{c.customers.representative}</p>
+                          )}
+                        </div>
+                        {stage && (
+                          <span className={`text-[9px] font-bold text-white px-2 py-0.5 rounded-full ${stageInfo?.color || 'bg-gray-400'}`}>
+                            {stage}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
         </div>
       )}
 
