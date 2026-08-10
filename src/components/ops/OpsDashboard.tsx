@@ -2191,53 +2191,18 @@ function DashboardOverview({ cases }: { cases: OpsCase[] }) {
   return (
     <div className="space-y-4">
       {/* 통계 카드 */}
-      <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: '전체 케이스', value: cases.length, color: 'text-[#1B2A45]', bg: 'bg-[#1B2A45]/5' },
           { label: '진행중', value: activeCases.length, color: 'text-amber-600', bg: 'bg-amber-50' },
           { label: '이번달 종료', value: monthCases.length, color: 'text-emerald-600', bg: 'bg-emerald-50' },
           { label: '환불', value: refundCases.length, color: 'text-rose-500', bg: 'bg-rose-50' },
-          { label: '신취 진행', value: shintwiCases.length, color: 'text-sky-600', bg: 'bg-sky-50' },
         ].map(s => (
           <div key={s.label} className={`${s.bg} rounded-xl p-4 text-center`}>
             <p className={`text-3xl font-black ${s.color}`}>{s.value}</p>
             <p className="text-xs text-gray-500 mt-1">{s.label}</p>
           </div>
         ))}
-      </div>
-
-      {/* 신취 예정 현황 */}
-      {shintwiCases.length > 0 && (
-        <div className="bg-sky-50 border border-sky-200 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-[11px] font-bold text-sky-700">소진공 신취 진행 현황</p>
-            <span className="text-sky-600 font-black text-lg">{shintwiCases.length}건</span>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {Object.entries(shintwiByStage).sort((a, b) => b[1] - a[1]).map(([stage, cnt]) => (
-              <span key={stage} className="bg-white border border-sky-200 rounded-lg px-2.5 py-1 text-[10px] font-semibold text-sky-700">
-                {stage} <span className="text-sky-500 font-black">{cnt}</span>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 본인 매출 현황 */}
-      <div className="bg-gradient-to-r from-[#1B2A45] to-[#2d4a7a] rounded-xl p-4 text-white">
-        <p className="text-white/60 text-xs font-semibold mb-3">나의 매출 현황</p>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white/10 rounded-lg px-3 py-2.5 text-center">
-            <p className="text-white/50 text-[9px] mb-0.5">이번달 입금</p>
-            <p className="text-emerald-300 font-black text-lg">{allMonthRevenue > 0 ? fmt(allMonthRevenue) + '원' : '—'}</p>
-            <p className="text-white/30 text-[9px] mt-0.5">{monthCases.length}건</p>
-          </div>
-          <div className="bg-white/10 rounded-lg px-3 py-2.5 text-center">
-            <p className="text-white/50 text-[9px] mb-0.5">총 누적 입금</p>
-            <p className="text-sky-300 font-black text-lg">{totalAllRevenue > 0 ? fmt(totalAllRevenue) + '원' : '—'}</p>
-            <p className="text-white/30 text-[9px] mt-0.5">{completedCases.length}건</p>
-          </div>
-        </div>
       </div>
 
       {/* 기관별 진행 현황 — 클릭하면 업체 목록 표시 */}
@@ -2266,35 +2231,61 @@ function DashboardOverview({ cases }: { cases: OpsCase[] }) {
             })}
           </div>
 
-          {/* 선택된 기관의 업체 목록 */}
+          {/* 선택된 기관의 단계별 요약 + 업체 목록 */}
           {selectedInst && (() => {
+            const isIndirectSel = INDIRECT_SET.has(selectedInst)
             const instCases = activeCases.filter(c =>
               (c.institution || '').split(',').map((s: string) => s.trim()).includes(selectedInst)
             )
+            // 단계별 집계
+            const stageMap: Record<string, number> = {}
+            instCases.forEach(c => {
+              const st = (isIndirectSel ? c.details?.indirect_stage : c.details?.direct_stage) || c.progress_stage || '미정'
+              stageMap[st] = (stageMap[st] || 0) + 1
+            })
+            const stageSummary = Object.entries(stageMap).sort((a, b) => b[1] - a[1])
+            const allStages = [...PIPELINE_STAGES, ...OVERALL_STAGES]
             return (
-              <div className="border-t border-gray-100 pt-3">
-                <p className="text-[11px] font-bold text-gray-600 mb-2">{selectedInst} 진행 업체 ({instCases.length}건)</p>
-                <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                  {instCases.map(c => {
-                    const company = c.customers?.details?.company || c.customers?.name || '—'
-                    const stage = c.details?.direct_stage || c.details?.indirect_stage || c.progress_stage || '—'
-                    const stageInfo = [...PIPELINE_STAGES, ...OVERALL_STAGES].find(s => s.key === stage)
-                    return (
-                      <div key={c.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
-                        <div>
-                          <p className="text-xs font-semibold text-[#1B2A45]">{company}</p>
-                          {c.customers?.representative && (
-                            <p className="text-[10px] text-gray-400 mt-0.5">{c.customers.representative}</p>
+              <div className="border-t border-gray-100 pt-3 space-y-3">
+                {/* 단계별 요약 칩 */}
+                <div>
+                  <p className="text-[10px] font-bold text-gray-500 mb-1.5">{selectedInst} 단계별 현황</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {stageSummary.map(([stage, cnt]) => {
+                      const si = allStages.find(s => s.key === stage)
+                      return (
+                        <span key={stage} className={`flex items-center gap-1 text-[10px] font-semibold text-white px-2.5 py-1 rounded-full ${si?.color || 'bg-gray-400'}`}>
+                          {stage} <span className="font-black">{cnt}</span>
+                        </span>
+                      )
+                    })}
+                  </div>
+                </div>
+                {/* 업체 목록 */}
+                <div>
+                  <p className="text-[10px] font-bold text-gray-500 mb-1.5">업체 목록 ({instCases.length}건)</p>
+                  <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                    {instCases.map(c => {
+                      const company = c.customers?.details?.company || c.customers?.name || '—'
+                      const stage = (isIndirectSel ? c.details?.indirect_stage : c.details?.direct_stage) || c.progress_stage || '—'
+                      const stageInfo = allStages.find(s => s.key === stage)
+                      return (
+                        <div key={c.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                          <div>
+                            <p className="text-xs font-semibold text-[#1B2A45]">{company}</p>
+                            {c.customers?.representative && (
+                              <p className="text-[10px] text-gray-400 mt-0.5">{c.customers.representative}</p>
+                            )}
+                          </div>
+                          {stage && stage !== '—' && (
+                            <span className={`text-[9px] font-bold text-white px-2 py-0.5 rounded-full ${stageInfo?.color || 'bg-gray-400'}`}>
+                              {stage}
+                            </span>
                           )}
                         </div>
-                        {stage && (
-                          <span className={`text-[9px] font-bold text-white px-2 py-0.5 rounded-full ${stageInfo?.color || 'bg-gray-400'}`}>
-                            {stage}
-                          </span>
-                        )}
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
+                  </div>
                 </div>
               </div>
             )
@@ -4261,10 +4252,10 @@ export default function OpsDashboard({ userId, userName }: Props) {
                   새로고침
                 </button>
               </div>
-              <DashboardOverview cases={cases} />
-
-              {/* 이달 매출 요약 */}
+              {/* 이달 매출 — 최상단 */}
               <OpsMiniRevenue userName={userName} />
+
+              <DashboardOverview cases={cases} />
 
               {/* 공지사항 */}
               {notices.length > 0 && (
