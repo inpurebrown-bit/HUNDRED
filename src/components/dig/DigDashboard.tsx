@@ -651,54 +651,60 @@ export default function DigDashboard({ userId, userName, username }: Props) {
         {/* ══════════ 스크립트 탭 ══════════ */}
         {activeTab === 'script' && (
           <div className="space-y-3">
-            <div className="bg-[#1B2A45] rounded-xl px-5 py-4">
-              <h2 className="text-sm font-bold text-white">가망 인폼 스크립트</h2>
-              <p className="text-white/50 text-[11px] mt-1">헌드레드컨설팅 · 발굴팀 TM 전용</p>
+            {/* 헤더 */}
+            <div className="bg-[#1B2A45] rounded-xl px-4 py-3 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-white">가망 인폼 스크립트</h2>
+                <p className="text-white/40 text-[10px] mt-0.5">헌드레드컨설팅 · 발굴팀 TM 전용 · 옆으로 스크롤</p>
+              </div>
+              <span className="text-white/30 text-lg">→</span>
             </div>
 
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-              <p className="text-[11px] font-bold text-amber-700 mb-2">통화 전 필수 체크리스트 — 통화 종료 전 모두 확인</p>
-              {CHECKLIST_ITEMS.map((item, i) => (
-                <div key={item.key} className="flex items-start gap-2 py-1.5">
-                  <span className="text-amber-400 text-sm shrink-0">{i + 1}.</span>
-                  <div>
-                    <p className="text-sm font-semibold text-amber-800">{item.label}</p>
-                    <p className="text-[11px] text-amber-600 mt-0.5">{item.desc}</p>
-                  </div>
-                </div>
-              ))}
+            {/* 필수 체크리스트 — 칩 형태로 한줄 */}
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+              <p className="text-[10px] font-bold text-amber-700 mb-1.5">통화 종료 전 필수 체크</p>
+              <div className="flex flex-wrap gap-1">
+                {CHECKLIST_ITEMS.map((item, i) => (
+                  <span key={item.key} className="text-[10px] bg-amber-100 border border-amber-300 text-amber-800 px-2 py-0.5 rounded-full font-semibold">
+                    {i + 1}. {item.label}
+                  </span>
+                ))}
+              </div>
             </div>
 
-            {SCRIPT_SECTIONS.map((section, i) => {
-              const colorMap: Record<string, string> = {
-                blue: 'bg-blue-50 border-blue-200 text-blue-800',
-                green: 'bg-emerald-50 border-emerald-200 text-emerald-800',
-                orange: 'bg-orange-50 border-orange-200 text-orange-800',
-                purple: 'bg-purple-50 border-purple-200 text-purple-800',
-                red: 'bg-red-50 border-red-200 text-red-800',
-                'red-dark': 'bg-red-100 border-red-300 text-red-900',
-              }
-              const headerColor: Record<string, string> = {
-                blue: 'text-blue-700', green: 'text-emerald-700', orange: 'text-orange-700',
-                purple: 'text-purple-700', red: 'text-red-700', 'red-dark': 'text-red-900',
-              }
-              return (
-                <div key={i} className={`border rounded-xl overflow-hidden ${colorMap[section.color]}`}>
-                  <button
-                    type="button"
-                    onClick={() => setScriptOpen(scriptOpen === i ? null : i)}
-                    className="w-full flex items-center justify-between px-4 py-3">
-                    <span className={`text-sm font-bold ${headerColor[section.color]}`}>{section.title}</span>
-                    <span className="text-gray-400 text-sm">{scriptOpen === i ? '▲' : '▼'}</span>
-                  </button>
-                  {scriptOpen === i && (
-                    <div className="px-4 pb-4 text-sm whitespace-pre-wrap leading-relaxed text-gray-700 border-t border-current/10">
-                      {section.content}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+            {/* 스크립트 가로 스크롤 카드 */}
+            <div className="overflow-x-auto -mx-4 px-4 pb-4">
+              <div className="flex gap-3" style={{ width: 'max-content' }}>
+                {(() => {
+                  const cardColors: Record<string, { bg: string; border: string; title: string; badge: string }> = {
+                    blue:   { bg: 'bg-blue-50',    border: 'border-blue-200',   title: 'text-blue-800',    badge: 'bg-blue-200 text-blue-800' },
+                    green:  { bg: 'bg-emerald-50', border: 'border-emerald-200',title: 'text-emerald-800', badge: 'bg-emerald-200 text-emerald-800' },
+                    orange: { bg: 'bg-orange-50',  border: 'border-orange-200', title: 'text-orange-800',  badge: 'bg-orange-200 text-orange-800' },
+                    purple: { bg: 'bg-purple-50',  border: 'border-purple-200', title: 'text-purple-800',  badge: 'bg-purple-200 text-purple-800' },
+                    red:    { bg: 'bg-red-50',     border: 'border-red-200',    title: 'text-red-800',     badge: 'bg-red-200 text-red-800' },
+                  }
+                  const stepLabels = ['STEP 1', 'STEP 2-A', 'STEP 2-B', 'STEP 3', 'TIP']
+                  return SCRIPT_SECTIONS.map((section, i) => {
+                    const c = cardColors[section.color] || cardColors.blue
+                    return (
+                      <div key={i} className={`w-[270px] shrink-0 rounded-xl border ${c.border} ${c.bg} flex flex-col`}>
+                        {/* 카드 헤더 */}
+                        <div className={`px-3 py-2.5 border-b ${c.border} flex items-center gap-2`}>
+                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${c.badge}`}>
+                            {stepLabels[i] || `STEP ${i + 1}`}
+                          </span>
+                          <span className={`text-sm font-bold ${c.title}`}>{section.title}</span>
+                        </div>
+                        {/* 카드 내용 */}
+                        <div className={`px-3 py-3 text-xs whitespace-pre-wrap leading-relaxed ${c.title} flex-1`}>
+                          {section.content}
+                        </div>
+                      </div>
+                    )
+                  })
+                })()}
+              </div>
+            </div>
           </div>
         )}
       </main>
