@@ -430,28 +430,6 @@ export default function DigDashboard({ userId, userName, username }: Props) {
         {/* ══════════ 가망 등록 탭 ══════════ */}
         {activeTab === 'submit' && (
           <>
-            {/* 절대 금지 / 가망 인정 기준 배너 */}
-            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 space-y-2">
-              <p className="text-xs font-bold text-red-700 tracking-wide">⚠ 절대 하면 안 되는 것</p>
-              <div className="space-y-0.5">
-                {[
-                  '"지원금·공짜" 표현으로 후킹',
-                  '정책자금 니즈 없는 고객 억지로 확보',
-                  '두리뭉실한 유도 질문으로 번호만 받기',
-                  '"무조건 나옵니다", "100% 된다" 확정 표현',
-                ].map((txt, i) => (
-                  <p key={i} className="text-[11px] text-red-700 flex items-start gap-1.5">
-                    <span className="shrink-0">❌</span>{txt}
-                  </p>
-                ))}
-              </div>
-              <div className="border-t border-red-200 pt-2 space-y-0.5">
-                <p className="text-[11px] font-bold text-emerald-700">✅ 가망 인정 기준</p>
-                <p className="text-[11px] text-emerald-700">• 모든 인폼 전달 + 상담사 연결 동의 받은 경우</p>
-                <p className="text-[11px] text-emerald-700">• 번호만 받은 경우 → 다음날 재통화 후 가망 확정</p>
-              </div>
-            </div>
-
             {/* 오늘 현황 배너 */}
             <div className="bg-[#1B2A45] rounded-xl px-4 py-3 flex items-center justify-between">
               <div>
@@ -474,120 +452,141 @@ export default function DigDashboard({ userId, userName, username }: Props) {
               )}
             </div>
 
+            {/* 절대 금지 / 가망 인정 기준 배너 (compact) */}
+            <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 flex gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-bold text-red-700 mb-1">⚠ 절대 금지</p>
+                <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+                  {['"지원금·공짜" 후킹', '니즈 없는 고객 확보', '번호만 받는 유도', '"100% 된다" 확정'].map((txt, i) => (
+                    <p key={i} className="text-[9px] text-red-600 flex items-start gap-0.5 leading-tight">
+                      <span className="shrink-0">❌</span>{txt}
+                    </p>
+                  ))}
+                </div>
+              </div>
+              <div className="w-px bg-red-200 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-bold text-emerald-700 mb-1">✅ 가망 기준</p>
+                <p className="text-[9px] text-emerald-700 leading-tight">모든 인폼 + 상담사 연결 동의</p>
+                <p className="text-[9px] text-emerald-700 leading-tight mt-0.5">번호만 → 다음날 재통화 확정</p>
+              </div>
+            </div>
+
             <form onSubmit={handleSubmitClick} className="space-y-3">
               {/* 업체정보 + 체크리스트 2열 */}
-              <div className="flex gap-2.5 items-start">
-                {/* 업체정보 (left, flex-1) */}
-                <div className="flex-1 min-w-0 bg-white rounded-xl border border-gray-100 p-3 space-y-2">
-                  <h3 className="text-sm font-bold text-[#1B2A45]">업체 정보</h3>
-
-                  {/* 업체명 */}
-                  <div>
-                    <label className="text-[10px] text-gray-400 font-medium">업체명</label>
-                    <input value={form.company} onChange={e => setForm(p => ({ ...p, company: e.target.value }))}
-                      placeholder="업체명" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
-                  </div>
-
-                  {/* 업력 */}
-                  <div>
-                    <label className="text-[10px] text-gray-400 font-medium">업력</label>
-                    <input value={form.business_age} onChange={e => setForm(p => ({ ...p, business_age: e.target.value }))}
-                      placeholder="예) 3년" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
-                  </div>
-
-                  {/* 연매출 */}
-                  <div>
-                    <label className="text-[10px] text-gray-400 font-medium">연매출</label>
-                    <input value={form.annual_revenue} onChange={e => setForm(p => ({ ...p, annual_revenue: e.target.value }))}
-                      placeholder="예) 5억" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
-                  </div>
-
-                  {/* 업종 */}
-                  <div>
-                    <label className="text-[10px] text-gray-400 font-medium">업종</label>
-                    <input value={form.industry} onChange={e => setForm(p => ({ ...p, industry: e.target.value }))}
-                      placeholder="예) 제조업" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
-                  </div>
-
-                  {/* 연체·체납 */}
-                  <div className="flex items-center gap-2 py-1">
-                    <input type="checkbox" checked={form.has_delinquency}
-                      onChange={e => setForm(p => ({ ...p, has_delinquency: e.target.checked }))}
-                      className="w-4 h-4 accent-red-500 shrink-0" id="delinquency" />
-                    <label htmlFor="delinquency" className="text-sm text-gray-600 cursor-pointer">연체·체납 있음</label>
-                  </div>
-
-                  {/* 신용점수 */}
-                  <div>
-                    <label className="text-[10px] text-gray-400 font-medium">신용점수</label>
-                    <input value={form.credit_score} onChange={e => setForm(p => ({ ...p, credit_score: e.target.value }))}
-                      placeholder="예) 780점" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
-                  </div>
-
-                  {/* 010 번호 */}
-                  <div>
-                    <label className="text-[10px] text-gray-400 font-medium">010 번호 <span className="text-red-400">*</span></label>
-                    <input value={form.phone_010} onChange={e => setForm(p => ({ ...p, phone_010: e.target.value }))}
-                      placeholder="010-0000-0000" required
-                      className="mt-0.5 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
-                  </div>
-
-                  {/* 대표이름 */}
-                  <div>
-                    <label className="text-[10px] text-gray-400 font-medium">대표자 성함</label>
-                    <input value={form.ceo_name} onChange={e => setForm(p => ({ ...p, ceo_name: e.target.value }))}
-                      placeholder="홍길동" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
-                  </div>
-
-                  {/* 기존 연락처 (접어서) */}
-                  <div>
-                    <label className="text-[10px] text-gray-400 font-medium">기존 DB 번호</label>
-                    <input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
-                      placeholder="DB 연락처" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
-                  </div>
-
-                  {/* 필요자금 */}
-                  <div>
-                    <label className="text-[10px] text-gray-400 font-medium">필요자금</label>
-                    <input value={form.required_fund} onChange={e => setForm(p => ({ ...p, required_fund: e.target.value }))}
-                      placeholder="예) 1억" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
-                  </div>
-
-                  {/* 메모 */}
-                  <div>
-                    <label className="text-[10px] text-gray-400 font-medium">특이사항 메모</label>
-                    <textarea value={form.memo} onChange={e => setForm(p => ({ ...p, memo: e.target.value }))}
-                      rows={2} placeholder="재통화 요청, 기타..."
-                      className="mt-0.5 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30 resize-none" />
+              <div className="flex gap-2 items-start">
+                {/* 업체정보 (left) — 2열 그리드로 한눈에 */}
+                <div className="flex-1 min-w-0 bg-white rounded-xl border border-gray-100 p-3">
+                  <h3 className="text-xs font-bold text-[#1B2A45] mb-2">업체 정보</h3>
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-2">
+                    {/* 업체명 — 전체 폭 */}
+                    <div className="col-span-2">
+                      <label className="text-[9px] text-gray-400 font-medium uppercase tracking-wide">업체명</label>
+                      <input value={form.company} onChange={e => setForm(p => ({ ...p, company: e.target.value }))}
+                        placeholder="업체명" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
+                    </div>
+                    {/* 업력 */}
+                    <div>
+                      <label className="text-[9px] text-gray-400 font-medium uppercase tracking-wide">업력</label>
+                      <input value={form.business_age} onChange={e => setForm(p => ({ ...p, business_age: e.target.value }))}
+                        placeholder="3년" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
+                    </div>
+                    {/* 연매출 */}
+                    <div>
+                      <label className="text-[9px] text-gray-400 font-medium uppercase tracking-wide">연매출</label>
+                      <input value={form.annual_revenue} onChange={e => setForm(p => ({ ...p, annual_revenue: e.target.value }))}
+                        placeholder="5억" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
+                    </div>
+                    {/* 업종 */}
+                    <div>
+                      <label className="text-[9px] text-gray-400 font-medium uppercase tracking-wide">업종</label>
+                      <input value={form.industry} onChange={e => setForm(p => ({ ...p, industry: e.target.value }))}
+                        placeholder="제조업" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
+                    </div>
+                    {/* 신용점수 */}
+                    <div>
+                      <label className="text-[9px] text-gray-400 font-medium uppercase tracking-wide">신용점수</label>
+                      <input value={form.credit_score} onChange={e => setForm(p => ({ ...p, credit_score: e.target.value }))}
+                        placeholder="780점" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
+                    </div>
+                    {/* 연체·체납 */}
+                    <div className="flex items-center gap-1.5 pt-3">
+                      <input type="checkbox" checked={form.has_delinquency}
+                        onChange={e => setForm(p => ({ ...p, has_delinquency: e.target.checked }))}
+                        className="w-3.5 h-3.5 accent-red-500 shrink-0" id="delinquency" />
+                      <label htmlFor="delinquency" className="text-[10px] text-gray-600 cursor-pointer font-medium">연체·체납</label>
+                    </div>
+                    {/* 010 번호 — 전체 폭 */}
+                    <div className="col-span-2">
+                      <label className="text-[9px] text-gray-400 font-medium uppercase tracking-wide">010 번호 <span className="text-red-400">*</span></label>
+                      <input value={form.phone_010} onChange={e => setForm(p => ({ ...p, phone_010: e.target.value }))}
+                        placeholder="010-0000-0000" required
+                        className="mt-0.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
+                    </div>
+                    {/* 대표이름 */}
+                    <div>
+                      <label className="text-[9px] text-gray-400 font-medium uppercase tracking-wide">대표 성함</label>
+                      <input value={form.ceo_name} onChange={e => setForm(p => ({ ...p, ceo_name: e.target.value }))}
+                        placeholder="홍길동" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
+                    </div>
+                    {/* 기존 DB 번호 */}
+                    <div>
+                      <label className="text-[9px] text-gray-400 font-medium uppercase tracking-wide">기존 DB</label>
+                      <input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
+                        placeholder="DB 번호" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
+                    </div>
+                    {/* 필요자금 */}
+                    <div>
+                      <label className="text-[9px] text-gray-400 font-medium uppercase tracking-wide">필요자금</label>
+                      <input value={form.required_fund} onChange={e => setForm(p => ({ ...p, required_fund: e.target.value }))}
+                        placeholder="1억" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
+                    </div>
+                    {/* 메모 — 전체 폭 */}
+                    <div className="col-span-2">
+                      <label className="text-[9px] text-gray-400 font-medium uppercase tracking-wide">메모</label>
+                      <textarea value={form.memo} onChange={e => setForm(p => ({ ...p, memo: e.target.value }))}
+                        rows={2} placeholder="재통화 요청, 기타..."
+                        className="mt-0.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30 resize-none" />
+                    </div>
                   </div>
                 </div>
 
-                {/* 체크리스트 compact (right, fixed width) */}
-                <div className="w-[130px] shrink-0 bg-white rounded-xl border border-gray-100 p-3">
+                {/* 체크리스트 (right) — 상세 내용 포함 */}
+                <div className="w-[148px] shrink-0 bg-white rounded-xl border border-gray-100 p-2.5">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-xs font-bold text-[#1B2A45]">체크리스트</h3>
-                    {checklistAllDone && (
-                      <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-semibold">완료</span>
-                    )}
+                    {checklistAllDone
+                      ? <span className="text-[8px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">완료</span>
+                      : <span className="text-[8px] text-gray-300">{Object.values(checklist).filter(Boolean).length}/5</span>
+                    }
                   </div>
-                  <div className="space-y-0.5">
+                  <div className="space-y-1">
                     {CHECKLIST_ITEMS.map(item => (
-                      <label key={item.key} className="flex items-center gap-1.5 py-1.5 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={checklist[item.key]}
-                          onChange={e => setChecklist(prev => ({ ...prev, [item.key]: e.target.checked }))}
-                          className="w-4 h-4 accent-emerald-600 shrink-0"
-                        />
-                        <span className={`text-[11px] font-medium leading-tight ${checklist[item.key] ? 'text-emerald-700' : 'text-gray-500'}`}>
-                          {item.shortLabel}
-                        </span>
+                      <label key={item.key} className={`block cursor-pointer rounded-lg p-1.5 border transition-colors ${
+                        checklist[item.key]
+                          ? 'bg-emerald-50 border-emerald-200'
+                          : 'bg-gray-50 border-gray-100 hover:border-gray-200'
+                      }`}>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="checkbox"
+                            checked={checklist[item.key]}
+                            onChange={e => setChecklist(prev => ({ ...prev, [item.key]: e.target.checked }))}
+                            className="w-3.5 h-3.5 accent-emerald-600 shrink-0"
+                          />
+                          <span className={`text-[10px] font-bold leading-tight ${checklist[item.key] ? 'text-emerald-700' : 'text-gray-600'}`}>
+                            {item.shortLabel}
+                          </span>
+                        </div>
+                        <p className="text-[8px] text-gray-400 leading-tight mt-0.5 pl-[18px] line-clamp-2">
+                          {item.desc}
+                        </p>
                       </label>
                     ))}
                   </div>
                   {!checklistAllDone && (
-                    <p className="text-[9px] text-amber-600 mt-2 leading-tight border-t border-amber-100 pt-2">
-                      미완료 시 심사에 불리합니다
+                    <p className="text-[8px] text-amber-600 mt-1.5 leading-tight text-center">
+                      미완료 시 심사 불리
                     </p>
                   )}
                 </div>
