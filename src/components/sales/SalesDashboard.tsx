@@ -55,9 +55,21 @@ const SALES_USERS: string[] = []
 
 type SalesTab = 'board' | 'db010' | 'customers' | 'contracted' | 'emotional' | 'trash' | 'revenue' | 'report' | 'schedule' | 'profile'
 
+function filterCustomers(list: Customer[], q: string): Customer[] {
+  if (!q.trim()) return list
+  const lower = q.trim().toLowerCase()
+  return list.filter(c => {
+    const company = ((c as any).company || (c as any).details?.company || '').toLowerCase()
+    const name = ((c as any).name || '').toLowerCase()
+    const phone = ((c as any).phone || '').replace(/-/g, '')
+    return company.includes(lower) || name.includes(lower) || phone.includes(lower.replace(/-/g, ''))
+  })
+}
+
 // ── Component ──────────────────────────────────────────────────────────
 export default function SalesDashboard({ userId, userName, username }: Props) {
   const [activeTab, setActiveTab] = useState<SalesTab>('board')
+  const goTab = (tab: SalesTab) => { setActiveTab(tab); setTabSearchQuery('') }
   const [customers, setCustomers] = useState<Customer[]>([])
   const [contracts, setContracts] = useState<Contract[]>([])
   const [notices, setNotices] = useState<Notice[]>([])
@@ -191,6 +203,8 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const searchRef = useRef<HTMLInputElement>(null)
   const [splitActive, setSplitActive] = useState(false)
   const [scrollToCustomerId, setScrollToCustomerId] = useState<string | undefined>(undefined)
+  // 탭 내부 검색
+  const [tabSearchQuery, setTabSearchQuery] = useState('')
 
   // New customer form state
   const [showNewForm, setShowNewForm] = useState(false)
@@ -902,7 +916,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   <button key={c.id}
                     onClick={() => {
                       const tab = STATUS_TAB[c.status] ?? 'customers'
-                      setActiveTab(tab)
+                      goTab(tab)
                       setScrollToCustomerId(c.id)
                       setSearchQuery('')
                     }}
@@ -975,7 +989,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 </div>
                 {tabs.map(tab => (
                   <button key={tab.key}
-                    onClick={() => { setActiveTab(tab.key); setMenuOpen(false) }}
+                    onClick={() => { goTab(tab.key); setMenuOpen(false) }}
                     className={`w-full text-left px-4 py-3 text-sm transition-colors flex items-center justify-between ${
                       activeTab === tab.key
                         ? 'text-[#C5A258] font-semibold bg-[#C5A258]/8'
@@ -999,7 +1013,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
       {/* ── 데스크탑 탭바 ── */}
       <div className="hidden md:flex bg-white border-b border-gray-200 sticky top-[52px] z-20 px-6 overflow-x-auto shadow-sm">
         {tabs.map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+          <button key={tab.key} onClick={() => goTab(tab.key)}
             className={`relative px-4 py-3 text-sm whitespace-nowrap shrink-0 transition-colors font-medium flex items-center gap-1.5 ${
               activeTab === tab.key ? 'text-[#1B2A45]' : 'text-[#1B2A45]/45 hover:text-[#1B2A45]/75'
             }`}>
@@ -1377,7 +1391,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             <div className="bg-gradient-to-r from-[#1B2A45] to-blue-600 rounded-xl px-5 py-3.5 flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-bold text-white">직가 DB</h2>
-                <p className="text-white/50 text-[11px] mt-0.5">총 {db010List.length}건</p>
+                <p className="text-white/50 text-[11px] mt-0.5">총 {db010List.length}건{tabSearchQuery && ` · 검색 ${filterCustomers(db010List, tabSearchQuery).length}건`}</p>
               </div>
               <div className="flex items-center gap-2">
                 {/* 보기 방식 토글 */}
@@ -1402,6 +1416,21 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   {show010Form ? '✕ 취소' : '+ 직가DB 등록'}
                 </button>
               </div>
+            </div>
+
+            {/* 탭 내부 검색 */}
+            <div className="relative">
+              <input
+                type="text"
+                value={tabSearchQuery}
+                onChange={e => setTabSearchQuery(e.target.value)}
+                placeholder="업체명·이름·연락처 검색..."
+                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-300 pr-8"
+              />
+              {tabSearchQuery && (
+                <button onClick={() => setTabSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
+              )}
             </div>
 
             {show010Form && (
@@ -1430,9 +1459,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
                 직가 DB가 없습니다.
               </div>
+            ) : filterCustomers(db010List, tabSearchQuery).length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-gray-400 text-sm">
+                &quot;{tabSearchQuery}&quot; 검색 결과 없음
+              </div>
             ) : (
               <InCallTableView
-                customers={db010List}
+                customers={filterCustomers(db010List, tabSearchQuery)}
                 allCustomers={customers}
                 tabType="db010"
                 salesUsers={salesUserNames}
@@ -1453,12 +1486,27 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             <div className="bg-gradient-to-r from-[#1B2A45] to-indigo-600 rounded-xl px-5 py-3.5 flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-bold text-white">📂 공가 DB</h2>
-                <p className="text-white/50 text-[11px] mt-0.5">총 {activeCustomers.length}건</p>
+                <p className="text-white/50 text-[11px] mt-0.5">총 {activeCustomers.length}건{tabSearchQuery && ` · 검색 ${filterCustomers(activeCustomers, tabSearchQuery).length}건`}</p>
               </div>
               <button onClick={() => setShowNewForm(v => !v)}
                 className="bg-white/15 hover:bg-white/25 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-colors border border-white/20">
                 {showNewForm ? '✕ 취소' : '+ 공가DB 등록'}
               </button>
+            </div>
+
+            {/* 탭 내부 검색 */}
+            <div className="relative">
+              <input
+                type="text"
+                value={tabSearchQuery}
+                onChange={e => setTabSearchQuery(e.target.value)}
+                placeholder="업체명·이름·연락처 검색..."
+                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 pr-8"
+              />
+              {tabSearchQuery && (
+                <button onClick={() => setTabSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
+              )}
             </div>
 
             {showNewForm && (
@@ -1477,9 +1525,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
                 공가 DB가 없습니다.
               </div>
+            ) : filterCustomers(activeCustomers, tabSearchQuery).length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-gray-400 text-sm">
+                &quot;{tabSearchQuery}&quot; 검색 결과 없음
+              </div>
             ) : (
               <InCallTableView
-                customers={activeCustomers}
+                customers={filterCustomers(activeCustomers, tabSearchQuery)}
                 allCustomers={customers}
                 opsContracts={contracts}
                 tabType="lead"
@@ -1499,7 +1551,22 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
           <div className="space-y-3">
             <div className="bg-gradient-to-r from-[#1B2A45] to-emerald-600 rounded-xl px-5 py-3.5">
               <h2 className="text-sm font-bold text-white">계약 업체</h2>
-              <p className="text-white/50 text-[11px] mt-0.5">총 {contractedCustomers.length}건</p>
+              <p className="text-white/50 text-[11px] mt-0.5">총 {contractedCustomers.length}건{tabSearchQuery && ` · 검색 ${filterCustomers(contractedCustomers, tabSearchQuery).length}건`}</p>
+            </div>
+
+            {/* 탭 내부 검색 */}
+            <div className="relative">
+              <input
+                type="text"
+                value={tabSearchQuery}
+                onChange={e => setTabSearchQuery(e.target.value)}
+                placeholder="업체명·이름·연락처 검색..."
+                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 pr-8"
+              />
+              {tabSearchQuery && (
+                <button onClick={() => setTabSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
+              )}
             </div>
 
             {loading ? (
@@ -1508,8 +1575,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
                 계약 업체가 없습니다.
               </div>
+            ) : filterCustomers(contractedCustomers, tabSearchQuery).length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-gray-400 text-sm">
+                &quot;{tabSearchQuery}&quot; 검색 결과 없음
+              </div>
             ) : (
               <>
+                {!tabSearchQuery && (
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-center">
                     <p className="text-[10px] text-gray-400 mb-0.5">이번달 계약</p>
@@ -1520,8 +1592,9 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                     <p className="text-2xl font-black text-gray-700">{contractedCustomers.length}건</p>
                   </div>
                 </div>
+                )}
                 <InCallTableView
-                  customers={contractedCustomers}
+                  customers={filterCustomers(contractedCustomers, tabSearchQuery)}
                   allCustomers={customers}
                   tabType="contracted"
                   salesUsers={salesUserNames}
@@ -1544,7 +1617,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             <div className="bg-gradient-to-r from-[#1B2A45] to-violet-600 rounded-xl px-5 py-3.5 flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-bold text-white">감성톡 관리 업체</h2>
-                <p className="text-white/50 text-[11px] mt-0.5">총 {emotionalCustomers.length}건 · 장기 육성 대상</p>
+                <p className="text-white/50 text-[11px] mt-0.5">총 {emotionalCustomers.length}건{tabSearchQuery && ` · 검색 ${filterCustomers(emotionalCustomers, tabSearchQuery).length}건`} · 장기 육성 대상</p>
               </div>
               <div className="flex bg-white/10 rounded-lg p-0.5 border border-white/20">
                 <button
@@ -1562,6 +1635,21 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   등록일
                 </button>
               </div>
+            </div>
+
+            {/* 탭 내부 검색 */}
+            <div className="relative">
+              <input
+                type="text"
+                value={tabSearchQuery}
+                onChange={e => setTabSearchQuery(e.target.value)}
+                placeholder="업체명·이름·연락처 검색..."
+                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-300 pr-8"
+              />
+              {tabSearchQuery && (
+                <button onClick={() => setTabSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
+              )}
             </div>
 
             {/* 오늘 재통화 업체 미니맵 */}
@@ -1595,9 +1683,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
                 감성톡 관리 업체가 없습니다.
               </div>
+            ) : filterCustomers(emotionalCustomers, tabSearchQuery).length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-gray-400 text-sm">
+                &quot;{tabSearchQuery}&quot; 검색 결과 없음
+              </div>
             ) : (
               <InCallTableView
-                customers={emotionalCustomers}
+                customers={filterCustomers(emotionalCustomers, tabSearchQuery)}
                 allCustomers={customers}
                 tabType="emotional"
                 salesUsers={salesUserNames}
@@ -1617,7 +1709,22 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
           <div className="space-y-3">
             <div className="bg-gradient-to-r from-[#1B2A45] to-slate-600 rounded-xl px-5 py-3.5">
               <h2 className="text-sm font-bold text-white">🗑 자체거절 업체</h2>
-              <p className="text-white/50 text-[11px] mt-0.5">총 {trashCustomers.length}건 · 복구 가능</p>
+              <p className="text-white/50 text-[11px] mt-0.5">총 {trashCustomers.length}건{tabSearchQuery && ` · 검색 ${filterCustomers(trashCustomers, tabSearchQuery).length}건`} · 복구 가능</p>
+            </div>
+
+            {/* 탭 내부 검색 */}
+            <div className="relative">
+              <input
+                type="text"
+                value={tabSearchQuery}
+                onChange={e => setTabSearchQuery(e.target.value)}
+                placeholder="업체명·이름·연락처 검색..."
+                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-300 pr-8"
+              />
+              {tabSearchQuery && (
+                <button onClick={() => setTabSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
+              )}
             </div>
 
             {loading ? (
@@ -1626,9 +1733,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
                 자체거절 업체가 없습니다.
               </div>
+            ) : filterCustomers(trashCustomers, tabSearchQuery).length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-gray-400 text-sm">
+                &quot;{tabSearchQuery}&quot; 검색 결과 없음
+              </div>
             ) : (
               <InCallTableView
-                customers={trashCustomers}
+                customers={filterCustomers(trashCustomers, tabSearchQuery)}
                 allCustomers={customers}
                 tabType="trash"
                 salesUsers={salesUserNames}
