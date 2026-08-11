@@ -66,6 +66,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [db010GroupBy, setDb010GroupBy] = useState<'date' | 'mood'>('date')
+  const [emotionalGroupBy, setEmotionalGroupBy] = useState<'date' | 'mood'>('mood')
   // ── 메모장 ──────────────────────────────────────────────────────────────
   const [notepadOpen, setNotepadOpen] = useState(false)
   const [notepadOpacity, setNotepadOpacity] = useState(90)
@@ -1537,9 +1538,27 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         {/* ══════════ 감성톡 관리 ══════════ */}
         {activeTab === 'emotional' && (
           <div className="space-y-3">
-            <div className="bg-gradient-to-r from-[#1B2A45] to-violet-600 rounded-xl px-5 py-3.5">
-              <h2 className="text-sm font-bold text-white">감성톡 관리 업체</h2>
-              <p className="text-white/50 text-[11px] mt-0.5">총 {emotionalCustomers.length}건 · 장기 육성 대상</p>
+            <div className="bg-gradient-to-r from-[#1B2A45] to-violet-600 rounded-xl px-5 py-3.5 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-white">감성톡 관리 업체</h2>
+                <p className="text-white/50 text-[11px] mt-0.5">총 {emotionalCustomers.length}건 · 장기 육성 대상</p>
+              </div>
+              <div className="flex bg-white/10 rounded-lg p-0.5 border border-white/20">
+                <button
+                  onClick={() => setEmotionalGroupBy('mood')}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                    emotionalGroupBy === 'mood' ? 'bg-white text-[#1B2A45]' : 'text-white/60 hover:text-white'
+                  }`}>
+                  감도
+                </button>
+                <button
+                  onClick={() => setEmotionalGroupBy('date')}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                    emotionalGroupBy === 'date' ? 'bg-white text-[#1B2A45]' : 'text-white/60 hover:text-white'
+                  }`}>
+                  등록일
+                </button>
+              </div>
             </div>
 
             {/* 오늘 재통화 업체 미니맵 */}
@@ -1580,6 +1599,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 tabType="emotional"
                 salesUsers={salesUserNames}
                 userName={userName}
+                groupBy={emotionalGroupBy}
                 scrollToId={scrollToCustomerId}
                 onUpdate={updateCustomer}
                 onStatusChange={async (id, status) => moveCustomer(id, status as any)}

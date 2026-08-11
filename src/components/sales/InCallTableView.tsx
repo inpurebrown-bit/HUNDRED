@@ -2091,9 +2091,9 @@ export default function InCallTableView({
     return () => clearTimeout(timer)
   }, [scrollToId])
 
-  const isMoodGroup = tabType === 'emotional' || (tabType === 'db010' && groupBy === 'mood')
+  const isMoodGroup = (tabType === 'emotional' && groupBy === 'mood') || (tabType === 'db010' && groupBy === 'mood')
 
-  const groups = tabType === 'emotional'
+  const groups = (tabType === 'emotional' && groupBy === 'mood')
     ? (['상', '중', '하', ''] as const).map(mood => ({
         date: mood || '__none__',
         items: customers.filter(c => (c.details?.rejection_mood || '') === mood),
