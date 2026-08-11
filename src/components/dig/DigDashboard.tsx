@@ -17,11 +17,11 @@ const DAILY_GOAL = 8
 const BONUS_PER_EXTRA = 10000
 
 const CHECKLIST_ITEMS = [
-  { key: 'needs_check', label: '정책자금 니즈 확인', desc: '"혹시 지금 정책자금 알아보신 적 있으시거나 필요하세요?"' },
-  { key: 'basic_info', label: '기본 정보 수집', desc: '업력 / 연매출 / 업종 / 연체·체납 / 신용점수 / 대표자 성함' },
-  { key: 'purpose_explained', label: '취지 설명', desc: '무료 컨설팅, 들어보고 좋으면 비용 지불, 아니면 자료만 받아도 됨' },
-  { key: 'closing_done', label: '클로징 멘트', desc: '"저희 컨설팅 매니저님이 내일 연락드려서 무료 상담 진행해드릴 겁니다"' },
-  { key: 'phone_secured', label: '010 번호 확보', desc: '통화 가능한 010 번호 확보' },
+  { key: 'needs_check', label: '정책자금 니즈 확인', shortLabel: '니즈 확인', desc: '"혹시 지금 정책자금 알아보신 적 있으시거나 필요하세요?"' },
+  { key: 'basic_info', label: '기본 정보 수집', shortLabel: '정보 수집', desc: '업력 / 연매출 / 업종 / 연체·체납 / 신용점수 / 대표자 성함' },
+  { key: 'purpose_explained', label: '취지 설명', shortLabel: '취지 설명', desc: '무료 컨설팅, 들어보고 좋으면 비용 지불, 아니면 자료만 받아도 됨' },
+  { key: 'closing_done', label: '클로징 멘트', shortLabel: '클로징', desc: '"저희 컨설팅 매니저님이 내일 연락드려서 무료 상담 진행해드릴 겁니다"' },
+  { key: 'phone_secured', label: '010 번호 확보', shortLabel: '010 확보', desc: '통화 가능한 010 번호 확보' },
 ]
 
 const SCRIPT_SECTIONS = [
@@ -34,7 +34,7 @@ const SCRIPT_SECTIONS = [
 (대표자 확인) → 아래 이어서 진행
 
 "최근 정부에서 사업가·기업들을 대상으로 여러 지원 혜택들이 많이 나와서 연락드렸습니다.
-저희는 원픽스 파트너스라는 경영자문 회사입니다.
+저희는 헌드레드컨설팅이라는 경영자문 회사입니다.
 
 최근 000 업종에 대해서 나라에서 많은 지원을 해주고 있는데요!
 요즘 정책자금이 업종별로 하반기 막받이라서 혜택 못 받고 지나치시는 분들이 많아서 안내드리고 있거든요~
@@ -137,10 +137,11 @@ export default function DigDashboard({ userId, userName, username }: Props) {
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [scriptOpen, setScriptOpen] = useState<number | null>(null)
+  const [showRecordingModal, setShowRecordingModal] = useState(false)
 
-  // 폼 상태
   const [form, setForm] = useState({
     company: '', ceo_name: '', phone: '', phone_010: '',
     business_age: '', annual_revenue: '', industry: '',
@@ -153,7 +154,6 @@ export default function DigDashboard({ userId, userName, username }: Props) {
   const [recordingFile, setRecordingFile] = useState<File | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [analysis, setAnalysis] = useState<any>(null)
-  const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -171,35 +171,28 @@ export default function DigDashboard({ userId, userName, username }: Props) {
     setLoading(false)
   }, [])
 
-  useEffect(() => {
-    loadProspects()
-  }, [loadProspects])
+  useEffect(() => { loadProspects() }, [loadProspects])
+  useEffect(() => { if (activeTab === 'mylist') loadProspects() }, [activeTab, loadProspects])
 
-  useEffect(() => {
-    if (activeTab === 'mylist') loadProspects()
-  }, [activeTab, loadProspects])
-
-  // 오늘 기준 통계
   const today = new Date().toISOString().slice(0, 10)
-  const todayProspects = prospects.filter(p => p.call_date === today)
-  const todayApproved = todayProspects.filter(p => p.status === 'approved' || p.status === 'assigned').length
+  const currentMonth = new Date().toISOString().slice(0, 7)
+  const todayApproved = prospects.filter(p => p.call_date === today && (p.status === 'approved' || p.status === 'assigned')).length
+  const monthApproved = prospects.filter(p => p.call_date?.startsWith(currentMonth) && (p.status === 'approved' || p.status === 'assigned')).length
   const bonusCount = Math.max(0, todayApproved - DAILY_GOAL)
   const bonusAmount = bonusCount * BONUS_PER_EXTRA
+  const checklistAllDone = Object.values(checklist).every(Boolean)
 
-  // 녹취 파일 업로드 + Gemini 분석
   async function handleRecordingChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     setRecordingFile(file)
     setAnalysis(null)
 
-    // 파일 크기 체크
     if (file.size > 50 * 1024 * 1024) {
       showToast('파일이 너무 큽니다 (최대 50MB)', 'error')
       return
     }
 
-    // Gemini 분석 (20MB 이하만)
     if (file.size <= 20 * 1024 * 1024) {
       setAnalyzing(true)
       try {
@@ -209,11 +202,9 @@ export default function DigDashboard({ userId, userName, username }: Props) {
         const data = await res.json()
         if (data.analysis && !data.analysis.parse_error) {
           setAnalysis(data.analysis)
-          // AI가 파악한 체크리스트 자동 반영
           if (data.analysis.checklist) {
             setChecklist(prev => ({ ...prev, ...data.analysis.checklist }))
           }
-          // AI가 파악한 고객 정보 자동 반영
           if (data.analysis.customer_info) {
             const ci = data.analysis.customer_info
             setForm(prev => ({
@@ -240,18 +231,23 @@ export default function DigDashboard({ userId, userName, username }: Props) {
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmitClick(e: React.FormEvent) {
     e.preventDefault()
     if (!form.phone_010.trim()) {
       showToast('010 번호는 필수입니다', 'error')
       return
     }
+    setRecordingFile(null)
+    setAnalysis(null)
+    if (fileRef.current) fileRef.current.value = ''
+    setShowRecordingModal(true)
+  }
 
+  async function handleFinalSubmit() {
     setSubmitting(true)
     let recording_url = ''
     let recording_filename = ''
 
-    // 1. 녹취 파일 업로드
     if (recordingFile) {
       setUploading(true)
       try {
@@ -277,7 +273,6 @@ export default function DigDashboard({ userId, userName, username }: Props) {
       setUploading(false)
     }
 
-    // 2. 가망 등록
     try {
       const res = await fetch('/api/dig-prospects', {
         method: 'POST',
@@ -305,6 +300,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
         setRecordingFile(null)
         setAnalysis(null)
         if (fileRef.current) fileRef.current.value = ''
+        setShowRecordingModal(false)
       } else {
         showToast(data.error || '등록 실패', 'error')
       }
@@ -314,8 +310,6 @@ export default function DigDashboard({ userId, userName, username }: Props) {
     setSubmitting(false)
   }
 
-  const checklistAllDone = Object.values(checklist).every(Boolean)
-
   return (
     <div className="min-h-screen bg-[#F7F6F2]">
       {/* 토스트 */}
@@ -324,6 +318,65 @@ export default function DigDashboard({ userId, userName, username }: Props) {
           toast.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'
         }`}>
           {toast.msg}
+        </div>
+      )}
+
+      {/* 녹취 파일 첨부 모달 */}
+      {showRecordingModal && (
+        <div className="fixed inset-0 z-[9998] flex items-end justify-center bg-black/60">
+          <div className="bg-white rounded-t-2xl w-full max-w-lg px-5 pt-5 pb-8 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-[#1B2A45]">녹취 파일 첨부</h3>
+                <p className="text-[11px] text-gray-400 mt-0.5">첨부 시 AI 분석 + 대표님 심사에 활용됩니다 (선택)</p>
+              </div>
+              <button type="button" onClick={() => setShowRecordingModal(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none p-1">✕</button>
+            </div>
+
+            <input ref={fileRef} type="file" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg"
+              onChange={handleRecordingChange} className="hidden" />
+            <button type="button" onClick={() => fileRef.current?.click()}
+              className="w-full border-2 border-dashed border-gray-200 rounded-xl py-5 text-center hover:border-[#1B2A45]/30 transition-colors">
+              {recordingFile ? (
+                <span className="text-sm text-gray-700 font-medium">{recordingFile.name}</span>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-400">+ 녹취 파일 선택</p>
+                  <p className="text-[11px] text-gray-300 mt-0.5">mp3, m4a, wav, aac 등</p>
+                </>
+              )}
+            </button>
+
+            {analyzing && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm text-blue-700">AI가 통화 내용 분석 중...</p>
+              </div>
+            )}
+
+            {analysis && !analysis.parse_error && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-2">
+                <p className="text-[11px] font-bold text-emerald-700">AI 분석 결과</p>
+                <p className="text-sm text-gray-700">{analysis.summary}</p>
+                {analysis.feedback && (
+                  <p className="text-[11px] text-amber-700 bg-amber-50 rounded-lg px-3 py-2">{analysis.feedback}</p>
+                )}
+                <p className={`text-[11px] font-semibold ${analysis.all_passed ? 'text-emerald-700' : 'text-amber-600'}`}>
+                  {analysis.all_passed ? '✅ 모든 체크리스트 통과' : '⚠ 일부 체크리스트 미완료'}
+                </p>
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <button type="button"
+                onClick={handleFinalSubmit}
+                disabled={submitting || analyzing}
+                className="flex-1 py-4 bg-[#1B2A45] text-white text-sm font-bold rounded-xl hover:bg-[#1B2A45]/90 transition-colors disabled:opacity-50">
+                {uploading ? '업로드 중...' : submitting ? '제출 중...' : recordingFile ? '녹취 포함 제출' : '녹취 없이 제출'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -366,11 +419,11 @@ export default function DigDashboard({ userId, userName, username }: Props) {
 
       {/* 탭바 */}
       <div className="bg-white border-b border-gray-200 flex sticky top-[52px] z-20 shadow-sm">
-        {[
+        {([
           { key: 'submit' as Tab, label: '가망 등록' },
           { key: 'mylist' as Tab, label: '내 가망 목록' },
           { key: 'script' as Tab, label: '스크립트' },
-        ].map(t => (
+        ] as const).map(t => (
           <button key={t.key}
             onClick={() => setActiveTab(t.key)}
             className={`flex-1 py-3 text-sm font-medium transition-colors relative ${
@@ -384,229 +437,194 @@ export default function DigDashboard({ userId, userName, username }: Props) {
         ))}
       </div>
 
-      <main className="max-w-xl mx-auto px-4 py-5 space-y-4">
-        {/* ── 오늘 현황 배너 ── */}
-        <div className="bg-[#1B2A45] rounded-xl px-5 py-4">
-          <p className="text-white/50 text-[11px] mb-2">오늘 {today} 성과</p>
-          <div className="flex items-end gap-4">
-            <div>
-              <p className="text-white/60 text-[11px]">승인 완료</p>
-              <p className="text-3xl font-black text-white">
-                {todayApproved}
-                <span className="text-base font-normal text-white/50"> / {DAILY_GOAL}</span>
-              </p>
-            </div>
-            {bonusCount > 0 && (
-              <div className="bg-[#C5A258]/20 border border-[#C5A258]/40 rounded-xl px-4 py-2">
-                <p className="text-[#C5A258] text-[11px]">추가 인센티브</p>
-                <p className="text-[#C5A258] text-xl font-black">+{bonusAmount.toLocaleString()}원</p>
-                <p className="text-[#C5A258]/70 text-[10px]">{bonusCount}건 × 1만원</p>
-              </div>
-            )}
-          </div>
-          {todayApproved >= DAILY_GOAL ? (
-            <p className="text-emerald-400 text-xs mt-2 font-semibold">목표 달성! 추가 인센티브 발생 중</p>
-          ) : (
-            <p className="text-white/40 text-xs mt-2">목표까지 {DAILY_GOAL - todayApproved}건 남음</p>
-          )}
-        </div>
+      <main className="max-w-xl mx-auto px-4 py-4 space-y-3">
 
         {/* ══════════ 가망 등록 탭 ══════════ */}
         {activeTab === 'submit' && (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* 체크리스트 */}
-            <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-[#1B2A45]">통화 전 체크리스트</h3>
-                {checklistAllDone && (
-                  <span className="text-[11px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">완료</span>
-                )}
+          <>
+            {/* 오늘 현황 배너 */}
+            <div className="bg-[#1B2A45] rounded-xl px-4 py-3 flex items-center justify-between">
+              <div>
+                <p className="text-white/50 text-[10px] mb-0.5">오늘 {today}</p>
+                <div className="flex items-baseline gap-1.5">
+                  <p className="text-2xl font-black text-white">{todayApproved}</p>
+                  <p className="text-white/40 text-sm">/ {DAILY_GOAL}</p>
+                </div>
+                {todayApproved >= DAILY_GOAL
+                  ? <p className="text-emerald-400 text-[10px] mt-0.5 font-semibold">목표 달성!</p>
+                  : <p className="text-white/30 text-[10px] mt-0.5">목표까지 {DAILY_GOAL - todayApproved}건</p>
+                }
               </div>
-              {CHECKLIST_ITEMS.map(item => (
-                <label key={item.key} className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors ${
-                  checklist[item.key] ? 'bg-emerald-50 border border-emerald-200' : 'bg-gray-50 border border-gray-100'
-                }`}>
-                  <input
-                    type="checkbox"
-                    checked={checklist[item.key]}
-                    onChange={e => setChecklist(prev => ({ ...prev, [item.key]: e.target.checked }))}
-                    className="mt-0.5 w-4 h-4 accent-emerald-600 shrink-0"
-                  />
-                  <div>
-                    <p className={`text-sm font-semibold ${checklist[item.key] ? 'text-emerald-700' : 'text-gray-700'}`}>
-                      {item.label}
-                    </p>
-                    <p className="text-[11px] text-gray-400 mt-0.5">{item.desc}</p>
-                  </div>
-                </label>
-              ))}
-              {!checklistAllDone && (
-                <p className="text-[11px] text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
-                  체크리스트 미완료 시 가망 인정 불가 — 모두 완료 후 제출해주세요
-                </p>
+              {bonusCount > 0 && (
+                <div className="bg-[#C5A258]/20 border border-[#C5A258]/40 rounded-xl px-3 py-2 text-right">
+                  <p className="text-[#C5A258] text-[10px]">인센티브</p>
+                  <p className="text-[#C5A258] text-lg font-black">+{bonusAmount.toLocaleString()}원</p>
+                  <p className="text-[#C5A258]/70 text-[9px]">{bonusCount}건 × 1만원</p>
+                </div>
               )}
             </div>
 
-            {/* 녹취 파일 업로드 */}
-            <div className="bg-white rounded-xl border border-gray-100 p-4">
-              <h3 className="text-sm font-bold text-[#1B2A45] mb-3">녹취 파일 업로드</h3>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg"
-                onChange={handleRecordingChange}
-                className="hidden"
-              />
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                className="w-full border-2 border-dashed border-gray-200 rounded-xl py-4 text-sm text-gray-400 hover:border-[#1B2A45]/30 hover:text-gray-600 transition-colors">
-                {recordingFile ? (
-                  <span className="text-gray-700 font-medium">{recordingFile.name}</span>
-                ) : (
-                  '+ 녹취 파일 선택 (mp3, m4a, wav 등)'
-                )}
-              </button>
+            <form onSubmit={handleSubmitClick} className="space-y-3">
+              {/* 업체정보 + 체크리스트 2열 */}
+              <div className="flex gap-2.5 items-start">
+                {/* 업체정보 (left, flex-1) */}
+                <div className="flex-1 min-w-0 bg-white rounded-xl border border-gray-100 p-3 space-y-2">
+                  <h3 className="text-sm font-bold text-[#1B2A45]">업체 정보</h3>
 
-              {analyzing && (
-                <div className="mt-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-                  <p className="text-sm text-blue-700">AI가 통화 내용 분석 중...</p>
+                  {/* 업체명 */}
+                  <div>
+                    <label className="text-[10px] text-gray-400 font-medium">업체명</label>
+                    <input value={form.company} onChange={e => setForm(p => ({ ...p, company: e.target.value }))}
+                      placeholder="업체명" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
+                  </div>
+
+                  {/* 업력 */}
+                  <div>
+                    <label className="text-[10px] text-gray-400 font-medium">업력</label>
+                    <input value={form.business_age} onChange={e => setForm(p => ({ ...p, business_age: e.target.value }))}
+                      placeholder="예) 3년" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
+                  </div>
+
+                  {/* 연매출 */}
+                  <div>
+                    <label className="text-[10px] text-gray-400 font-medium">연매출</label>
+                    <input value={form.annual_revenue} onChange={e => setForm(p => ({ ...p, annual_revenue: e.target.value }))}
+                      placeholder="예) 5억" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
+                  </div>
+
+                  {/* 업종 */}
+                  <div>
+                    <label className="text-[10px] text-gray-400 font-medium">업종</label>
+                    <input value={form.industry} onChange={e => setForm(p => ({ ...p, industry: e.target.value }))}
+                      placeholder="예) 제조업" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
+                  </div>
+
+                  {/* 연체·체납 */}
+                  <div className="flex items-center gap-2 py-1">
+                    <input type="checkbox" checked={form.has_delinquency}
+                      onChange={e => setForm(p => ({ ...p, has_delinquency: e.target.checked }))}
+                      className="w-4 h-4 accent-red-500 shrink-0" id="delinquency" />
+                    <label htmlFor="delinquency" className="text-sm text-gray-600 cursor-pointer">연체·체납 있음</label>
+                  </div>
+
+                  {/* 신용점수 */}
+                  <div>
+                    <label className="text-[10px] text-gray-400 font-medium">신용점수</label>
+                    <input value={form.credit_score} onChange={e => setForm(p => ({ ...p, credit_score: e.target.value }))}
+                      placeholder="예) 780점" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
+                  </div>
+
+                  {/* 010 번호 */}
+                  <div>
+                    <label className="text-[10px] text-gray-400 font-medium">010 번호 <span className="text-red-400">*</span></label>
+                    <input value={form.phone_010} onChange={e => setForm(p => ({ ...p, phone_010: e.target.value }))}
+                      placeholder="010-0000-0000" required
+                      className="mt-0.5 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
+                  </div>
+
+                  {/* 대표이름 */}
+                  <div>
+                    <label className="text-[10px] text-gray-400 font-medium">대표자 성함</label>
+                    <input value={form.ceo_name} onChange={e => setForm(p => ({ ...p, ceo_name: e.target.value }))}
+                      placeholder="홍길동" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
+                  </div>
+
+                  {/* 기존 연락처 (접어서) */}
+                  <div>
+                    <label className="text-[10px] text-gray-400 font-medium">기존 DB 번호</label>
+                    <input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
+                      placeholder="DB 연락처" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
+                  </div>
+
+                  {/* 필요자금 */}
+                  <div>
+                    <label className="text-[10px] text-gray-400 font-medium">필요자금</label>
+                    <input value={form.required_fund} onChange={e => setForm(p => ({ ...p, required_fund: e.target.value }))}
+                      placeholder="예) 1억" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
+                  </div>
+
+                  {/* 메모 */}
+                  <div>
+                    <label className="text-[10px] text-gray-400 font-medium">특이사항 메모</label>
+                    <textarea value={form.memo} onChange={e => setForm(p => ({ ...p, memo: e.target.value }))}
+                      rows={2} placeholder="재통화 요청, 기타..."
+                      className="mt-0.5 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30 resize-none" />
+                  </div>
                 </div>
-              )}
 
-              {analysis && !analysis.parse_error && (
-                <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-2">
-                  <p className="text-[11px] font-bold text-emerald-700">AI 분석 결과</p>
-                  <p className="text-sm text-gray-700">{analysis.summary}</p>
-                  {analysis.feedback && (
-                    <p className="text-[11px] text-amber-700 bg-amber-50 rounded-lg px-3 py-2">{analysis.feedback}</p>
-                  )}
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {Object.entries(analysis.checklist || {}).map(([k, v]) => (
-                      <span key={k} className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                        v ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'
-                      }`}>
-                        {CHECKLIST_ITEMS.find(i => i.key === k)?.label || k}: {v ? '✓' : '✗'}
-                      </span>
+                {/* 체크리스트 compact (right, fixed width) */}
+                <div className="w-[130px] shrink-0 bg-white rounded-xl border border-gray-100 p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-xs font-bold text-[#1B2A45]">체크리스트</h3>
+                    {checklistAllDone && (
+                      <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-semibold">완료</span>
+                    )}
+                  </div>
+                  <div className="space-y-0.5">
+                    {CHECKLIST_ITEMS.map(item => (
+                      <label key={item.key} className="flex items-center gap-1.5 py-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={checklist[item.key]}
+                          onChange={e => setChecklist(prev => ({ ...prev, [item.key]: e.target.checked }))}
+                          className="w-4 h-4 accent-emerald-600 shrink-0"
+                        />
+                        <span className={`text-[11px] font-medium leading-tight ${checklist[item.key] ? 'text-emerald-700' : 'text-gray-500'}`}>
+                          {item.shortLabel}
+                        </span>
+                      </label>
                     ))}
                   </div>
-                  {analysis.all_passed && (
-                    <p className="text-[11px] text-emerald-700 font-semibold">✅ 모든 항목 통과 — 가망 인정 가능</p>
+                  {!checklistAllDone && (
+                    <p className="text-[9px] text-amber-600 mt-2 leading-tight border-t border-amber-100 pt-2">
+                      미완료 시 심사에 불리합니다
+                    </p>
                   )}
                 </div>
-              )}
-            </div>
-
-            {/* 업체 정보 입력 */}
-            <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
-              <h3 className="text-sm font-bold text-[#1B2A45]">업체 정보</h3>
-              <p className="text-[11px] text-gray-400">녹취 분석 후 자동 입력됩니다. 확인 후 수정해주세요.</p>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] text-gray-500 font-medium">업체명</label>
-                  <input value={form.company} onChange={e => setForm(p => ({ ...p, company: e.target.value }))}
-                    placeholder="업체명" className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A45]/20" />
-                </div>
-                <div>
-                  <label className="text-[11px] text-gray-500 font-medium">대표자 성함</label>
-                  <input value={form.ceo_name} onChange={e => setForm(p => ({ ...p, ceo_name: e.target.value }))}
-                    placeholder="홍길동" className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A45]/20" />
-                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] text-gray-500 font-medium">기존 연락처</label>
-                  <input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
-                    placeholder="DB 번호" className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A45]/20" />
-                </div>
-                <div>
-                  <label className="text-[11px] text-gray-500 font-medium">확보한 010 번호 *</label>
-                  <input value={form.phone_010} onChange={e => setForm(p => ({ ...p, phone_010: e.target.value }))}
-                    placeholder="010-0000-0000" required className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A45]/20" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] text-gray-500 font-medium">업력</label>
-                  <input value={form.business_age} onChange={e => setForm(p => ({ ...p, business_age: e.target.value }))}
-                    placeholder="3년" className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A45]/20" />
-                </div>
-                <div>
-                  <label className="text-[11px] text-gray-500 font-medium">연매출</label>
-                  <input value={form.annual_revenue} onChange={e => setForm(p => ({ ...p, annual_revenue: e.target.value }))}
-                    placeholder="5억" className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A45]/20" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] text-gray-500 font-medium">업종</label>
-                  <input value={form.industry} onChange={e => setForm(p => ({ ...p, industry: e.target.value }))}
-                    placeholder="제조업" className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A45]/20" />
-                </div>
-                <div>
-                  <label className="text-[11px] text-gray-500 font-medium">신용점수</label>
-                  <input value={form.credit_score} onChange={e => setForm(p => ({ ...p, credit_score: e.target.value }))}
-                    placeholder="780점" className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A45]/20" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] text-gray-500 font-medium">필요자금</label>
-                  <input value={form.required_fund} onChange={e => setForm(p => ({ ...p, required_fund: e.target.value }))}
-                    placeholder="1억" className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A45]/20" />
-                </div>
-                <div className="flex flex-col justify-end">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={form.has_delinquency}
-                      onChange={e => setForm(p => ({ ...p, has_delinquency: e.target.checked }))}
-                      className="w-4 h-4 accent-red-500"
-                    />
-                    <span className="text-sm text-gray-700">연체·체납 있음</span>
-                  </label>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[11px] text-gray-500 font-medium">특이사항 메모</label>
-                <textarea value={form.memo} onChange={e => setForm(p => ({ ...p, memo: e.target.value }))}
-                  rows={2} placeholder="통화 시간, 재통화 요청, 기타 메모..."
-                  className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A45]/20 resize-none" />
-              </div>
-            </div>
-
-            {/* 제출 */}
-            <button
-              type="submit"
-              disabled={submitting || !form.phone_010.trim()}
-              className={`w-full py-4 rounded-xl font-bold text-sm transition-colors ${
-                submitting || !form.phone_010.trim()
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : checklistAllDone
-                    ? 'bg-[#1B2A45] text-white hover:bg-[#1B2A45]/90'
-                    : 'bg-amber-500 text-white hover:bg-amber-600'
-              }`}>
-              {uploading ? '녹취 업로드 중...' : submitting ? '등록 중...' : checklistAllDone ? '가망 제출 (체크리스트 완료)' : '가망 제출 (체크리스트 미완료)'}
-            </button>
-
-            {!checklistAllDone && (
-              <p className="text-center text-xs text-amber-600">
-                체크리스트 미완료 상태입니다. 제출은 가능하지만 대표님 심사에서 불리할 수 있습니다.
-              </p>
-            )}
-          </form>
+              <button
+                type="submit"
+                disabled={!form.phone_010.trim()}
+                className={`w-full py-4 rounded-xl font-bold text-sm transition-colors ${
+                  !form.phone_010.trim()
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : checklistAllDone
+                      ? 'bg-[#1B2A45] text-white hover:bg-[#1B2A45]/90'
+                      : 'bg-amber-500 text-white hover:bg-amber-600'
+                }`}>
+                {checklistAllDone ? '가망 제출 →' : '가망 제출 (체크리스트 미완료)'}
+              </button>
+            </form>
+          </>
         )}
 
         {/* ══════════ 내 가망 목록 탭 ══════════ */}
         {activeTab === 'mylist' && (
           <div className="space-y-3">
+            {/* 데일리 / 이번달 통계 */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-[#1B2A45] rounded-xl px-4 py-3">
+                <p className="text-white/50 text-[10px] mb-1">오늘 승인</p>
+                <p className="text-2xl font-black text-white">
+                  {todayApproved}
+                  <span className="text-sm font-normal text-white/40"> / {DAILY_GOAL}</span>
+                </p>
+                {bonusCount > 0
+                  ? <p className="text-[#C5A258] text-[10px] mt-0.5">+{bonusAmount.toLocaleString()}원</p>
+                  : <p className="text-white/30 text-[10px] mt-0.5">목표까지 {Math.max(0, DAILY_GOAL - todayApproved)}건</p>
+                }
+              </div>
+              <div className="bg-[#1B2A45] rounded-xl px-4 py-3">
+                <p className="text-white/50 text-[10px] mb-1">이번달 승인</p>
+                <p className="text-2xl font-black text-white">
+                  {monthApproved}
+                  <span className="text-sm font-normal text-white/40">건</span>
+                </p>
+                <p className="text-white/30 text-[10px] mt-0.5">{currentMonth.replace('-', '년 ')}월</p>
+              </div>
+            </div>
+
             {loading ? (
               <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
             ) : prospects.length === 0 ? (
@@ -625,11 +643,10 @@ export default function DigDashboard({ userId, userName, username }: Props) {
         {activeTab === 'script' && (
           <div className="space-y-3">
             <div className="bg-[#1B2A45] rounded-xl px-5 py-4">
-              <h2 className="text-sm font-bold text-white">1차 가망 인폼 스크립트</h2>
-              <p className="text-white/50 text-[11px] mt-1">헌드레드컨설팅 · 1차 TM 전용</p>
+              <h2 className="text-sm font-bold text-white">가망 인폼 스크립트</h2>
+              <p className="text-white/50 text-[11px] mt-1">헌드레드컨설팅 · 발굴팀 TM 전용</p>
             </div>
 
-            {/* 필수 체크리스트 요약 */}
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
               <p className="text-[11px] font-bold text-amber-700 mb-2">통화 전 필수 체크리스트 — 통화 종료 전 모두 확인</p>
               {CHECKLIST_ITEMS.map((item, i) => (
@@ -718,9 +735,9 @@ function ProspectCard({ prospect: p }: { prospect: Prospect }) {
             {p.business_age && <p><span className="text-gray-400">업력</span> {p.business_age}</p>}
             {p.annual_revenue && <p><span className="text-gray-400">연매출</span> {p.annual_revenue}</p>}
             {p.industry && <p><span className="text-gray-400">업종</span> {p.industry}</p>}
+            <p><span className="text-gray-400">연체·체납</span> {p.has_delinquency ? '있음' : '없음'}</p>
             {p.credit_score && <p><span className="text-gray-400">신용점수</span> {p.credit_score}</p>}
             {p.required_fund && <p><span className="text-gray-400">필요자금</span> {p.required_fund}</p>}
-            <p><span className="text-gray-400">연체·체납</span> {p.has_delinquency ? '있음' : '없음'}</p>
           </div>
           {p.memo && <p className="text-gray-500 bg-gray-50 rounded-lg px-3 py-2">{p.memo}</p>}
           {p.recording_url && (
