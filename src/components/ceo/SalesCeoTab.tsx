@@ -764,6 +764,11 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
       setLoading(false)
     }
     load()
+    function onVisible() {
+      if (document.visibilityState === 'visible') load()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
 
   const salesPeople = useMemo(() => {
