@@ -485,18 +485,25 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
   }
 
   async function handleRefundComplete() {
-    const company = d.company || c.customers?.details?.company || c.customers?.name || '—'
-    const feeAmt  = parseFloat(String(d.fee_amount || '0').replace(/[^0-9.]/g, '')) || 0
-    const dedCnt  = contractWeight(feeAmt, false) // fee_amount는 공급가액(VAT제외)
-    const fmtFee  = feeAmt > 0 ? feeAmt.toLocaleString('ko-KR') + '원' : '—'
+    const company    = d.company || c.customers?.details?.company || c.customers?.name || '—'
+    const feeAmt     = parseFloat(String(d.fee_amount || '0').replace(/[^0-9.]/g, '')) || 0
+    const fmtFee     = feeAmt > 0 ? feeAmt.toLocaleString('ko-KR') + '원' : '—'
+    const kstNow     = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' })
+    const kstMonth   = kstNow.slice(0, 7)
+    const salesUser  = d.sales_user_name || c.customers?.details?.sales_user_name || ''
+    // 원계약 가중치: 착수금 기준
+    const payAmt     = parseFloat(String(c.customers?.details?.payment_amount || d.payment_amount || '0').replace(/[^0-9.]/g, ''))
+    const vatInc     = c.customers?.details?.vat_included
+    const contractW  = contractWeight(payAmt, vatInc)  // 계약 당시 가중치
+    const contractMonth = (c.customers?.details?.contract_date || c.created_at || '').slice(0, 7)
+    const isSameMonth = contractMonth === kstMonth
+
     const ok = window.confirm(
-      `[환불완료 처리]\n\n업체: ${company}\n수수료 환수금액: ${fmtFee}\n공제 건수: -${dedCnt}개\n\n환불완료 처리하시겠습니까?`
+      `[환불완료 처리]\n\n업체: ${company}\n수수료 환수금액: ${fmtFee}\n계약 차감 가중치: -${contractW}개\n원계약 월: ${contractMonth || '미상'}\n\n환불완료 처리하시겠습니까?`
     )
     if (!ok) return
 
-    const kstMonth = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(0, 7)
-    const opsUser  = c.ops_user_name || userName || ''
-    const salesUser = d.sales_user_name || ''
+    const opsUser = c.ops_user_name || userName || ''
 
     const patch = {
       progress_stage: 'refunded',
@@ -504,10 +511,12 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
         ...(local.details || {}),
         refund_completed: true,
         refund_completed_at: kstMonth,
-        refund_deduction_count: dedCnt,
+        refund_deduction_count: contractW,
         refund_deduction_amount: feeAmt,
         refund_ops_user: opsUser,
         refund_sales_user: salesUser,
+        refund_contract_month: contractMonth,
+        refund_is_same_month: isSameMonth,
       },
     }
 
@@ -519,13 +528,22 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
       })
       if (!res.ok) { alert('저장 실패'); return }
 
-      // customers 테이블 status도 contracted → refunded(active+sub_status)로 되돌림
-      // → PayrollTab 집계(status==='contracted' 필터)에서 자동 제외
+      // customers status: contracted → active+sub_status:refunded (집계 제외)
+      // 전월 계약 건은 추가로 refund_deduction_month 기록 → PayrollTab이 이번달 차감에 사용
       if (c.customer_id) {
+        const customerPatch: Record<string, any> = { status: 'refunded' }
+        if (!isSameMonth && salesUser && contractW > 0) {
+          customerPatch.details = {
+            refund_deduction_month: kstMonth,
+            refund_deduction_weight: contractW,
+            refund_deduction_sales: salesUser,
+            refund_company: company,
+          }
+        }
         await fetch(`/api/customers/${c.customer_id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'refunded' }),
+          body: JSON.stringify(customerPatch),
         })
       }
 

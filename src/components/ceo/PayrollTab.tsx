@@ -366,14 +366,13 @@ export default function PayrollTab() {
 
       // 해당 월 계약 실시간 집계 (contractWeight 기준)
       const salesByName: Record<string, { amount: number; count: number }> = {}
-      const contractDetails: Record<string, Array<{ company: string; amount: number; weight: number; date: string }>> = {}
+      const contractDetails: Record<string, Array<{ company: string; amount: number; weight: number; date: string; refund?: boolean }>> = {}
       ;(custJson.customers || []).forEach((c: any) => {
         if (c.status !== 'contracted') return
         const contractMonth = (c.details?.contract_date || c.created_at || '').slice(0, 7)
         if (contractMonth !== yearMonth) return
         const name = (c.details?.sales_user_name || c.sales_user_name || '').trim()
         if (!name) return
-        // my_revenue 없으면 payment_amount 폴백 (미입력 계약 누락 방지)
         const rev = parseMon(c.details?.my_revenue) || parseMon(c.details?.payment_amount)
         const w = contractWeight(c.details?.payment_amount, c.details?.vat_included)
         if (!salesByName[name]) salesByName[name] = { amount: 0, count: 0 }
@@ -387,6 +386,27 @@ export default function PayrollTab() {
           date: c.details?.contract_date || c.created_at || '',
         })
       })
+
+      // 전월 계약 → 이번달 환불 차감 (개수만 차감, 금액 건드리지 않음)
+      ;(custJson.customers || []).forEach((c: any) => {
+        const dedMonth = c.details?.refund_deduction_month
+        if (dedMonth !== yearMonth) return
+        const name = (c.details?.refund_deduction_sales || '').trim()
+        if (!name) return
+        const w = parseFloat(String(c.details?.refund_deduction_weight || 0)) || 0
+        if (w <= 0) return
+        if (!salesByName[name]) salesByName[name] = { amount: 0, count: 0 }
+        salesByName[name].count = Math.max(0, salesByName[name].count - w)
+        if (!contractDetails[name]) contractDetails[name] = []
+        contractDetails[name].push({
+          company: `[환불차감] ${c.details?.refund_company || c.details?.company || c.name || ''}`,
+          amount: 0,
+          weight: -w,
+          date: dedMonth,
+          refund: true,
+        })
+      })
+
       setSalesContractMap(contractDetails)
 
       const newSalesEmps = salesEmps.map(emp => {
@@ -458,15 +478,14 @@ export default function PayrollTab() {
 
       // 영업팀
       const salesByName: Record<string, { amount: number; count: number }> = {}
-      const contractDetails: Record<string, Array<{ company: string; amount: number; weight: number; date: string }>> = {}
+      const contractDetails: Record<string, Array<{ company: string; amount: number; weight: number; date: string; refund?: boolean }>> = {}
       for (const e of salesEntries) {
         const name = (e.sales_user_name || '').trim()
         if (!name) continue
         if (!salesByName[name]) salesByName[name] = { amount: 0, count: 0 }
         salesByName[name].amount += e.amount || 0
-        // contractWeight 기준 가중치 적용 (50만이하=0.5, 31~99만=1, 100만~=2,3,4...)
         const w = contractWeight((e as any).payment_amount, (e as any).vat_included)
-        salesByName[name].count += w > 0 ? w : 1  // payment_amount 없으면 1로 폴백
+        salesByName[name].count += w > 0 ? w : 1
         if (!contractDetails[name]) contractDetails[name] = []
         contractDetails[name].push({
           company: (e as any).company || '(업체명 없음)',
@@ -475,6 +494,31 @@ export default function PayrollTab() {
           date: (e as any).date || '',
         })
       }
+
+      // 전월 계약 → 이번달 환불 차감 (개수만, 금액 건드리지 않음)
+      try {
+        const custRes2 = await fetch('/api/customers')
+        const custJson2 = await custRes2.json()
+        ;(custJson2.customers || []).forEach((c: any) => {
+          const dedMonth = c.details?.refund_deduction_month
+          if (dedMonth !== yearMonth) return
+          const name = (c.details?.refund_deduction_sales || '').trim()
+          if (!name) return
+          const w = parseFloat(String(c.details?.refund_deduction_weight || 0)) || 0
+          if (w <= 0) return
+          if (!salesByName[name]) salesByName[name] = { amount: 0, count: 0 }
+          salesByName[name].count = Math.max(0, salesByName[name].count - w)
+          if (!contractDetails[name]) contractDetails[name] = []
+          contractDetails[name].push({
+            company: `[환불차감] ${c.details?.refund_company || c.details?.company || c.name || ''}`,
+            amount: 0,
+            weight: -w,
+            date: dedMonth,
+            refund: true,
+          })
+        })
+      } catch { /* 환불차감 로드 실패해도 계속 */ }
+
       setSalesContractMap(contractDetails)
       const newSalesEmps = currentSales.map(emp => {
         if (!emp.name) return emp
@@ -741,12 +785,12 @@ export default function PayrollTab() {
                       {contracts.length === 0 ? (
                         <p className="text-[10px] text-gray-400 py-1">자동반영 후 목록이 표시됩니다</p>
                       ) : contracts.map((c, ci) => (
-                        <div key={ci} className="flex items-center justify-between text-[10px] py-0.5 border-b border-amber-100 last:border-0">
-                          <span className="text-gray-700 font-medium">{c.company}</span>
+                        <div key={ci} className={`flex items-center justify-between text-[10px] py-0.5 border-b last:border-0 ${(c as any).refund ? 'border-rose-100 bg-rose-50/50' : 'border-amber-100'}`}>
+                          <span className={`font-medium ${(c as any).refund ? 'text-rose-600' : 'text-gray-700'}`}>{c.company}</span>
                           <div className="flex items-center gap-3 text-gray-400">
                             <span>{c.date.slice(0, 10)}</span>
-                            <span className="text-amber-600 font-semibold">{parseFloat(Number(c.weight).toFixed(2))}개</span>
-                            <span>{c.amount > 0 ? c.amount.toLocaleString('ko-KR') + '원' : '—'}</span>
+                            <span className={`font-semibold ${(c as any).refund ? 'text-rose-600' : 'text-amber-600'}`}>{parseFloat(Number(c.weight).toFixed(2))}개</span>
+                            {!(c as any).refund && <span>{c.amount > 0 ? c.amount.toLocaleString('ko-KR') + '원' : '—'}</span>}
                           </div>
                         </div>
                       ))}
