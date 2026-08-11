@@ -57,8 +57,8 @@ export async function POST(req: NextRequest) {
   if (!name || !username || !password || !role) {
     return NextResponse.json({ error: '이름, 아이디, 비밀번호, 역할은 필수입니다' }, { status: 400 })
   }
-  if (!['sales', 'ops'].includes(role)) {
-    return NextResponse.json({ error: '역할은 sales 또는 ops만 가능합니다' }, { status: 400 })
+  if (!['sales', 'ops', 'dig'].includes(role)) {
+    return NextResponse.json({ error: '역할은 sales, ops, dig만 가능합니다' }, { status: 400 })
   }
   if (password.length < 4) {
     return NextResponse.json({ error: '비밀번호는 4자 이상이어야 합니다' }, { status: 400 })

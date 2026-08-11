@@ -1476,12 +1476,12 @@ function EmployeeManageSection() {
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
-  const [createForm, setCreateForm] = useState({ name: '', username: '', password: '', role: 'sales' as 'sales' | 'ops' })
+  const [createForm, setCreateForm] = useState({ name: '', username: '', password: '', role: 'sales' as 'sales' | 'ops' | 'dig' })
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
 
-  const roleLabel: Record<string, string> = { sales: '영업팀', ops: '관리팀', ceo: '대표' }
-  const roleBg: Record<string, string> = { sales: 'bg-sky-100 text-sky-700', ops: 'bg-violet-100 text-violet-700', ceo: 'bg-amber-100 text-amber-700' }
+  const roleLabel: Record<string, string> = { sales: '영업팀', ops: '관리팀', dig: '1차발굴팀', ceo: '대표' }
+  const roleBg: Record<string, string> = { sales: 'bg-sky-100 text-sky-700', ops: 'bg-violet-100 text-violet-700', dig: 'bg-orange-100 text-orange-700', ceo: 'bg-amber-100 text-amber-700' }
 
   const load = async () => {
     setLoading(true)
@@ -1571,10 +1571,16 @@ function EmployeeManageSection() {
         <div className="bg-white border border-[#1B2A45]/20 rounded-xl p-5 space-y-4">
           <p className="text-sm font-bold text-[#1B2A45]">새 직원 계정 만들기</p>
           <div className="flex gap-2">
-            {(['sales', 'ops'] as const).map(r => (
+            {(['sales', 'ops', 'dig'] as const).map(r => (
               <button key={r} onClick={() => setCreateForm(f => ({ ...f, role: r }))}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${createForm.role === r ? (r === 'sales' ? 'bg-sky-500 text-white border-sky-500' : 'bg-violet-500 text-white border-violet-500') : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'}`}>
-                {r === 'sales' ? '영업팀' : '관리팀'}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
+                  createForm.role === r
+                    ? r === 'sales' ? 'bg-sky-500 text-white border-sky-500'
+                      : r === 'ops' ? 'bg-violet-500 text-white border-violet-500'
+                      : 'bg-orange-500 text-white border-orange-500'
+                    : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
+                }`}>
+                {r === 'sales' ? '영업팀' : r === 'ops' ? '관리팀' : '1차발굴팀'}
               </button>
             ))}
           </div>

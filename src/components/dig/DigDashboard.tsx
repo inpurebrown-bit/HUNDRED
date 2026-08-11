@@ -172,6 +172,10 @@ export default function DigDashboard({ userId, userName, username }: Props) {
   }, [])
 
   useEffect(() => {
+    loadProspects()
+  }, [loadProspects])
+
+  useEffect(() => {
     if (activeTab === 'mylist') loadProspects()
   }, [activeTab, loadProspects])
 
@@ -283,6 +287,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
           checklist,
           recording_url,
           recording_filename,
+          recording_analysis: analysis || null,
         }),
       })
       const data = await res.json()

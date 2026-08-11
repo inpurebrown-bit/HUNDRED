@@ -52,13 +52,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     if (fetchErr || !prospect) return NextResponse.json({ error: '가망 없음' }, { status: 404 })
 
-    // customers 테이블에 새 row 생성
+    // customers 테이블에 새 row 생성 (직가DB — db010)
     const { data: newCustomer, error: custErr } = await supabaseAdmin
       .from('customers')
       .insert({
         name: prospect.ceo_name || '(미입력)',
         phone: prospect.phone_010 || prospect.phone,
-        status: 'lead',
+        status: 'db010',
         owner_id: assigned_to,
         details: {
           company: prospect.company,
@@ -114,9 +114,9 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
 
-  const query = supabaseAdmin.from('dig_prospects').delete().eq('id', params.id)
+  let query = supabaseAdmin.from('dig_prospects').delete().eq('id', params.id)
   if (user.role === 'dig') {
-    query.eq('dig_user_id', user.id).eq('status', 'pending')
+    query = query.eq('dig_user_id', user.id).eq('status', 'pending') as typeof query
   }
 
   const { error } = await query

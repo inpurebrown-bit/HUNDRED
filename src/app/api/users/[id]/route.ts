@@ -30,7 +30,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   if (name) updateFields.name = name
   if (username) updateFields.username = username
   if (password) updateFields.password_hash = await bcrypt.hash(password, 10)
-  if (role && ['sales', 'ops'].includes(role)) updateFields.role = role
+  if (role && ['sales', 'ops', 'dig'].includes(role)) updateFields.role = role
 
   const { data: updated, error } = await supabaseAdmin
     .from('users').update(updateFields).eq('id', id).select('id, name, username, role').single()

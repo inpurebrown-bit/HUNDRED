@@ -111,6 +111,7 @@ export default function DigManageTab() {
     })
     if (res.ok) {
       showToast('승인 완료')
+      setExpanded(null)
       await load()
     } else {
       const d = await res.json()
@@ -132,6 +133,7 @@ export default function DigManageTab() {
     })
     if (res.ok) {
       showToast('거절 처리됨')
+      setExpanded(null)
       await load()
     } else {
       const d = await res.json()
@@ -159,6 +161,7 @@ export default function DigManageTab() {
     })
     if (res.ok) {
       showToast(`${salesUser?.name}에게 배정 완료 — 직가DB로 이동됩니다`)
+      setExpanded(null)
       await load()
     } else {
       const d = await res.json()

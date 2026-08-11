@@ -68,13 +68,15 @@ export default function PinManageTab() {
   }, [newPins, load])
 
   const roleLabel = (role: string) =>
-    role === 'ceo' ? '대표' : role === 'sales' ? '영업팀' : '자금팀'
+    role === 'ceo' ? '대표' : role === 'sales' ? '영업팀' : role === 'dig' ? '발굴팀' : '자금팀'
 
   const roleBadge = (role: string) =>
     role === 'ceo'
       ? 'bg-amber-100 text-amber-700'
       : role === 'sales'
       ? 'bg-blue-100 text-blue-700'
+      : role === 'dig'
+      ? 'bg-orange-100 text-orange-700'
       : 'bg-emerald-100 text-emerald-700'
 
   return (

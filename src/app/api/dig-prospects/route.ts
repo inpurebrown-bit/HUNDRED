@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     business_age, annual_revenue, industry,
     has_delinquency, credit_score, required_fund,
     checklist, memo,
-    recording_url, recording_filename,
+    recording_url, recording_filename, recording_analysis,
   } = body
 
   if (!phone_010) {
@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
       checklist: checklist || {},
       memo,
       recording_url, recording_filename,
+      recording_analysis: recording_analysis || null,
       status: 'pending',
       call_date: new Date().toISOString().slice(0, 10),
     })
