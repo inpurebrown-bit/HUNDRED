@@ -251,7 +251,14 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
     setLoading(false)
   }
 
-  useEffect(() => { loadAll() }, [])
+  useEffect(() => {
+    loadAll()
+    function onVisible() {
+      if (document.visibilityState === 'visible') loadAll()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
 
   // ── 대표 결제율 현황 불러오기 ──────────────────────────────────────────────
   useEffect(() => {
