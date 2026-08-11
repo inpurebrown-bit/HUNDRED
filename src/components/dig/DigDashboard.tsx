@@ -654,17 +654,14 @@ export default function DigDashboard({ userId, userName, username }: Props) {
 
         {/* ══════════ 스크립트 탭 ══════════ */}
         {activeTab === 'script' && (
-          <div className="space-y-3">
+          <div className="space-y-3 pb-8">
             {/* 헤더 */}
-            <div className="bg-[#1B2A45] rounded-xl px-4 py-3 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold text-white">가망 인폼 스크립트</h2>
-                <p className="text-white/40 text-[10px] mt-0.5">헌드레드컨설팅 · 발굴팀 TM 전용 · 옆으로 스크롤</p>
-              </div>
-              <span className="text-white/30 text-lg">→</span>
+            <div className="bg-[#1B2A45] rounded-xl px-4 py-3">
+              <h2 className="text-sm font-bold text-white">가망 인폼 스크립트</h2>
+              <p className="text-white/40 text-[10px] mt-0.5">헌드레드컨설팅 · 발굴팀 TM 전용</p>
             </div>
 
-            {/* 필수 체크리스트 — 칩 형태로 한줄 */}
+            {/* 필수 체크리스트 칩 */}
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
               <p className="text-[10px] font-bold text-amber-700 mb-1.5">통화 종료 전 필수 체크</p>
               <div className="flex flex-wrap gap-1">
@@ -676,37 +673,115 @@ export default function DigDashboard({ userId, userName, username }: Props) {
               </div>
             </div>
 
-            {/* 스크립트 가로 스크롤 카드 */}
-            <div className="overflow-x-auto -mx-4 px-4 pb-4">
-              <div className="flex gap-3" style={{ width: 'max-content' }}>
-                {(() => {
-                  const cardColors: Record<string, { bg: string; border: string; title: string; badge: string }> = {
-                    blue:   { bg: 'bg-blue-50',    border: 'border-blue-200',   title: 'text-blue-800',    badge: 'bg-blue-200 text-blue-800' },
-                    green:  { bg: 'bg-emerald-50', border: 'border-emerald-200',title: 'text-emerald-800', badge: 'bg-emerald-200 text-emerald-800' },
-                    orange: { bg: 'bg-orange-50',  border: 'border-orange-200', title: 'text-orange-800',  badge: 'bg-orange-200 text-orange-800' },
-                    purple: { bg: 'bg-purple-50',  border: 'border-purple-200', title: 'text-purple-800',  badge: 'bg-purple-200 text-purple-800' },
-                    red:    { bg: 'bg-red-50',     border: 'border-red-200',    title: 'text-red-800',     badge: 'bg-red-200 text-red-800' },
-                  }
-                  const stepLabels = ['STEP 1', 'STEP 2-A', 'STEP 2-B', 'STEP 3', 'TIP']
-                  return SCRIPT_SECTIONS.map((section, i) => {
-                    const c = cardColors[section.color] || cardColors.blue
-                    return (
-                      <div key={i} className={`w-[270px] shrink-0 rounded-xl border ${c.border} ${c.bg} flex flex-col`}>
-                        {/* 카드 헤더 */}
-                        <div className={`px-3 py-2.5 border-b ${c.border} flex items-center gap-2`}>
-                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${c.badge}`}>
-                            {stepLabels[i] || `STEP ${i + 1}`}
-                          </span>
-                          <span className={`text-sm font-bold ${c.title}`}>{section.title}</span>
-                        </div>
-                        {/* 카드 내용 */}
-                        <div className={`px-3 py-3 text-xs whitespace-pre-wrap leading-relaxed ${c.title} flex-1`}>
-                          {section.content}
-                        </div>
-                      </div>
-                    )
-                  })
-                })()}
+            {/* ── STEP 1: 도입부 ── */}
+            <div className="bg-white rounded-xl border border-blue-200 overflow-hidden">
+              <div className="bg-blue-50 px-4 py-2 flex items-center gap-2 border-b border-blue-200">
+                <span className="text-[9px] font-black bg-blue-200 text-blue-800 px-1.5 py-0.5 rounded">STEP 1</span>
+                <span className="text-sm font-bold text-blue-800">도입부</span>
+              </div>
+              <div className="px-4 py-3 text-sm text-gray-700 leading-relaxed space-y-2">
+                <p className="font-semibold text-blue-700">"안녕하세요 대표님~ 000 기업 대표님 맞으실까요~?"</p>
+                <p className="text-xs text-gray-400">(대표 아닌 경우) → "아 그러세요~ 그럼 다음에 연락드릴게요~"</p>
+                <p className="text-xs text-gray-400">(대표자 확인) → 아래 이어서 진행</p>
+                <div className="border-t border-gray-100 pt-2 text-xs leading-relaxed">
+                  <p>최근 정부에서 사업가·기업들을 대상으로 여러 지원 혜택들이 많이 나와서 연락드렸습니다.</p>
+                  <p className="font-semibold mt-1">저희는 헌드레드컨설팅이라는 경영자문 회사입니다.</p>
+                  <p className="mt-1">최근 000 업종에 대해서 나라에서 많은 지원을 해주고 있는데요! 요즘 정책자금이 업종별로 하반기 막받이라서 혜택 못 받고 지나치시는 분들이 많아서 안내드리고 있거든요~</p>
+                  <p className="mt-1">정책자금은 사업자분들 대상으로 은행보다도 낮은 금리에 담보 없이도 사업자만 보고 주는 자금들이 있고요, 보통 최소 1천만 원에서 1억 이상까지도 나오는데</p>
+                  <p className="font-semibold mt-2 text-blue-700">"혹시 지금 정책자금 알아보신 적 있으시거나 사용하고 계신 게 있으세요?"</p>
+                </div>
+              </div>
+            </div>
+
+            {/* ── 반론 대응 표 ── */}
+            <div className="bg-white rounded-xl border border-red-200 overflow-hidden">
+              <div className="bg-red-50 px-4 py-2 border-b border-red-200">
+                <span className="text-xs font-bold text-red-700">⚡ 초반 반론 대응</span>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {([
+                  { situation: '바빠요 / 됐어요', reply: '"아 바쁘시죠~ 연락처만 주시면 편한 시간에 매니저가 연락드릴게요. 010~"' },
+                  { situation: '필요없어요 / 관심없어요', reply: '"아 그러세요~ 무료라서 자료만 받아보셔도 되시구요~ 미리 진단만 받아 놓으셔도 나중에 자금 필요하실 때 고금리가 아니라 정부자금 사용하시는 게 금리도 낮고 부담이 없으시기 때문에 도움이 무조건 되실 겁니다!"' },
+                  { situation: '이미 쓰고 있어요', reply: '"아 사용하고 계시군요~ 기관마다 중복으로 추가 가능한 것도 있어서 보통 1년 동안 3~4번씩 받아가신다고 하는데요~"' },
+                  { situation: '사기 같아요', reply: '"먼저 무료 컨설팅이고 진행 원하실 때만 비용 발생해요~ 결정은 자금이 나올 수 있는지 듣고 결정하시는 거라서 마음 편하실 거에요~"' },
+                  { situation: '문자 남겨주세요', reply: '"문자로는 정확한 안내가 어려워서요~ 연락처 주시면 상담사가 딱 5분만 설명드릴게요."' },
+                ] as const).map((row, i) => (
+                  <div key={i} className="flex">
+                    <div className="w-[110px] shrink-0 bg-red-50/60 px-3 py-2.5 flex items-start">
+                      <span className="text-[11px] font-bold text-red-700 leading-tight">{row.situation}</span>
+                    </div>
+                    <div className="flex-1 px-3 py-2.5">
+                      <p className="text-xs text-gray-700 leading-relaxed">{row.reply}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── 니즈 분기 ── */}
+            <div>
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <div className="h-px flex-1 bg-gray-200" />
+                <span className="text-[11px] text-gray-400 font-medium">↓ 니즈 확인 후 분기</span>
+                <div className="h-px flex-1 bg-gray-200" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {/* 니즈 있을 때 */}
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl overflow-hidden">
+                  <div className="bg-emerald-100 px-3 py-1.5 border-b border-emerald-200">
+                    <span className="text-[11px] font-bold text-emerald-800">✓ 니즈 있을 때</span>
+                  </div>
+                  <div className="px-3 py-2.5 text-xs text-emerald-800 leading-relaxed">
+                    <p>"아 그러세요~ 그럼 혹시 어디서 받으셨어요?</p>
+                    <p className="mt-1">아아 잘하셨네요~! ㅎㅎ 근데 한번 받으신다고 더 못받는게 아니라, 기관마다 추가로 활용 가능 자금도 많이있거든요~</p>
+                    <p className="mt-1">보통 저희 대표님들은 1년에 3~4번도 타가시는분들 많습니다 ㅎㅎ"</p>
+                  </div>
+                </div>
+                {/* 니즈 없을 때 */}
+                <div className="bg-orange-50 border border-orange-200 rounded-xl overflow-hidden">
+                  <div className="bg-orange-100 px-3 py-1.5 border-b border-orange-200">
+                    <span className="text-[11px] font-bold text-orange-800">✗ 니즈 없을 때</span>
+                  </div>
+                  <div className="px-3 py-2.5 text-xs text-orange-800 leading-relaxed">
+                    <p>"아 그러시군요~ 대부분 사업하시면서 자금이 많이 필요하실텐데 캐피탈 같은 고금리가 아니라 시중 은행보다도 금리가 낮은 정부정책자금을 활용하시면 1년에 수백만 원 이자비용 아끼시기 때문에 활용하시는 거거든요~?"</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── 아래 순서대로 질문 ── */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                <span className="text-xs font-bold text-gray-700">↓ 아래 순서대로 질문</span>
+              </div>
+              <div className="px-4 py-3 space-y-2">
+                {([
+                  { q: '"혹시 사업 시작하신 지 얼마나 되셨어요?"', tag: '업력' },
+                  { q: '"연매출은 대략 어느 정도 되세요?"', tag: '연매출' },
+                  { q: '"혹시 세금 체납이나 대출 연체, 카드연체 같은 건 없으시죠?"', tag: '연체·체납' },
+                  { q: '"그럼 업종이 000 맞나요?"', tag: '업종' },
+                  { q: '"필요하신 자금은 얼마 정도이실까요?"', tag: '필요자금' },
+                  { q: '"신용점수는 대략 몇점이실까요~?"', tag: '신용점수' },
+                ] as const).map((item, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <span className="shrink-0 mt-0.5 text-[9px] font-bold bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{item.tag}</span>
+                    <p className="text-xs text-gray-700 leading-relaxed">{item.q}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── STEP 3: 취지 설명 + 번호 확보 ── */}
+            <div className="bg-white rounded-xl border border-purple-200 overflow-hidden">
+              <div className="bg-purple-50 px-4 py-2 flex items-center gap-2 border-b border-purple-200">
+                <span className="text-[9px] font-black bg-purple-200 text-purple-800 px-1.5 py-0.5 rounded">STEP 3</span>
+                <span className="text-sm font-bold text-purple-800">취지 설명 + 번호 확보</span>
+              </div>
+              <div className="px-4 py-3 text-xs text-gray-700 leading-relaxed space-y-2">
+                <p>"말씀 감사드려요~ 우선 대표님이 정책자금 어떤 기관에서 어떤 상품으로 들어가고, 한도는 얼마나 나올 것 같은지, 금리는 몇%대로 나올 것 같은지에 대해 저희가 컨설팅 매니저님이 자세히 무료상담 도와드릴거에요!</p>
+                <p className="font-semibold text-purple-700">"저희 전문 컨설턴트님이 내일 오후에 자세히 안내드릴건데, 받아보실 번호가 010에 몇번이실까요?"</p>
+                <p>"네 제가 문자로 저희 회사 자료 남겨드릴테니, 한번 검토해주시고 내일 오후에 안내 잘 받아보십쇼! ㅎㅎ</p>
+                <p className="font-semibold text-purple-700">"아 그리고 대표님 성함은 어떻게 되세요~?"</p>
               </div>
             </div>
           </div>
