@@ -133,7 +133,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
   const [form, setForm] = useState({
     company: '', ceo_name: '', phone: '', phone_010: '',
     business_age: '', annual_revenue: '', industry: '',
-    has_delinquency: false, credit_score: '', required_fund: '', memo: '',
+    delinquency_detail: '', credit_score: '', required_fund: '',
   })
   const [checklist, setChecklist] = useState<Record<string, boolean>>({
     needs_check: false, basic_info: false, purpose_explained: false,
@@ -266,7 +266,17 @@ export default function DigDashboard({ userId, userName, username }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...form,
+          company: form.company,
+          ceo_name: form.ceo_name,
+          phone: form.phone,
+          phone_010: form.phone_010,
+          business_age: form.business_age,
+          annual_revenue: form.annual_revenue,
+          industry: form.industry,
+          has_delinquency: !!form.delinquency_detail.trim(),
+          credit_score: form.credit_score,
+          required_fund: form.required_fund,
+          memo: form.delinquency_detail.trim(),
           checklist,
           recording_url,
           recording_filename,
@@ -279,7 +289,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
         setForm({
           company: '', ceo_name: '', phone: '', phone_010: '',
           business_age: '', annual_revenue: '', industry: '',
-          has_delinquency: false, credit_score: '', required_fund: '', memo: '',
+          delinquency_detail: '', credit_score: '', required_fund: '',
         })
         setChecklist({
           needs_check: false, basic_info: false, purpose_explained: false,
@@ -452,23 +462,25 @@ export default function DigDashboard({ userId, userName, username }: Props) {
               )}
             </div>
 
-            {/* 절대 금지 / 가망 인정 기준 배너 (compact) */}
-            <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 flex gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-bold text-red-700 mb-1">⚠ 절대 금지</p>
-                <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
-                  {['"지원금·공짜" 후킹', '니즈 없는 고객 확보', '번호만 받는 유도', '"100% 된다" 확정'].map((txt, i) => (
-                    <p key={i} className="text-[9px] text-red-600 flex items-start gap-0.5 leading-tight">
-                      <span className="shrink-0">❌</span>{txt}
-                    </p>
-                  ))}
+            {/* 절대 금지 / 가망 인정 기준 배너 */}
+            <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-3">
+              <div className="flex gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-red-700 mb-1.5">⚠ 절대 금지</p>
+                  <div className="space-y-1">
+                    {['"지원금·공짜" 표현 후킹', '니즈 없는 고객 억지 확보', '번호만 받는 유도 질문', '"100% 된다" 확정 표현'].map((txt, i) => (
+                      <p key={i} className="text-[11px] text-red-600 flex items-start gap-1 leading-snug">
+                        <span className="shrink-0">❌</span>{txt}
+                      </p>
+                    ))}
+                  </div>
                 </div>
-              </div>
-              <div className="w-px bg-red-200 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-bold text-emerald-700 mb-1">✅ 가망 기준</p>
-                <p className="text-[9px] text-emerald-700 leading-tight">모든 인폼 + 상담사 연결 동의</p>
-                <p className="text-[9px] text-emerald-700 leading-tight mt-0.5">번호만 → 다음날 재통화 확정</p>
+                <div className="w-px bg-red-200 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-emerald-700 mb-1.5">✅ 가망 기준</p>
+                  <p className="text-[11px] text-emerald-700 leading-snug">모든 인폼 전달 +<br />상담사 연결 동의</p>
+                  <p className="text-[11px] text-emerald-700 leading-snug mt-1.5">번호만 받은 경우 →<br />다음날 재통화 확정</p>
+                </div>
               </div>
             </div>
 
@@ -510,11 +522,10 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                         placeholder="780점" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
                     </div>
                     {/* 연체·체납 */}
-                    <div className="flex items-center gap-1.5 pt-3">
-                      <input type="checkbox" checked={form.has_delinquency}
-                        onChange={e => setForm(p => ({ ...p, has_delinquency: e.target.checked }))}
-                        className="w-3.5 h-3.5 accent-red-500 shrink-0" id="delinquency" />
-                      <label htmlFor="delinquency" className="text-[10px] text-gray-600 cursor-pointer font-medium">연체·체납</label>
+                    <div>
+                      <label className="text-[9px] text-gray-400 font-medium uppercase tracking-wide">연체·체납</label>
+                      <input value={form.delinquency_detail} onChange={e => setForm(p => ({ ...p, delinquency_detail: e.target.value }))}
+                        placeholder="없음 / 500만원 등" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
                     </div>
                     {/* 010 번호 — 전체 폭 */}
                     <div className="col-span-2">
@@ -540,13 +551,6 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                       <label className="text-[9px] text-gray-400 font-medium uppercase tracking-wide">필요자금</label>
                       <input value={form.required_fund} onChange={e => setForm(p => ({ ...p, required_fund: e.target.value }))}
                         placeholder="1억" className="mt-0.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30" />
-                    </div>
-                    {/* 메모 — 전체 폭 */}
-                    <div className="col-span-2">
-                      <label className="text-[9px] text-gray-400 font-medium uppercase tracking-wide">메모</label>
-                      <textarea value={form.memo} onChange={e => setForm(p => ({ ...p, memo: e.target.value }))}
-                        rows={2} placeholder="재통화 요청, 기타..."
-                        className="mt-0.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1B2A45]/30 resize-none" />
                     </div>
                   </div>
                 </div>

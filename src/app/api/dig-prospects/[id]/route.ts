@@ -57,15 +57,24 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
         owner_id: assigned_to,
         details: {
           company: prospect.company,
+          // 영업팀 CustomerCard 필드명으로 매핑
+          years_in_business: prospect.business_age,
+          business_type: prospect.industry,
+          revenue_2026: prospect.annual_revenue,
+          credit_score: prospect.credit_score,
+          tax_delinquency: prospect.memo || (prospect.has_delinquency ? '있음' : '없음'),
+          required_funds: prospect.required_fund,
+          // 원본 보존
           business_age: prospect.business_age,
           annual_revenue: prospect.annual_revenue,
           industry: prospect.industry,
-          credit_score: prospect.credit_score,
-          required_fund: prospect.required_fund,
           has_delinquency: prospect.has_delinquency,
+          required_fund: prospect.required_fund,
+          // 출처 정보
           source: 'dig',
           dig_prospect_id: prospect.id,
           dig_user_name: prospect.dig_user_name,
+          dig_phone_010: prospect.phone_010,
         },
       })
       .select()
