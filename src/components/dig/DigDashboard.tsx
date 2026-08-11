@@ -205,7 +205,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
               industry: ci.industry || prev.industry,
               credit_score: ci.credit_score || prev.credit_score,
               required_fund: ci.required_fund || prev.required_fund,
-              has_delinquency: ci.has_delinquency ?? prev.has_delinquency,
+              delinquency_detail: ci.has_delinquency != null ? (ci.has_delinquency ? '있음' : '없음') : prev.delinquency_detail,
             }))
           }
           showToast('AI 분석 완료! 체크리스트·정보가 자동 입력됐습니다')
