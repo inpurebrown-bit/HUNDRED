@@ -720,13 +720,22 @@ export default function OpsCeoTab() {
   }
 
   // 환불예정/종료예정 → 대표 승인(환불/종료) 또는 반려(진행중)
-  function handleApprove(id: string, action: 'approve' | 'reject') {
+  async function handleApprove(id: string, action: 'approve' | 'reject') {
     const c = cases.find(x => x.id === id)
     if (!c) return
     const nextStage = action === 'approve'
       ? (c.progress_stage === '환불예정' ? '환불' : '종료')
       : '진행중'
     handleSave(id, { progress_stage: nextStage })
+
+    // 환불 승인 시 customers status도 contracted → refunded로 되돌림
+    if (action === 'approve' && c.progress_stage === '환불예정' && c.customer_id) {
+      await fetch(`/api/customers/${c.customer_id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'refunded' }),
+      })
+    }
   }
 
   const q = search.trim().toLowerCase()

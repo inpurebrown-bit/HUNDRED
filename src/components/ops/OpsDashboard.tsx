@@ -518,6 +518,17 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
         body: JSON.stringify(patch),
       })
       if (!res.ok) { alert('저장 실패'); return }
+
+      // customers 테이블 status도 contracted → refunded(active+sub_status)로 되돌림
+      // → PayrollTab 집계(status==='contracted' 필터)에서 자동 제외
+      if (c.customer_id) {
+        await fetch(`/api/customers/${c.customer_id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'refunded' }),
+        })
+      }
+
       setLocal(prev => ({ ...prev, ...patch, details: patch.details }))
       onSave(c.id, patch)
     } catch {
