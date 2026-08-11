@@ -70,7 +70,7 @@ export default function MyProfileTab() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
-  const roleLabel = user.role === 'ceo' ? '대표' : user.role === 'sales' ? '영업팀' : user.role === 'dig' ? '1차 발굴팀' : '자금팀'
+  const roleLabel = user.role === 'ceo' ? '대표' : user.role === 'sales' ? '영업팀' : user.role === 'dig' ? '발굴팀' : '자금팀'
   const roleBadgeColor =
     user.role === 'ceo'
       ? 'bg-amber-100 text-amber-700'

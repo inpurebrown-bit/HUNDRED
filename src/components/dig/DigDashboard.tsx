@@ -332,7 +332,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
         <Link href="/" className="relative h-8 w-24 shrink-0 block">
           <Image src="/images/logo.png" alt="HUNDRED" fill className="object-contain object-left brightness-0 invert" unoptimized />
         </Link>
-        <span className="text-white/60 text-xs font-medium">1차 발굴팀 · {userName}</span>
+        <span className="text-white/60 text-xs font-medium">발굴팀 · {userName}</span>
         <button
           onClick={() => setMenuOpen(!menuOpen)}
           className={`flex flex-col gap-[5px] p-2 rounded-lg transition-colors ${menuOpen ? 'bg-white/20' : 'hover:bg-white/10'}`}>
@@ -345,7 +345,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
             <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
             <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 py-2 min-w-[180px]">
               <div className="px-4 py-3 border-b border-gray-100">
-                <p className="text-[10px] text-[#C5A258] font-bold tracking-wide uppercase mb-0.5">1차 발굴팀</p>
+                <p className="text-[10px] text-[#C5A258] font-bold tracking-wide uppercase mb-0.5">발굴팀</p>
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-bold text-[#1B2A45]">{userName}</p>
                   <button

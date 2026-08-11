@@ -183,7 +183,7 @@ export default function DigManageTab() {
 
       {/* 오늘 성과 요약 */}
       <div className="bg-[#1B2A45] rounded-xl px-5 py-4">
-        <p className="text-white/50 text-[11px] mb-3">오늘 {today} · 1차 발굴팀 성과</p>
+        <p className="text-white/50 text-[11px] mb-3">오늘 {today} · 발굴팀 성과</p>
         {Object.keys(byUser).length === 0 ? (
           <p className="text-white/40 text-sm">오늘 승인된 가망이 없습니다</p>
         ) : (

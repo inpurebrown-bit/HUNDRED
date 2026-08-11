@@ -237,7 +237,7 @@ export default function CeoDashboard() {
 
   const tabs = [
     { key: 'overview',       label: '전체 현황' },
-    { key: 'dig',            label: '1차 발굴팀' },
+    { key: 'dig',            label: '발굴팀' },
     { key: 'assign',         label: '계약 배정' },
     { key: 'sales',          label: '영업팀' },
     { key: 'ops',            label: '관리팀' },
@@ -1480,7 +1480,7 @@ function EmployeeManageSection() {
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
 
-  const roleLabel: Record<string, string> = { sales: '영업팀', ops: '관리팀', dig: '1차발굴팀', ceo: '대표' }
+  const roleLabel: Record<string, string> = { sales: '영업팀', ops: '관리팀', dig: '발굴팀', ceo: '대표' }
   const roleBg: Record<string, string> = { sales: 'bg-sky-100 text-sky-700', ops: 'bg-violet-100 text-violet-700', dig: 'bg-orange-100 text-orange-700', ceo: 'bg-amber-100 text-amber-700' }
 
   const load = async () => {
@@ -1580,7 +1580,7 @@ function EmployeeManageSection() {
                       : 'bg-orange-500 text-white border-orange-500'
                     : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
                 }`}>
-                {r === 'sales' ? '영업팀' : r === 'ops' ? '관리팀' : '1차발굴팀'}
+                {r === 'sales' ? '영업팀' : r === 'ops' ? '관리팀' : '발굴팀'}
               </button>
             ))}
           </div>
