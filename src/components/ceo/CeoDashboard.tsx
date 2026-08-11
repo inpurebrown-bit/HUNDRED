@@ -22,6 +22,7 @@ import PersonalFinanceTab from './PersonalFinanceTab'
 import PullToRefresh from '@/components/ui/PullToRefresh'
 import SplitView from '@/components/shared/SplitView'
 import TabErrorBoundary from '@/components/shared/TabErrorBoundary'
+import DigManageTab from './DigManageTab'
 
 // ── 공통 서브탭 바 컴포넌트 ────────────────────────────────────
 function SubTabBar<T extends string>({ tabs, active, onChange }: {
@@ -132,7 +133,7 @@ export default function CeoDashboard() {
   const { data: session } = useSession()
   const ceoName = session?.user?.name ?? '대표'
   const ceoId = (session?.user as any)?.id ?? ''
-  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'staffmanage' | 'minutesreports' | 'calendar' | 'ailogs' | 'trash' | 'dbmanage' | 'profile'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'staffmanage' | 'minutesreports' | 'calendar' | 'ailogs' | 'trash' | 'dbmanage' | 'profile' | 'dig'>('overview')
   const [menuOpen, setMenuOpen] = useState(false)
   const [salesInitialView, setSalesInitialView] = useState<'customers' | 'inspection' | 'as' | 'transfer' | 'diary' | undefined>(undefined)
   const [salesInitialStatusTab, setSalesInitialStatusTab] = useState<'all' | 'lead' | 'db010' | 'contracted' | 'emotional' | 'trash' | undefined>(undefined)
@@ -236,6 +237,7 @@ export default function CeoDashboard() {
 
   const tabs = [
     { key: 'overview',       label: '전체 현황' },
+    { key: 'dig',            label: '1차 발굴팀' },
     { key: 'assign',         label: '계약 배정' },
     { key: 'sales',          label: '영업팀' },
     { key: 'ops',            label: '관리팀' },
@@ -407,6 +409,7 @@ export default function CeoDashboard() {
             setSalesInitialStatusTab(undefined)
           }
         }} />}
+        {activeTab === 'dig'            && <DigManageTab />}
         {activeTab === 'assign'         && <AssignBoard />}
         {activeTab === 'sales'          && <TabErrorBoundary tabName="영업팀"><SalesCeoTab initialView={salesInitialView} initialStatusTab={salesInitialStatusTab} /></TabErrorBoundary>}
         {activeTab === 'ops'            && <TabErrorBoundary tabName="관리팀"><OpsCeoTab /></TabErrorBoundary>}

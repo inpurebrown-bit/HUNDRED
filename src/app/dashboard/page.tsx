@@ -13,6 +13,7 @@ export default async function DashboardPage() {
   if (role === 'ceo') redirect('/dashboard/ceo')
   if (role === 'sales') redirect('/dashboard/sales')
   if (role === 'ops') redirect('/dashboard/ops')
+  if (role === 'dig') redirect('/dashboard/dig')
 
   redirect('/login')
 }
