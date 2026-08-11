@@ -362,7 +362,7 @@ export default function DigManageTab() {
                     {/* 승인됨: 영업팀 배정 */}
                     {viewTab === 'approved' && (
                       <div className="space-y-3 border-t border-gray-100 pt-3">
-                        <p className="text-xs font-semibold text-gray-700">영업팀 직원 배정 → 직가DB로 이동</p>
+                        <p className="text-xs font-semibold text-gray-700">영업팀 직원 배정 → 공급DB로 이동</p>
                         <select
                           value={assignTarget[p.id] || ''}
                           onChange={e => setAssignTarget(prev => ({ ...prev, [p.id]: e.target.value }))}

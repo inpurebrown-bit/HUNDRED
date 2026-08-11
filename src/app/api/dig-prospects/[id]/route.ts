@@ -53,7 +53,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       .insert({
         name: prospect.ceo_name || '(미입력)',
         phone: prospect.phone_010 || prospect.phone,
-        status: 'db010',
+        status: 'lead',
         owner_id: assigned_to,
         details: {
           company: prospect.company,
