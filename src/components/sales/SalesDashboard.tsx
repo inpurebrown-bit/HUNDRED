@@ -199,8 +199,8 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const [show010Form, setShow010Form] = useState(false)
 
   // ── Data loading ──────────────────────────────────────────────────
-  async function loadAll() {
-    setLoading(true)
+  async function loadAll(silent = false) {
+    if (!silent) setLoading(true)
     const [cRes, conRes, nRes, scRes] = await Promise.all([
       fetch('/api/customers'),
       fetch('/api/contracts'),
@@ -254,16 +254,17 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
 
   useEffect(() => {
     loadAll()
-    const timer = setInterval(loadAll, 30000)
+    const timer = setInterval(() => loadAll(true), 30000)
     function onVisible() {
-      if (document.visibilityState === 'visible') loadAll()
+      if (document.visibilityState === 'visible') loadAll(true)
     }
+    const onFocus = () => loadAll(true)
     document.addEventListener('visibilitychange', onVisible)
-    window.addEventListener('focus', loadAll)
+    window.addEventListener('focus', onFocus)
     return () => {
       clearInterval(timer)
       document.removeEventListener('visibilitychange', onVisible)
-      window.removeEventListener('focus', loadAll)
+      window.removeEventListener('focus', onFocus)
     }
   }, [])
 

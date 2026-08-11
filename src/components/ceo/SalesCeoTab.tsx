@@ -723,8 +723,8 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
   const [ceoDirectTransferQueue, setCeoDirectTransferQueue] = useState<Customer | null>(null)
 
   useEffect(() => {
-    async function load() {
-      setLoading(true)
+    async function load(silent = false) {
+      if (!silent) setLoading(true)
       try {
         const [cRes, oRes, scRes, uRes] = await Promise.all([
           fetch('/api/customers'),
@@ -764,16 +764,15 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
       setLoading(false)
     }
     load()
-    const timer = setInterval(load, 30000)
-    function onVisible() {
-      if (document.visibilityState === 'visible') load()
-    }
+    const timer = setInterval(() => load(true), 30000)
+    function onVisible() { if (document.visibilityState === 'visible') load(true) }
+    const onFocus = () => load(true)
     document.addEventListener('visibilitychange', onVisible)
-    window.addEventListener('focus', load)
+    window.addEventListener('focus', onFocus)
     return () => {
       clearInterval(timer)
       document.removeEventListener('visibilitychange', onVisible)
-      window.removeEventListener('focus', load)
+      window.removeEventListener('focus', onFocus)
     }
   }, [])
 
