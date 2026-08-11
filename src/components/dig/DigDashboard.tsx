@@ -94,18 +94,6 @@ const SCRIPT_SECTIONS = [
 ▶ "문자 남겨주세요"
 "문자로는 정확한 안내가 어려워서요~ 연락처 주시면 상담사가 딱 5분만 설명드릴게요."`
   },
-  {
-    title: '절대 하면 안 되는 것',
-    color: 'red-dark',
-    content: `❌ "지원금·공짜" 표현으로 후킹
-❌ 정책자금 니즈 없는 고객 억지로 확보
-❌ 두리뭉실한 유도 질문으로 번호만 받기
-❌ "무조건 나옵니다", "100% 된다" 확정 표현
-
-✅ 가망 인정 기준
-• 모든 인폼 내용 전달 + 상담사 연결 동의 받은 경우
-• 번호만 받고 인지 못한 경우 → 다음날 재통화해서 가망 확정`
-  },
 ]
 
 interface Prospect {
@@ -442,6 +430,28 @@ export default function DigDashboard({ userId, userName, username }: Props) {
         {/* ══════════ 가망 등록 탭 ══════════ */}
         {activeTab === 'submit' && (
           <>
+            {/* 절대 금지 / 가망 인정 기준 배너 */}
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 space-y-2">
+              <p className="text-xs font-bold text-red-700 tracking-wide">⚠ 절대 하면 안 되는 것</p>
+              <div className="space-y-0.5">
+                {[
+                  '"지원금·공짜" 표현으로 후킹',
+                  '정책자금 니즈 없는 고객 억지로 확보',
+                  '두리뭉실한 유도 질문으로 번호만 받기',
+                  '"무조건 나옵니다", "100% 된다" 확정 표현',
+                ].map((txt, i) => (
+                  <p key={i} className="text-[11px] text-red-700 flex items-start gap-1.5">
+                    <span className="shrink-0">❌</span>{txt}
+                  </p>
+                ))}
+              </div>
+              <div className="border-t border-red-200 pt-2 space-y-0.5">
+                <p className="text-[11px] font-bold text-emerald-700">✅ 가망 인정 기준</p>
+                <p className="text-[11px] text-emerald-700">• 모든 인폼 전달 + 상담사 연결 동의 받은 경우</p>
+                <p className="text-[11px] text-emerald-700">• 번호만 받은 경우 → 다음날 재통화 후 가망 확정</p>
+              </div>
+            </div>
+
             {/* 오늘 현황 배너 */}
             <div className="bg-[#1B2A45] rounded-xl px-4 py-3 flex items-center justify-between">
               <div>
