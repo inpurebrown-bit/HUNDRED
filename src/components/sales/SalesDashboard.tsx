@@ -254,12 +254,14 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
 
   useEffect(() => {
     loadAll()
+    const timer = setInterval(loadAll, 30000)
     function onVisible() {
       if (document.visibilityState === 'visible') loadAll()
     }
     document.addEventListener('visibilitychange', onVisible)
     window.addEventListener('focus', loadAll)
     return () => {
+      clearInterval(timer)
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('focus', loadAll)
     }
