@@ -257,7 +257,11 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
       if (document.visibilityState === 'visible') loadAll()
     }
     document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', loadAll)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', loadAll)
+    }
   }, [])
 
   // ── 대표 결제율 현황 불러오기 ──────────────────────────────────────────────
