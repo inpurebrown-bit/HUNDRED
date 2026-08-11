@@ -561,6 +561,15 @@ function PayRateSubView() {
       } catch {}
     }
     load()
+    const timer = setInterval(load, 30000)
+    function onVisible() { if (document.visibilityState === 'visible') load() }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', load)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', load)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
