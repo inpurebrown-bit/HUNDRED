@@ -131,6 +131,15 @@ const PENDING_REFUND_KEYS  = new Set(['환불예정'])
 const PENDING_DONE_KEYS    = new Set(['종료예정'])
 const NEWDB_STAGE_KEYS     = new Set(['new_db'])
 
+// 계약일로부터 12개월 초과 여부 판정 (종료/환불 제외한 활성 케이스에 적용)
+function isContractExpired(c: any): boolean {
+  const contractDate = c.customers?.details?.contract_date || c.details?.contract_date || c.details?.puto_contract_date
+  if (!contractDate) return false
+  const expiry = new Date(contractDate)
+  expiry.setFullYear(expiry.getFullYear() + 1)
+  return expiry < new Date()
+}
+
 // ── 기관 목록 ──────────────────────────────────────────────────────────
 const INST_DIRECT   = ['중진공','소진공(혁신)','소진공(신취)','소진공(재도전)','소진공(일시적경영애로)','서민금융(미소)']
 const INST_INDIRECT = ['기보','신보','재단']
@@ -244,11 +253,12 @@ const INCALL_CLOSING_RESULTS = [
 ]
 
 // ── Tab types ──────────────────────────────────────────────────────────
-type OpsTab = 'dashboard' | 'active' | 'refund' | 'completed' | 'newdb' | 'ops_contract' | 'report' | 'revenue' | 'profile'
+type OpsTab = 'dashboard' | 'active' | 'expired' | 'refund' | 'completed' | 'newdb' | 'ops_contract' | 'report' | 'revenue' | 'profile'
 
 const opsTabs: { key: OpsTab; label: string }[] = [
   { key: 'dashboard',    label: '대시보드' },
   { key: 'active',       label: '진행중업체' },
+  { key: 'expired',      label: '계약기간만료' },
   { key: 'refund',       label: '환불업체' },
   { key: 'completed',    label: '종료업체' },
   { key: 'newdb',        label: '신규DB' },
@@ -4117,18 +4127,28 @@ export default function OpsDashboard({ userId, userName }: Props) {
     : cases
 
   const newdbCases     = filteredCases.filter(c => NEWDB_STAGE_KEYS.has(c.progress_stage))
+  const refundCases    = filteredCases.filter(c => REFUND_STAGE_KEYS.has(c.progress_stage) || c.is_refund)
+  const completedCases = filteredCases.filter(c => COMPLETED_STAGE_KEYS.has(c.progress_stage) || c.is_completed)
+  const expiredCases   = filteredCases.filter(c =>
+    !NEWDB_STAGE_KEYS.has(c.progress_stage) &&
+    !REFUND_STAGE_KEYS.has(c.progress_stage) && !c.is_refund &&
+    !COMPLETED_STAGE_KEYS.has(c.progress_stage) && !c.is_completed &&
+    (ACTIVE_STAGE_KEYS.has(c.progress_stage) || true) &&
+    isContractExpired(c)
+  )
+  const expiredIds = new Set(expiredCases.map(c => c.id))
   const activeCases    = filteredCases.filter(c =>
-    !NEWDB_STAGE_KEYS.has(c.progress_stage) && (
+    !NEWDB_STAGE_KEYS.has(c.progress_stage) &&
+    !expiredIds.has(c.id) && (
       ACTIVE_STAGE_KEYS.has(c.progress_stage) ||
       (!REFUND_STAGE_KEYS.has(c.progress_stage) && !COMPLETED_STAGE_KEYS.has(c.progress_stage) && !c.is_refund && !c.is_completed)
     )
   )
-  const refundCases    = filteredCases.filter(c => REFUND_STAGE_KEYS.has(c.progress_stage) || c.is_refund)
-  const completedCases = filteredCases.filter(c => COMPLETED_STAGE_KEYS.has(c.progress_stage) || c.is_completed)
 
   const tabCounts: Record<OpsTab, number | null> = {
     dashboard:    null,
     active:       activeCases.length,
+    expired:      expiredCases.length,
     refund:       refundCases.length,
     completed:    completedCases.length,
     newdb:        newdbCases.length,
@@ -4173,8 +4193,9 @@ export default function OpsDashboard({ userId, userName }: Props) {
                   const tabKey = NEWDB_STAGE_KEYS.has(c.progress_stage) ? 'newdb'
                     : (REFUND_STAGE_KEYS.has(c.progress_stage) || c.is_refund) ? 'refund'
                     : (COMPLETED_STAGE_KEYS.has(c.progress_stage) || c.is_completed) ? 'completed'
+                    : expiredIds.has(c.id) ? 'expired'
                     : 'active'
-                  const tabLabel: Record<string, string> = { active: '진행중', refund: '환불', completed: '종료', newdb: '신규DB' }
+                  const tabLabel: Record<string, string> = { active: '진행중', expired: '기간만료', refund: '환불', completed: '종료', newdb: '신규DB' }
                   return (
                     <button key={c.id}
                       onClick={() => {
@@ -4336,6 +4357,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4">
                 {[
                   { tab: 'active' as OpsTab, icon: '', label: '진행중업체', count: activeCases.length, color: 'border-amber-200 hover:border-amber-400' },
+                  { tab: 'expired' as OpsTab, icon: '', label: '계약기간만료', count: expiredCases.length, color: 'border-orange-300 hover:border-orange-500' },
                   { tab: 'refund' as OpsTab, icon: '', label: '환불업체', count: refundCases.length, color: 'border-rose-200 hover:border-rose-400' },
                   { tab: 'completed' as OpsTab, icon: '', label: '종료업체', count: completedCases.length, color: 'border-emerald-200 hover:border-emerald-400' },
                   { tab: 'ops_contract' as OpsTab, icon: '', label: '관리팀계약', count: null, color: 'border-violet-200 hover:border-violet-400' },
@@ -4428,6 +4450,33 @@ export default function OpsDashboard({ userId, userName }: Props) {
               </div>
             )}
             {/* 상세 패널은 우측 슬라이딩 패널로만 표시 (#18) */}
+          </div>
+        )}
+
+        {/* ── 계약기간만료 ── */}
+        {activeTab === 'expired' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-bold text-[#1B2A45] text-base">계약기간만료</h2>
+                <p className="text-xs text-orange-500 mt-0.5">계약일로부터 1년 경과한 진행중 업체</p>
+              </div>
+              <span className="text-xs text-gray-400">{expiredCases.length}건</span>
+            </div>
+            {loading ? (
+              <div className="text-center py-16 text-[#1B2A45]/40 text-sm">불러오는 중...</div>
+            ) : expiredCases.length === 0 ? (
+              <div className="bg-white rounded-xl border border-[#E8E2D4] p-14 text-center text-[#1B2A45]/40 text-sm">계약기간 만료 업체가 없습니다</div>
+            ) : (
+              <InstitutionGroupedView
+                cases={expiredCases}
+                openPanelIds={openPanelIds}
+                onToggle={togglePanel}
+                onScriptToggle={(id, val) =>
+                  handleSave(id, { details: { ...(cases.find(x => x.id === id)?.details || {}), script_sent: val } })
+                }
+              />
+            )}
           </div>
         )}
 

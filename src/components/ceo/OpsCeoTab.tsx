@@ -44,6 +44,14 @@ const PENDING_REFUND_KEYS  = new Set(['환불예정'])
 const PENDING_DONE_KEYS    = new Set(['종료예정'])
 const NEWDB_STAGE_KEYS     = new Set(['new_db'])
 
+function isContractExpired(c: any): boolean {
+  const contractDate = c.customers?.details?.contract_date || c.details?.contract_date || c.details?.puto_contract_date
+  if (!contractDate) return false
+  const expiry = new Date(contractDate)
+  expiry.setFullYear(expiry.getFullYear() + 1)
+  return expiry < new Date()
+}
+
 function formatPhone(p: string) {
   const d = p.replace(/\D/g, '')
   if (d.length === 11) return `${d.slice(0,3)}-${d.slice(3,7)}-${d.slice(7)}`
@@ -626,7 +634,7 @@ function CeoPutoContractView({ cases, openPanelIds, onToggle, onScriptToggle }: 
 }
 
 // ─── Main Component ───────────────────────────────────────
-type OpsView = 'active' | 'refund' | 'completed' | 'newdb' | 'puto_contract' | 'revenue'
+type OpsView = 'active' | 'expired' | 'refund' | 'completed' | 'newdb' | 'puto_contract' | 'revenue'
 
 export default function OpsCeoTab() {
   const [cases, setCases] = useState<OpsCase[]>([])
@@ -754,14 +762,22 @@ export default function OpsCeoTab() {
     : cases
 
   const newdbCases     = filtered.filter(c => NEWDB_STAGE_KEYS.has(c.progress_stage))
+  const refundCases    = filtered.filter(c => REFUND_STAGE_KEYS.has(c.progress_stage) || c.is_refund)
+  const completedCases = filtered.filter(c => COMPLETED_STAGE_KEYS.has(c.progress_stage) || c.is_completed)
+  const expiredCases   = filtered.filter(c =>
+    !NEWDB_STAGE_KEYS.has(c.progress_stage) &&
+    !REFUND_STAGE_KEYS.has(c.progress_stage) && !c.is_refund &&
+    !COMPLETED_STAGE_KEYS.has(c.progress_stage) && !c.is_completed &&
+    isContractExpired(c)
+  )
+  const expiredIds = new Set(expiredCases.map(c => c.id))
   const activeCases    = filtered.filter(c =>
-    !NEWDB_STAGE_KEYS.has(c.progress_stage) && (
+    !NEWDB_STAGE_KEYS.has(c.progress_stage) &&
+    !expiredIds.has(c.id) && (
       ACTIVE_STAGE_KEYS.has(c.progress_stage) ||
       (!REFUND_STAGE_KEYS.has(c.progress_stage) && !COMPLETED_STAGE_KEYS.has(c.progress_stage) && !c.is_refund && !c.is_completed)
     )
   )
-  const refundCases    = filtered.filter(c => REFUND_STAGE_KEYS.has(c.progress_stage) || c.is_refund)
-  const completedCases = filtered.filter(c => COMPLETED_STAGE_KEYS.has(c.progress_stage) || c.is_completed)
 
   const putoContractCases = filtered.filter(c => {
     const amt = parseInt(String(c.details?.puto_contract_amount || '0').replace(/[^0-9]/g, '') || '0')
@@ -770,6 +786,7 @@ export default function OpsCeoTab() {
 
   const MENU = [
     { key: 'active' as OpsView,        label: '진행중업체', count: activeCases.length },
+    { key: 'expired' as OpsView,       label: '계약기간만료', count: expiredCases.length },
     { key: 'refund' as OpsView,        label: '환불업체',   count: refundCases.length },
     { key: 'completed' as OpsView,     label: '종료업체',   count: completedCases.length },
     { key: 'newdb' as OpsView,         label: '🗄️ 뿌토DB',    count: newdbCases.length },
@@ -777,7 +794,7 @@ export default function OpsCeoTab() {
     { key: 'revenue' as OpsView,       label: '매출현황',   count: null },
   ] as const
 
-  const viewCases = view === 'refund' ? refundCases : view === 'completed' ? completedCases : view === 'newdb' ? newdbCases : activeCases
+  const viewCases = view === 'refund' ? refundCases : view === 'completed' ? completedCases : view === 'newdb' ? newdbCases : view === 'expired' ? expiredCases : activeCases
 
   return (
     <div className="space-y-4 pb-8 max-w-5xl mx-auto">
@@ -805,10 +822,14 @@ export default function OpsCeoTab() {
           const monthLabel   = now.getMonth() + 1
           return (
             <>
-              <div className="grid grid-cols-4 gap-2 mb-2">
+              <div className="grid grid-cols-5 gap-2 mb-2">
                 <div className="bg-white/10 rounded-lg px-2 py-2 text-center">
                   <p className="text-white/50 text-[9px]">진행업체</p>
                   <p className="text-white font-black text-lg">{activeCases.length}</p>
+                </div>
+                <div className="bg-orange-500/20 rounded-lg px-2 py-2 text-center cursor-pointer" onClick={() => setView('expired')}>
+                  <p className="text-orange-300/70 text-[9px]">기간만료</p>
+                  <p className="text-orange-300 font-black text-lg">{expiredCases.length}</p>
                 </div>
                 <div className="bg-white/10 rounded-lg px-2 py-2 text-center">
                   <p className="text-white/50 text-[9px]">신규DB</p>
@@ -869,6 +890,15 @@ export default function OpsCeoTab() {
         <div className="text-center py-12 text-gray-400">불러오는 중...</div>
       ) : view === 'active' ? (
         <InstitutionGroupedView cases={activeCases} openPanelIds={openPanelIds} onToggle={togglePanel} onScriptToggle={handleScriptToggle} onApprove={handleApprove} />
+      ) : view === 'expired' ? (
+        expiredCases.length === 0 ? (
+          <div className="bg-white rounded-xl border border-[#E8E2D4] p-12 text-center text-gray-400 text-sm">계약기간 만료 업체가 없습니다</div>
+        ) : (
+          <>
+            <p className="text-xs text-orange-500 mb-2">계약일로부터 1년 경과한 진행중 업체 ({expiredCases.length}건)</p>
+            <InstitutionGroupedView cases={expiredCases} openPanelIds={openPanelIds} onToggle={togglePanel} onScriptToggle={handleScriptToggle} onApprove={handleApprove} />
+          </>
+        )
       ) : (
         viewCases.length === 0 ? (
           <div className="bg-white rounded-xl border border-[#E8E2D4] p-12 text-center text-gray-400 text-sm">
