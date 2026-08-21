@@ -1319,6 +1319,76 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                   )
                 })()}
 
+                {/* ── 안심통장 ── */}
+                {(() => {
+                  const ANSIM_BANKS = ['국민','신한','하나','우리','농협','기업','카카오','케이뱅크','토스','새마을','수협','부산','경남','대구','광주','전북','제주','씨티','SC제일']
+                  const ANSIM_STATUS = ['개설완료','개설예정','미개설','해지']
+                  const ansimBank: string = gv('ansim_bank', cd.ansim_bank || '')
+                  const ansimLimit: string = gv('ansim_limit', cd.ansim_limit || '')
+                  const ansimStatus: string = gv('ansim_status', cd.ansim_status || '')
+                  return (
+                    <div className="mb-0">
+                      <div className="bg-teal-600 px-3 py-1.5">
+                        <span className="text-[10px] font-bold text-white tracking-wide">안심통장</span>
+                      </div>
+                      <div className="px-3 py-2 space-y-2 hover:bg-gray-50 transition-colors">
+                        <div>
+                          <span className="text-[10px] text-gray-400 font-medium block mb-1">은행</span>
+                          {incallEditing ? (
+                            <div className="flex flex-wrap gap-1">
+                              {ANSIM_BANKS.map(b => (
+                                <button key={b} type="button"
+                                  onClick={() => incallField('ansim_bank', ansimBank === b ? '' : b)}
+                                  className={`px-2 py-0.5 rounded text-[10px] font-semibold border transition-colors ${
+                                    ansimBank === b ? 'bg-teal-500 text-white border-teal-500' : 'bg-white text-gray-500 border-gray-300 hover:bg-teal-50'
+                                  }`}>{b}</button>
+                              ))}
+                            </div>
+                          ) : (
+                            ansimBank
+                              ? <span className="bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded text-[10px] font-semibold">{ansimBank}</span>
+                              : <span className="text-xs font-semibold text-gray-300">—</span>
+                          )}
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-gray-400 font-medium block mb-1">한도</span>
+                          {incallEditing ? (
+                            <input
+                              type="text"
+                              value={ansimLimit}
+                              onChange={e => incallField('ansim_limit', e.target.value)}
+                              placeholder="예) 300만원"
+                              className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-300"
+                            />
+                          ) : (
+                            ansimLimit
+                              ? <span className="text-xs text-gray-700 font-medium">{ansimLimit}</span>
+                              : <span className="text-xs font-semibold text-gray-300">—</span>
+                          )}
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-gray-400 font-medium block mb-1">상태</span>
+                          {incallEditing ? (
+                            <div className="flex flex-wrap gap-1">
+                              {ANSIM_STATUS.map(s => (
+                                <button key={s} type="button"
+                                  onClick={() => incallField('ansim_status', ansimStatus === s ? '' : s)}
+                                  className={`px-2 py-0.5 rounded text-[10px] font-semibold border transition-colors ${
+                                    ansimStatus === s ? 'bg-teal-500 text-white border-teal-500' : 'bg-white text-gray-500 border-gray-300 hover:bg-teal-50'
+                                  }`}>{s}</button>
+                              ))}
+                            </div>
+                          ) : (
+                            ansimStatus
+                              ? <span className="bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded text-[10px] font-semibold">{ansimStatus}</span>
+                              : <span className="text-xs font-semibold text-gray-300">—</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+
                 {/* ── 통화 메모 ── */}
                 <div className="mb-0">
                   <div className="bg-gray-700 px-3 py-1.5">
