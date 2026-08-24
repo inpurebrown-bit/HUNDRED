@@ -1709,13 +1709,16 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                           해제
                         </button>
                       )}
-                      {!entryLocked && (
+                      {(!entryLocked || isCeo) && (
                         <button type="button"
                           onClick={() => {
+                            if (entryLocked && !window.confirm('저장된 입금내역을 삭제하시겠습니까?')) return
                             const entries: any[] = d.payment_entries || []
                             detailField('payment_entries', entries.filter((_: any, i: number) => i !== idx))
                           }}
-                          className="text-[10px] text-red-400 hover:text-red-600 font-bold">✕ 삭제</button>
+                          className={`text-[10px] font-bold ${entryLocked ? 'text-orange-400 hover:text-red-600' : 'text-red-400 hover:text-red-600'}`}>
+                          {entryLocked ? '🔓 삭제(대표)' : '✕ 삭제'}
+                        </button>
                       )}
                     </div>
                   </div>

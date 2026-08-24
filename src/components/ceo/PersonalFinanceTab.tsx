@@ -55,7 +55,7 @@ const DEFAULT_LOANS: Loan[] = [
     memo: '', goal: '',
   },
   {
-    id: '3', amount: 18000000, rate: 6.23, institution: '서민금융', bank: 'ibk저축',
+    id: '3', amount: 16000000, rate: 6.23, institution: '서민금융', bank: 'ibk저축',
     repayment_type: '매월상환', repayment_day: '매월 18일',
     p1_principal: 333333, p1_interest: 84831, p1_monthly: 420000,
     p2_same: true, p2_principal: 0, p2_interest: 0, p2_monthly: 0,
@@ -338,6 +338,8 @@ export default function PersonalFinanceTab() {
   const [loading, setLoading]     = useState(false)
   const [msg, setMsg]             = useState('')
   const [editPhase, setEditPhase] = useState(false)
+  const [quickAmtId, setQuickAmtId] = useState<string | null>(null)
+  const [quickAmtVal, setQuickAmtVal] = useState('')
 
   // 불러오기
   useEffect(() => {
@@ -455,7 +457,47 @@ export default function PersonalFinanceTab() {
                   <div className="bg-gradient-to-r from-gray-800 to-gray-700 px-4 py-3">
                     <div className="flex items-start justify-between">
                       <div>
-                        <p className="text-white font-black text-lg leading-none">{(loan.amount / 10000).toFixed(0)}<span className="text-sm font-normal text-white/60 ml-0.5">만원</span></p>
+                        {quickAmtId === loan.id ? (
+                          <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                            <input
+                              autoFocus
+                              type="text" inputMode="numeric"
+                              value={quickAmtVal}
+                              onChange={e => setQuickAmtVal(e.target.value.replace(/[^0-9]/g, ''))}
+                              onKeyDown={async e => {
+                                if (e.key === 'Enter') {
+                                  const amt = parseInt(quickAmtVal) * 10000
+                                  if (amt > 0) {
+                                    const next = loans.map(l => l.id === loan.id ? { ...l, amount: amt } : l)
+                                    setLoans(next)
+                                    await fetch('/api/personal-finance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: { loans: next, subs, phaseLabels } }) })
+                                  }
+                                  setQuickAmtId(null)
+                                }
+                                if (e.key === 'Escape') setQuickAmtId(null)
+                              }}
+                              placeholder={String((loan.amount / 10000).toFixed(0))}
+                              className="w-20 bg-white/20 text-white font-black text-lg rounded px-1 focus:outline-none focus:bg-white/30"
+                            />
+                            <span className="text-sm text-white/60">만원</span>
+                            <button onClick={async () => {
+                              const amt = parseInt(quickAmtVal) * 10000
+                              if (amt > 0) {
+                                const next = loans.map(l => l.id === loan.id ? { ...l, amount: amt } : l)
+                                setLoans(next)
+                                await fetch('/api/personal-finance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: { loans: next, subs, phaseLabels } }) })
+                              }
+                              setQuickAmtId(null)
+                            }} className="text-[10px] bg-white/20 text-white px-1.5 py-0.5 rounded hover:bg-white/30">✓</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => { setQuickAmtId(loan.id); setQuickAmtVal(String((loan.amount / 10000).toFixed(0))) }}
+                            className="flex items-baseline gap-0.5 group">
+                            <span className="text-white font-black text-lg leading-none group-hover:text-amber-200 transition-colors">{(loan.amount / 10000).toFixed(0)}</span>
+                            <span className="text-sm font-normal text-white/60 ml-0.5">만원</span>
+                            <span className="text-[9px] text-white/30 group-hover:text-white/60 ml-1 transition-colors">잔액수정</span>
+                          </button>
+                        )}
                         <p className="text-white/60 text-xs mt-0.5">{loan.bank} · {loan.institution}</p>
                       </div>
                       <div className="text-right">
