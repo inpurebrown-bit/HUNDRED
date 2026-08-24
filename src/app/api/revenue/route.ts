@@ -192,11 +192,13 @@ export async function GET(req: NextRequest) {
   })
 
   // ── 부가세 기간별 집계 ───────────────────────────────────────────────
-  // 작년 2기(7~12월) / 이번년 1기(1~6월)
+  // 작년 2기(7~12월) / 이번년 1기(1~6월) / 이번년 2기(7~12월)
   const prevH2Start = `${lastYear}-07`; const prevH2End = `${lastYear}-12`
   const currH1Start = `${thisYear}-01`; const currH1End = `${thisYear}-06`
+  const currH2Start = `${thisYear}-07`; const currH2End = `${thisYear}-12`
   const vatPrevH2 = { sales_vat: 0, ops_vat: 0 }
   const vatCurrH1 = { sales_vat: 0, ops_vat: 0 }
+  const vatCurrH2 = { sales_vat: 0, ops_vat: 0 }
 
   // 영업팀 착수금 VAT (vat_included=true → payment_amount/11)
   ;(custContracted || []).forEach((c: any) => {
@@ -207,6 +209,7 @@ export async function GET(req: NextRequest) {
     const month = (c.details?.contract_date || c.created_at || '').slice(0, 7)
     if (month >= prevH2Start && month <= prevH2End) vatPrevH2.sales_vat += vat
     if (month >= currH1Start && month <= currH1End) vatCurrH1.sales_vat += vat
+    if (month >= currH2Start && month <= currH2End) vatCurrH2.sales_vat += vat
   })
 
   // 관리팀 수수료 VAT: tax_invoice_requested=false로 명시된 것만 제외, 나머지(true/undefined) 포함
@@ -220,6 +223,7 @@ export async function GET(req: NextRequest) {
         const month = (d.deposit_date || c.created_at || '').slice(0, 7)
         if (month >= prevH2Start && month <= prevH2End) vatPrevH2.ops_vat += vat
         if (month >= currH1Start && month <= currH1End) vatCurrH1.ops_vat += vat
+        if (month >= currH2Start && month <= currH2End) vatCurrH2.ops_vat += vat
       }
     }
     // payment_entries 수수료
@@ -231,6 +235,7 @@ export async function GET(req: NextRequest) {
       const month = (pe.date || c.created_at || '').slice(0, 7)
       if (month >= prevH2Start && month <= prevH2End) vatPrevH2.ops_vat += vat
       if (month >= currH1Start && month <= currH1End) vatCurrH1.ops_vat += vat
+      if (month >= currH2Start && month <= currH2End) vatCurrH2.ops_vat += vat
     }
   })
 
@@ -283,6 +288,7 @@ export async function GET(req: NextRequest) {
     annualRevenue,
     vatPrevH2: { period: `${lastYear}년 7~12월`, ...vatPrevH2, total_vat: vatPrevH2.sales_vat + vatPrevH2.ops_vat },
     vatCurrH1: { period: `${thisYear}년 1~6월`, ...vatCurrH1, total_vat: vatCurrH1.sales_vat + vatCurrH1.ops_vat },
+    vatCurrH2: { period: `${thisYear}년 7~12월`, ...vatCurrH2, total_vat: vatCurrH2.sales_vat + vatCurrH2.ops_vat },
     lastYear,
     thisYear,
   })

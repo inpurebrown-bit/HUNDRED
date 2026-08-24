@@ -141,10 +141,18 @@ function isContractExpired(c: any): boolean {
 }
 
 // ── 기관 목록 ──────────────────────────────────────────────────────────
-const INST_DIRECT   = ['중진공','소진공(혁신)','소진공(신취)','소진공(재도전)','소진공(일시적경영애로)','서민금융(미소)']
-const INST_INDIRECT = ['기보','신보','재단','안심통장']
-const INDIRECT_SET  = new Set(INST_INDIRECT)
-const ALL_INST_ORDER = [...INST_DIRECT, ...INST_INDIRECT]
+export const INST_DIRECT_DEF   = ['중진공','소진공(혁신)','소진공(신취)','소진공(재도전)','소진공(일시적경영애로)','서민금융(미소)']
+export const INST_INDIRECT_DEF = ['기보','신보','재단','안심통장']
+let INST_DIRECT   = [...INST_DIRECT_DEF]
+let INST_INDIRECT = [...INST_INDIRECT_DEF]
+let INDIRECT_SET  = new Set(INST_INDIRECT_DEF)
+let ALL_INST_ORDER = [...INST_DIRECT_DEF, ...INST_INDIRECT_DEF]
+export function updateInstLists(direct: string[], indirect: string[]) {
+  INST_DIRECT   = direct
+  INST_INDIRECT = indirect
+  INDIRECT_SET  = new Set(indirect)
+  ALL_INST_ORDER = [...direct, ...indirect]
+}
 
 // ── 기관명 축약 ────────────────────────────────────────────
 function abbrevInst(inst: string): string {
@@ -4032,6 +4040,21 @@ export default function OpsDashboard({ userId, userName }: Props) {
   }
 
   useEffect(() => { loadCases() }, [])
+
+  useEffect(() => {
+    fetch('/api/settings?key=inst_lists')
+      .then(r => r.json())
+      .then(({ settings }) => {
+        if (settings?.direct || settings?.indirect) {
+          updateInstLists(
+            settings.direct || INST_DIRECT_DEF,
+            settings.indirect || INST_INDIRECT_DEF,
+          )
+          setCases(prev => [...prev]) // 리렌더 트리거
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     fetch('/api/notices?team=ops&_t=' + Date.now())

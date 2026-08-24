@@ -1211,6 +1211,7 @@ function RevenueTab() {
         const annualRev = data.annualRevenue || {}
         const prevH2 = data.vatPrevH2 || {}
         const currH1 = data.vatCurrH1 || {}
+        const currH2 = data.vatCurrH2 || {}
 
         const rows = [
           { label: `${lastYr}년 종소세`, year: lastYr, reportYear: lastYr + 1 },
@@ -1274,10 +1275,14 @@ function RevenueTab() {
                 {[
                   { label: prevH2.period || `${lastYr}년 7~12월`, d: prevH2, subLabel: '2기 확정 신고 (다음년 1월 25일)' },
                   { label: currH1.period || `${thisYr}년 1~6월`, d: currH1, subLabel: '1기 확정 신고 (7월 25일)' },
-                ].map(({ label, d, subLabel }) => (
-                  <div key={label} className="px-4 py-3">
+                  { label: currH2.period || `${thisYr}년 7~12월`, d: currH2, subLabel: '2기 확정 신고 (다음년 1월 25일)', current: true },
+                ].map(({ label, d, subLabel, current }: any) => (
+                  <div key={label} className={`px-4 py-3 ${current ? 'bg-teal-50/50' : ''}`}>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold text-gray-700">{label}</span>
+                      <span className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                        {label}
+                        {current && <span className="text-[9px] bg-teal-500 text-white px-1.5 py-0.5 rounded-full font-bold">진행중</span>}
+                      </span>
                       <span className="text-[10px] text-gray-400">{subLabel}</span>
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-[11px]">

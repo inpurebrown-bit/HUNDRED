@@ -32,10 +32,17 @@ const OVERALL_STAGES = [
   { key: 'completed',  label: '완료',       color: 'bg-emerald-700' },
   { key: 'assigned',   label: '신규배정',   color: 'bg-sky-500'     },
 ]
-const INST_DIRECT    = ['중진공','소진공(혁신)','소진공(신취)','소진공(재도전)','소진공(일시적경영애로)','서민금융(미소)']
-const INST_INDIRECT  = ['기보','신보','재단','안심통장']
-const INDIRECT_SET   = new Set(INST_INDIRECT)
-const ALL_INST_ORDER = [...INST_DIRECT, ...INST_INDIRECT]
+import { INST_DIRECT_DEF, INST_INDIRECT_DEF } from '@/components/ops/OpsDashboard'
+let INST_DIRECT    = [...INST_DIRECT_DEF]
+let INST_INDIRECT  = [...INST_INDIRECT_DEF]
+let INDIRECT_SET   = new Set(INST_INDIRECT_DEF)
+let ALL_INST_ORDER = [...INST_DIRECT_DEF, ...INST_INDIRECT_DEF]
+function updateCeoInstLists(direct: string[], indirect: string[]) {
+  INST_DIRECT   = direct
+  INST_INDIRECT = indirect
+  INDIRECT_SET  = new Set(indirect)
+  ALL_INST_ORDER = [...direct, ...indirect]
+}
 
 const ACTIVE_STAGE_KEYS    = new Set(['서류받는중','접수전','신청완료','반려보정','실사대기','실사완료','승인대기','승인','부결','입금전','홀딩','검토중','접수','진행중','assigned','absorbed','doc_collect','reviewing','approved','executing','rejected','환불예정','종료예정'])
 const REFUND_STAGE_KEYS    = new Set(['환불','refunded'])
@@ -646,6 +653,13 @@ export default function OpsCeoTab() {
   const [closingPanelIds, setClosingPanelIds] = useState<string[]>([])
   const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const [revData, setRevData] = useState<any>(null)
+  // ── 기관 관리 ────────────────────────────────────────────
+  const [showInstMgr, setShowInstMgr] = useState(false)
+  const [editDirect, setEditDirect] = useState<string[]>([])
+  const [editIndirect, setEditIndirect] = useState<string[]>([])
+  const [newDirect, setNewDirect] = useState('')
+  const [newIndirect, setNewIndirect] = useState('')
+  const [instTick, setInstTick] = useState(0) // 기관 목록 변경 시 리렌더 트리거
 
   function parseMoney(v: any) { return parseInt(String(v || '0').replace(/[^0-9]/g, ''), 10) || 0 }
   function fmtM(n: number) {
@@ -673,6 +687,35 @@ export default function OpsCeoTab() {
   }
 
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    fetch('/api/settings?key=inst_lists')
+      .then(r => r.json())
+      .then(({ settings }) => {
+        const d = settings?.direct || INST_DIRECT_DEF
+        const i = settings?.indirect || INST_INDIRECT_DEF
+        updateCeoInstLists(d, i)
+        setEditDirect(d)
+        setEditIndirect(i)
+        setInstTick(v => v + 1)
+      })
+      .catch(() => {
+        setEditDirect([...INST_DIRECT_DEF])
+        setEditIndirect([...INST_INDIRECT_DEF])
+      })
+  }, [])
+
+  async function saveInstLists(direct: string[], indirect: string[]) {
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ _key: 'inst_lists', direct, indirect }),
+    })
+    updateCeoInstLists(direct, indirect)
+    setEditDirect(direct)
+    setEditIndirect(indirect)
+    setInstTick(v => v + 1)
+  }
 
   // ⚡ details 머지 버그 수정: 패치 시 기존 details와 머지
   const handleSave = useCallback((id: string, patch: Record<string, any>) => {
@@ -864,7 +907,7 @@ export default function OpsCeoTab() {
           )
         })()}
         {/* 뷰 탭 */}
-        <div className="flex gap-1.5 flex-wrap">
+        <div className="flex gap-1.5 flex-wrap items-center">
           {MENU.map(m => (
             <button key={m.key} onClick={() => setView(m.key)}
               className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
@@ -878,8 +921,108 @@ export default function OpsCeoTab() {
               )}
             </button>
           ))}
+          <button onClick={() => setShowInstMgr(true)}
+            className="ml-auto flex items-center gap-1 text-[11px] px-2.5 py-1.5 rounded-lg bg-white/10 text-white/60 hover:bg-white/20 transition-colors">
+            ⚙️ 자금 관리
+          </button>
         </div>
       </div>
+
+      {/* ── 기관(자금) 관리 모달 ── */}
+      {showInstMgr && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowInstMgr(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[480px] max-h-[80vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base font-bold text-gray-800">자금 종류 관리</h2>
+              <button onClick={() => setShowInstMgr(false)} className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+            </div>
+
+            {/* 직접자금 */}
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">직접자금</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 mb-2 min-h-[28px]">
+                {editDirect.map(inst => (
+                  <span key={inst} className="flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full text-xs font-medium">
+                    {inst}
+                    <button onClick={() => setEditDirect(prev => prev.filter(x => x !== inst))} className="text-blue-400 hover:text-red-500 ml-0.5 font-bold">×</button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={newDirect}
+                  onChange={e => setNewDirect(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && newDirect.trim()) {
+                      setEditDirect(prev => prev.includes(newDirect.trim()) ? prev : [...prev, newDirect.trim()])
+                      setNewDirect('')
+                    }
+                  }}
+                  placeholder="자금명 입력 후 Enter"
+                  className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+                <button
+                  onClick={() => {
+                    if (newDirect.trim()) {
+                      setEditDirect(prev => prev.includes(newDirect.trim()) ? prev : [...prev, newDirect.trim()])
+                      setNewDirect('')
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-blue-500 text-white text-xs font-semibold rounded-lg hover:bg-blue-600">추가</button>
+              </div>
+            </div>
+
+            {/* 간접자금 */}
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-[11px] font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded">간접자금</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 mb-2 min-h-[28px]">
+                {editIndirect.map(inst => (
+                  <span key={inst} className="flex items-center gap-1 bg-violet-50 text-violet-700 border border-violet-200 px-2 py-0.5 rounded-full text-xs font-medium">
+                    {inst}
+                    <button onClick={() => setEditIndirect(prev => prev.filter(x => x !== inst))} className="text-violet-400 hover:text-red-500 ml-0.5 font-bold">×</button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={newIndirect}
+                  onChange={e => setNewIndirect(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && newIndirect.trim()) {
+                      setEditIndirect(prev => prev.includes(newIndirect.trim()) ? prev : [...prev, newIndirect.trim()])
+                      setNewIndirect('')
+                    }
+                  }}
+                  placeholder="자금명 입력 후 Enter"
+                  className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-200"
+                />
+                <button
+                  onClick={() => {
+                    if (newIndirect.trim()) {
+                      setEditIndirect(prev => prev.includes(newIndirect.trim()) ? prev : [...prev, newIndirect.trim()])
+                      setNewIndirect('')
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-violet-500 text-white text-xs font-semibold rounded-lg hover:bg-violet-600">추가</button>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2 border-t border-gray-100">
+              <button onClick={() => setShowInstMgr(false)} className="flex-1 py-2 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">취소</button>
+              <button
+                onClick={async () => {
+                  await saveInstLists(editDirect, editIndirect)
+                  setShowInstMgr(false)
+                }}
+                className="flex-1 py-2 text-xs font-bold text-white bg-[#1B2A45] rounded-lg hover:bg-[#243a5e]">저장</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 목록 */}
       {view === 'revenue' ? (

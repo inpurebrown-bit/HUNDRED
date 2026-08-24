@@ -8,9 +8,11 @@ export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   const user = session.user as any
-  if (user.role !== 'ceo') return NextResponse.json({ error: '권한 없음' }, { status: 403 })
-
   const key = req.nextUrl.searchParams.get('key') || 'gcal'
+  // inst_lists는 모든 인증 유저가 읽을 수 있음 (ops 대시보드에서 필요)
+  if (user.role !== 'ceo' && key !== 'inst_lists') {
+    return NextResponse.json({ error: '권한 없음' }, { status: 403 })
+  }
 
   const { data } = await supabaseAdmin
     .from('settings')
