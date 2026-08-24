@@ -33,7 +33,7 @@ const OVERALL_STAGES = [
   { key: 'assigned',   label: '신규배정',   color: 'bg-sky-500'     },
 ]
 const INST_DIRECT    = ['중진공','소진공(혁신)','소진공(신취)','소진공(재도전)','소진공(일시적경영애로)','서민금융(미소)']
-const INST_INDIRECT  = ['기보','신보','재단']
+const INST_INDIRECT  = ['기보','신보','재단','안심통장']
 const INDIRECT_SET   = new Set(INST_INDIRECT)
 const ALL_INST_ORDER = [...INST_DIRECT, ...INST_INDIRECT]
 
@@ -85,6 +85,7 @@ function abbrevInst(inst: string): string {
     '기보':          '기보',
     '신보':          '신보',
     '재단':          '재단',
+    '안심통장':      '안심통장',
   }
   return MAP[inst] || inst
 }
