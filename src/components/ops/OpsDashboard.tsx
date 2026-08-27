@@ -1487,16 +1487,35 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                     1차 입금 {feeLocked && <span className="ml-1 text-[9px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">저장됨 (대표만 수정)</span>}
                   </p>
                   {isCeo && d.fee_locked && (
-                    <button type="button"
-                      onClick={() => {
-                        const mergedDetails = { ...(local.details || {}), fee_locked: false }
-                        setLocal({ ...local, details: mergedDetails })
-                        onSave(c.id, { details: mergedDetails })
-                        setFeeSaved(false)
-                      }}
-                      className="text-[9px] bg-amber-100 hover:bg-amber-200 text-amber-700 px-2 py-0.5 rounded font-bold transition-colors">
-                      잠금 해제
-                    </button>
+                    <div className="flex gap-1">
+                      <button type="button"
+                        onClick={() => {
+                          const mergedDetails = { ...(local.details || {}), fee_locked: false }
+                          setLocal({ ...local, details: mergedDetails })
+                          onSave(c.id, { details: mergedDetails })
+                          setFeeSaved(false)
+                        }}
+                        className="text-[9px] bg-amber-100 hover:bg-amber-200 text-amber-700 px-2 py-0.5 rounded font-bold transition-colors">
+                        잠금 해제
+                      </button>
+                      <button type="button"
+                        onClick={() => {
+                          if (!window.confirm('1차 입금 내역을 모두 삭제하시겠습니까?')) return
+                          const mergedDetails = {
+                            ...(local.details || {}),
+                            fee_locked: false, fee_amount: '', fee_rate: '',
+                            deposit_date: '', deposit_institution: '', deposit_product: '',
+                            approval_amount: '', tax_invoice_requested: null, tax_invoice_issued: null,
+                            payment_amount: '',
+                          }
+                          setLocal({ ...local, details: mergedDetails })
+                          onSave(c.id, { details: mergedDetails })
+                          setFeeSaved(false)
+                        }}
+                        className="text-[9px] bg-red-100 hover:bg-red-200 text-red-600 px-2 py-0.5 rounded font-bold transition-colors">
+                        삭제
+                      </button>
+                    </div>
                   )}
                 </div>
                 {feeLocked ? (
@@ -1713,8 +1732,8 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                         <button type="button"
                           onClick={() => {
                             if (entryLocked && !window.confirm('저장된 입금내역을 삭제하시겠습니까?')) return
-                            const entries: any[] = d.payment_entries || []
-                            detailField('payment_entries', entries.filter((_: any, i: number) => i !== idx))
+                            const entries: any[] = (d.payment_entries || []).filter((_: any, i: number) => i !== idx)
+                            immediateDetailFields({ payment_entries: entries })
                           }}
                           className={`text-[10px] font-bold ${entryLocked ? 'text-orange-400 hover:text-red-600' : 'text-red-400 hover:text-red-600'}`}>
                           {entryLocked ? '🔓 삭제(대표)' : '✕ 삭제'}
