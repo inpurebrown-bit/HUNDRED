@@ -405,6 +405,8 @@ function PayRateSubView() {
 
   useEffect(() => {
     async function load() {
+      // 자동저장 대기 중이면 reload 건너뜀 (입력값 덮어쓰기 방지)
+      if (autoSaveTimer.current) return
       try {
         const [payRes, custRes, userRes, revRes, casesRes, scRes] = await Promise.all([
           fetch(`/api/payrate?year_month=${month}`),
