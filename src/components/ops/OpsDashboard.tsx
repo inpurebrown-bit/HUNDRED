@@ -3822,16 +3822,17 @@ function OpsReportTab({ userId, userName, activeCases }: { userId: string; userN
         ) : (
           <div className="divide-y divide-gray-50">
             {processingCases.map(c => (
-              <div key={c.id} className="px-4 py-3 flex items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-[#1B2A45] truncate">{getCaseName(c)}</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5 truncate">{c.institution || '기관 미정'}</p>
+              <div key={c.id} className="px-4 py-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-bold text-[#1B2A45] truncate flex-1">{getCaseName(c)}</p>
+                  <span className="text-[10px] text-gray-400 shrink-0">{c.institution || '기관 미정'}</span>
                 </div>
-                <input
+                <textarea
                   value={caseNotes[c.id] || ''}
                   onChange={e => setCaseNotes(p => ({ ...p, [c.id]: e.target.value }))}
-                  placeholder="특이사항"
-                  className="w-48 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-300"
+                  placeholder="특이사항 — 현재 진행 상황, 이슈, 대표님께 보고할 내용 등"
+                  rows={2}
+                  className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-violet-300 resize-none"
                 />
               </div>
             ))}
