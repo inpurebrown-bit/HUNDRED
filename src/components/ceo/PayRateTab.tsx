@@ -524,7 +524,8 @@ function PayRateSubView() {
           const synced = baseRows
             .filter((row: EmployeeRow) => !row.name || salesNameSet.has(cleanName(row.name)))
             .map(syncRow)
-          setEmployees(synced)
+          // fetch 완료 후에도 편집 중이면 덮어쓰기 금지
+          if (!autoSaveTimer.current) setEmployees(synced)
         } else {
           // DB 레코드 없으면 localStorage 폴백 시도
           try {
@@ -549,12 +550,12 @@ function PayRateSubView() {
                   } : row
                   return goal > 0 ? { ...r2, target: goal } : r2
                 })
-              setEmployees(synced)
+              if (!autoSaveTimer.current) setEmployees(synced)
             } else {
-              setEmployees(people.map(mkRow))
+              if (!autoSaveTimer.current) setEmployees(people.map(mkRow))
             }
           } catch {
-            setEmployees(people.map(n => {
+            if (!autoSaveTimer.current) setEmployees(people.map(n => {
               const goal = goalMap[cleanName(n)]
               return { ...mkRow(n), target: goal > 0 ? goal : 0 }
             }))

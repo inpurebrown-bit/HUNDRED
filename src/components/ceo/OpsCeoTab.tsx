@@ -1043,10 +1043,67 @@ export default function OpsCeoTab() {
             <InstitutionGroupedView cases={expiredCases} openPanelIds={openPanelIds} onToggle={togglePanel} onScriptToggle={handleScriptToggle} onApprove={handleApprove} />
           </>
         )
+      ) : view === 'newdb' ? (
+        (() => {
+          const stage1 = newdbCases.filter(c => (c.details?.absorption_stage ?? 1) !== 2)
+          const stage2 = newdbCases.filter(c => (c.details?.absorption_stage ?? 1) === 2)
+          return (
+            <div className="grid grid-cols-2 gap-4">
+              {/* 1차흡수 대기 */}
+              <div>
+                <div className="flex items-center gap-2 mb-3 px-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-sky-400 flex-shrink-0" />
+                  <p className="text-sm font-bold text-sky-600">1차흡수 대기</p>
+                  <span className="text-[10px] bg-sky-100 text-sky-600 px-1.5 py-0.5 rounded-full font-bold">{stage1.length}</span>
+                </div>
+                {stage1.length === 0 ? (
+                  <div className="bg-sky-50 rounded-xl border border-sky-100 p-6 text-center"><p className="text-xs text-sky-400">없음</p></div>
+                ) : (
+                  <div className="space-y-2">
+                    {stage1.map(c => (
+                      <div key={c.id} className="relative">
+                        <CeoCaseCard c={c} isOpen={openPanelIds.includes(c.id)} onToggle={togglePanel} onScriptToggle={handleScriptToggle} />
+                        <button
+                          onClick={() => handleSave(c.id, { details: { ...(c.details || {}), absorption_stage: 2 } })}
+                          className="absolute bottom-2 right-2 text-[9px] bg-orange-100 text-orange-600 border border-orange-200 hover:bg-orange-200 rounded px-1.5 py-0.5 font-bold z-10">
+                          2차 →
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {/* 2차흡수 대기 */}
+              <div>
+                <div className="flex items-center gap-2 mb-3 px-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-orange-400 flex-shrink-0" />
+                  <p className="text-sm font-bold text-orange-600">2차흡수 대기</p>
+                  <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full font-bold">{stage2.length}</span>
+                </div>
+                {stage2.length === 0 ? (
+                  <div className="bg-orange-50 rounded-xl border border-orange-100 p-6 text-center"><p className="text-xs text-orange-400">없음</p></div>
+                ) : (
+                  <div className="space-y-2">
+                    {stage2.map(c => (
+                      <div key={c.id} className="relative">
+                        <CeoCaseCard c={c} isOpen={openPanelIds.includes(c.id)} onToggle={togglePanel} onScriptToggle={handleScriptToggle} />
+                        <button
+                          onClick={() => handleSave(c.id, { details: { ...(c.details || {}), absorption_stage: 1 } })}
+                          className="absolute bottom-2 right-2 text-[9px] bg-sky-100 text-sky-600 border border-sky-200 hover:bg-sky-200 rounded px-1.5 py-0.5 font-bold z-10">
+                          ← 1차
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })()
       ) : (
         viewCases.length === 0 ? (
           <div className="bg-white rounded-xl border border-[#E8E2D4] p-12 text-center text-gray-400 text-sm">
-            {view === 'refund' ? '환불 업체가 없습니다' : view === 'newdb' ? '뿌토DB가 없습니다' : '종료 업체가 없습니다'}
+            {view === 'refund' ? '환불 업체가 없습니다' : '종료 업체가 없습니다'}
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">

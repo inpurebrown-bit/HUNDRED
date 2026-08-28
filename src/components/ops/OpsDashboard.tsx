@@ -3028,10 +3028,10 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
 
       {/* 헤더 */}
       <div className="bg-gradient-to-r from-[#1B2A45] to-sky-700 rounded-xl px-5 py-4 text-white">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between">
           <div>
             <h2 className="font-bold text-base">신규DB (뿌토)</h2>
-            <p className="text-white/60 text-xs mt-0.5">배정받은 DB · 계약 처리 시 진행중업체로 자동 이동</p>
+            <p className="text-white/60 text-xs mt-0.5">배정받은 DB · 계약 처리 시 진행중업체로 이동</p>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setAddModal(true)}
@@ -3043,155 +3043,201 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
         </div>
       </div>
 
-      {/* 카드 그리드 */}
-      {cases.length === 0 ? (
-        <div className="bg-white rounded-xl border border-[#E8E2D4] p-16 text-center">
-          <p className="text-2xl mb-2"></p>
-          <p className="text-sm font-semibold text-gray-400">배정된 신규DB가 없습니다</p>
-          <p className="text-xs text-gray-300 mt-1">대표가 뿌토 DB를 배정하면 여기에 표시됩니다</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {cases.map(c => {
-            const d = c.customers?.details || {}
-            const company = d.company || c.customers?.company || c.customers?.name || '—'
-            const repName = c.customers?.representative || c.customers?.name || ''
-            const phone = c.customers?.phone || ''
-            const businessType = d.business_type || ''
-            const realWork = d.real_work || ''
-            const yearsInBiz = d.years_in_business || ''
-            const loanTotal = d.loan_total || ''
-            const requiredFunds = d.required_funds || ''
-            const solution = d.solution || c.details?.solution || ''
-            const creditKcb = d.credit_kcb || ''
-            const patent = d.patent || ''
-            const revenueLatest = d.revenue_2025 || d.revenue_2024 || ''
-            const { date } = formatKST(c.created_at || '')
-            const isSelected = openId === c.id
-            const isSelfAdded = c.details?.ops_user_name === userName && !c.details?.sales_customer_info
-            const isMonthly = c.details?.contract_type === '월정기권'
+      {/* 1차/2차 흡수 대기 분리 */}
+      {(() => {
+        const stage1 = cases.filter(c => (c.details?.absorption_stage ?? 1) !== 2)
+        const stage2 = cases.filter(c => (c.details?.absorption_stage ?? 1) === 2)
 
-            return (
-              <div key={c.id}
-                className={`border-2 rounded-2xl overflow-hidden cursor-pointer hover:shadow-lg transition-all relative ${
-                  isMonthly
-                    ? isSelected ? 'bg-purple-100 ring-2 ring-purple-500 border-purple-500 shadow-lg' : 'bg-purple-100 border-purple-400 hover:border-purple-600'
-                    : isSelected ? 'bg-white ring-2 ring-sky-400 border-sky-300 shadow-lg' : 'bg-white border-gray-200 hover:border-sky-300'
-                }`}
-                onClick={() => setOpenId(id => id === c.id ? null : c.id)}
-              >
-                {/* 상단 컬러바 */}
-                <div className={`w-full ${
-                  isMonthly ? 'h-7 bg-gradient-to-r from-purple-600 to-violet-700 flex items-center px-3 gap-1.5'
-                  : isSelfAdded ? 'h-1 bg-gradient-to-r from-emerald-400 to-teal-400'
-                  : 'h-1 bg-gradient-to-r from-sky-400 to-blue-500'
-                }`}>
-                  {isMonthly && (
-                    <>
-                      <span className="text-white text-[11px] font-bold tracking-wide">월정기권</span>
-                      <span className="text-purple-200 text-[10px]">· 월 10만 × 12개월 · 수수료 없음</span>
-                    </>
-                  )}
-                </div>
+        function renderCard(c: OpsCase) {
+          const d = c.customers?.details || {}
+          const company = d.company || c.customers?.company || c.customers?.name || '—'
+          const repName = c.customers?.representative || c.customers?.name || ''
+          const phone = c.customers?.phone || ''
+          const businessType = d.business_type || ''
+          const realWork = d.real_work || ''
+          const yearsInBiz = d.years_in_business || ''
+          const loanTotal = d.loan_total || ''
+          const requiredFunds = d.required_funds || ''
+          const solution = d.solution || c.details?.solution || ''
+          const creditKcb = d.credit_kcb || ''
+          const patent = d.patent || ''
+          const revenueLatest = d.revenue_2025 || d.revenue_2024 || ''
+          const { date } = formatKST(c.created_at || '')
+          const isSelected = openId === c.id
+          const isSelfAdded = c.details?.ops_user_name === userName && !c.details?.sales_customer_info
+          const isMonthly = c.details?.contract_type === '월정기권'
+          const stage = c.details?.absorption_stage ?? 1
 
-                <div className="p-3.5">
-                  {/* 헤더 행: 뱃지 + 업체명 */}
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        {!isMonthly && (
+          return (
+            <div key={c.id}
+              className={`border-2 rounded-2xl overflow-hidden cursor-pointer hover:shadow-lg transition-all relative ${
+                isMonthly
+                  ? isSelected ? 'bg-purple-100 ring-2 ring-purple-500 border-purple-500 shadow-lg' : 'bg-purple-100 border-purple-400 hover:border-purple-600'
+                  : isSelected ? 'bg-white ring-2 ring-sky-400 border-sky-300 shadow-lg' : 'bg-white border-gray-200 hover:border-sky-300'
+              }`}
+              onClick={() => setOpenId(id => id === c.id ? null : c.id)}
+            >
+              {/* 상단 컬러바 */}
+              <div className={`w-full ${
+                isMonthly ? 'h-7 bg-gradient-to-r from-purple-600 to-violet-700 flex items-center px-3 gap-1.5'
+                : isSelfAdded ? 'h-1 bg-gradient-to-r from-emerald-400 to-teal-400'
+                : 'h-1 bg-gradient-to-r from-sky-400 to-blue-500'
+              }`}>
+                {isMonthly && (
+                  <>
+                    <span className="text-white text-[11px] font-bold tracking-wide">월정기권</span>
+                    <span className="text-purple-200 text-[10px]">· 월 10만 × 12개월 · 수수료 없음</span>
+                  </>
+                )}
+              </div>
+
+              <div className="p-3.5">
+                {/* 헤더 행: 뱃지 + 업체명 */}
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      {!isMonthly && (
                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold ${isSelfAdded ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'}`}>
                           {isSelfAdded ? '직접추가' : '배정'}
                         </span>
-                        )}
-                        {solution && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700">
-                            {solution.length > 8 ? solution.slice(0,8)+'…' : solution}
-                          </span>
-                        )}
-                      </div>
-                      <p className="font-bold text-[#1B2A45] text-sm leading-tight truncate">{company}</p>
-                      {repName && repName !== company && (
-                        <p className="text-[11px] text-gray-500 mt-0.5">{repName}</p>
+                      )}
+                      {solution && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700">
+                          {solution.length > 8 ? solution.slice(0,8)+'…' : solution}
+                        </span>
                       )}
                     </div>
-                  </div>
-
-                  {/* 정보 그리드 */}
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-1 mb-3">
-                    {phone && (
-                      <div className="col-span-2 flex items-center gap-1">
-                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">연락처</span>
-                        <span className="text-[11px] font-medium text-gray-700">{formatPhone(phone)}</span>
-                      </div>
-                    )}
-                    {(businessType || realWork) && (
-                      <div className="col-span-2 flex items-center gap-1">
-                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">업종</span>
-                        <span className="text-[11px] text-gray-700 truncate">{realWork || businessType}</span>
-                      </div>
-                    )}
-                    {yearsInBiz && (
-                      <div className="flex items-center gap-1">
-                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">업력</span>
-                        <span className="text-[11px] text-gray-700">{yearsInBiz}</span>
-                      </div>
-                    )}
-                    {creditKcb && (
-                      <div className="flex items-center gap-1">
-                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">KCB</span>
-                        <span className="text-[11px] text-gray-700">{creditKcb}</span>
-                      </div>
-                    )}
-                    {patent && (
-                      <div className="flex items-center gap-1">
-                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">특허</span>
-                        <span className="text-[11px] text-gray-700">{patent}</span>
-                      </div>
-                    )}
-                    {revenueLatest && (
-                      <div className="flex items-center gap-1">
-                        <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">매출</span>
-                        <span className="text-[11px] text-gray-700">{revenueLatest}</span>
-                      </div>
+                    <p className="font-bold text-[#1B2A45] text-sm leading-tight truncate">{company}</p>
+                    {repName && repName !== company && (
+                      <p className="text-[11px] text-gray-500 mt-0.5">{repName}</p>
                     )}
                   </div>
+                </div>
 
-                  {/* 기대출 + 필요자금 강조 */}
-                  {(loanTotal || requiredFunds) && (
-                    <div className="flex gap-2 mb-3">
-                      {loanTotal && (
-                        <div className="flex-1 bg-rose-50 border border-rose-100 rounded-lg px-2 py-1.5 text-center">
-                          <p className="text-[9px] text-rose-400 font-medium">기대출합계</p>
-                          <p className="text-[11px] font-bold text-rose-700 mt-0.5">{loanTotal}</p>
-                        </div>
-                      )}
-                      {requiredFunds && (
-                        <div className="flex-1 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1.5 text-center">
-                          <p className="text-[9px] text-emerald-400 font-medium">필요자금</p>
-                          <p className="text-[11px] font-bold text-emerald-700 mt-0.5">{requiredFunds}</p>
-                        </div>
-                      )}
+                {/* 정보 그리드 */}
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 mb-3">
+                  {phone && (
+                    <div className="col-span-2 flex items-center gap-1">
+                      <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">연락처</span>
+                      <span className="text-[11px] font-medium text-gray-700">{formatPhone(phone)}</span>
                     </div>
                   )}
+                  {(businessType || realWork) && (
+                    <div className="col-span-2 flex items-center gap-1">
+                      <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">업종</span>
+                      <span className="text-[11px] text-gray-700 truncate">{realWork || businessType}</span>
+                    </div>
+                  )}
+                  {yearsInBiz && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">업력</span>
+                      <span className="text-[11px] text-gray-700">{yearsInBiz}</span>
+                    </div>
+                  )}
+                  {creditKcb && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">KCB</span>
+                      <span className="text-[11px] text-gray-700">{creditKcb}</span>
+                    </div>
+                  )}
+                  {patent && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">특허</span>
+                      <span className="text-[11px] text-gray-700">{patent}</span>
+                    </div>
+                  )}
+                  {revenueLatest && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[9px] text-gray-400 w-10 flex-shrink-0">매출</span>
+                      <span className="text-[11px] text-gray-700">{revenueLatest}</span>
+                    </div>
+                  )}
+                </div>
 
-                  {/* 하단: 날짜 + 계약 버튼 */}
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[9px] text-gray-300">배정: {date}</span>
+                {/* 기대출 + 필요자금 강조 */}
+                {(loanTotal || requiredFunds) && (
+                  <div className="flex gap-2 mb-3">
+                    {loanTotal && (
+                      <div className="flex-1 bg-rose-50 border border-rose-100 rounded-lg px-2 py-1.5 text-center">
+                        <p className="text-[9px] text-rose-400 font-medium">기대출합계</p>
+                        <p className="text-[11px] font-bold text-rose-700 mt-0.5">{loanTotal}</p>
+                      </div>
+                    )}
+                    {requiredFunds && (
+                      <div className="flex-1 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1.5 text-center">
+                        <p className="text-[9px] text-emerald-400 font-medium">필요자금</p>
+                        <p className="text-[11px] font-bold text-emerald-700 mt-0.5">{requiredFunds}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 하단: 날짜 + 흡수단계 이동 + 계약 버튼 */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[9px] text-gray-300">배정: {date}</span>
+                  <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
                     <button
                       type="button"
-                      onClick={e => { e.stopPropagation(); openContractModal(c) }}
-                      className="text-[10px] bg-sky-500 hover:bg-sky-600 text-white rounded-lg px-3 py-1.5 font-semibold transition-colors flex-shrink-0"
-                    >
+                      onClick={() => {
+                        const newStage = stage === 1 ? 2 : 1
+                        onSave(c.id, { details: { ...(c.details || {}), absorption_stage: newStage } })
+                      }}
+                      className={`text-[9px] rounded-lg px-2 py-1 font-bold border transition-colors ${
+                        stage === 2
+                          ? 'bg-orange-100 text-orange-600 border-orange-300 hover:bg-orange-200'
+                          : 'bg-sky-100 text-sky-600 border-sky-200 hover:bg-sky-200'
+                      }`}>
+                      {stage === 2 ? '← 1차' : '2차 →'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openContractModal(c)}
+                      className="text-[10px] bg-sky-500 hover:bg-sky-600 text-white rounded-lg px-3 py-1.5 font-semibold transition-colors flex-shrink-0">
                       계약하기
                     </button>
                   </div>
                 </div>
               </div>
-            )
-          })}
-        </div>
-      )}
+            </div>
+          )
+        }
+
+        return (
+          <div className="grid grid-cols-2 gap-4">
+            {/* 1차흡수 대기 */}
+            <div>
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-sky-400 flex-shrink-0" />
+                <p className="text-sm font-bold text-sky-600">1차흡수 대기</p>
+                <span className="text-[10px] bg-sky-100 text-sky-600 px-1.5 py-0.5 rounded-full font-bold">{stage1.length}</span>
+              </div>
+              {stage1.length === 0 ? (
+                <div className="bg-sky-50 rounded-xl border border-sky-100 p-6 text-center">
+                  <p className="text-xs text-sky-400 font-medium">없음</p>
+                </div>
+              ) : (
+                <div className="space-y-3">{stage1.map(renderCard)}</div>
+              )}
+            </div>
+
+            {/* 2차흡수 대기 */}
+            <div>
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-orange-400 flex-shrink-0" />
+                <p className="text-sm font-bold text-orange-600">2차흡수 대기</p>
+                <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full font-bold">{stage2.length}</span>
+              </div>
+              {stage2.length === 0 ? (
+                <div className="bg-orange-50 rounded-xl border border-orange-100 p-6 text-center">
+                  <p className="text-xs text-orange-400 font-medium">없음</p>
+                </div>
+              ) : (
+                <div className="space-y-3">{stage2.map(renderCard)}</div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* 상세 드로어 */}
       {openId && (() => {
@@ -4365,61 +4411,92 @@ export default function OpsDashboard({ userId, userName }: Props) {
       </div>
 
       {/* 콘텐츠 */}
-      <div className="px-4 md:px-6 py-6 max-w-6xl mx-auto">
+      <div className="px-4 md:px-6 py-5 max-w-6xl mx-auto pb-24 md:pb-6">
 
         {/* ── 대시보드 ── */}
         {activeTab === 'dashboard' && (
           loading ? (
             <div className="text-center py-16 text-[#1B2A45]/40 text-sm">불러오는 중...</div>
           ) : (
-            <div className="max-w-5xl mx-auto">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-bold text-[#1B2A45] text-base">관리팀 대시보드</h2>
+            <div className="max-w-3xl mx-auto space-y-4">
+              {/* 인사 + 새로고침 */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-400">{new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}</p>
+                  <h2 className="font-black text-[#1B2A45] text-lg leading-tight">{userName}님, 안녕하세요</h2>
+                </div>
                 <button onClick={loadCases}
-                  className="text-xs bg-white border border-[#E8E2D4] text-[#1B2A45]/60 px-3 py-1.5 rounded-lg hover:border-[#1B2A45]/30 transition-colors">
-                  새로고침
+                  className="text-xs bg-white border border-[#E8E2D4] text-[#1B2A45]/60 px-3 py-1.5 rounded-xl hover:border-[#1B2A45]/30 transition-colors flex items-center gap-1">
+                  <span className="text-sm">↻</span> 새로고침
                 </button>
               </div>
-              {/* 이달 매출 — 최상단 */}
+
+              {/* 주요 케이스 현황 */}
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => setActiveTab('active')}
+                  className="bg-gradient-to-br from-[#1B2A45] to-[#2d4270] rounded-2xl p-4 text-white text-left shadow active:scale-[0.98] transition-transform">
+                  <p className="text-4xl font-black">{activeCases.length}</p>
+                  <p className="text-sm font-bold mt-1 opacity-90">진행중업체</p>
+                  <p className="text-[10px] opacity-50 mt-0.5">탭하여 상세보기 →</p>
+                </button>
+                <button onClick={() => setActiveTab('newdb')}
+                  className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-4 text-white text-left shadow active:scale-[0.98] transition-transform">
+                  <p className="text-4xl font-black">{newdbCases.length}</p>
+                  <p className="text-sm font-bold mt-1 opacity-90">신규DB</p>
+                  <p className="text-[10px] opacity-50 mt-0.5">흡수 대기 중 →</p>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <button onClick={() => setActiveTab('expired')}
+                  className="bg-white rounded-xl border border-orange-200 hover:border-orange-400 py-3 px-2 text-center transition-colors active:scale-[0.97]">
+                  <p className="text-2xl font-black text-orange-500">{expiredCases.length}</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5 font-medium">계약만료</p>
+                </button>
+                <button onClick={() => setActiveTab('refund')}
+                  className="bg-white rounded-xl border border-rose-200 hover:border-rose-400 py-3 px-2 text-center transition-colors active:scale-[0.97]">
+                  <p className="text-2xl font-black text-rose-500">{refundCases.length}</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5 font-medium">환불</p>
+                </button>
+                <button onClick={() => setActiveTab('completed')}
+                  className="bg-white rounded-xl border border-emerald-200 hover:border-emerald-400 py-3 px-2 text-center transition-colors active:scale-[0.97]">
+                  <p className="text-2xl font-black text-emerald-600">{completedCases.length}</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5 font-medium">종료</p>
+                </button>
+              </div>
+
+              {/* 이달 매출 */}
               <OpsMiniRevenue userName={userName} />
 
+              {/* 기관별 현황 */}
               <DashboardOverview cases={cases} />
 
               {/* 공지사항 */}
               {notices.length > 0 && (
-                <div className="space-y-2 mt-4">
-                  <h3 className="text-sm font-bold text-gray-700">공지사항</h3>
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-gray-500 px-1">공지사항</p>
                   {notices.map(n => (
-                    <div key={n.id} className="bg-white border border-[#E8E2D4] rounded-xl px-5 py-4">
+                    <div key={n.id} className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
                       <p className="font-semibold text-[#1B2A45] text-sm">{n.title}</p>
-                      {n.content && <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{n.content}</p>}
-                      <p className="text-xs text-gray-300 mt-2">{new Date(n.created_at).toLocaleDateString('ko-KR')}</p>
+                      {n.content && <p className="text-xs text-gray-600 mt-1 whitespace-pre-wrap">{n.content}</p>}
+                      <p className="text-[10px] text-gray-400 mt-1.5">{new Date(n.created_at).toLocaleDateString('ko-KR')}</p>
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* 빠른 메뉴 */}
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4">
+              {/* 기타 메뉴 */}
+              <div className="grid grid-cols-2 gap-2">
                 {[
-                  { tab: 'active' as OpsTab, icon: '', label: '진행중업체', count: activeCases.length, color: 'border-amber-200 hover:border-amber-400' },
-                  { tab: 'expired' as OpsTab, icon: '', label: '계약기간만료', count: expiredCases.length, color: 'border-orange-300 hover:border-orange-500' },
-                  { tab: 'refund' as OpsTab, icon: '', label: '환불업체', count: refundCases.length, color: 'border-rose-200 hover:border-rose-400' },
-                  { tab: 'completed' as OpsTab, icon: '', label: '종료업체', count: completedCases.length, color: 'border-emerald-200 hover:border-emerald-400' },
-                  { tab: 'ops_contract' as OpsTab, icon: '', label: '관리팀계약', count: null, color: 'border-violet-200 hover:border-violet-400' },
-                  { tab: 'report' as OpsTab, icon: '', label: '관리팀보고', count: null, color: 'border-blue-200 hover:border-blue-400' },
-                  { tab: 'revenue' as OpsTab, icon: '', label: '매출 현황', count: null, color: 'border-emerald-200 hover:border-emerald-400' },
-                  { tab: 'profile' as OpsTab, icon: '', label: '사원정보', count: null, color: 'border-gray-200 hover:border-gray-400' },
+                  { tab: 'ops_contract' as OpsTab, label: '관리팀계약', desc: '직접 계약 관리', accent: 'border-violet-200 hover:border-violet-400' },
+                  { tab: 'report' as OpsTab, label: '관리팀보고', desc: '업무 보고 현황', accent: 'border-blue-200 hover:border-blue-400' },
+                  { tab: 'revenue' as OpsTab, label: '매출 현황', desc: '월별·직원별 분석', accent: 'border-teal-200 hover:border-teal-400' },
+                  { tab: 'profile' as OpsTab, label: '사원정보', desc: '내 프로필', accent: 'border-gray-200 hover:border-gray-300' },
                 ].map(item => (
                   <button key={item.tab} onClick={() => setActiveTab(item.tab)}
-                    className={`bg-white border rounded-xl p-4 text-left transition-colors ${item.color}`}>
-                    <div className="flex items-center justify-between">
-                      <span className="text-2xl">{item.icon}</span>
-                      {item.count !== null && (
-                        <span className="text-xl font-black text-[#1B2A45]">{item.count}</span>
-                      )}
-                    </div>
-                    <p className="text-sm font-semibold text-[#1B2A45] mt-2">{item.label}</p>
+                    className={`bg-white border rounded-xl p-3.5 text-left transition-colors ${item.accent}`}>
+                    <p className="text-sm font-bold text-[#1B2A45]">{item.label}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{item.desc}</p>
                   </button>
                 ))}
               </div>
@@ -4560,6 +4637,37 @@ export default function OpsDashboard({ userId, userName }: Props) {
           </div>
         )}
       </div>
+
+      {/* ── 모바일 하단 네비게이션 ── */}
+      <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-white border-t border-gray-200 z-30 flex safe-area-inset-bottom">
+        {([
+          { key: 'dashboard', label: '홈', icon: '⌂' },
+          { key: 'active',    label: '진행중', icon: '◈', count: activeCases.length },
+          { key: 'newdb',     label: '신규DB', icon: '✦', count: newdbCases.length },
+          { key: 'report',    label: '보고', icon: '◉' },
+        ] as { key: OpsTab; label: string; icon: string; count?: number }[]).map(tab => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+            className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 relative transition-colors ${
+              activeTab === tab.key ? 'text-[#1B2A45]' : 'text-gray-400'
+            }`}>
+            <span className={`text-lg leading-none font-bold ${activeTab === tab.key ? 'scale-110' : ''} transition-transform`}>{tab.icon}</span>
+            <span className={`text-[9px] font-semibold ${activeTab === tab.key ? 'text-[#1B2A45]' : 'text-gray-400'}`}>{tab.label}</span>
+            {tab.count !== undefined && tab.count > 0 && (
+              <span className="absolute top-1.5 right-[22%] text-[9px] bg-red-500 text-white rounded-full min-w-[16px] h-4 flex items-center justify-center font-bold px-0.5">
+                {tab.count > 99 ? '99+' : tab.count}
+              </span>
+            )}
+            {activeTab === tab.key && (
+              <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-[#1B2A45] rounded-full" />
+            )}
+          </button>
+        ))}
+        <button onClick={() => setMenuOpen(v => !v)}
+          className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors ${menuOpen ? 'text-[#1B2A45]' : 'text-gray-400'}`}>
+          <span className="text-lg leading-none font-bold">≡</span>
+          <span className="text-[9px] font-semibold">더보기</span>
+        </button>
+      </nav>
 
       {/* ── 플로팅 메모장 ── */}
       {notepadOpen && (

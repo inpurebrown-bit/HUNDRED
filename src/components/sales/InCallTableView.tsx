@@ -810,6 +810,7 @@ function CustomerCard({
   const [qtCheckedCoop,  setQtCheckedCoop]  = useState(false)
   const [qtLoading, setQtLoading] = useState(false)
   const [qtContractDate, setQtContractDate] = useState('')
+  const [qtPayMethod, setQtPayMethod] = useState<'카드' | '현금' | ''>('')
   const [tlText, setTlText] = useState('')
   const [tradeOpen, setTradeOpen] = useState(false)
   const [logEditMode, setLogEditMode] = useState(false)
@@ -985,17 +986,23 @@ function CustomerCard({
 
   async function handleQuickTransfer() {
     if (!onTransferToOps) return
+    if (!qtPayMethod) {
+      alert('결제방식(현금/카드)을 선택해야 자금팀으로 전송할 수 있습니다.')
+      return
+    }
     setQtLoading(true)
-    // 계약일자가 바뀐 경우 먼저 업데이트
+    // 계약일자 / 결제방식 변경사항 저장
     const existingDate = (c as any).details?.contract_date || ''
-    if (qtContractDate && qtContractDate !== existingDate) {
-      await onUpdate(c.id, { details: { contract_date: qtContractDate } })
+    const existingMethod = (c as any).details?.payment_method || ''
+    if ((qtContractDate && qtContractDate !== existingDate) || qtPayMethod !== existingMethod) {
+      await onUpdate(c.id, { details: { contract_date: qtContractDate, payment_method: qtPayMethod } })
     }
     await onTransferToOps(c)
     setQtLoading(false)
     setQuickTransferOpen(false)
     setQtCheckedGroup(false)
     setQtCheckedCoop(false)
+    setQtPayMethod('')
   }
 
   return (
@@ -1038,6 +1045,26 @@ function CustomerCard({
                   className="w-full border border-red-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300/50 text-gray-800 bg-white"
                 />
               </div>
+              {/* 결제방식 필수 선택 */}
+              <div className={`rounded-xl px-3 py-2.5 border ${qtPayMethod ? 'bg-blue-50 border-blue-200' : 'bg-red-50 border-red-300'}`}>
+                <p className={`text-[10px] font-bold mb-2 ${qtPayMethod ? 'text-blue-700' : 'text-red-700'}`}>
+                  결제방식 <span className="text-red-500">* 필수</span>
+                  {!qtPayMethod && <span className="ml-1 text-red-500">(미선택 시 전송 불가)</span>}
+                </p>
+                <div className="flex gap-2">
+                  {(['카드', '현금'] as const).map(m => (
+                    <button key={m} type="button"
+                      onClick={() => setQtPayMethod(prev => prev === m ? '' : m)}
+                      className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-colors ${
+                        qtPayMethod === m
+                          ? m === '카드' ? 'bg-blue-500 text-white border-blue-500' : 'bg-emerald-500 text-white border-emerald-500'
+                          : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
+                      }`}>
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <p className="text-[10px] text-gray-400 font-semibold">전송 전 체크리스트</p>
               <label className="flex items-center gap-3 cursor-pointer bg-emerald-50 rounded-lg px-3 py-2.5 border border-emerald-100">
                 <input type="checkbox" checked={qtCheckedGroup} onChange={e => setQtCheckedGroup(e.target.checked)} className="w-4 h-4 accent-emerald-500" />
@@ -1055,9 +1082,9 @@ function CustomerCard({
                 className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50">
                 취소
               </button>
-              <button onClick={handleQuickTransfer} disabled={qtLoading}
-                className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
-                {qtLoading ? '전송중...' : '자금팀 전송'}
+              <button onClick={handleQuickTransfer} disabled={qtLoading || !qtPayMethod}
+                className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
+                {qtLoading ? '전송중...' : !qtPayMethod ? '결제방식 미선택' : '자금팀 전송'}
               </button>
             </div>
           </div>
@@ -1430,6 +1457,7 @@ function CustomerCard({
             onClick={e => {
               e.stopPropagation()
               setQtContractDate((c as any).details?.contract_date || new Date().toISOString().slice(0, 10))
+              setQtPayMethod(((c as any).details?.payment_method as '카드' | '현금' | '') || '')
               setQuickTransferOpen(true)
             }}
             className="mt-1.5 w-full text-[9px] bg-amber-500 hover:bg-amber-600 text-white rounded py-1 font-semibold transition-colors"
