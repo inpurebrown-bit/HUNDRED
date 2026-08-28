@@ -13,10 +13,10 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
 
   const { id } = await context.params
   const body = await req.json()
-  const { name, username, password, role } = body
+  const { name, username, password, role, blocked } = body
 
   // 대상 직원 확인
-  const { data: target } = await supabaseAdmin.from('users').select('role, name').eq('id', id).single()
+  const { data: target } = await supabaseAdmin.from('users').select('role, name, blocked').eq('id', id).single()
   if (!target) return NextResponse.json({ error: '직원 없음' }, { status: 404 })
   if (target.role === 'ceo') return NextResponse.json({ error: '대표 계정은 수정할 수 없습니다' }, { status: 400 })
 
@@ -31,13 +31,14 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   if (username) updateFields.username = username
   if (password) updateFields.password_hash = await bcrypt.hash(password, 10)
   if (role && ['sales', 'ops', 'dig'].includes(role)) updateFields.role = role
+  if (typeof blocked === 'boolean') updateFields.blocked = blocked
 
   const { data: updated, error } = await supabaseAdmin
-    .from('users').update(updateFields).eq('id', id).select('id, name, username, role').single()
+    .from('users').update(updateFields).eq('id', id).select('id, name, username, role, blocked').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // 팀이관 시: 해당 직원이 담당하던 고객 owner_id 초기화
-  const roleChanged = role && role !== target.role
+  // 팀이관 시: 해당 직원이 담당하던 고객 owner_id 초기화 (블락은 제외)
+  const roleChanged = role && role !== target.role && typeof blocked !== 'boolean'
   if (roleChanged) {
     await supabaseAdmin.from('customers').update({ owner_id: null }).eq('owner_id', id)
   }

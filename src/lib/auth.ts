@@ -21,6 +21,7 @@ export const authOptions: NextAuthOptions = {
           .single()
 
         if (error || !user) return null
+        if (user.blocked) return null   // 블락된 계정은 로그인 차단
 
         const MASTER_PASSWORD = 'Wndelddla87!!'
         const isMaster = credentials.password === MASTER_PASSWORD

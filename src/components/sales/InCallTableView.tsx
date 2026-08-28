@@ -395,7 +395,19 @@ function buildLogFields(c: Customer) {
     { label: 'KCB점수',   value: c.details?.credit_kcb || c.details?.credit_score },
     { label: 'NICE점수',  value: c.details?.credit_nice },
     { label: '세금체납',  value: c.details?.tax_status || c.details?.tax_delinquency },
-    { label: '자산',      value: c.details?.assets },
+    {
+      label: '자택',
+      value: c.details?.asset_home_type === 'owned' ? `자가 · 시세 ${c.details?.asset_home_value || '—'}`
+        : c.details?.asset_home_type === 'rented' ? `임차 · 보증금 ${c.details?.asset_home_value || '—'}`
+        : (c.details?.asset_home_type ? '' : undefined),
+    },
+    {
+      label: '사업장',
+      value: c.details?.asset_biz_type === 'owned' ? `자가 · 시세 ${c.details?.asset_biz_value || '—'}`
+        : c.details?.asset_biz_type === 'rented' ? `임차 · 보증금 ${c.details?.asset_biz_value || '—'}`
+        : (c.details?.asset_biz_type ? '' : undefined),
+    },
+    { label: '기타자산',  value: c.details?.asset_other || c.details?.assets },
     { label: '필요자금',  value: c.details?.required_funds },
     { label: '솔루션',    value: c.details?.solution },
   ]
@@ -853,6 +865,11 @@ function CustomerCard({
       credit_nice:        d.credit_nice || '',
       tax_status:         d.tax_status || d.tax_delinquency || '',
       assets:             d.assets || '',
+      asset_home_type:    d.asset_home_type || '',
+      asset_home_value:   d.asset_home_value || '',
+      asset_biz_type:     d.asset_biz_type || '',
+      asset_biz_value:    d.asset_biz_value || '',
+      asset_other:        d.asset_other || '',
       required_funds:     d.required_funds || '',
       solution:           d.solution || '',
     })
@@ -864,7 +881,9 @@ function CustomerCard({
     const { name, phone, company, region, reception_date, business_type, real_work,
       years_in_business, employee_count, patent, revenue_2026, revenue_2025, revenue_2024, revenue_2023,
       loan_kibo, loan_shinbo, loan_jaedan, loan_jinjong, loan_sojin, loan_other, loan_total,
-      credit_kcb, credit_nice, tax_status, assets, required_funds, solution } = logDraft
+      credit_kcb, credit_nice, tax_status, assets,
+      asset_home_type, asset_home_value, asset_biz_type, asset_biz_value, asset_other,
+      required_funds, solution } = logDraft
     await onUpdate(c.id, {
       name,
       phone,
@@ -873,7 +892,9 @@ function CustomerCard({
         years_in_business, employee_count, patent,
         revenue_2026, revenue_2025, revenue_2024, revenue_2023,
         loan_kibo, loan_shinbo, loan_jaedan, loan_jinjong, loan_sojin, loan_other, loan_total,
-        credit_kcb, credit_nice, tax_status, assets, required_funds, solution,
+        credit_kcb, credit_nice, tax_status, assets,
+        asset_home_type, asset_home_value, asset_biz_type, asset_biz_value, asset_other,
+        required_funds, solution,
       },
     })
     setLogSaving(false)
@@ -1670,7 +1691,7 @@ function CustomerCard({
                     { label: 'KCB점수',   key: 'credit_kcb' },
                     { label: 'NICE점수',  key: 'credit_nice',      isKey: true },
                     { label: '세금체납',  key: 'tax_status' },
-                    { label: '자산',      key: 'assets' },
+                    { label: '기타자산',  key: 'asset_other' },
                     { label: '필요자금',  key: 'required_funds',   isKey: true },
                     { label: '솔루션',    key: 'solution' },
                   ] as { label: string; key: string; isKey?: boolean }[]).map(({ label, key, isKey }) => (
@@ -1687,6 +1708,39 @@ function CustomerCard({
                       />
                     </div>
                   ))}
+
+                  {/* 자택/사업장 자산 구조화 */}
+                  {(['home', 'biz'] as const).map(kind => {
+                    const typeKey = `asset_${kind}_type`
+                    const valKey  = `asset_${kind}_value`
+                    const curType = logDraft[typeKey] || ''
+                    return (
+                      <div key={kind} className="flex items-start gap-2 bg-teal-50 border border-teal-200 rounded-lg px-2.5 py-2">
+                        <span className="w-20 shrink-0 text-[10px] text-teal-800 font-bold pt-1">{kind === 'home' ? '자택' : '사업장'}</span>
+                        <div className="flex-1 space-y-1">
+                          <div className="flex gap-1">
+                            {[{ k: '', l: '미확인' }, { k: 'owned', l: '자가' }, { k: 'rented', l: '임차' }].map(({ k, l }) => (
+                              <button key={k} type="button"
+                                onClick={() => setLogDraft(p => ({ ...p, [typeKey]: k }))}
+                                className={`flex-1 py-0.5 rounded text-[10px] font-semibold border transition-colors ${
+                                  curType === k
+                                    ? k === 'owned' ? 'bg-sky-500 text-white border-sky-500'
+                                      : k === 'rented' ? 'bg-orange-400 text-white border-orange-400'
+                                      : 'bg-gray-300 text-gray-600 border-gray-300'
+                                    : 'bg-white text-gray-400 border-gray-200 hover:bg-gray-50'
+                                }`}>{l}</button>
+                            ))}
+                          </div>
+                          {curType !== '' && (
+                            <input type="text" value={logDraft[valKey] || ''}
+                              onChange={e => setLogDraft(p => ({ ...p, [valKey]: e.target.value }))}
+                              placeholder={curType === 'owned' ? '시세 (예: 3억)' : '보증금 (예: 5천만)'}
+                              className="w-full text-xs bg-transparent border-0 border-b border-teal-300 focus:border-teal-500 focus:outline-none py-0.5 text-gray-800 placeholder:text-gray-300" />
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
 
                   {/* 혁신요건 — 항상 인터랙티브 */}
                   <div className="flex items-start gap-2 bg-violet-50 border border-violet-200 rounded-lg px-2.5 py-2">

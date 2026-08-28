@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
 
   const query = supabaseAdmin
     .from('users')
-    .select('id, name, username, role')
+    .select('id, name, username, role, blocked')
     .order('name')
 
   const finalQuery = role ? query.eq('role', role) : query

@@ -25,6 +25,12 @@ export interface InCallData {
   credit_score: string
   tax_delinquency: string
   assets: string
+  // 자산 구조화 필드
+  asset_home_type: 'owned' | 'rented' | ''   // 자택: 자가 / 임차
+  asset_home_value: string                    // 자가→시세, 임차→보증금
+  asset_biz_type: 'owned' | 'rented' | ''    // 사업장: 자가 / 임차
+  asset_biz_value: string                     // 자가→시세, 임차→보증금
+  asset_other: string                         // 기타 자산
   required_funds: string
   sensitivity: '' | '상' | '중' | '하'
   notes: string
@@ -37,7 +43,11 @@ export function emptyInCallData(): InCallData {
     business_type: '', years_in_business: '', employee_count: '',
     loan_policy: '', loan_kibo: '', loan_credit: '',
     revenue_2026: '', revenue_2025: '', revenue_2024: '', revenue_2023: '',
-    credit_score: '', tax_delinquency: '', assets: '', required_funds: '',
+    credit_score: '', tax_delinquency: '', assets: '',
+    asset_home_type: '', asset_home_value: '',
+    asset_biz_type: '', asset_biz_value: '',
+    asset_other: '',
+    required_funds: '',
     sensitivity: '', notes: '',
   }
 }
@@ -215,10 +225,68 @@ export default function InCallForm({ title, salesUsers, submitting, initialData,
             <input type="text" value={d.tax_delinquency} onChange={e => f('tax_delinquency', e.target.value)}
               className={inp} placeholder="없음" />
           </div>
-          <div>
-            <label className={lbl}>자산</label>
-            <input type="text" value={d.assets} onChange={e => f('assets', e.target.value)}
-              className={inp} placeholder="부동산 2억" />
+          {/* 자산여부 파악 — 자택/사업장 구조화 */}
+          <div className="col-span-4">
+            <label className={lbl} style={{marginBottom: '6px', display: 'block'}}>자산여부 파악</label>
+            <div className="grid grid-cols-2 gap-3">
+              {/* 자택 */}
+              <div className="border border-gray-100 rounded-lg p-2.5 space-y-1.5 bg-gray-50/50">
+                <p className="text-[10px] font-bold text-gray-500">자택</p>
+                <div className="flex gap-1">
+                  {(['', 'owned', 'rented'] as const).map(t => (
+                    <button key={t} type="button"
+                      onClick={() => f('asset_home_type', t)}
+                      className={`flex-1 py-1 rounded text-[10px] font-semibold border transition-colors ${
+                        d.asset_home_type === t
+                          ? t === 'owned' ? 'bg-sky-500 text-white border-sky-500'
+                            : t === 'rented' ? 'bg-orange-400 text-white border-orange-400'
+                            : 'bg-gray-300 text-gray-700 border-gray-300'
+                          : 'bg-white text-gray-400 border-gray-200 hover:bg-gray-50'
+                      }`}>
+                      {t === '' ? '미확인' : t === 'owned' ? '자가' : '임차'}
+                    </button>
+                  ))}
+                </div>
+                {d.asset_home_type !== '' && (
+                  <div>
+                    <label className={lbl}>{d.asset_home_type === 'owned' ? '시세' : '보증금'}</label>
+                    <input type="text" value={d.asset_home_value} onChange={e => f('asset_home_value', e.target.value)}
+                      className={inp} placeholder="예: 3억" />
+                  </div>
+                )}
+              </div>
+              {/* 사업장 */}
+              <div className="border border-gray-100 rounded-lg p-2.5 space-y-1.5 bg-gray-50/50">
+                <p className="text-[10px] font-bold text-gray-500">사업장</p>
+                <div className="flex gap-1">
+                  {(['', 'owned', 'rented'] as const).map(t => (
+                    <button key={t} type="button"
+                      onClick={() => f('asset_biz_type', t)}
+                      className={`flex-1 py-1 rounded text-[10px] font-semibold border transition-colors ${
+                        d.asset_biz_type === t
+                          ? t === 'owned' ? 'bg-sky-500 text-white border-sky-500'
+                            : t === 'rented' ? 'bg-orange-400 text-white border-orange-400'
+                            : 'bg-gray-300 text-gray-700 border-gray-300'
+                          : 'bg-white text-gray-400 border-gray-200 hover:bg-gray-50'
+                      }`}>
+                      {t === '' ? '미확인' : t === 'owned' ? '자가' : '임차'}
+                    </button>
+                  ))}
+                </div>
+                {d.asset_biz_type !== '' && (
+                  <div>
+                    <label className={lbl}>{d.asset_biz_type === 'owned' ? '시세' : '보증금'}</label>
+                    <input type="text" value={d.asset_biz_value} onChange={e => f('asset_biz_value', e.target.value)}
+                      className={inp} placeholder="예: 5천만" />
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="mt-1.5">
+              <label className={lbl}>기타 자산</label>
+              <input type="text" value={d.asset_other} onChange={e => f('asset_other', e.target.value)}
+                className={inp} placeholder="차량, 주식, 기타 보유자산" />
+            </div>
           </div>
           <div>
             <label className={lbl}>필요자금</label>

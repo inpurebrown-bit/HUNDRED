@@ -1471,7 +1471,7 @@ function DuplicateOnlyTab() {
 }
 
 // ─── 직원 관리 섹션 (생성·수정·팀이관) ──────────────────────
-interface EmpRow { id: string; name: string; username: string; role: string }
+interface EmpRow { id: string; name: string; username: string; role: string; blocked?: boolean }
 function EmployeeManageSection() {
   const [employees, setEmployees] = useState<EmpRow[]>([])
   const [loading, setLoading] = useState(false)
@@ -1484,6 +1484,7 @@ function EmployeeManageSection() {
   const [createForm, setCreateForm] = useState({ name: '', username: '', password: '', role: 'sales' as 'sales' | 'ops' | 'dig' })
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
+  const [blockingId, setBlockingId] = useState<string | null>(null)
 
   const roleLabel: Record<string, string> = { sales: '영업팀', ops: '관리팀', dig: '발굴팀', ceo: '대표' }
   const roleBg: Record<string, string> = { sales: 'bg-sky-100 text-sky-700', ops: 'bg-violet-100 text-violet-700', dig: 'bg-orange-100 text-orange-700', ceo: 'bg-amber-100 text-amber-700' }
@@ -1533,6 +1534,25 @@ function EmployeeManageSection() {
     const res = await fetch(`/api/users/${emp.id}`, { method: 'DELETE' })
     if (res.ok) setEmployees(p => p.filter(e => e.id !== emp.id))
     else { const d = await res.json(); alert(`삭제 실패: ${d.error}`) }
+  }
+
+  async function toggleBlock(emp: EmpRow) {
+    const newBlocked = !emp.blocked
+    const label = newBlocked ? '블락' : '블락 해제'
+    if (!confirm(`${emp.name} 계정을 ${label}하시겠습니까?${newBlocked ? '\n\n블락 시 해당 아이디로 로그인이 차단됩니다. (DB는 유지됩니다)' : ''}`)) return
+    setBlockingId(emp.id)
+    const res = await fetch(`/api/users/${emp.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ blocked: newBlocked }),
+    })
+    const data = await res.json()
+    if (res.ok) {
+      setEmployees(p => p.map(e => e.id === emp.id ? { ...e, blocked: data.user.blocked } : e))
+    } else {
+      alert(`${label} 실패: ${data.error}`)
+    }
+    setBlockingId(null)
   }
 
   async function createEmployee() {
@@ -1659,21 +1679,33 @@ function EmployeeManageSection() {
                 </div>
               ) : (
                 /* 기본 행 */
-                <div className="flex items-center gap-4 px-5 py-4">
-                  <div className="w-10 h-10 rounded-xl bg-[#1B2A45]/10 flex items-center justify-center text-sm font-bold text-[#1B2A45] shrink-0">
+                <div className={`flex items-center gap-4 px-5 py-4 ${emp.blocked ? 'bg-gray-50 opacity-70' : ''}`}>
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0 ${emp.blocked ? 'bg-gray-200 text-gray-400' : 'bg-[#1B2A45]/10 text-[#1B2A45]'}`}>
                     {emp.name?.slice(-2) || '??'}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-[#1B2A45] text-sm">{emp.name}</span>
+                      <span className={`font-semibold text-sm ${emp.blocked ? 'text-gray-400 line-through' : 'text-[#1B2A45]'}`}>{emp.name}</span>
                       <span className="text-xs text-gray-400 font-mono">{emp.username}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${roleBg[emp.role] || 'bg-gray-100 text-gray-600'}`}>
-                        {roleLabel[emp.role] || emp.role}
-                      </span>
+                      {emp.blocked ? (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-red-100 text-red-600">블락됨</span>
+                      ) : (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${roleBg[emp.role] || 'bg-gray-100 text-gray-600'}`}>
+                          {roleLabel[emp.role] || emp.role}
+                        </span>
+                      )}
                       {emp.id === newlyCreatedId && <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-green-100 text-green-700">방금 생성</span>}
                     </div>
                   </div>
                   <div className="flex gap-2 shrink-0">
+                    <button onClick={() => toggleBlock(emp)} disabled={blockingId === emp.id}
+                      className={`text-xs px-3 py-1.5 rounded-xl border transition-colors font-medium disabled:opacity-50 ${
+                        emp.blocked
+                          ? 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-transparent hover:border-emerald-200'
+                          : 'text-orange-500 hover:text-orange-700 hover:bg-orange-50 border-transparent hover:border-orange-200'
+                      }`}>
+                      {blockingId === emp.id ? '처리 중...' : emp.blocked ? '해제' : '블락'}
+                    </button>
                     <button onClick={() => openEdit(emp)}
                       className="text-xs text-[#1B2A45] hover:text-[#1B2A45]/80 px-3 py-1.5 rounded-xl hover:bg-[#1B2A45]/10 border border-transparent hover:border-[#1B2A45]/20 transition-colors font-medium">
                       수정

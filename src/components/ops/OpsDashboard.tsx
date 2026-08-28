@@ -1222,7 +1222,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                 title: '신용 / 재무', bg: 'bg-violet-700', textColor: 'text-white',
                 fields: [
                   [['KCB점수', 'credit_kcb', gv('credit_kcb', cd.credit_kcb || cd.credit_score || '')], ['NICE점수', 'credit_nice', gv('credit_nice', cd.credit_nice || '')]],
-                  [['세금체납', 'tax_status', gv('tax_status', cd.tax_status || cd.tax_delinquency || '')], ['자산', 'assets', gv('assets', cd.assets || '')]],
+                  [['세금체납', 'tax_status', gv('tax_status', cd.tax_status || cd.tax_delinquency || '')]],
                   [['26년매출', 'revenue_2026', gv('revenue_2026', cd.revenue_2026 || '')], ['25년매출', 'revenue_2025', gv('revenue_2025', cd.revenue_2025 || '')]],
                   [['24년매출', 'revenue_2024', gv('revenue_2024', cd.revenue_2024 || '')], ['23년매출', 'revenue_2023', gv('revenue_2023', cd.revenue_2023 || '')]],
                   [['필요자금', 'required_funds', gv('required_funds', cd.required_funds || '')], ['솔루션', 'solution', gv('solution', cd.solution || '')]],
@@ -1277,6 +1277,94 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                     </div>
                   </div>
                 ))}
+
+                {/* ── 자산여부 파악 ── */}
+                {(() => {
+                  const homeType  = gv('asset_home_type',  cd.asset_home_type  || '')
+                  const homeVal   = gv('asset_home_value', cd.asset_home_value || '')
+                  const bizType   = gv('asset_biz_type',   cd.asset_biz_type   || '')
+                  const bizVal    = gv('asset_biz_value',  cd.asset_biz_value  || '')
+                  const other     = gv('asset_other',      cd.asset_other      || cd.assets || '')
+                  const TYPES = [{ k: '', l: '미확인' }, { k: 'owned', l: '자가' }, { k: 'rented', l: '임차' }] as const
+                  return (
+                    <div className="mb-0">
+                      <div className="bg-teal-700 px-3 py-1.5">
+                        <span className="text-[10px] font-bold text-white tracking-wide">자산여부 파악</span>
+                      </div>
+                      <div className="px-3 py-2 space-y-2">
+                        {/* 자택 */}
+                        <div>
+                          <span className="text-[10px] text-gray-400 font-medium block mb-1">자택</span>
+                          {incallEditing ? (
+                            <div className="space-y-1">
+                              <div className="flex gap-1">
+                                {TYPES.map(({ k, l }) => (
+                                  <button key={k} type="button" onClick={() => incallField('asset_home_type', k)}
+                                    className={`flex-1 py-0.5 rounded text-[10px] font-semibold border transition-colors ${
+                                      homeType === k
+                                        ? k === 'owned' ? 'bg-sky-500 text-white border-sky-500'
+                                          : k === 'rented' ? 'bg-orange-400 text-white border-orange-400'
+                                          : 'bg-gray-300 text-gray-600 border-gray-300'
+                                        : 'bg-white text-gray-400 border-gray-200 hover:bg-gray-50'
+                                    }`}>{l}</button>
+                                ))}
+                              </div>
+                              {homeType !== '' && (
+                                <input type="text" value={homeVal} onChange={e => incallField('asset_home_value', e.target.value)}
+                                  placeholder={homeType === 'owned' ? '시세 (예: 3억)' : '보증금 (예: 5천만)'}
+                                  className="w-full text-xs font-semibold text-[#1B2A45] bg-transparent border-b border-violet-300 focus:outline-none focus:border-violet-500 px-0.5 py-0" />
+                              )}
+                            </div>
+                          ) : (
+                            <span className={`text-xs font-semibold ${homeType ? 'text-[#1B2A45]' : 'text-gray-300'}`}>
+                              {homeType === 'owned' ? `자가 · 시세 ${homeVal || '—'}` : homeType === 'rented' ? `임차 · 보증금 ${homeVal || '—'}` : '—'}
+                            </span>
+                          )}
+                        </div>
+                        {/* 사업장 */}
+                        <div>
+                          <span className="text-[10px] text-gray-400 font-medium block mb-1">사업장</span>
+                          {incallEditing ? (
+                            <div className="space-y-1">
+                              <div className="flex gap-1">
+                                {TYPES.map(({ k, l }) => (
+                                  <button key={k} type="button" onClick={() => incallField('asset_biz_type', k)}
+                                    className={`flex-1 py-0.5 rounded text-[10px] font-semibold border transition-colors ${
+                                      bizType === k
+                                        ? k === 'owned' ? 'bg-sky-500 text-white border-sky-500'
+                                          : k === 'rented' ? 'bg-orange-400 text-white border-orange-400'
+                                          : 'bg-gray-300 text-gray-600 border-gray-300'
+                                        : 'bg-white text-gray-400 border-gray-200 hover:bg-gray-50'
+                                    }`}>{l}</button>
+                                ))}
+                              </div>
+                              {bizType !== '' && (
+                                <input type="text" value={bizVal} onChange={e => incallField('asset_biz_value', e.target.value)}
+                                  placeholder={bizType === 'owned' ? '시세 (예: 2억)' : '보증금 (예: 3천만)'}
+                                  className="w-full text-xs font-semibold text-[#1B2A45] bg-transparent border-b border-violet-300 focus:outline-none focus:border-violet-500 px-0.5 py-0" />
+                              )}
+                            </div>
+                          ) : (
+                            <span className={`text-xs font-semibold ${bizType ? 'text-[#1B2A45]' : 'text-gray-300'}`}>
+                              {bizType === 'owned' ? `자가 · 시세 ${bizVal || '—'}` : bizType === 'rented' ? `임차 · 보증금 ${bizVal || '—'}` : '—'}
+                            </span>
+                          )}
+                        </div>
+                        {/* 기타 */}
+                        <div>
+                          <span className="text-[10px] text-gray-400 font-medium block mb-1">기타 자산</span>
+                          {incallEditing ? (
+                            <input type="text" value={other} onChange={e => incallField('asset_other', e.target.value)}
+                              placeholder="차량, 주식, 기타"
+                              className="w-full text-xs font-semibold text-[#1B2A45] bg-transparent border-b border-violet-300 focus:outline-none focus:border-violet-500 px-0.5 py-0" />
+                          ) : (
+                            <span className={`text-xs font-semibold ${other ? 'text-[#1B2A45]' : 'text-gray-300'}`}>{other || '—'}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
 
                 {/* ── 혁신성장촉진자금 ── */}
                 <div className="mb-0">
@@ -2428,6 +2516,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
   onSave?: (id: string, patch: Record<string, any>) => void
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+  const [searchQuery, setSearchQuery] = useState('')
 
   // 플래그 분류 헬퍼
   const isHolding  = (c: OpsCase) => !!(c.details?.is_holding)
@@ -2485,9 +2574,87 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
     return UPCOMING_STAGES.has(stage)
   }
 
+  // 검색 필터 적용 (항상 그룹 구조는 유지, 표시 여부만 필터)
+  const q = searchQuery.trim().toLowerCase()
+  const matchesSearch = (c: OpsCase) => {
+    if (!q) return true
+    const company = (c.customers?.company || c.customers?.name || '').toLowerCase()
+    const rep = (c.customers?.representative || '').toLowerCase()
+    return company.includes(q) || rep.includes(q)
+  }
+
+  // 미니맵 통계 (검색 전 전체 기준)
+  const totalRegular = regularCases.filter(c => c.institution && c.institution.trim() !== '')
+  const activeCount  = totalRegular.filter(c => {
+    const inst = (c.institution || '').split(',')[0].trim()
+    return !isUpcoming(c, inst)
+  }).length
+  const upcomingCount = totalRegular.filter(c => {
+    const inst = (c.institution || '').split(',')[0].trim()
+    return isUpcoming(c, inst)
+  }).length
+  const newInflowCount = unassigned.length
+  const stage1Count = unassigned.filter(c => (c.details?.absorption_stage ?? 1) !== 2).length
+  const stage2Count = unassigned.filter(c => (c.details?.absorption_stage ?? 1) === 2).length
+
+  // 전체 그룹 키 목록 (expand/collapse all)
+  const allGroupKeys = instGroups.map(g => g.inst)
+  const allCollapsed = allGroupKeys.every(k => collapsed[k])
+
   return (
-    <div className="space-y-4">
-      {instGroups.map(({ inst, items }) => {
+    <div className="space-y-3">
+      {/* 미니맵 요약 */}
+      <div className="flex flex-wrap gap-2 bg-white border border-[#E8E2D4] rounded-xl px-4 py-3">
+        <span className="text-[10px] font-bold text-gray-400 self-center mr-1">현황</span>
+        <span className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-semibold px-2.5 py-1 rounded-full">
+          진행중 <span className="bg-emerald-500 text-white rounded-full px-1.5 py-0.5 text-[10px] leading-none">{activeCount}</span>
+        </span>
+        <span className="inline-flex items-center gap-1 bg-gray-50 border border-gray-200 text-gray-500 text-[11px] font-semibold px-2.5 py-1 rounded-full">
+          대기중 <span className="bg-gray-400 text-white rounded-full px-1.5 py-0.5 text-[10px] leading-none">{upcomingCount}</span>
+        </span>
+        <span className="inline-flex items-center gap-1 bg-sky-50 border border-sky-200 text-sky-700 text-[11px] font-semibold px-2.5 py-1 rounded-full">
+          1차흡수 <span className="bg-sky-500 text-white rounded-full px-1.5 py-0.5 text-[10px] leading-none">{stage1Count}</span>
+        </span>
+        <span className="inline-flex items-center gap-1 bg-orange-50 border border-orange-200 text-orange-700 text-[11px] font-semibold px-2.5 py-1 rounded-full">
+          2차흡수 <span className="bg-orange-500 text-white rounded-full px-1.5 py-0.5 text-[10px] leading-none">{stage2Count}</span>
+        </span>
+        {holdingCases.length > 0 && (
+          <span className="inline-flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-700 text-[11px] font-semibold px-2.5 py-1 rounded-full">
+            홀딩 <span className="bg-amber-500 text-white rounded-full px-1.5 py-0.5 text-[10px] leading-none">{holdingCases.length}</span>
+          </span>
+        )}
+        {handlingCases.length > 0 && (
+          <span className="inline-flex items-center gap-1 bg-rose-50 border border-rose-200 text-rose-700 text-[11px] font-semibold px-2.5 py-1 rounded-full">
+            핸들링 <span className="bg-rose-500 text-white rounded-full px-1.5 py-0.5 text-[10px] leading-none">{handlingCases.length}</span>
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="업체명 검색..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 w-36 focus:outline-none focus:border-[#1B2A45]/40 bg-gray-50"
+          />
+          <button
+            onClick={() => {
+              if (allCollapsed) {
+                setCollapsed({})
+              } else {
+                setCollapsed(Object.fromEntries(allGroupKeys.map(k => [k, true])))
+              }
+            }}
+            className="text-[11px] border border-gray-200 bg-white px-2.5 py-1.5 rounded-lg text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors whitespace-nowrap"
+          >
+            {allCollapsed ? '전체 열기' : '전체 닫기'}
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+      {instGroups.map(({ inst, items: rawItems }) => {
+        const items = rawItems.filter(matchesSearch)
+        if (q && items.length === 0) return null
         const isIndirect = INDIRECT_SET.has(inst)
         const isOpen = !collapsed[inst]
         const isSpecial = inst === '신규 유입' || inst === '대표 승인 대기' || inst === '핸들링' || inst === '홀딩'
@@ -2581,9 +2748,22 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
                     })()}
                   </div>
                 </div>
+              ) : isSpecial ? (
+                // 핸들링/홀딩/대표승인대기: 단순 그리드 (다음자금 없음)
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  {items.map(c => (
+                    <OpsCard
+                      key={`${inst}-${c.id}`}
+                      c={c}
+                      isOpen={openPanelIds.includes(c.id)}
+                      onToggle={onToggle}
+                      onScriptToggle={onScriptToggle}
+                    />
+                  ))}
+                </div>
               ) : (
+                // 기관 그룹: 진행 / 다음자금대기 좌우 분리
                 <div className="flex gap-0 items-start">
-                  {/* 진행 중 카드 — 항상 w-1/2 고정 */}
                   <div className="w-1/2 min-w-0 pr-3">
                     {activeItems.length > 0 ? (
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
@@ -2601,7 +2781,6 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
                       <div className="h-full min-h-[40px]" />
                     )}
                   </div>
-                  {/* 다음 자금 대기 — 항상 w-1/2 고정, 분리선 항상 표시 */}
                   <div className="w-1/2 min-w-0 border-l-2 border-dashed border-gray-200 pl-3">
                     <p className="text-[9px] font-bold text-gray-400 mb-1.5 uppercase tracking-wide">다음 자금 대기</p>
                     {upcomingItems.length > 0 ? (
@@ -2626,6 +2805,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
           </div>
         )
       })}
+      </div>
     </div>
   )
 }
@@ -3626,7 +3806,13 @@ function OpsReportTab({ userId, userName, activeCases }: { userId: string; userN
 
   // 자동 계산 — 흡수 현황
   const UPCOMING_STAGES = new Set(['', '미선택', '서류받는중', '접수전'])
-  const newInflow = activeCases.filter(c => !c.institution || c.institution.trim() === '')
+  // 진행중업체 기준과 동일: pending/holding/handling 제외
+  const _isHoldingR = (c: OpsCase) => !!(c.details?.is_holding)
+  const _isHandlingR = (c: OpsCase) => !!(c.details?.handling_no_contact || c.details?.handling_no_fit || c.details?.handling_mindless)
+  const regularActive = activeCases.filter(c =>
+    !PENDING_REFUND_KEYS.has(c.progress_stage) && !PENDING_DONE_KEYS.has(c.progress_stage) && !_isHoldingR(c) && !_isHandlingR(c)
+  )
+  const newInflow = regularActive.filter(c => !c.institution || c.institution.trim() === '')
   const stage1Cases = newInflow.filter(c => (c.details?.absorption_stage ?? 1) !== 2)
   const stage2Cases = newInflow.filter(c => (c.details?.absorption_stage ?? 1) === 2)
 
