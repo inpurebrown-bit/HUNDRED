@@ -319,12 +319,13 @@ function isUpcoming(c: OpsCase, inst: string): boolean {
   return UPCOMING_STAGES.has(stage)
 }
 
-function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle, onApprove }: {
+function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle, onApprove, onSave }: {
   cases: OpsCase[]
   openPanelIds: string[]
   onToggle: (id: string) => void
   onScriptToggle: (id: string, val: boolean) => void
   onApprove: (id: string, action: 'approve' | 'reject') => void
+  onSave?: (id: string, patch: Record<string, any>) => void
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
@@ -393,8 +394,56 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
               <span className="text-white/60 text-xs">{isOpen ? '▲' : '▼'}</span>
             </button>
             {isOpen && (
-              isSpecial ? (
-                // 특수 그룹: 단순 그리드
+              inst === '신규 유입' ? (
+                // 신규유입: 1차흡수 대기 / 2차흡수 대기 좌우 분리
+                <div className="flex gap-0 items-start">
+                  <div className="w-1/2 min-w-0 pr-3">
+                    <p className="text-[9px] font-bold text-sky-500 mb-1.5 uppercase tracking-wide">1차흡수 대기</p>
+                    {(() => {
+                      const s1 = items.filter(c => (c.details?.absorption_stage ?? 1) !== 2)
+                      return s1.length > 0 ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                          {s1.map(c => (
+                            <div key={`신규-1-${c.id}`} className="relative group">
+                              <CeoCaseCard c={c} isOpen={openPanelIds.includes(c.id)} onToggle={onToggle} onScriptToggle={onScriptToggle} />
+                              <button
+                                onClick={e => { e.stopPropagation(); onSave?.(c.id, { details: { ...(c.details || {}), absorption_stage: 2 } }) }}
+                                className="absolute bottom-1 right-1 text-[8px] bg-orange-100 text-orange-600 border border-orange-300 rounded px-1.5 py-0.5 font-bold opacity-0 group-hover:opacity-100 transition-opacity hover:bg-orange-200">
+                                2차 →
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-gray-300 italic">없음</p>
+                      )
+                    })()}
+                  </div>
+                  <div className="w-1/2 min-w-0 border-l-2 border-dashed border-orange-200 pl-3">
+                    <p className="text-[9px] font-bold text-orange-500 mb-1.5 uppercase tracking-wide">2차흡수 대기</p>
+                    {(() => {
+                      const s2 = items.filter(c => (c.details?.absorption_stage ?? 1) === 2)
+                      return s2.length > 0 ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                          {s2.map(c => (
+                            <div key={`신규-2-${c.id}`} className="relative group">
+                              <CeoCaseCard c={c} isOpen={openPanelIds.includes(c.id)} onToggle={onToggle} onScriptToggle={onScriptToggle} />
+                              <button
+                                onClick={e => { e.stopPropagation(); onSave?.(c.id, { details: { ...(c.details || {}), absorption_stage: 1 } }) }}
+                                className="absolute bottom-1 right-1 text-[8px] bg-sky-100 text-sky-600 border border-sky-200 rounded px-1.5 py-0.5 font-bold opacity-0 group-hover:opacity-100 transition-opacity hover:bg-sky-200">
+                                ← 1차
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-gray-300 italic">없음</p>
+                      )
+                    })()}
+                  </div>
+                </div>
+              ) : isSpecial ? (
+                // 기타 특수 그룹: 단순 그리드
                 <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
                   {items.map(c => (
                     <CeoCaseCard key={`${inst}-${c.id}`} c={c} isOpen={openPanelIds.includes(c.id)} onToggle={onToggle} onScriptToggle={onScriptToggle} onApprove={isPending ? onApprove : undefined} />
@@ -1033,14 +1082,14 @@ export default function OpsCeoTab() {
       ) : loading ? (
         <div className="text-center py-12 text-gray-400">불러오는 중...</div>
       ) : view === 'active' ? (
-        <InstitutionGroupedView cases={activeCases} openPanelIds={openPanelIds} onToggle={togglePanel} onScriptToggle={handleScriptToggle} onApprove={handleApprove} />
+        <InstitutionGroupedView cases={activeCases} openPanelIds={openPanelIds} onToggle={togglePanel} onScriptToggle={handleScriptToggle} onApprove={handleApprove} onSave={handleSave} />
       ) : view === 'expired' ? (
         expiredCases.length === 0 ? (
           <div className="bg-white rounded-xl border border-[#E8E2D4] p-12 text-center text-gray-400 text-sm">계약기간 만료 업체가 없습니다</div>
         ) : (
           <>
             <p className="text-xs text-orange-500 mb-2">계약일로부터 1년 경과한 진행중 업체 ({expiredCases.length}건)</p>
-            <InstitutionGroupedView cases={expiredCases} openPanelIds={openPanelIds} onToggle={togglePanel} onScriptToggle={handleScriptToggle} onApprove={handleApprove} />
+            <InstitutionGroupedView cases={expiredCases} openPanelIds={openPanelIds} onToggle={togglePanel} onScriptToggle={handleScriptToggle} onApprove={handleApprove} onSave={handleSave} />
           </>
         )
       ) : view === 'newdb' ? (
