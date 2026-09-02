@@ -1008,6 +1008,121 @@ function OpsTab() {
   )
 }
 
+// ─── 관리실장 김윤지 현황 카드 ───────────────────────────
+function KimYunjiCard({ totalOpsRevenue, putoContractCount, fmt }: {
+  totalOpsRevenue: number
+  putoContractCount: number
+  fmt: (n: number) => string
+}) {
+  const [targetRevenue, setTargetRevenue] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0
+    return Number(localStorage.getItem('mgr-target-revenue') || 0)
+  })
+  const [targetContracts, setTargetContracts] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0
+    return Number(localStorage.getItem('mgr-target-contracts') || 0)
+  })
+  const [editingRevenue, setEditingRevenue] = useState(false)
+  const [editingContracts, setEditingContracts] = useState(false)
+  const [tempRevenue, setTempRevenue] = useState('')
+  const [tempContracts, setTempContracts] = useState('')
+
+  // 수수료매출 = ops 총매출 × 10%
+  const commissionRevenue = Math.round(totalOpsRevenue * 0.1)
+
+  const putoContracts = putoContractCount
+
+  function saveTargetRevenue() {
+    const v = Number(tempRevenue.replace(/[^0-9]/g, ''))
+    setTargetRevenue(v)
+    localStorage.setItem('mgr-target-revenue', String(v))
+    setEditingRevenue(false)
+  }
+  function saveTargetContracts() {
+    const v = Number(tempContracts.replace(/[^0-9]/g, ''))
+    setTargetContracts(v)
+    localStorage.setItem('mgr-target-contracts', String(v))
+    setEditingContracts(false)
+  }
+
+  const revenueProgress = targetRevenue > 0 ? Math.min(100, Math.round((commissionRevenue / targetRevenue) * 100)) : 0
+  const contractProgress = targetContracts > 0 ? Math.min(100, Math.round((putoContracts / targetContracts) * 100)) : 0
+
+  return (
+    <div className="bg-gradient-to-br from-teal-50 to-emerald-50 rounded-xl border border-teal-200 p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <div className="w-7 h-7 rounded-full bg-teal-500 flex items-center justify-center text-white text-xs font-bold">김</div>
+        <h3 className="text-sm font-semibold text-teal-900">관리실장 김윤지 현황</h3>
+        <span className="text-xs text-teal-500 bg-teal-100 px-2 py-0.5 rounded-full">수수료 10% · 뿌토 40%</span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        {/* 수수료 매출 */}
+        <div className="bg-white rounded-lg p-4 border border-teal-100">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs text-gray-500">수수료매출 (관리팀 × 10%)</p>
+            <button onClick={() => { setTempRevenue(String(targetRevenue)); setEditingRevenue(true) }}
+              className="text-[10px] text-teal-400 hover:text-teal-600">목표 설정</button>
+          </div>
+          <p className="text-lg font-bold text-teal-700">{fmt(commissionRevenue)}원</p>
+          {editingRevenue ? (
+            <div className="flex gap-1 mt-2">
+              <input autoFocus type="text" value={tempRevenue} onChange={e => setTempRevenue(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveTargetRevenue(); if (e.key === 'Escape') setEditingRevenue(false) }}
+                className="flex-1 border border-teal-200 rounded px-2 py-1 text-xs"
+                placeholder="목표 금액 (원)" />
+              <button onClick={saveTargetRevenue} className="px-2 py-1 bg-teal-500 text-white rounded text-xs">저장</button>
+            </div>
+          ) : targetRevenue > 0 ? (
+            <div className="mt-2">
+              <div className="flex justify-between text-[10px] text-gray-400 mb-0.5">
+                <span>목표 {fmt(targetRevenue)}원</span>
+                <span>{revenueProgress}%</span>
+              </div>
+              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full bg-teal-400 rounded-full transition-all" style={{ width: `${revenueProgress}%` }} />
+              </div>
+            </div>
+          ) : (
+            <p className="text-[10px] text-gray-300 mt-1">목표 미설정</p>
+          )}
+        </div>
+
+        {/* 뿌토 계약 */}
+        <div className="bg-white rounded-lg p-4 border border-teal-100">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs text-gray-500">뿌토 계약 (진행중)</p>
+            <button onClick={() => { setTempContracts(String(targetContracts)); setEditingContracts(true) }}
+              className="text-[10px] text-teal-400 hover:text-teal-600">목표 설정</button>
+          </div>
+          <p className="text-lg font-bold text-emerald-700">{putoContracts}건</p>
+          {editingContracts ? (
+            <div className="flex gap-1 mt-2">
+              <input autoFocus type="text" value={tempContracts} onChange={e => setTempContracts(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveTargetContracts(); if (e.key === 'Escape') setEditingContracts(false) }}
+                className="flex-1 border border-teal-200 rounded px-2 py-1 text-xs"
+                placeholder="목표 계약 건수" />
+              <button onClick={saveTargetContracts} className="px-2 py-1 bg-teal-500 text-white rounded text-xs">저장</button>
+            </div>
+          ) : targetContracts > 0 ? (
+            <div className="mt-2">
+              <div className="flex justify-between text-[10px] text-gray-400 mb-0.5">
+                <span>목표 {targetContracts}건</span>
+                <span>{contractProgress}%</span>
+              </div>
+              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full bg-emerald-400 rounded-full transition-all" style={{ width: `${contractProgress}%` }} />
+              </div>
+            </div>
+          ) : (
+            <p className="text-[10px] text-gray-300 mt-1">목표 미설정</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── 매출 관리 ───────────────────────────────────────────
 function RevenueTab() {
   const [data, setData] = useState<any>(null)
@@ -1456,6 +1571,9 @@ function RevenueTab() {
           )}
         </div>
       </div>
+
+      {/* 관리실장 김윤지 현황 */}
+      <KimYunjiCard totalOpsRevenue={data.totalOps || 0} putoContractCount={data.putoContractCount || 0} fmt={fmt} />
     </div>
   )
 }

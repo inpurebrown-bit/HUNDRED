@@ -272,6 +272,11 @@ export async function GET(req: NextRequest) {
   const totalSales = salesEntries.reduce((s, e) => s + e.amount, 0)
   const totalOps   = opsEntries.reduce((s, e) => s + e.amount, 0)
 
+  // 뿌토 계약 건수 (puto_contract_amount 있는 ops_cases)
+  const putoContractCount = (opsCases || []).filter((c: any) =>
+    parseMoney(c.details?.puto_contract_amount) > 0
+  ).length
+
   return NextResponse.json({
     monthly,
     salesByUser: Object.values(salesByUser),
@@ -279,6 +284,7 @@ export async function GET(req: NextRequest) {
     totalSales,
     totalOps,
     total: totalSales + totalOps,
+    putoContractCount,
     thisMonthSales,
     thisMonthOps,
     thisMonthOpsContracts,
