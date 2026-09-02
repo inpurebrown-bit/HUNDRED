@@ -1840,16 +1840,24 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                               : parseComma(String(d.fee_amount)))}원
                           </span>
                         </div>
-                        <div className="flex items-center gap-1.5 pt-0.5">
+                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                          {d.fee_payment_type === 'card' && (
+                            <span className="text-[9px] bg-violet-50 text-violet-600 px-1.5 py-0.5 rounded font-bold">카드결제</span>
+                          )}
                           {d.tax_invoice_requested
                             ? <span className="text-[9px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded font-bold">계산서 희망</span>
                             : <span className="text-[9px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded font-bold">계산서 불필요</span>
                           }
-                          {d.tax_invoice_requested && (
-                            d.tax_invoice_issued
-                              ? <span className="text-[9px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-bold">발급 완료</span>
-                              : <span className="text-[9px] bg-red-50 text-red-500 px-1.5 py-0.5 rounded font-bold">발급 대기</span>
-                          )}
+                          {d.tax_invoice_issued
+                            ? <span className="text-[9px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-bold">발급 완료</span>
+                            : (
+                              <button type="button"
+                                onClick={() => detailField('tax_invoice_issued', true)}
+                                className="text-[9px] bg-red-50 text-red-500 px-1.5 py-0.5 rounded font-bold hover:bg-red-100 border border-red-200">
+                                발급 대기 → 완료
+                              </button>
+                            )
+                          }
                         </div>
                       </div>
                     )}
@@ -1919,14 +1927,30 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                           미희망
                         </button>
                       </div>
-                      {d.tax_invoice_requested === true && (
-                        <label className="flex items-center gap-2 cursor-pointer select-none pl-1">
-                          <input type="checkbox" checked={!!d.tax_invoice_issued}
-                            onChange={e => detailField('tax_invoice_issued', e.target.checked)}
-                            className="w-3.5 h-3.5 accent-emerald-500" />
-                          <span className="text-xs font-semibold text-emerald-700">발급 완료</span>
-                        </label>
-                      )}
+                      {/* 결제수단: 카드면 세금계산서 자동발급 처리 */}
+                      <div className="flex gap-1.5">
+                        <button type="button"
+                          onClick={() => detailField('fee_payment_type', 'cash')}
+                          className={`flex-1 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                            d.fee_payment_type !== 'card'
+                              ? 'bg-violet-500 text-white border-violet-500'
+                              : 'bg-white text-gray-500 border-gray-300 hover:border-violet-400 hover:text-violet-600'
+                          }`}>현금</button>
+                        <button type="button"
+                          onClick={() => detailFields({ fee_payment_type: 'card', tax_invoice_issued: true })}
+                          className={`flex-1 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                            d.fee_payment_type === 'card'
+                              ? 'bg-violet-500 text-white border-violet-500'
+                              : 'bg-white text-gray-500 border-gray-300 hover:border-violet-400 hover:text-violet-600'
+                          }`}>카드 (계산서 자동)</button>
+                      </div>
+                      {/* 발급완료: 희망·미희망 구분 없이 항상 표시 */}
+                      <label className="flex items-center gap-2 cursor-pointer select-none pl-1">
+                        <input type="checkbox" checked={!!d.tax_invoice_issued}
+                          onChange={e => detailField('tax_invoice_issued', e.target.checked)}
+                          className="w-3.5 h-3.5 accent-emerald-500" />
+                        <span className="text-xs font-semibold text-emerald-700">발급 완료</span>
+                      </label>
                     </div>
                     {/* 실제입금액 */}
                     <div className="col-span-2">
@@ -2085,20 +2109,32 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                     {/* 세금계산서 */}
                     <div className="col-span-2 space-y-1.5">
                       {entryLocked ? (
-                        /* 잠금 상태: 읽기전용 표시 */
-                        <div className="flex items-center gap-1.5">
+                        /* 잠금 상태: 읽기전용 표시 + 발급완료 버튼 */
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {entry.payment_type === 'card' && (
+                            <span className="text-[9px] bg-violet-50 text-violet-600 px-1.5 py-0.5 rounded font-bold">카드결제</span>
+                          )}
                           {entry.tax_invoice_requested
                             ? <span className="text-[9px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded font-bold">계산서 희망</span>
                             : <span className="text-[9px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded font-bold">계산서 불필요</span>
                           }
-                          {entry.tax_invoice_requested && (
-                            entry.tax_invoice_issued
-                              ? <span className="text-[9px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-bold">발급 완료</span>
-                              : <span className="text-[9px] bg-red-50 text-red-500 px-1.5 py-0.5 rounded font-bold">발급 대기</span>
-                          )}
+                          {entry.tax_invoice_issued
+                            ? <span className="text-[9px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-bold">발급 완료</span>
+                            : (
+                              <button type="button"
+                                onClick={() => {
+                                  const entries: any[] = [...(d.payment_entries || [])]
+                                  entries[idx] = { ...entries[idx], tax_invoice_issued: true }
+                                  detailField('payment_entries', entries)
+                                }}
+                                className="text-[9px] bg-red-50 text-red-500 px-1.5 py-0.5 rounded font-bold hover:bg-red-100 border border-red-200">
+                                발급 대기 → 완료
+                              </button>
+                            )
+                          }
                         </div>
                       ) : (
-                        /* 편집 상태: 체크박스 */
+                        /* 편집 상태 */
                         <>
                           <p className="text-[10px] text-gray-500 font-medium mb-1">세금계산서</p>
                           <div className="flex gap-1.5">
@@ -2119,7 +2155,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                               onClick={() => {
                                 const entries: any[] = [...(d.payment_entries || [])]
                                 entries[idx] = { ...entries[idx], tax_invoice_requested: false, tax_invoice_issued: false }
-                                detailField('payment_entries', entries)  // entries는 객체라 단일 호출로 OK
+                                detailField('payment_entries', entries)
                               }}
                               className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
                                 entry.tax_invoice_requested === false
@@ -2129,19 +2165,43 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                               미희망
                             </button>
                           </div>
-                          {entry.tax_invoice_requested === true && (
-                            <label className="flex items-center gap-2 cursor-pointer select-none pl-1 mt-1">
-                              <input type="checkbox"
-                                checked={!!entry.tax_invoice_issued}
-                                onChange={e => {
-                                  const entries: any[] = [...(d.payment_entries || [])]
-                                  entries[idx] = { ...entries[idx], tax_invoice_issued: e.target.checked }
-                                  detailField('payment_entries', entries)
-                                }}
-                                className="w-3.5 h-3.5 accent-emerald-500" />
-                              <span className="text-xs font-semibold text-emerald-700">발급 완료</span>
-                            </label>
-                          )}
+                          {/* 결제수단: 카드면 계산서 자동발급 */}
+                          <div className="flex gap-1.5">
+                            <button type="button"
+                              onClick={() => {
+                                const entries: any[] = [...(d.payment_entries || [])]
+                                entries[idx] = { ...entries[idx], payment_type: 'cash' }
+                                detailField('payment_entries', entries)
+                              }}
+                              className={`flex-1 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                                entry.payment_type !== 'card'
+                                  ? 'bg-violet-500 text-white border-violet-500'
+                                  : 'bg-white text-gray-500 border-gray-300 hover:border-violet-400 hover:text-violet-600'
+                              }`}>현금</button>
+                            <button type="button"
+                              onClick={() => {
+                                const entries: any[] = [...(d.payment_entries || [])]
+                                entries[idx] = { ...entries[idx], payment_type: 'card', tax_invoice_issued: true }
+                                detailField('payment_entries', entries)
+                              }}
+                              className={`flex-1 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                                entry.payment_type === 'card'
+                                  ? 'bg-violet-500 text-white border-violet-500'
+                                  : 'bg-white text-gray-500 border-gray-300 hover:border-violet-400 hover:text-violet-600'
+                              }`}>카드 (계산서 자동)</button>
+                          </div>
+                          {/* 발급완료: 희망·미희망 구분 없이 항상 표시 */}
+                          <label className="flex items-center gap-2 cursor-pointer select-none pl-1 mt-1">
+                            <input type="checkbox"
+                              checked={!!entry.tax_invoice_issued}
+                              onChange={e => {
+                                const entries: any[] = [...(d.payment_entries || [])]
+                                entries[idx] = { ...entries[idx], tax_invoice_issued: e.target.checked }
+                                detailField('payment_entries', entries)
+                              }}
+                              className="w-3.5 h-3.5 accent-emerald-500" />
+                            <span className="text-xs font-semibold text-emerald-700">발급 완료</span>
+                          </label>
                         </>
                       )}
                     </div>
