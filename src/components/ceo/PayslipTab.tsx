@@ -123,7 +123,7 @@ function PayslipDocument({ emp, financial, yearMonth }: {
   // ── 관리팀 계산 ──
   const opsCalc = (() => {
     const feeInc    = Math.round(Number(financial.fee_revenue) * 0.10)
-    const putoInc   = Math.round(Number(financial.puto_revenue) * 0.35)
+    const putoInc   = Math.round(Number(financial.puto_revenue) * 0.40)
     const allowSum  = (financial.allowance_details || []).reduce((s, a) => s + Number(a.amount || 0), 0)
     const subtotal  = Number(financial.base_salary) + feeInc + putoInc + Number(financial.ops_performance_bonus) + allowSum
     const beforeTax = subtotal - financial.deduction
@@ -287,8 +287,8 @@ function PayslipDocument({ emp, financial, yearMonth }: {
                 <td className={tdN}>{opsCalc.feeInc > 0 ? fmt(opsCalc.feeInc) : '-'}</td>
               </tr>
               <tr>
-                <td className={tdL}>③ 뿌토 인센(35%)</td>
-                <td className={tdV}>뿌토매출(VAT제외) {fmt(financial.puto_revenue)} × 35%</td>
+                <td className={tdL}>③ 뿌토 인센(40%)</td>
+                <td className={tdV}>뿌토매출(VAT제외) {fmt(financial.puto_revenue)} × 40%</td>
                 <td className={tdN}>{opsCalc.putoInc > 0 ? fmt(opsCalc.putoInc) : '-'}</td>
               </tr>
               <tr>
@@ -1017,11 +1017,11 @@ function OpsFinancialForm({ fin, update }: { fin: EmpFinancial; update: (p: Part
           )}
         </div>
         <div>
-          <label className={lbl}>뿌토매출 VAT제외 (원) <span className="text-gray-400 text-[10px]">인센 35% 자동계산</span></label>
+          <label className={lbl}>뿌토매출 VAT제외 (원) <span className="text-gray-400 text-[10px]">인센 40% 자동계산</span></label>
           <input type="number" value={fin.puto_revenue}
             onChange={e => update({ puto_revenue: Number(e.target.value) })} className={inp} />
           {fin.puto_revenue > 0 && (
-            <p className="text-[10px] text-violet-600 mt-0.5">인센: {Math.round(fin.puto_revenue * 0.35).toLocaleString()}원</p>
+            <p className="text-[10px] text-violet-600 mt-0.5">인센: {Math.round(fin.puto_revenue * 0.40).toLocaleString()}원</p>
           )}
         </div>
       </div>

@@ -40,7 +40,7 @@ interface OtherCosts {
 
 function calcOps(e: OpsEmployee) {
   const feeInc  = Math.round(Number(e.fee_revenue)  * 0.10)
-  const putoInc = Math.round(Number(e.puto_revenue) * 0.35)
+  const putoInc = Math.round(Number(e.puto_revenue) * 0.40)
   const before  = Number(e.base_salary) + feeInc + putoInc + Number(e.performance_bonus)
   const after   = Math.round(before * 0.967)
   return { feeInc, putoInc, before, after }
@@ -177,7 +177,7 @@ function OpsCard({
         <PayRow label="수수료매출(VAT제외)" value={emp.fee_revenue} autoTag />
         <PayRow label="수수료인센(10%)" value={c.feeInc} />
         <PayRow label="뿌토매출(VAT제외)" value={emp.puto_revenue} autoTag />
-        <PayRow label="뿌토인센(35%)" value={c.putoInc} />
+        <PayRow label="뿌토인센(40%)" value={c.putoInc} />
         <PayRow label="성과급" value={emp.performance_bonus} editable onEdit={v => onChange(idx, 'performance_bonus', v)} />
       </div>
     </div>
