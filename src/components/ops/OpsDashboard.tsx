@@ -1254,24 +1254,37 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                     <div className="divide-y divide-gray-50">
                       {sec.fields.map((row, ri) => (
                         <div key={ri} className={`grid gap-0 divide-x divide-gray-50 ${row.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                          {row.map(([label, k, val]: any) => (
-                            <div key={k} className="flex items-center px-3 py-2 hover:bg-gray-50 transition-colors">
-                              <span className="text-[10px] text-gray-400 font-medium w-[58px] shrink-0">{label}</span>
+                          {row.map(([label, k, val]: any) => {
+                            const isLongText = k === 'real_work' || k === 'solution'
+                            return (
+                            <div key={k} className={`flex ${isLongText ? 'items-start' : 'items-center'} px-3 py-2 hover:bg-gray-50 transition-colors`}>
+                              <span className="text-[10px] text-gray-400 font-medium w-[58px] shrink-0 pt-0.5">{label}</span>
                               {incallEditing ? (
-                                <input
-                                  type="text"
-                                  value={k === 'phone' ? autoHyphenPhone(val) : val}
-                                  onChange={e => incallField(k, k === 'phone' ? autoHyphenPhone(e.target.value) : e.target.value)}
-                                  placeholder={k === 'phone' ? '010-0000-0000' : '—'}
-                                  className="flex-1 text-xs font-semibold text-[#1B2A45] bg-transparent border-b border-violet-300 focus:outline-none focus:border-violet-500 px-0.5 py-0"
-                                />
+                                isLongText ? (
+                                  <textarea
+                                    value={val}
+                                    onChange={e => incallField(k, e.target.value)}
+                                    placeholder="—"
+                                    rows={3}
+                                    className="flex-1 text-xs font-semibold text-[#1B2A45] bg-white border border-violet-300 rounded px-1.5 py-1 focus:outline-none focus:border-violet-500 resize-y"
+                                  />
+                                ) : (
+                                  <input
+                                    type="text"
+                                    value={k === 'phone' ? autoHyphenPhone(val) : val}
+                                    onChange={e => incallField(k, k === 'phone' ? autoHyphenPhone(e.target.value) : e.target.value)}
+                                    placeholder={k === 'phone' ? '010-0000-0000' : '—'}
+                                    className="flex-1 text-xs font-semibold text-[#1B2A45] bg-transparent border-b border-violet-300 focus:outline-none focus:border-violet-500 px-0.5 py-0"
+                                  />
+                                )
                               ) : (
-                                <span className={`flex-1 text-xs font-semibold ${val ? 'text-[#1B2A45]' : 'text-gray-300'}`}>
+                                <span className={`flex-1 text-xs font-semibold ${val ? 'text-[#1B2A45]' : 'text-gray-300'} whitespace-pre-wrap break-words`}>
                                   {k === 'phone' ? (val ? formatPhone(val) : '—') : (val || '—')}
                                 </span>
                               )}
                             </div>
-                          ))}
+                            )
+                          })}
                         </div>
                       ))}
                     </div>

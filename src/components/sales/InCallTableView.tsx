@@ -824,6 +824,8 @@ function CustomerCard({
   const [qtContractDate, setQtContractDate] = useState('')
   const [qtPayMethod, setQtPayMethod] = useState<'카드' | '현금' | ''>('')
   const [tlText, setTlText] = useState('')
+  const [tlSaving, setTlSaving] = useState(false)
+  const [tlError, setTlError] = useState('')
   const [tradeOpen, setTradeOpen] = useState(false)
   const [logEditMode, setLogEditMode] = useState(false)
   const [logDraft, setLogDraft] = useState<Record<string, string>>({})
@@ -970,15 +972,24 @@ function CustomerCard({
   }
 
   async function addTimelineEntry() {
-    if (!tlText.trim()) return
+    if (!tlText.trim() || tlSaving) return
+    const savedText = tlText.trim()
     const entry = {
       user: userName,
-      content: tlText.trim(),
+      content: savedText,
       created_at: nowKST(),
     }
     const updated = [...(c.call_timeline || []), entry]
-    setTlText('')
-    await onUpdate(c.id, { call_timeline: updated })
+    setTlSaving(true)
+    setTlError('')
+    try {
+      await onUpdate(c.id, { call_timeline: updated })
+      setTlText('')
+    } catch {
+      setTlError('저장 실패 — 다시 시도해주세요')
+    } finally {
+      setTlSaving(false)
+    }
   }
 
   async function deleteTimelineEntry(reversedIdx: number) {
@@ -1693,20 +1704,33 @@ function CustomerCard({
                     { label: '세금체납',  key: 'tax_status' },
                     { label: '필요자금',  key: 'required_funds',   isKey: true },
                     { label: '솔루션',    key: 'solution' },
-                  ] as { label: string; key: string; isKey?: boolean }[]).map(({ label, key, isKey }) => (
-                    <div key={key} className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 ${
+                  ] as { label: string; key: string; isKey?: boolean }[]).map(({ label, key, isKey }) => {
+                    const isLongText = key === 'real_work' || key === 'solution'
+                    return (
+                    <div key={key} className={`flex items-start gap-2 rounded-lg px-2.5 py-1.5 ${
                       isKey ? 'bg-blue-50 border border-blue-200' : 'bg-white border border-gray-100'
                     }`}>
-                      <span className={`w-20 shrink-0 text-[10px] font-bold ${isKey ? 'text-blue-800' : 'text-blue-600'}`}>{label}</span>
-                      <input
-                        type="text"
-                        value={key === 'phone' ? autoHyphenPhone(logDraft[key] || '') : (logDraft[key] || '')}
-                        onChange={e => setLogDraft(prev => ({ ...prev, [key]: key === 'phone' ? autoHyphenPhone(e.target.value) : e.target.value }))}
-                        className="flex-1 text-xs bg-transparent border-0 border-b border-gray-300 focus:border-blue-400 focus:outline-none py-0.5 text-gray-800 placeholder:text-gray-300"
-                        placeholder={key === 'phone' ? '010-0000-0000' : '—'}
-                      />
+                      <span className={`w-20 shrink-0 text-[10px] font-bold pt-1 ${isKey ? 'text-blue-800' : 'text-blue-600'}`}>{label}</span>
+                      {isLongText ? (
+                        <textarea
+                          value={logDraft[key] || ''}
+                          onChange={e => setLogDraft(prev => ({ ...prev, [key]: e.target.value }))}
+                          rows={3}
+                          className="flex-1 text-xs bg-transparent border border-gray-200 rounded px-2 py-1 focus:border-blue-400 focus:outline-none text-gray-800 placeholder:text-gray-300 resize-y"
+                          placeholder="—"
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={key === 'phone' ? autoHyphenPhone(logDraft[key] || '') : (logDraft[key] || '')}
+                          onChange={e => setLogDraft(prev => ({ ...prev, [key]: key === 'phone' ? autoHyphenPhone(e.target.value) : e.target.value }))}
+                          className="flex-1 text-xs bg-transparent border-0 border-b border-gray-300 focus:border-blue-400 focus:outline-none py-0.5 text-gray-800 placeholder:text-gray-300"
+                          placeholder={key === 'phone' ? '010-0000-0000' : '—'}
+                        />
+                      )}
                     </div>
-                  ))}
+                    )
+                  })}
 
                   {/* 자택/사업장 자산 구조화 */}
                   {(['home', 'biz'] as const).map(kind => {
@@ -2083,24 +2107,26 @@ function CustomerCard({
                   {/* 타임라인 */}
                   <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                     <p className="text-[10px] font-bold text-blue-700 mb-2">타임라인</p>
-                    <div className="flex gap-2 mb-3">
+                    <div className="flex gap-2 mb-1">
                       <input
                         type="text"
                         value={tlText}
-                        onChange={e => setTlText(e.target.value)}
+                        onChange={e => { setTlText(e.target.value); setTlError('') }}
                         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTimelineEntry() } }}
                         placeholder="기록 입력 후 Enter…"
                         className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50"
+                        disabled={tlSaving}
                       />
                       <button
                         type="button"
                         onClick={addTimelineEntry}
-                        disabled={!tlText.trim()}
+                        disabled={!tlText.trim() || tlSaving}
                         className="shrink-0 bg-[#1B2A45] hover:bg-[#243959] disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors"
                       >
-                        추가
+                        {tlSaving ? '저장중…' : '추가'}
                       </button>
                     </div>
+                    {tlError && <p className="text-[10px] text-red-500 mb-2">{tlError}</p>}
                     {c.call_timeline && c.call_timeline.length > 0 ? (
                       <div className="space-y-2">
                         {(c.call_timeline as any[]).slice().reverse().map((entry: any, i: number) => {
