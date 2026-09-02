@@ -540,7 +540,21 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
         setSalesGoals(a(goalsData).sales_goals ?? a(goalsData).goals ?? [])
         setLastMonthGoals(a(lastGoalsData).sales_goals ?? a(lastGoalsData).goals ?? [])
         // config 형식: { month, people: { 이름: { goal, base, supplied } } }
-        setSupplyConfigMap(a(supplyData).config?.people ?? a(supplyData).config ?? {})
+        // 달이 바뀌면 supplied/base는 0으로 초기화 (goal만 유지)
+        {
+          const cfg = a(supplyData).config
+          const people = cfg?.people ?? cfg ?? {}
+          const cfgMonth = cfg?.month
+          if (cfgMonth && cfgMonth !== thisMonthStr) {
+            const goalOnly: Record<string, any> = {}
+            Object.entries(people).forEach(([k, v]: [string, any]) => {
+              if (v && typeof v === 'object') goalOnly[k] = { supplied: 0, base: 0, goal: v.goal ?? 0 }
+            })
+            setSupplyConfigMap(goalOnly)
+          } else {
+            setSupplyConfigMap(people)
+          }
+        }
         // payrate 직원별 공급수: daily_supplies 합계 우선, 없으면 supply_count (급여손익과 동일 로직)
         const calcSupplyCount = (e: any): number => {
           const fromDaily = e.daily_supplies

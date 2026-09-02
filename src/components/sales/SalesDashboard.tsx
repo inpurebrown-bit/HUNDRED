@@ -228,8 +228,18 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
     setContracts(conData.contracts || [])
     setNotices(nData.notices || [])
     const thisMonth = new Date().toISOString().slice(0, 7)
-    if (scData.config?.month === thisMonth) {
-      setSupplyConfig(scData.config.people || {})
+    if (scData.config) {
+      const people = scData.config.people || scData.config
+      if (scData.config.month && scData.config.month !== thisMonth) {
+        // 지난달 config: goal만 유지하고 supplied/base 초기화
+        const goalOnly: Record<string, any> = {}
+        Object.entries(people).forEach(([k, v]: [string, any]) => {
+          if (v && typeof v === 'object') goalOnly[k] = { supplied: 0, base: 0, goal: v.goal ?? 0 }
+        })
+        setSupplyConfig(goalOnly)
+      } else {
+        setSupplyConfig(people)
+      }
     }
 
     // 자금팀 전송된 고객들의 진행현황 조회
