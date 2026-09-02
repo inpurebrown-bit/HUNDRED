@@ -202,7 +202,8 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const [searchQuery, setSearchQuery] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
   const [splitActive, setSplitActive] = useState(false)
-  const [scrollToCustomerId, setScrollToCustomerId] = useState<string | undefined>(undefined)
+  const [scrollTarget, setScrollTarget] = useState<{ id: string; nonce: number } | undefined>(undefined)
+  const scrollToCustomerId = scrollTarget?.id
   // 탭 내부 검색
   const [tabSearchQuery, setTabSearchQuery] = useState('')
 
@@ -718,13 +719,18 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   }
   const q = searchQuery.trim().toLowerCase()
   const searchResults = q.length >= 1
-    ? customers.filter(c =>
-        c.company?.toLowerCase().includes(q) ||
-        c.name?.toLowerCase().includes(q) ||
-        c.phone?.replace(/-/g, '').includes(q.replace(/-/g, '')) ||
-        c.details?.business_type?.toLowerCase().includes(q) ||
-        c.details?.region?.toLowerCase().includes(q)
-      )
+    ? customers.filter(c => {
+        const company = ((c as any).details?.company || c.company || '').toLowerCase()
+        const name = (c.name || '').toLowerCase()
+        const phone = (c.phone || '').replace(/-/g, '')
+        return (
+          company.includes(q) ||
+          name.includes(q) ||
+          phone.includes(q.replace(/-/g, '')) ||
+          (c.details?.business_type || '').toLowerCase().includes(q) ||
+          (c.details?.region || '').toLowerCase().includes(q)
+        )
+      })
     : []
 
   // ── 매출 집계 ──────────────────────────────────────────────
@@ -917,12 +923,12 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                     onClick={() => {
                       const tab = STATUS_TAB[c.status] ?? 'customers'
                       goTab(tab)
-                      setScrollToCustomerId(c.id)
+                      setScrollTarget({ id: c.id, nonce: Date.now() })
                       setSearchQuery('')
                     }}
                     className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors flex items-center justify-between gap-2 border-t border-gray-50">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 truncate">{c.company || '(업체명 없음)'}</p>
+                      <p className="text-sm font-semibold text-gray-800 truncate">{(c as any).details?.company || c.company || '(업체명 없음)'}</p>
                       <p className="text-[11px] text-gray-400 truncate">{c.name} · {c.phone}</p>
                     </div>
                     <span className="shrink-0 text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">
@@ -1471,7 +1477,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 salesUsers={salesUserNames}
                 userName={userName}
                 groupBy={db010GroupBy}
-                scrollToId={scrollToCustomerId}
+                scrollToId={scrollTarget}
                 onUpdate={updateCustomer}
                 onStatusChange={async (id, status) => moveCustomer(id, status as any)}
                 onDelete={async (id) => requestDeleteDb010(id)}
@@ -1537,7 +1543,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 tabType="lead"
                 salesUsers={salesUserNames}
                 userName={userName}
-                scrollToId={scrollToCustomerId}
+                scrollToId={scrollTarget}
                 onUpdate={updateCustomer}
                 onStatusChange={async (id, status) => moveCustomer(id, status as any)}
                 onDelete={async (id) => deleteCustomer(id)}
@@ -1599,7 +1605,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   tabType="contracted"
                   salesUsers={salesUserNames}
                   userName={userName}
-                  scrollToId={scrollToCustomerId}
+                  scrollToId={scrollTarget}
                   onUpdate={updateCustomer}
                   onStatusChange={async (id, status) => moveCustomer(id, status as any)}
                   onDelete={async (id) => deleteCustomer(id)}
@@ -1695,7 +1701,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 salesUsers={salesUserNames}
                 userName={userName}
                 groupBy={emotionalGroupBy}
-                scrollToId={scrollToCustomerId}
+                scrollToId={scrollTarget}
                 onUpdate={updateCustomer}
                 onStatusChange={async (id, status) => moveCustomer(id, status as any)}
                 onDelete={async (id) => deleteCustomer(id)}
@@ -1744,7 +1750,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 tabType="trash"
                 salesUsers={salesUserNames}
                 userName={userName}
-                scrollToId={scrollToCustomerId}
+                scrollToId={scrollTarget}
                 onUpdate={updateCustomer}
                 onStatusChange={async (id, status) => moveCustomer(id, status as any)}
                 onDelete={async (id) => deleteCustomer(id)}

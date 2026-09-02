@@ -160,7 +160,7 @@ export interface Props {
   onMarkDirect?: (id: string) => Promise<void>  // 대표 전용: 공가→직가 전환
   showOwner?: boolean
   groupBy?: 'date' | 'mood'   // db010 전용: 접수날짜별 or 감도별
-  scrollToId?: string          // 이 ID의 카드로 자동 스크롤 + 펼침
+  scrollToId?: { id: string; nonce: number } | string   // 이 ID의 카드로 자동 스크롤 + 펼침
 }
 
 // ── ops 진행단계 스타일 ──────────────────────────────────────────
@@ -1691,7 +1691,6 @@ function CustomerCard({
                     { label: 'KCB점수',   key: 'credit_kcb' },
                     { label: 'NICE점수',  key: 'credit_nice',      isKey: true },
                     { label: '세금체납',  key: 'tax_status' },
-                    { label: '기타자산',  key: 'asset_other' },
                     { label: '필요자금',  key: 'required_funds',   isKey: true },
                     { label: '솔루션',    key: 'solution' },
                   ] as { label: string; key: string; isKey?: boolean }[]).map(({ label, key, isKey }) => (
@@ -1741,6 +1740,18 @@ function CustomerCard({
                       </div>
                     )
                   })}
+
+                  {/* 기타자산 — 자택/사업장 다음 */}
+                  <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-lg px-2.5 py-2">
+                    <span className="w-20 shrink-0 text-[10px] text-teal-800 font-bold">기타자산</span>
+                    <input
+                      type="text"
+                      value={logDraft['asset_other'] || ''}
+                      onChange={e => setLogDraft(p => ({ ...p, asset_other: e.target.value }))}
+                      placeholder="차량, 주식, 기타"
+                      className="flex-1 text-xs bg-transparent border-0 border-b border-teal-300 focus:border-teal-500 focus:outline-none py-0.5 text-gray-800 placeholder:text-gray-300"
+                    />
+                  </div>
 
                   {/* 혁신요건 — 항상 인터랙티브 */}
                   <div className="flex items-start gap-2 bg-violet-50 border border-violet-200 rounded-lg px-2.5 py-2">
@@ -2157,21 +2168,22 @@ export default function InCallTableView({
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   // scrollToId가 바뀌면 해당 카드로 스크롤 + 펼치기
+  const targetId = typeof scrollToId === 'object' ? scrollToId?.id : scrollToId
   useEffect(() => {
-    if (!scrollToId) return
-    setExpandedId(scrollToId)
+    if (!targetId) return
+    setExpandedId(targetId)
     // 렌더링 후 스크롤
     const timer = setTimeout(() => {
-      const el = document.getElementById(`ccard-${scrollToId}`)
+      const el = document.getElementById(`ccard-${targetId}`)
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' })
         // 노란 highlight 효과
         el.classList.add('ring-2', 'ring-[#C5A258]', 'ring-offset-1')
         setTimeout(() => el.classList.remove('ring-2', 'ring-[#C5A258]', 'ring-offset-1'), 2500)
       }
-    }, 120)
+    }, 150)
     return () => clearTimeout(timer)
-  }, [scrollToId])
+  }, [scrollToId])  // scrollToId 객체 자체를 의존: nonce가 바뀌면 항상 재발동
 
   const isMoodGroup = (tabType === 'emotional' && groupBy === 'mood') || (tabType === 'db010' && groupBy === 'mood')
 
