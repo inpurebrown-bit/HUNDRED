@@ -4,10 +4,12 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 
 interface Props {
   onClose: () => void
+  initialUrl?: string
 }
 
-export default function SplitView({ onClose }: Props) {
+export default function SplitView({ onClose, initialUrl }: Props) {
   const [leftWidth, setLeftWidth] = useState(50)
+  const currentUrl = initialUrl ?? (typeof window !== 'undefined' ? window.location.href : '/')
   const dragging = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -77,7 +79,7 @@ export default function SplitView({ onClose }: Props) {
             <span className="text-[9px] text-gray-500 font-medium tracking-widest uppercase">Left Panel</span>
           </div>
           <iframe
-            src="/"
+            src={currentUrl}
             className="flex-1 w-full border-0"
             title="좌측 패널"
             style={{ display: 'block' }}
@@ -103,7 +105,7 @@ export default function SplitView({ onClose }: Props) {
             <span className="text-[9px] text-gray-500 font-medium tracking-widest uppercase">Right Panel</span>
           </div>
           <iframe
-            src="/"
+            src={currentUrl}
             className="flex-1 w-full border-0"
             title="우측 패널"
             style={{ display: 'block' }}
