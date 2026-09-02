@@ -278,7 +278,7 @@ const opsTabs: { key: OpsTab; label: string }[] = [
 ]
 
 // ── Detail Tab Types: 진행현황 우선, 타임라인 진행현황 하단에 통합 ──────────
-const DETAIL_TABS = ['진행현황', '인콜일지', '기관ID/PW', '입금/계약'] as const
+const DETAIL_TABS = ['진행현황', '인콜일지', '기관ID/PW', '입금/계약', '여신구분'] as const
 type DetailTab = typeof DETAIL_TABS[number]
 
 // ──────────────────────────────────────────────────────────────────────
@@ -352,6 +352,199 @@ function TimelineSection({ initialTimeline, onSchedule, userName }: {
             )
           })}
         </div>
+      )}
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// CreditReportTab — 여신구분 탭
+// ──────────────────────────────────────────────────────────────────────
+interface DebtItem {
+  no: number; type: string; loanType: string; institution: string
+  date: string; amountChon: number; amountWan: number; category: string
+  isGuarantee: boolean; skipped?: boolean
+}
+interface CreditReport {
+  name: string; reportDate: string; totalDebt: number
+  items: DebtItem[]
+  summary: Record<string, { totalWan: number; count: number }>
+  annualRevenue?: number
+  savedAt?: string
+}
+
+const CATEGORY_COLOR: Record<string, string> = {
+  '신용대출': 'bg-blue-50 text-blue-700 border-blue-200',
+  '담보대출': 'bg-orange-50 text-orange-700 border-orange-200',
+  '정책자금': 'bg-green-50 text-green-700 border-green-200',
+  '카드론':   'bg-red-50 text-red-600 border-red-200',
+  '현금서비스': 'bg-pink-50 text-pink-700 border-pink-200',
+  '기타':     'bg-gray-50 text-gray-600 border-gray-200',
+}
+
+function won(n: number) {
+  if (!n) return '0원'
+  if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}억원`
+  if (n >= 10_000) return `${Math.round(n / 10_000)}만원`
+  return n.toLocaleString('ko-KR') + '원'
+}
+
+function CreditReportTab({ savedReport, onSaveReport }: {
+  savedReport: CreditReport | null
+  onSaveReport: (r: CreditReport) => void
+}) {
+  const [report, setReport] = useState<CreditReport | null>(savedReport)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+  const [revenue, setRevenue] = useState<string>(
+    savedReport?.annualRevenue ? String(Math.round(savedReport.annualRevenue / 10000)) : ''
+  )
+  const [filterYear, setFilterYear] = useState<string>('전체')
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const annualRevWan = parseInt(revenue.replace(/[^0-9]/g, ''), 10) * 10_000 || 0
+  const totalDebt = report ? report.items.filter(i => !i.skipped).reduce((s, i) => s + i.amountWan, 0) : 0
+  const debtRatio = annualRevWan > 0 ? Math.round((totalDebt / annualRevWan) * 100) : null
+
+  async function handleFile(file: File) {
+    setLoading(true)
+    setErr('')
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/parse-credit-pdf', { method: 'POST', body: fd })
+      const json = await res.json()
+      if (json.error) { setErr('파싱 오류: ' + json.error); return }
+      const newReport: CreditReport = { ...json, annualRevenue: annualRevWan || undefined, savedAt: new Date().toISOString() }
+      setReport(newReport)
+      onSaveReport(newReport)
+    } catch {
+      setErr('업로드 실패')
+    } finally { setLoading(false) }
+  }
+
+  function saveRevenue() {
+    if (!report) return
+    const updated = { ...report, annualRevenue: annualRevWan }
+    setReport(updated)
+    onSaveReport(updated)
+  }
+
+  const activeItems = report ? report.items.filter(i => !i.skipped) : []
+  const years = ['전체', ...Array.from(new Set(activeItems.map(i => i.date.slice(0, 4)))).sort().reverse()]
+  const filtered = filterYear === '전체' ? activeItems : activeItems.filter(i => i.date.startsWith(filterYear))
+
+  const categories = ['신용대출', '담보대출', '정책자금', '카드론', '현금서비스', '기타']
+
+  return (
+    <div className="space-y-4">
+      {/* 업로드 */}
+      <div className="flex items-center gap-2">
+        <input ref={fileRef} type="file" accept="application/pdf" className="hidden"
+          onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = '' }} />
+        <button type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={loading}
+          className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+          {loading ? '분석중…' : '📄 채권자변동정보 PDF 첨부'}
+        </button>
+        {report && (
+          <span className="text-[10px] text-gray-400">
+            {report.name && `${report.name} · `}{report.reportDate && `조회일: ${report.reportDate}`}
+          </span>
+        )}
+        {err && <span className="text-[10px] text-red-500">{err}</span>}
+      </div>
+
+      {report && (
+        <>
+          {/* 매출 입력 + 부채비율 */}
+          <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 shrink-0">연간 매출</span>
+              <div className="flex items-center gap-1 flex-1">
+                <input
+                  type="text" inputMode="numeric"
+                  value={revenue}
+                  onChange={e => setRevenue(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="만원 단위 입력"
+                  className="w-32 text-right text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                />
+                <span className="text-xs text-gray-400">만원</span>
+                <button type="button" onClick={saveRevenue}
+                  className="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-2 py-1 rounded font-semibold transition-colors">
+                  저장
+                </button>
+              </div>
+            </div>
+            <div className="flex gap-3 flex-wrap">
+              <div className="text-xs">
+                <span className="text-gray-400">총 기대출: </span>
+                <span className="font-bold text-gray-700">{won(totalDebt)}</span>
+              </div>
+              {debtRatio !== null && (
+                <div className="text-xs">
+                  <span className="text-gray-400">부채비율: </span>
+                  <span className={`font-bold ${debtRatio >= 700 ? 'text-red-600' : debtRatio >= 400 ? 'text-orange-500' : 'text-emerald-600'}`}>
+                    {debtRatio.toLocaleString()}%
+                    {debtRatio >= 700 && ' ⚠️ 700% 초과'}
+                  </span>
+                </div>
+              )}
+              {annualRevWan > 0 && totalDebt > annualRevWan && (
+                <div className="text-xs">
+                  <span className="font-bold text-red-600">⚠️ 매출 초과차입</span>
+                  <span className="text-gray-400 ml-1">(매출 대비 {Math.round(totalDebt / annualRevWan * 100)}%)</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 카테고리 요약 */}
+          <div className="grid grid-cols-3 gap-2">
+            {categories.map(cat => {
+              const s = report.summary?.[cat]
+              if (!s) return null
+              return (
+                <div key={cat} className={`rounded-lg border p-2 ${CATEGORY_COLOR[cat] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                  <p className="text-[10px] font-bold">{cat}</p>
+                  <p className="text-xs font-semibold mt-0.5">{won(s.totalWan)}</p>
+                  <p className="text-[9px] opacity-70">{s.count}건</p>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* 연도 필터 */}
+          <div className="flex gap-1 flex-wrap">
+            {years.map(y => (
+              <button key={y} type="button"
+                onClick={() => setFilterYear(y)}
+                className={`text-[10px] px-2 py-0.5 rounded font-medium border transition-colors ${
+                  filterYear === y ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-200 hover:border-indigo-400'
+                }`}>{y}</button>
+            ))}
+          </div>
+
+          {/* 상세 목록 */}
+          <div className="space-y-1">
+            {filtered.map((item, idx) => (
+              <div key={idx} className="flex items-center gap-2 text-[11px] py-1.5 border-b border-gray-50 last:border-0">
+                <span className={`shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold border ${CATEGORY_COLOR[item.category] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                  {item.category}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <span className="text-gray-700 font-medium truncate block">{item.institution}</span>
+                  <span className="text-gray-400 text-[9px]">{item.loanType} · {item.date}</span>
+                </div>
+                <span className="shrink-0 font-semibold text-gray-700">{won(item.amountWan)}</span>
+              </div>
+            ))}
+            {filtered.length === 0 && (
+              <p className="text-xs text-gray-400 text-center py-4">데이터 없음</p>
+            )}
+          </div>
+        </>
       )}
     </div>
   )
@@ -2060,6 +2253,18 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── 여신구분 ── */}
+      {activeDetailTab === '여신구분' && (
+        <CreditReportTab
+          savedReport={d.credit_report || null}
+          onSaveReport={(report) => {
+            const merged = { ...(local.details || {}), credit_report: report }
+            setLocal({ ...local, details: merged })
+            onSave(c.id, { details: merged })
+          }}
+        />
       )}
     </div>
   )
