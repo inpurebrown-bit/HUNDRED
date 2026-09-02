@@ -351,6 +351,40 @@ export default function PayrollTab() {
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
   }, [opsEmps, salesEmps, costs, revTotals]) // eslint-disable-line
 
+  // ── 과거 월 계약 목록만 로드 (집계된 계약 표시용, salesEmps/doSave 건드리지 않음) ──
+  // 저장된 contract_count(이미 환수 반영된 값)는 그대로 두고 지급명세 목록만 채움
+  async function loadPastContractMap(ym: string) {
+    try {
+      const custRes = await fetch('/api/customers')
+      const custJson = await custRes.json()
+      const parseMon = (v: any) => parseInt(String(v || '0').replace(/[^0-9]/g, ''), 10) || 0
+      const details: Record<string, Array<{ company: string; amount: number; weight: number; date: string; refund?: boolean }>> = {}
+      ;(custJson.customers || []).forEach((c: any) => {
+        if (c.status !== 'contracted') return
+        const cm = (c.details?.contract_date || c.created_at || '').slice(0, 7)
+        if (cm !== ym) return
+        const name = (c.details?.sales_user_name || c.sales_user_name || '').trim()
+        if (!name) return
+        const rev = parseMon(c.details?.my_revenue) || parseMon(c.details?.payment_amount)
+        const w = contractWeight(c.details?.payment_amount, c.details?.vat_included)
+        if (!details[name]) details[name] = []
+        details[name].push({ company: c.details?.company || c.name || '(업체명 없음)', amount: rev, weight: w > 0 ? w : 1, date: c.details?.contract_date || c.created_at || '' })
+      })
+      // 환수 차감 표시 (목록에만 표시, count 재계산 안 함 — 저장된 값이 이미 반영된 값)
+      ;(custJson.customers || []).forEach((c: any) => {
+        const dedMonth = c.details?.refund_deduction_month
+        if (dedMonth !== ym) return
+        const name = (c.details?.refund_deduction_sales || '').trim()
+        if (!name) return
+        const w = parseFloat(String(c.details?.refund_deduction_weight || 0)) || 0
+        if (w <= 0) return
+        if (!details[name]) details[name] = []
+        details[name].push({ company: `[환불차감] ${c.details?.refund_company || c.details?.company || c.name || ''}`, amount: 0, weight: -w, date: dedMonth, refund: true })
+      })
+      setSalesContractMap(details)
+    } catch { /* 목록 로드 실패해도 계속 */ }
+  }
+
   // ── 전월 불러오기: 고객 DB 실시간 집계 (이달이 아닐 때 사용) ─────────────
   const prevMonthLoad = useCallback(async () => {
     ++loadToken.current  // handleLoad가 진행 중이면 결과 무시하도록 토큰 무효화
@@ -643,10 +677,14 @@ export default function PayrollTab() {
         await autoLoad(freshOps, freshSales, freshCosts)
       } else {
         setMsg('불러오기 완료')
+        await loadPastContractMap(yearMonth)
       }
     } else {
       if (yearMonth === thisMonth()) await autoLoad()
-      else setMsg('저장된 데이터 없음')
+      else {
+        setMsg('저장된 데이터 없음')
+        await loadPastContractMap(yearMonth)
+      }
     }
     didInitLoad.current = true
     setLoading(false)
