@@ -268,6 +268,10 @@ export async function GET(req: NextRequest) {
   const thisMonthOpsContracts  = opsContractEntries.filter(e => e.date?.startsWith(thisMonthKey))
   const lastMonthOps           = opsEntries.filter(e => e.date?.startsWith(lastMonthKey))
   const lastMonthOpsContracts  = opsContractEntries.filter(e => e.date?.startsWith(lastMonthKey))
+  const twoMonthsAgoDate2 = new Date(now.getFullYear(), now.getMonth() - 2, 1)
+  const twoAgoKey = `${twoMonthsAgoDate2.getFullYear()}-${String(twoMonthsAgoDate2.getMonth() + 1).padStart(2, '0')}`
+  const twoAgoOps          = opsEntries.filter(e => e.date?.startsWith(twoAgoKey))
+  const twoAgoOpsContracts = opsContractEntries.filter(e => e.date?.startsWith(twoAgoKey))
 
   const totalSales = salesEntries.reduce((s, e) => s + e.amount, 0)
   const totalOps   = opsEntries.reduce((s, e) => s + e.amount, 0)
@@ -290,6 +294,8 @@ export async function GET(req: NextRequest) {
     thisMonthOpsContracts,
     lastMonthOps,
     lastMonthOpsContracts,
+    twoAgoOps,
+    twoAgoOpsContracts,
     thisMonthKey,
     annualRevenue,
     vatPrevH2: { period: `${lastYear}년 7~12월`, ...vatPrevH2, total_vat: vatPrevH2.sales_vat + vatPrevH2.ops_vat },

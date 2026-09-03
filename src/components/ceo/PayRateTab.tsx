@@ -845,32 +845,7 @@ function PayRateSubView() {
   return (
     <div className="space-y-5 pb-8">
 
-      {/* ─── 이번달 계약 자동집계 (compact) ─── */}
-      {autoStats.length > 0 && (
-        <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2.5 flex items-center gap-3 flex-wrap">
-          <span className="text-[10px] font-bold text-emerald-600 shrink-0">이번달 계약</span>
-          <div className="flex gap-2 flex-wrap flex-1">
-            {autoStats.map(s => (
-              <div key={s.name} className="bg-white rounded-lg px-3 py-1.5 border border-emerald-100 flex items-center gap-1.5">
-                <span className="text-[10px] text-gray-400">{s.name}</span>
-                <span className="text-sm font-black text-emerald-700">
-                  {s.contracted % 1 === 0 ? s.contracted : s.contracted.toFixed(1)}
-                </span>
-                <span className="text-[9px] text-gray-400">건</span>
-              </div>
-            ))}
-            {autoStats.length > 1 && (
-              <div className="bg-emerald-600 rounded-lg px-3 py-1.5 flex items-center gap-1.5">
-                <span className="text-[10px] text-white/70">합계</span>
-                <span className="text-sm font-black text-white">
-                  {paymentCount % 1 === 0 ? paymentCount : paymentCount.toFixed(1)}
-                </span>
-                <span className="text-[9px] text-white/70">건</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+
 
       {/* ─── 👥 직원별 현황 (영업일기준보다 먼저) ─── */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
@@ -930,41 +905,9 @@ function PayRateSubView() {
             </div>
           </div>
         )}
-      </div>
 
-      {/* ─── 📈 영업일 기준 (영업팀) ─── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-gray-800">영업일 기준 <span className="text-violet-500 font-semibold">(영업팀)</span></h3>
-          <span className="text-[11px] text-gray-300">{today}</span>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
-          <NumInput label="인원수"   value={employeeCount} color="gray"     auto unit="명" />
-          <NumInput label="목표개수" value={totTarget || targetCount} color="blue" auto unit="개" />
-          <NumInput label="결제개수" value={paymentCount % 1 === 0 ? paymentCount : Number(paymentCount.toFixed(1))}
-            color="green" auto unit="개" />
-          <div className="bg-slate-50 rounded-2xl px-3 py-2.5 flex flex-col items-center gap-0.5">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">진행 영업일</p>
-            <p className="text-xl font-black text-slate-800 leading-tight">
-              {we}<span className="text-sm text-slate-400 font-normal"> / {tw}일</span>
-            </p>
-            <span className="text-[9px] bg-amber-100 text-amber-600 rounded-full px-1.5 py-0.5 font-semibold">잔여 {remaining}일</span>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-          <NumInput label="예상개수"    value={fmtN(expected)}          color="gray" />
-          <NumInput label="인당이번달"  value={fmtN(expPerPersonMonth)} color="gray" />
-          <NumInput label="인당하루"    value={fmtN(expPerPersonDay)}   color="gray" />
-          <NumInput label="목표인당하루" value={fmtN(tgtPerPersonDay)}  color="blue" />
-          <div className="bg-amber-50 rounded-2xl px-3 py-2.5 flex flex-col items-center gap-1">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-amber-500">진행상태</p>
-            <PaceBadge status={paceStatus} score={paceScore} />
-          </div>
-        </div>
-      </div>
-
-      {/* ─── 🏢 관리팀 매출 + 진행 현황 (통합) ─── */}
-      {(opsRevenue !== null || opsCases.length > 0) && (() => {
+        {/* ─── 관리팀 매출 + 진행 현황 (직원별현황 카드 내 통합) ─── */}
+        {(opsRevenue !== null || opsCases.length > 0) && (() => {
         const INST_LIST = [
           '중진공', '소진공(혁신)', '소진공(신취)', '소진공(재도전)',
           '기보', '신보', '재단', '서민금융(미소)',
@@ -1054,7 +997,7 @@ function PayRateSubView() {
         ].filter(g => g.cases.length > 0)
 
         return (
-          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-4">
+          <div className="border-t border-gray-100 mt-5 pt-5 space-y-4">
             <h3 className="text-sm font-bold text-gray-800">관리팀 현재 매출 &amp; 진행 현황 <span className="text-[11px] text-gray-400 font-normal">({month})</span></h3>
 
             {/* 매출 요약 */}
@@ -1152,6 +1095,7 @@ function PayRateSubView() {
           </div>
         )
       })()}
+      </div>
 
       {/* ─── 저장 ─── */}
       <div className="flex items-center justify-end gap-3">

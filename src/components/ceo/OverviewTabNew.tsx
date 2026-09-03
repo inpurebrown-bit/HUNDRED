@@ -39,6 +39,8 @@ interface RevenueData {
   thisMonthOpsContracts?: { ops_user_name: string; amount: number }[]
   lastMonthOps?: { ops_user_name: string; amount: number }[]
   lastMonthOpsContracts?: { ops_user_name: string; amount: number }[]
+  twoAgoOps?: { ops_user_name: string; amount: number }[]
+  twoAgoOpsContracts?: { ops_user_name: string; amount: number }[]
   putoContractCount?: number
 }
 
@@ -441,6 +443,8 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
   const [supplyConfigMap, setSupplyConfigMap] = useState<Record<string, { base?: number }>>({})
   const [payRateEmps, setPayRateEmps] = useState<{ name: string; target: number; supplyCount?: number; supplyPayment?: number; directPayment?: number }[]>([])
   const [lastPayRateEmps, setLastPayRateEmps] = useState<{ name: string; target: number; supplyCount?: number; supplyPayment?: number; directPayment?: number }[]>([])
+  const [twoAgoPayRateEmps, setTwoAgoPayRateEmps] = useState<{ name: string; target: number; supplyCount?: number; supplyPayment?: number; directPayment?: number }[]>([])
+  const [twoAgoGoals, setTwoAgoGoals] = useState<SalesGoal[]>([])
 
   // Section refs for scroll-to
   const chartRef = useRef<HTMLDivElement>(null)
@@ -458,6 +462,11 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
   const lastYear = lastMonthDate.getFullYear()
   const lastMonth = lastMonthDate.getMonth() + 1
   const lastMonthStr = `${lastYear}-${String(lastMonth).padStart(2, '0')}`
+
+  const twoMonthsAgoDate = new Date(thisYear, thisMonth - 3, 1)
+  const twoAgoYear  = twoMonthsAgoDate.getFullYear()
+  const twoAgoMonth = twoMonthsAgoDate.getMonth() + 1
+  const twoAgoMonthStr = `${twoAgoYear}-${String(twoAgoMonth).padStart(2, '0')}`
 
   useEffect(() => {
     async function load() {
@@ -481,6 +490,8 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           payRateRes,
           lastPayRateRes,
           expensesRes,
+          twoAgoGoalsRes,
+          twoAgoPayRateRes,
         ] = await Promise.all([
           fetch('/api/revenue').catch(() => null),
           fetch('/api/assign').catch(() => null),
@@ -495,6 +506,8 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           fetch(`/api/payrate?year_month=${thisMonthStr}`).catch(() => null),
           fetch(`/api/payrate?year_month=${lastMonthStr}`).catch(() => null),
           fetch('/api/settings?key=monthly_expenses').catch(() => null),
+          fetch(`/api/sales-goals?year_month=${twoAgoMonthStr}`).catch(() => null),
+          fetch(`/api/payrate?year_month=${twoAgoMonthStr}`).catch(() => null),
         ])
 
         const [
@@ -511,6 +524,8 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           payRateData,
           lastPayRateData,
           expensesData,
+          twoAgoGoalsData,
+          twoAgoPayRateData,
         ] = await Promise.all([
           revRes?.json().catch(() => ({})) ?? {},
           assignRes?.json().catch(() => ({})) ?? {},
@@ -525,6 +540,8 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           payRateRes?.json().catch(() => ({})) ?? {},
           lastPayRateRes?.json().catch(() => ({})) ?? {},
           expensesRes?.json().catch(() => ({})) ?? {},
+          twoAgoGoalsRes?.json().catch(() => ({})) ?? {},
+          twoAgoPayRateRes?.json().catch(() => ({})) ?? {},
         ])
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -581,6 +598,16 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           supplyPayment: Number(e.supply_payment || 0),
           directPayment: Number(e.direct_payment || 0),
         })))
+        // 2달 전
+        setTwoAgoGoals(a(twoAgoGoalsData).sales_goals ?? a(twoAgoGoalsData).goals ?? [])
+        const twoAgoEmpDetails: any[] = a(twoAgoPayRateData).record?.employee_details ?? []
+        setTwoAgoPayRateEmps(twoAgoEmpDetails.map((e: any) => ({
+          name: String(e.name || ''),
+          target: Number(e.target || 0),
+          supplyCount: calcSupplyCount(e),
+          supplyPayment: Number(e.supply_payment || 0),
+          directPayment: Number(e.direct_payment || 0),
+        })))
       } catch {
         // silently ignore
       } finally {
@@ -588,7 +615,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
       }
     }
     load()
-  }, [thisMonthStr, lastMonthStr])
+  }, [thisMonthStr, lastMonthStr, twoAgoMonthStr])
 
   // ── Derived values ──────────────────────────────────────
 
@@ -654,6 +681,9 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
   const lastMonthContracts = mergedContracts.filter(
     c => (c.created_at ?? '').slice(0, 7) === lastMonthStr
   )
+  const twoAgoContracts = mergedContracts.filter(
+    c => (c.created_at ?? '').slice(0, 7) === twoAgoMonthStr
+  )
 
   // In-progress ops cases
   const completedStages = ['completed', 'rejected']
@@ -667,6 +697,11 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
       (c.created_at ?? '').slice(0, 7) === lastMonthStr &&
       !completedStages.includes(c.progress_stage ?? '')
   ).length
+  const twoAgoInProgress = opsCases.filter(
+    c =>
+      (c.created_at ?? '').slice(0, 7) === twoAgoMonthStr &&
+      !completedStages.includes(c.progress_stage ?? '')
+  ).length
 
   // Last month revenue breakdown
   const lastMonthRevEntry = revenueData?.monthly?.find(m => {
@@ -675,16 +710,28 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
   })
   const lastMonthRevRaw   = lastMonthRevEntry?.합계 ?? 0
   const lastMonthSalesRaw = lastMonthRevEntry?.영업팀 ?? 0
-  // 관리팀 = 수수료 + 계약매출 합산
   const lastMonthOpsRaw   = (lastMonthRevEntry?.관리팀 ?? 0) + (lastMonthRevEntry?.관리팀계약 ?? 0)
   const thisMonthSalesRaw = thisMonthRevEntry?.영업팀 ?? 0
   const thisMonthTax = Math.round(thisMonthRevRaw * 0.1)
   const lastMonthTax = Math.round(lastMonthRevRaw * 0.1)
+
+  // Two months ago revenue breakdown
+  const twoAgoRevEntry = revenueData?.monthly?.find(m => {
+    const mmStr = String(twoAgoMonth).padStart(2, '0') + '월'
+    return m.month === mmStr || m.month === twoAgoMonthStr
+  })
+  const twoAgoRevRaw   = twoAgoRevEntry?.합계 ?? 0
+  const twoAgoSalesRaw = twoAgoRevEntry?.영업팀 ?? 0
+  const twoAgoOpsRaw   = (twoAgoRevEntry?.관리팀 ?? 0) + (twoAgoRevEntry?.관리팀계약 ?? 0)
+  const twoAgoTax      = Math.round(twoAgoRevRaw * 0.1)
   // 발생 부가세: 부가세 체크된 계약금액만 합산 (vat_included !== false)
   const thisVatRevenue = thisMonthContracts
     .filter(c => c.vat_included !== false)
     .reduce((s, c) => s + (c.contract_amount || 0), 0)
   const lastVatRevenue = lastMonthContracts
+    .filter(c => c.vat_included !== false)
+    .reduce((s, c) => s + (c.contract_amount || 0), 0)
+  const twoAgoVatRevenue = twoAgoContracts
     .filter(c => c.vat_included !== false)
     .reduce((s, c) => s + (c.contract_amount || 0), 0)
 
@@ -697,6 +744,11 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
   const lastTotalBiz = getMonthBusinessDays(lastYear, lastMonth)
   const lastElapsed = lastTotalBiz
   const lastRemaining = 0
+
+  // Business days — two months ago
+  const twoAgoTotalBiz = getMonthBusinessDays(twoAgoYear, twoAgoMonth)
+  const twoAgoElapsed = twoAgoTotalBiz
+  const twoAgoRemaining = 0
 
   // Build per-user rows from contracts + goals
   function buildRows(
@@ -786,6 +838,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
 
   const thisMonthRows = buildRows(thisMonthContracts, salesGoals, thisElapsed, thisRemaining, true, supplyStats, payRateEmps)
   const lastMonthRows = buildRows(lastMonthContracts, lastMonthGoals, lastElapsed, lastRemaining, false, [], lastPayRateEmps)
+  const twoAgoRows    = buildRows(twoAgoContracts, twoAgoGoals, twoAgoElapsed, twoAgoRemaining, false, [], twoAgoPayRateEmps)
 
   // ── 관리팀 이달 직원별 집계 ───────────────────────────────
   function buildOpsUserRows(
@@ -813,6 +866,10 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
   const lastMonthOpsUserRows = buildOpsUserRows(
     revenueData?.lastMonthOps ?? [],
     revenueData?.lastMonthOpsContracts ?? []
+  )
+  const twoAgoOpsUserRows = buildOpsUserRows(
+    revenueData?.twoAgoOps ?? [],
+    revenueData?.twoAgoOpsContracts ?? []
   )
 
   // ── Scroll helpers ───────────────────────────────────────
@@ -877,7 +934,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
         <PayRateTab />
       </div>
 
-      {/* ══ 이번달 현황 ══ */}
+      {/* ══ 최근 3개월 현황 ══ */}
       <div ref={thisMonthRef}>
         <MonthSection
           title={`${thisMonth}월 현황`}
@@ -894,7 +951,6 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
         />
       </div>
 
-      {/* ══ 지난달 현황 ══ */}
       <div ref={lastMonthRef}>
         <MonthSection
           title={`${lastMonth}월 현황`}
@@ -909,6 +965,19 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           opsUserRows={lastMonthOpsUserRows}
         />
       </div>
+
+      <MonthSection
+        title={`${twoAgoMonth}월 현황`}
+        loading={loading}
+        contractCount={twoAgoContracts.reduce((s, c) => s + contractWeight(c.contract_amount, c.vat_included), 0)}
+        inProgressCount={twoAgoInProgress}
+        taxAmount={twoAgoTax}
+        employeeRows={twoAgoRows}
+        salesRevenueAmount={twoAgoSalesRaw}
+        opsRevenueAmount={twoAgoOpsRaw}
+        vatRevenue={twoAgoVatRevenue}
+        opsUserRows={twoAgoOpsUserRows}
+      />
 
       {/* ══ 공지사항 ══ */}
       <NoticeSection />
