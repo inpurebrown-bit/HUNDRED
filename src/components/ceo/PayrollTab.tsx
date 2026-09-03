@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap } from '@/lib/payrollCalc'
 import { contractWeight } from '@/lib/supplyRules'
 
 // ─── 타입 ─────────────────────────────────────────────────
@@ -39,21 +40,11 @@ interface OtherCosts {
 // ─── 계산 ─────────────────────────────────────────────────
 
 function calcOps(e: OpsEmployee) {
-  const feeInc  = Math.round(Number(e.fee_revenue)  * 0.10)
-  const putoInc = Math.round(Number(e.puto_revenue) * 0.40)
+  const feeInc  = Math.round(Number(e.fee_revenue)  * OPS_FEE_RATE)
+  const putoInc = Math.round(Number(e.puto_revenue) * OPS_PUTO_RATE)
   const before  = Number(e.base_salary) + feeInc + putoInc + Number(e.performance_bonus)
-  const after   = Math.round(before * 0.967)
+  const after   = Math.round(before * NET_RATE)
   return { feeInc, putoInc, before, after }
-}
-
-function getPromo(n: number) {
-  if (n >= 40) return 2_000_000
-  if (n >= 35) return 1_500_000
-  if (n >= 30) return 1_000_000
-  if (n >= 25) return   700_000
-  if (n >= 20) return   500_000
-  if (n >= 15) return   250_000
-  return 0
 }
 
 function calcSales(e: SalesEmployee) {
@@ -62,16 +53,13 @@ function calcSales(e: SalesEmployee) {
   const promo        = getPromo(e.contract_count)
   const awardsSum    = (e.awards || []).reduce((s, a) => s + Number(a.amount || 0), 0)
   const before       = contractInc + perfBonus + promo + awardsSum
-  const after        = Math.round(before * 0.967)
+  const after        = Math.round(before * NET_RATE)
   return { contractInc, perfBonus, promo, awardsSum, before, after }
 }
 
 // ─── 유틸 ─────────────────────────────────────────────────
 
-function thisMonth() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
+const thisMonth = currentYearMonth
 function won(n: number) {
   if (!n) return '-'
   return n.toLocaleString('ko-KR') + '원'
@@ -197,7 +185,7 @@ function SalesCard({
   onRemoveAward: (ei: number, ai: number) => void
 }) {
   const c = calcSales(emp)
-  const has12 = emp.contract_count >= 12
+  const has12 = emp.contract_count >= PERF_BONUS_MIN_COUNT
   const fmtN = (n: number) => parseFloat(n.toFixed(2))
   const promoLabel = emp.contract_count > 0 ? `${fmtN(emp.contract_count)}개` : '갯수 미정'
 
@@ -357,19 +345,11 @@ export default function PayrollTab() {
     try {
       const custRes = await fetch('/api/customers')
       const custJson = await custRes.json()
-      const parseMon = (v: any) => parseInt(String(v || '0').replace(/[^0-9]/g, ''), 10) || 0
+      const liveMap = buildSalesContractMap(custJson.customers || [], ym)
       const details: Record<string, Array<{ company: string; amount: number; weight: number; date: string; refund?: boolean }>> = {}
-      ;(custJson.customers || []).forEach((c: any) => {
-        if (c.status !== 'contracted') return
-        const cm = (c.details?.contract_date || c.created_at || '').slice(0, 7)
-        if (cm !== ym) return
-        const name = (c.details?.sales_user_name || c.sales_user_name || '').trim()
-        if (!name) return
-        const rev = parseMon(c.details?.my_revenue) || parseMon(c.details?.payment_amount)
-        const w = contractWeight(c.details?.payment_amount, c.details?.vat_included)
-        if (!details[name]) details[name] = []
-        details[name].push({ company: c.details?.company || c.name || '(업체명 없음)', amount: rev, weight: w > 0 ? w : 1, date: c.details?.contract_date || c.created_at || '' })
-      })
+      for (const [name, v] of Object.entries(liveMap)) {
+        details[name] = v.details
+      }
       // 환수 차감 표시 (목록에만 표시, count 재계산 안 함 — 저장된 값이 이미 반영된 값)
       ;(custJson.customers || []).forEach((c: any) => {
         const dedMonth = c.details?.refund_deduction_month
@@ -398,28 +378,14 @@ export default function PayrollTab() {
       ])
       const [custJson, prData] = await Promise.all([custRes.json(), prRes.json()])
 
-      // 해당 월 계약 실시간 집계 (contractWeight 기준)
+      // 해당 월 계약 실시간 집계 (buildSalesContractMap — payrollCalc.ts 단일 구현)
+      const liveMap = buildSalesContractMap(custJson.customers || [], yearMonth)
       const salesByName: Record<string, { amount: number; count: number }> = {}
       const contractDetails: Record<string, Array<{ company: string; amount: number; weight: number; date: string; refund?: boolean }>> = {}
-      ;(custJson.customers || []).forEach((c: any) => {
-        if (c.status !== 'contracted') return
-        const contractMonth = (c.details?.contract_date || c.created_at || '').slice(0, 7)
-        if (contractMonth !== yearMonth) return
-        const name = (c.details?.sales_user_name || c.sales_user_name || '').trim()
-        if (!name) return
-        const rev = parseMon(c.details?.my_revenue) || parseMon(c.details?.payment_amount)
-        const w = contractWeight(c.details?.payment_amount, c.details?.vat_included)
-        if (!salesByName[name]) salesByName[name] = { amount: 0, count: 0 }
-        salesByName[name].amount += rev
-        salesByName[name].count  += w > 0 ? w : 1
-        if (!contractDetails[name]) contractDetails[name] = []
-        contractDetails[name].push({
-          company: (c.details?.company || c.company || c.name || '(업체명 없음)'),
-          amount: rev,
-          weight: w > 0 ? w : 1,
-          date: c.details?.contract_date || c.created_at || '',
-        })
-      })
+      for (const [name, v] of Object.entries(liveMap)) {
+        salesByName[name]    = { amount: v.revenue, count: v.count }
+        contractDetails[name] = v.details
+      }
 
       // 전월 계약 → 이번달 환불 차감 (개수만 차감, 금액 건드리지 않음)
       ;(custJson.customers || []).forEach((c: any) => {

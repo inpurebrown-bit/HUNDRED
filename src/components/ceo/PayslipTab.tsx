@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { contractWeight } from '@/lib/supplyRules'
+import { getPromo, PROMO_TIERS, PERF_BONUS_MIN_COUNT, PERF_BONUS_RATE, INCOME_TAX_RATE, LOCAL_TAX_RATE, OPS_FEE_RATE, OPS_PUTO_RATE, currentYearMonth, buildSalesContractMap } from '@/lib/payrollCalc'
 
 // ─── 타입 ─────────────────────────────────────────────────
 
@@ -60,20 +60,8 @@ const COMPANY = {
 }
 
 // 승급프로모션 (PayrollTab과 동일)
-function getPromo(n: number): number {
-  if (n >= 40) return 2_000_000
-  if (n >= 35) return 1_500_000
-  if (n >= 30) return 1_000_000
-  if (n >= 25) return   700_000
-  if (n >= 20) return   500_000
-  if (n >= 15) return   250_000
-  return 0
-}
 
-function thisMonth(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
+const thisMonth = currentYearMonth
 
 function newEmp(): EmpPersonal {
   return {
@@ -114,21 +102,21 @@ function PayslipDocument({ emp, financial, yearMonth }: {
     const allowSum    = (financial.allowance_details || []).reduce((s, a) => s + Number(a.amount || 0), 0)
     const subtotal    = contractInc + perfBonus + promo + awardsSum + allowSum
     const beforeTax   = subtotal - financial.deduction
-    const incomeTax   = Math.round(beforeTax * 0.03)
-    const localTax    = Math.round(beforeTax * 0.003)
+    const incomeTax   = Math.round(beforeTax * INCOME_TAX_RATE)
+    const localTax    = Math.round(beforeTax * LOCAL_TAX_RATE)
     const actualPay   = beforeTax - incomeTax - localTax
     return { contractInc, perfBonus, promo, awardsSum, allowSum, subtotal, beforeTax, incomeTax, localTax, actualPay }
   })()
 
   // ── 관리팀 계산 ──
   const opsCalc = (() => {
-    const feeInc    = Math.round(Number(financial.fee_revenue) * 0.10)
-    const putoInc   = Math.round(Number(financial.puto_revenue) * 0.40)
+    const feeInc    = Math.round(Number(financial.fee_revenue) * OPS_FEE_RATE)
+    const putoInc   = Math.round(Number(financial.puto_revenue) * OPS_PUTO_RATE)
     const allowSum  = (financial.allowance_details || []).reduce((s, a) => s + Number(a.amount || 0), 0)
     const subtotal  = Number(financial.base_salary) + feeInc + putoInc + Number(financial.ops_performance_bonus) + allowSum
     const beforeTax = subtotal - financial.deduction
-    const incomeTax = Math.round(beforeTax * 0.03)
-    const localTax  = Math.round(beforeTax * 0.003)
+    const incomeTax = Math.round(beforeTax * INCOME_TAX_RATE)
+    const localTax  = Math.round(beforeTax * LOCAL_TAX_RATE)
     const actualPay = beforeTax - incomeTax - localTax
     return { feeInc, putoInc, allowSum, subtotal, beforeTax, incomeTax, localTax, actualPay }
   })()
@@ -231,11 +219,11 @@ function PayslipDocument({ emp, financial, yearMonth }: {
                 <td className={tdN}>{fmt(salesCalc.contractInc)}</td>
               </tr>
               <tr>
-                <td className={tdL}>② 성과급{financial.contract_count >= 12 ? ' (5%)' : ''}</td>
+                <td className={tdL}>② 성과급{financial.contract_count >= PERF_BONUS_MIN_COUNT ? ' (5%)' : ''}</td>
                 <td className={tdV}>
                   {financial.contract_count > 0 && (
-                    <span className={financial.contract_count >= 12 ? 'text-blue-700 font-medium' : 'text-gray-500'}>
-                      {financial.contract_count}건 {financial.contract_count >= 12 ? '— 5% 자동지급' : '— 12건 미만'}
+                    <span className={financial.contract_count >= PERF_BONUS_MIN_COUNT ? 'text-blue-700 font-medium' : 'text-gray-500'}>
+                      {financial.contract_count}건 {financial.contract_count >= PERF_BONUS_MIN_COUNT ? '— 5% 자동지급' : '— 12건 미만'}
                     </span>
                   )}
                 </td>
@@ -361,16 +349,8 @@ function PayslipDocument({ emp, financial, yearMonth }: {
 
       {/* 승급프로모션 안내 (영업팀만) */}
       {isSales && (() => {
-        const tiers = [
-          { label: '15건 이상', amount: 250_000 },
-          { label: '20건 이상', amount: 500_000 },
-          { label: '25건 이상', amount: 700_000 },
-          { label: '30건 이상', amount: 1_000_000 },
-          { label: '35건 이상', amount: 1_500_000 },
-          { label: '40건 이상', amount: 2_000_000 },
-        ]
-        const row1 = tiers.slice(0, 3)
-        const row2 = tiers.slice(3)
+        const row1 = PROMO_TIERS.slice(0, 3)
+        const row2 = PROMO_TIERS.slice(3)
         return (
           <table className="border-collapse text-xs w-full mb-3">
             <thead>
@@ -499,7 +479,7 @@ export default function PayslipTab() {
   }, [employees])
 
   // 급여계산기(payroll) 에서 자동 불러오기
-  // ★ 계약 데이터는 저장된 payroll이 아닌 customers DB 실시간값 사용 (저장 시점 무관)
+  // 이번 달: 실시간 고객 DB 우선 / 과거 달: 저장된 payroll 확정값 우선 (환수 차감 등 이미 반영된 값)
   async function handleLoad() {
     setLoading(true); setMsg('')
     try {
@@ -513,22 +493,15 @@ export default function PayslipTab() {
       const emps = json.record?.employees
       const opsList: any[] = emps?.ops_employees || []
 
-      // ── 해당 월 계약 실시간 집계 (contractWeight 기준) ──
-      const parseMon = (v: any) => parseInt(String(v || '0').replace(/[^0-9]/g, ''), 10) || 0
-      const liveByName: Record<string, { revenue: number; count: number }> = {}
-      ;(custJson.customers || []).forEach((c: any) => {
-        if (c.status !== 'contracted') return
-        const contractMonth = (c.details?.contract_date || c.created_at || '').slice(0, 7)
-        if (contractMonth !== yearMonth) return
-        const name = (c.details?.sales_user_name || c.sales_user_name || '').trim()
-        if (!name) return
-        // my_revenue 없으면 payment_amount 로 폴백 (미입력 계약 누락 방지)
-        const rev = parseMon(c.details?.my_revenue) || parseMon(c.details?.payment_amount)
-        const w   = contractWeight(c.details?.payment_amount, c.details?.vat_included)
-        if (!liveByName[name]) liveByName[name] = { revenue: 0, count: 0 }
-        liveByName[name].revenue += rev
-        liveByName[name].count   += w > 0 ? w : 1
-      })
+      // ── 해당 월 계약 실시간 집계 (buildSalesContractMap — payrollCalc.ts 단일 구현) ──
+      const liveMap    = buildSalesContractMap(custJson.customers || [], yearMonth)
+      const liveByName = Object.fromEntries(
+        Object.entries(liveMap).map(([k, v]) => [k, { revenue: v.revenue, count: v.count }])
+      )
+
+      const isCurrentMon = yearMonth === thisMonth()
+      // 과거 월에 savedMatch를 사용한 영업팀 직원 ID 집합 (환불 재적용 방지용)
+      const pastSavedEmpIds = new Set<string>()
 
       const updates: Record<string, Partial<EmpFinancial>> = {}
       for (const emp of employees) {
@@ -536,25 +509,35 @@ export default function PayslipTab() {
           a === b || a.includes(b) || b.includes(a)
 
         if (emp.team === 'sales') {
-          // 실시간 계약 데이터 우선 — 저장된 payroll은 awards/성과급 보조용으로만 사용
           const liveKey    = Object.keys(liveByName).find(k => nameMatch(emp.name, k))
           const savedMatch = (emps?.sales_employees || []).find((e: any) => nameMatch(emp.name, e.name || ''))
 
-          if (liveKey) {
+          if (!isCurrentMon && savedMatch) {
+            // 과거 월: 저장된 payroll 확정값 사용 (환수 차감·환불 이미 반영됨 — 재적용 금지)
+            pastSavedEmpIds.add(emp.id)
+            const count = Number(savedMatch.contract_count || 0)
+            const rev   = Number(savedMatch.contract_revenue || 0)
+            updates[emp.id] = {
+              contract_revenue:  rev,
+              contract_count:    count,
+              performance_bonus: Number(savedMatch.performance_bonus || 0),
+              promo: getPromo(count),
+              awards: savedMatch.awards || [],
+            }
+          } else if (liveKey) {
+            // 이번 달 or 저장 없음: 실시간 계약 데이터 사용
             const live  = liveByName[liveKey]
             const count = live.count
             updates[emp.id] = {
               contract_revenue:  live.revenue,
               contract_count:    count,
-              // 성과급: 저장된 값 유지 (수동 조정 가능), 12건 이상이면 자동 계산
-              performance_bonus: count >= 12
-                ? Math.round(live.revenue * 0.05)
+              performance_bonus: count >= PERF_BONUS_MIN_COUNT
+                ? Math.round(live.revenue * PERF_BONUS_RATE)
                 : Number(savedMatch?.performance_bonus || 0),
               promo:  getPromo(count),
               awards: savedMatch?.awards || [],
             }
           } else if (savedMatch) {
-            // 해당 월 계약 없으면 저장된 payroll 사용
             const count = Number(savedMatch.contract_count || 0)
             const rev   = Number(savedMatch.contract_revenue || 0)
             updates[emp.id] = {
@@ -622,16 +605,19 @@ export default function PayslipTab() {
             }
           }
         } else {
-          const key = Object.keys(refundBySalesUser).find(k => nameMatch(emp.name, k))
-          if (key) {
-            const r = refundBySalesUser[key]
-            const cur = updates[emp.id] || {}
-            updates[emp.id] = {
-              ...cur,
-              contract_count:   Math.max(0, (Number(cur.contract_count)   || 0) - r.totalCount),
-              contract_revenue: Math.max(0, (Number(cur.contract_revenue) || 0) - r.totalRevenue),
-              deduction:        r.totalRevenue,
-              refund_companies: r.companies.join(' | '),
+          // 과거 월 savedMatch 사용 직원은 payroll 저장 시 이미 환불 차감됨 — 재적용 금지
+          if (!pastSavedEmpIds.has(emp.id)) {
+            const key = Object.keys(refundBySalesUser).find(k => nameMatch(emp.name, k))
+            if (key) {
+              const r = refundBySalesUser[key]
+              const cur = updates[emp.id] || {}
+              updates[emp.id] = {
+                ...cur,
+                contract_count:   Math.max(0, (Number(cur.contract_count)   || 0) - r.totalCount),
+                contract_revenue: Math.max(0, (Number(cur.contract_revenue) || 0) - r.totalRevenue),
+                deduction:        r.totalRevenue,
+                refund_companies: r.companies.join(' | '),
+              }
             }
           }
         }
