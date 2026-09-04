@@ -28,10 +28,16 @@ export async function GET(req: NextRequest) {
     .from('ops_cases')
     .select('id, details, created_at, owner_id, ops_user_name, customer_name, phone')
 
-  const [{ data: custContracted }, { data: opsCasesRaw }] = await Promise.all([
+  const [{ data: custContracted }, { data: opsCasesRaw }, { data: usersRaw }] = await Promise.all([
     custQuery,
     opsQuery,
+    supabaseAdmin.from('users').select('id, role, name'),
   ])
+  // owner_id → role 맵 (급여 산정: role='ops'인 케이스만 개인 귀속)
+  const userRoleMap: Record<string, string> = {}
+  for (const u of (usersRaw || [])) {
+    userRoleMap[String(u.id)] = u.role || ''
+  }
 
   let opsCases = opsCasesRaw || []
   if (user.role === 'ops') {
@@ -69,15 +75,17 @@ export async function GET(req: NextRequest) {
     })
     .filter(Boolean) as { id: string; amount: number; date: string; sales_user_id: string; sales_user_name: string; company: string; payment_amount?: any; vat_included?: boolean }[]
 
-  type OpsEntry = { id: string; amount: number; date: string; ops_user_id: string; ops_user_name: string; company: string }
+  type OpsEntry = { id: string; amount: number; date: string; ops_user_id: string; ops_user_name: string; company: string; creator_role: string }
 
   // ── 관리팀 수수료 리스트 변환 ────────────────────────────────────────
   // fee_amount(1차) + payment_entries[*].fee_amount(추가)
+  // creator_role: owner_id의 role — 'ops' 계정만 급여 귀속, 대표(ceo/admin)는 회사 매출만
   const todayStr = new Date().toISOString().slice(0, 10)
   const opsEntries: OpsEntry[] = (opsCases || [])
     .flatMap((c: any) => {
       const d = c.details || {}
       const entries: OpsEntry[] = []
+      const creatorRole = userRoleMap[String(c.owner_id || '')] || ''
       const fee1 = parseMoney(d.fee_amount)
       if (fee1 > 0) {
         // deposit_date 우선 → updated_at → created_at → 오늘 (반드시 날짜 있어야 월별 집계 가능)
@@ -89,6 +97,7 @@ export async function GET(req: NextRequest) {
           ops_user_id: String(c.owner_id || ''),
           ops_user_name: c.ops_user_name || d.ops_user_name || '',
           company: d.sales_customer_info?.company || d.company || c.customer_name || '',
+          creator_role: creatorRole,
         })
       }
       for (const pe of (d.payment_entries || [])) {
@@ -101,6 +110,7 @@ export async function GET(req: NextRequest) {
             ops_user_id: String(c.owner_id || ''),
             ops_user_name: c.ops_user_name || d.ops_user_name || '',
             company: d.sales_customer_info?.company || d.company || c.customer_name || '',
+            creator_role: creatorRole,
           })
         }
       }
@@ -113,8 +123,9 @@ export async function GET(req: NextRequest) {
     .flatMap((c: any) => {
       const d = c.details || {}
       const entries: OpsContractEntry[] = []
-      const ownerName = c.ops_user_name || d.ops_user_name || ''
-      const ownerId   = String(c.owner_id || '')
+      const ownerName    = c.ops_user_name || d.ops_user_name || ''
+      const ownerId      = String(c.owner_id || '')
+      const creatorRoleC = userRoleMap[ownerId] || ''
       // 뿌토 계약 (신규DB → 계약)
       const putoAmt = parseMoney(d.puto_contract_amount)
       if (putoAmt > 0) {
@@ -124,6 +135,7 @@ export async function GET(req: NextRequest) {
           date: d.puto_contract_date || c.created_at?.slice(0, 10) || '',
           ops_user_id: ownerId, ops_user_name: ownerName,
           company: d.sales_customer_info?.company || c.customer_name || '',
+          creator_role: creatorRoleC,
           type: 'puto',
         })
       }
@@ -137,6 +149,7 @@ export async function GET(req: NextRequest) {
             date: d.contract_date || c.created_at?.slice(0, 10) || '',
             ops_user_id: ownerId, ops_user_name: ownerName,
             company: c.customer_name || '',
+            creator_role: creatorRoleC,
             type: 'direct',
           })
         }

@@ -168,17 +168,6 @@ function OpsCard({
       <div className="px-4 py-3 space-y-0">
         <PayRow label="기본급" value={emp.base_salary} editable onEdit={v => onChange(idx, 'base_salary', v)} />
         <PayRow label="수수료매출(VAT제외)" value={emp.fee_revenue} autoTag />
-        {/* 수수료 케이스별 내역 */}
-        {(emp.fee_details || []).length > 0 && (
-          <div className="ml-2 mb-1 space-y-0.5">
-            {emp.fee_details!.map((d, i) => (
-              <div key={i} className="flex items-center justify-between text-[10px] text-gray-400 pl-2 border-l border-gray-100">
-                <span className="truncate max-w-[140px]">{d.date?.slice(0, 10)} {d.company}</span>
-                <span className="font-mono shrink-0 ml-1">{d.amount.toLocaleString('ko-KR')}원</span>
-              </div>
-            ))}
-          </div>
-        )}
         <PayRow label="수수료인센(10%)" value={c.feeInc} />
         <PayRow label="뿌토매출(VAT제외)" value={emp.puto_revenue} autoTag />
         <PayRow label="뿌토인센(40%)" value={c.putoInc} />
@@ -296,6 +285,8 @@ export default function PayrollTab() {
   const [revTotals, setRevTotals] = useState<{ sales: number; ops: number; opsContract: number } | null>(null)
   const [perPersonSupply, setPerPersonSupply] = useState<{ name: string; count: number }[]>([])
   const [salesContractMap, setSalesContractMap] = useState<Record<string, Array<{ company: string; amount: number; weight: number; date: string }>>>({})
+  // 관리팀 전체 수수료 입금 내역 (이름 매칭 무관 — 아코디언 표시용)
+  const [opsAllFeeEntries, setOpsAllFeeEntries] = useState<Array<OpsFeeDetail & { ops_user_name: string }>>([])
 
   // 개인재무에서 자동 산출 (대출이자 + 구독료)
   // DB 미저장 시 PersonalFinanceTab DEFAULT_LOANS + DEFAULT_SUBS 합계를 기본값으로 사용
@@ -449,6 +440,8 @@ export default function PayrollTab() {
       const opsPutoByName: Record<string, number> = {}
       const opsFeeDetailsByName: Record<string, OpsFeeDetail[]> = {}
       for (const e of opsEntriesForMonth) {
+        // creator_role이 'ops'가 아닌 경우(대표 등) → 전체 매출에만 포함, 개인 급여 귀속 제외
+        if ((e as any).creator_role && (e as any).creator_role !== 'ops') continue
         const name = (e.ops_user_name || '').trim()
         if (!name) continue
         opsFeeByName[name] = (opsFeeByName[name] || 0) + (e.amount || 0)
@@ -481,6 +474,13 @@ export default function PayrollTab() {
         }
       })
       setOpsEmps(newOpsEmpsPrev)
+      // 전체 ops 수수료 내역 저장 (아코디언 표시용)
+      setOpsAllFeeEntries(
+        opsEntriesForMonth.map((e: any) => ({
+          company: e.company || '', amount: e.amount || 0, date: e.date || '',
+          ops_user_name: (e.ops_user_name || '').trim(),
+        }))
+      )
 
       // payrate에서 인별 공급수 로드
       let prevTotalSupply = 0
@@ -598,11 +598,13 @@ export default function PayrollTab() {
       })
       setSalesEmps(newSalesEmps)
 
-      // 관리팀
+      // 관리팀 — 급여 귀속: role='ops' 계정 케이스만 개인 귀속 (대표 케이스 제외)
       const opsFeeByName: Record<string, number>  = {}
       const opsPutoByName: Record<string, number> = {}
       const opsFeeDetailsByName: Record<string, OpsFeeDetail[]> = {}
       for (const e of opsEntries) {
+        // creator_role이 없거나 'ops'가 아닌 경우(대표 등) → 전체 매출에는 포함, 개인 급여 귀속 제외
+        if ((e as any).creator_role && (e as any).creator_role !== 'ops') continue
         const name = (e.ops_user_name || '').trim()
         if (!name) continue
         opsFeeByName[name] = (opsFeeByName[name] || 0) + (e.amount || 0)
@@ -636,6 +638,13 @@ export default function PayrollTab() {
         }
       })
       setOpsEmps(newOpsEmps)
+      // 전체 ops 수수료 내역 저장 (아코디언 표시용)
+      setOpsAllFeeEntries(
+        opsEntries.map((e: any) => ({
+          company: e.company || '', amount: e.amount || 0, date: e.date || '',
+          ops_user_name: (e.ops_user_name || '').trim(),
+        }))
+      )
 
       // DB 공급 갯수 자동 반영
       let newCosts = currentCosts
@@ -929,6 +938,34 @@ export default function PayrollTab() {
           {opsEmps.map((emp, i) => (
             <OpsCard key={i} emp={emp} idx={i} onChange={updateOps} onRemove={removeOps} />
           ))}
+
+          {/* 수수료 입금 내역 아코디언 — 전체 ops 케이스 표시 */}
+          {opsAllFeeEntries.length > 0 && (
+            <details className="mt-1 bg-sky-50 border border-sky-100 rounded-xl overflow-hidden">
+              <summary className="px-3 py-1.5 text-[10px] font-semibold text-sky-700 cursor-pointer select-none">
+                수수료 입금 내역 {opsAllFeeEntries.length}건 합계 {opsAllFeeEntries.reduce((s, e) => s + e.amount, 0).toLocaleString('ko-KR')}원 — 클릭해서 확인
+              </summary>
+              <div className="px-3 pb-2 space-y-0.5">
+                {opsAllFeeEntries
+                  .slice()
+                  .sort((a, b) => (a.date > b.date ? -1 : 1))
+                  .map((e, ci) => (
+                    <div key={ci} className="flex items-center justify-between text-[10px] py-0.5 border-b last:border-0 border-sky-100">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {e.ops_user_name && (
+                          <span className="shrink-0 text-[9px] bg-sky-200/60 text-sky-800 rounded px-1 py-0.5 font-medium">{e.ops_user_name}</span>
+                        )}
+                        <span className="font-medium text-gray-700 truncate max-w-[120px]">{e.company}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-gray-400 shrink-0 ml-1">
+                        <span>{e.date.slice(0, 10)}</span>
+                        <span className="font-semibold text-sky-600">{e.amount.toLocaleString('ko-KR')}원</span>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </details>
+          )}
 
           <button onClick={() => setOpsEmps(prev => [...prev, defaultOps()])}
             className="w-full py-2 border border-dashed border-gray-300 rounded-xl text-xs text-gray-400 hover:border-[#1B2A45]/40 hover:text-[#1B2A45]/60 transition-colors">
