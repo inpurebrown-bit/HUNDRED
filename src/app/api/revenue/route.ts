@@ -258,6 +258,19 @@ export async function GET(req: NextRequest) {
     opsByUser[id].count++
   })
 
+  // ── 특정 월 조회 (year_month 파라미터) — PayrollTab 과거 월 복구용 ──────
+  const targetMonth = req.nextUrl.searchParams.get('year_month')
+  if (targetMonth) {
+    const targetOps      = opsEntries.filter(e => e.date?.startsWith(targetMonth))
+    const targetContracts = opsContractEntries.filter(e => e.date?.startsWith(targetMonth))
+    const targetSales    = salesEntries.filter(e => e.date?.startsWith(targetMonth))
+    return NextResponse.json({
+      thisMonthOps:          targetOps,
+      thisMonthOpsContracts: targetContracts,
+      thisMonthSales:        targetSales,
+    })
+  }
+
   // ── 이달 / 지난달 내역 ──────────────────────────────────────────────
   const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   const lastMonthDate2 = new Date(now.getFullYear(), now.getMonth() - 1, 1)

@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap } from '@/lib/payrollCalc'
+import { getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, calcMonthlySubBonus } from '@/lib/payrollCalc'
 import { contractWeight } from '@/lib/supplyRules'
 
 // ─── 타입 ─────────────────────────────────────────────────
+
+interface OpsFeeDetail { company: string; amount: number; date: string }
 
 interface OpsEmployee {
   name: string
@@ -12,6 +14,8 @@ interface OpsEmployee {
   fee_revenue: number
   puto_revenue: number
   performance_bonus: number
+  monthly_sub_bonus: number  // 월정기권 5% 보너스 (관리팀장)
+  fee_details?: OpsFeeDetail[]
 }
 
 interface AwardItem { reason: string; amount: number }
@@ -42,9 +46,10 @@ interface OtherCosts {
 function calcOps(e: OpsEmployee) {
   const feeInc  = Math.round(Number(e.fee_revenue)  * OPS_FEE_RATE)
   const putoInc = Math.round(Number(e.puto_revenue) * OPS_PUTO_RATE)
-  const before  = Number(e.base_salary) + feeInc + putoInc + Number(e.performance_bonus)
+  const subBonus = Number(e.monthly_sub_bonus || 0)
+  const before  = Number(e.base_salary) + feeInc + putoInc + Number(e.performance_bonus) + subBonus
   const after   = Math.round(before * NET_RATE)
-  return { feeInc, putoInc, before, after }
+  return { feeInc, putoInc, subBonus, before, after }
 }
 
 function calcSales(e: SalesEmployee) {
@@ -81,7 +86,7 @@ function nowTimestamp() {
 }
 
 function defaultOps(): OpsEmployee {
-  return { name: '', base_salary: 0, fee_revenue: 0, puto_revenue: 0, performance_bonus: 0 }
+  return { name: '', base_salary: 0, fee_revenue: 0, puto_revenue: 0, performance_bonus: 0, monthly_sub_bonus: 0 }
 }
 function defaultSales(): SalesEmployee {
   return { name: '', contract_revenue: 0, contract_count: 0, performance_bonus: 0, awards: [] }
@@ -163,10 +168,24 @@ function OpsCard({
       <div className="px-4 py-3 space-y-0">
         <PayRow label="기본급" value={emp.base_salary} editable onEdit={v => onChange(idx, 'base_salary', v)} />
         <PayRow label="수수료매출(VAT제외)" value={emp.fee_revenue} autoTag />
+        {/* 수수료 케이스별 내역 */}
+        {(emp.fee_details || []).length > 0 && (
+          <div className="ml-2 mb-1 space-y-0.5">
+            {emp.fee_details!.map((d, i) => (
+              <div key={i} className="flex items-center justify-between text-[10px] text-gray-400 pl-2 border-l border-gray-100">
+                <span className="truncate max-w-[140px]">{d.date?.slice(0, 10)} {d.company}</span>
+                <span className="font-mono shrink-0 ml-1">{d.amount.toLocaleString('ko-KR')}원</span>
+              </div>
+            ))}
+          </div>
+        )}
         <PayRow label="수수료인센(10%)" value={c.feeInc} />
         <PayRow label="뿌토매출(VAT제외)" value={emp.puto_revenue} autoTag />
         <PayRow label="뿌토인센(40%)" value={c.putoInc} />
         <PayRow label="성과급" value={emp.performance_bonus} editable onEdit={v => onChange(idx, 'performance_bonus', v)} />
+        {c.subBonus > 0 && (
+          <PayRow label="월정기권보너스(5%)" value={c.subBonus} autoTag colorClass="text-violet-600" />
+        )}
       </div>
     </div>
   )
@@ -268,11 +287,10 @@ export default function PayrollTab() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
 
   const [opsEmps, setOpsEmps] = useState<OpsEmployee[]>([
-    { ...defaultOps(), name: '관리팀장', base_salary: 2_000_000 },
+    { ...defaultOps(), name: '김윤지', base_salary: 2_000_000 },
   ])
   const [salesEmps, setSalesEmps] = useState<SalesEmployee[]>([
     { ...defaultSales(), name: '손제후' },
-    { ...defaultSales(), name: '김윤지' },
   ])
   const [costs, setCosts]     = useState<OtherCosts>(defaultCosts())
   const [revTotals, setRevTotals] = useState<{ sales: number; ops: number; opsContract: number } | null>(null)
@@ -310,19 +328,25 @@ export default function PayrollTab() {
   const didInitLoad = useRef(false)
   // handleLoad와 prevMonthLoad 간 race condition 방지 토큰
   const loadToken   = useRef(0)
+  // 월 전환 자동저장용 — 이전 월과 그 당시 state 기억
+  const prevMonthRef = useRef(yearMonth)
+  const prevStateRef = useRef<{ ops: OpsEmployee[]; sales: SalesEmployee[]; costs: OtherCosts; rev: typeof revTotals }>({
+    ops: opsEmps, sales: salesEmps, costs, rev: revTotals,
+  })
 
-  // ── 저장 (내부용) ────────────────────────────────────────
+  // ── 저장 (내부용, 특정 month 지정 가능) ──────────────────
   async function doSave(
     ops: OpsEmployee[],
     sales: SalesEmployee[],
     c: OtherCosts,
-    rev: { sales: number; ops: number; opsContract: number } | null
+    rev: { sales: number; ops: number; opsContract: number } | null,
+    ym?: string,
   ) {
     await fetch('/api/payroll', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        year_month: yearMonth,
+        year_month: ym ?? yearMonth,
         employees: { ops_employees: ops, sales_employees: sales, other_costs: c, revenue_totals: rev },
         memo: '',
       }),
@@ -331,6 +355,8 @@ export default function PayrollTab() {
 
   // ── 자동저장 (state 변경 시 디바운스) ────────────────────
   useEffect(() => {
+    // 항상 최신 state를 prevStateRef에 기록 (월 전환 자동저장에 사용)
+    prevStateRef.current = { ops: opsEmps, sales: salesEmps, costs, rev: revTotals }
     if (!didInitLoad.current) return
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
@@ -371,14 +397,14 @@ export default function PayrollTab() {
     setAutoLoading(true)
     setMsg('')
     try {
-      const parseMon = (v: any) => parseInt(String(v || '0').replace(/[^0-9]/g, ''), 10) || 0
-      const [custRes, prRes] = await Promise.all([
+      const [custRes, prRes, revRes] = await Promise.all([
         fetch('/api/customers'),
         fetch(`/api/payrate?year_month=${yearMonth}`),
+        fetch(`/api/revenue?year_month=${yearMonth}`),   // 해당 월 ops 수수료 복구용
       ])
-      const [custJson, prData] = await Promise.all([custRes.json(), prRes.json()])
+      const [custJson, prData, revData] = await Promise.all([custRes.json(), prRes.json(), revRes.json()])
 
-      // 해당 월 계약 실시간 집계 (buildSalesContractMap — payrollCalc.ts 단일 구현)
+      // 영업팀 — 고객 DB에서 해당 월 계약 집계
       const liveMap = buildSalesContractMap(custJson.customers || [], yearMonth)
       const salesByName: Record<string, { amount: number; count: number }> = {}
       const contractDetails: Record<string, Array<{ company: string; amount: number; weight: number; date: string; refund?: boolean }>> = {}
@@ -387,7 +413,7 @@ export default function PayrollTab() {
         contractDetails[name] = v.details
       }
 
-      // 전월 계약 → 이번달 환불 차감 (개수만 차감, 금액 건드리지 않음)
+      // 환불 차감
       ;(custJson.customers || []).forEach((c: any) => {
         const dedMonth = c.details?.refund_deduction_month
         if (dedMonth !== yearMonth) return
@@ -400,13 +426,9 @@ export default function PayrollTab() {
         if (!contractDetails[name]) contractDetails[name] = []
         contractDetails[name].push({
           company: `[환불차감] ${c.details?.refund_company || c.details?.company || c.name || ''}`,
-          amount: 0,
-          weight: -w,
-          date: dedMonth,
-          refund: true,
+          amount: 0, weight: -w, date: dedMonth, refund: true,
         })
       })
-
       setSalesContractMap(contractDetails)
 
       const newSalesEmps = salesEmps.map(emp => {
@@ -420,7 +442,48 @@ export default function PayrollTab() {
       })
       setSalesEmps(newSalesEmps)
 
+      // 관리팀 — revenue API에서 해당 월 ops 수수료·뿌토 집계 (ops_cases 기반 정확한 이력)
+      const opsEntriesForMonth: any[] = revData.thisMonthOps || []
+      const opsPutoForMonth: any[]    = revData.thisMonthOpsContracts || []
+      const opsFeeByName: Record<string, number>  = {}
+      const opsPutoByName: Record<string, number> = {}
+      const opsFeeDetailsByName: Record<string, OpsFeeDetail[]> = {}
+      for (const e of opsEntriesForMonth) {
+        const name = (e.ops_user_name || '').trim()
+        if (!name) continue
+        opsFeeByName[name] = (opsFeeByName[name] || 0) + (e.amount || 0)
+        if (!opsFeeDetailsByName[name]) opsFeeDetailsByName[name] = []
+        opsFeeDetailsByName[name].push({ company: e.company || '', amount: e.amount || 0, date: e.date || '' })
+      }
+      for (const e of opsPutoForMonth) {
+        const name = (e.ops_user_name || '').trim()
+        if (!name) continue
+        opsPutoByName[name] = (opsPutoByName[name] || 0) + (e.amount || 0)
+      }
+      const monthlySubBonusPrev = calcMonthlySubBonus(custJson.customers || [], yearMonth)
+      const newRevTotals = {
+        sales:       (revData.thisMonthSales || []).reduce((s: number, e: any) => s + (e.amount || 0), 0),
+        ops:         opsEntriesForMonth.reduce((s: number, e: any) => s + (e.amount || 0), 0),
+        opsContract: opsPutoForMonth.reduce((s: number, e: any) => s + (e.amount || 0), 0),
+      }
+      setRevTotals(newRevTotals)
+      const newOpsEmpsPrev = opsEmps.map(emp => {
+        if (!emp.name) return emp
+        const fKey = Object.keys(opsFeeByName).find(k => k === emp.name || k.includes(emp.name) || emp.name.includes(k))
+        const pKey = Object.keys(opsPutoByName).find(k => k === emp.name || k.includes(emp.name) || emp.name.includes(k))
+        const dKey = Object.keys(opsFeeDetailsByName).find(k => k === emp.name || k.includes(emp.name) || emp.name.includes(k))
+        return {
+          ...emp,
+          fee_revenue:       fKey ? opsFeeByName[fKey]  : emp.fee_revenue,
+          puto_revenue:      pKey ? opsPutoByName[pKey] : emp.puto_revenue,
+          monthly_sub_bonus: emp.name.includes('윤지') ? monthlySubBonusPrev : 0,
+          fee_details:       dKey ? opsFeeDetailsByName[dKey] : [],
+        }
+      })
+      setOpsEmps(newOpsEmpsPrev)
+
       // payrate에서 인별 공급수 로드
+      let prevTotalSupply = 0
       try {
         if (prData.record?.employee_details) {
           const details = prData.record.employee_details as any[]
@@ -432,12 +495,17 @@ export default function PayrollTab() {
                 : 0
               return { name: String(e.name), count: fromDaily > 0 ? fromDaily : Number(e.supply_count || 0) }
             })
+          prevTotalSupply = perPerson.reduce((s: number, p: { count: number }) => s + p.count, 0)
           setPerPersonSupply(perPerson)
+          if (prevTotalSupply > 0) setCosts(p => ({ ...p, db_count: prevTotalSupply }))
         }
       } catch { /* payrate 실패해도 계속 */ }
 
-      // 저장
-      await doSave(opsEmps, newSalesEmps, costs, revTotals)
+      // 저장 — db_count는 payrate 실계산값 사용 (stale costs 사용 금지)
+      const savedCosts = prevTotalSupply > 0
+        ? { ...costs, db_count: prevTotalSupply }
+        : costs
+      await doSave(newOpsEmpsPrev, newSalesEmps, savedCosts, newRevTotals)
 
       const ts = nowTimestamp()
       setLastUpdated(ts)
@@ -533,24 +601,38 @@ export default function PayrollTab() {
       // 관리팀
       const opsFeeByName: Record<string, number>  = {}
       const opsPutoByName: Record<string, number> = {}
+      const opsFeeDetailsByName: Record<string, OpsFeeDetail[]> = {}
       for (const e of opsEntries) {
         const name = (e.ops_user_name || '').trim()
         if (!name) continue
         opsFeeByName[name] = (opsFeeByName[name] || 0) + (e.amount || 0)
+        if (!opsFeeDetailsByName[name]) opsFeeDetailsByName[name] = []
+        opsFeeDetailsByName[name].push({ company: e.company || '', amount: e.amount || 0, date: e.date || '' })
       }
       for (const e of contractEntries) {
         const name = (e.ops_user_name || '').trim()
         if (!name) continue
         opsPutoByName[name] = (opsPutoByName[name] || 0) + (e.amount || 0)
       }
+      // 월정기권 보너스 — 고객 DB에서 이번달 월정기권 계약 집계
+      let monthlySubBonusTotal = 0
+      try {
+        const custRes2 = await fetch('/api/customers')
+        const custJson2 = await custRes2.json()
+        monthlySubBonusTotal = calcMonthlySubBonus(custJson2.customers || [], yearMonth)
+      } catch { /* 계속 */ }
       const newOpsEmps = currentOps.map(emp => {
         if (!emp.name) return emp
         const key  = Object.keys(opsFeeByName).find(k => k === emp.name || k.includes(emp.name) || emp.name.includes(k))
         const pKey = Object.keys(opsPutoByName).find(k => k === emp.name || k.includes(emp.name) || emp.name.includes(k))
+        const dKey = Object.keys(opsFeeDetailsByName).find(k => k === emp.name || k.includes(emp.name) || emp.name.includes(k))
+        const isYunji = emp.name.includes('윤지')
         return {
           ...emp,
-          fee_revenue:  key  ? opsFeeByName[key]   : emp.fee_revenue,
-          puto_revenue: pKey ? opsPutoByName[pKey]  : emp.puto_revenue,
+          fee_revenue:       key  ? opsFeeByName[key]   : emp.fee_revenue,
+          puto_revenue:      pKey ? opsPutoByName[pKey]  : emp.puto_revenue,
+          monthly_sub_bonus: isYunji ? monthlySubBonusTotal : 0,
+          fee_details:       dKey ? opsFeeDetailsByName[dKey] : [],
         }
       })
       setOpsEmps(newOpsEmps)
@@ -606,6 +688,7 @@ export default function PayrollTab() {
     ])
     const json = await res.json()
     // payrate 에서 인별 공급수 로드
+    let payrateTotalSupply = 0
     try {
       const prData = await prRes.json()
       if (prData.record?.employee_details) {
@@ -618,6 +701,7 @@ export default function PayrollTab() {
               : 0
             return { name: String(e.name), count: fromDaily > 0 ? fromDaily : Number(e.supply_count || 0) }
           })
+        payrateTotalSupply = perPerson.reduce((s: number, p: { count: number }) => s + p.count, 0)
         setPerPersonSupply(perPerson)
       } else {
         setPerPersonSupply([])
@@ -632,7 +716,11 @@ export default function PayrollTab() {
       // 새로 로드한 값을 변수에 먼저 저장 — autoLoad에 직접 전달해 stale closure 방지
       const freshOps   = d.ops_employees  || opsEmps
       const freshSales = d.sales_employees || salesEmps
-      const freshCosts = d.other_costs ? { ...defaultCosts(), ...d.other_costs } : costs
+      const rawCosts   = d.other_costs ? { ...defaultCosts(), ...d.other_costs } : costs
+      // payrate 실계산값이 있으면 db_count를 실계산값으로 덮어씀 (저장값과 배지가 항상 일치)
+      const freshCosts = payrateTotalSupply > 0
+        ? { ...rawCosts, db_count: payrateTotalSupply }
+        : rawCosts
       setOpsEmps(freshOps)
       setSalesEmps(freshSales)
       setCosts(freshCosts)
@@ -656,7 +744,18 @@ export default function PayrollTab() {
     setLoading(false)
   }
 
-  useEffect(() => { handleLoad() }, [yearMonth]) // eslint-disable-line
+  useEffect(() => {
+    const prev = prevMonthRef.current
+    prevMonthRef.current = yearMonth
+
+    // 월이 실제로 바뀌었고 이전 달 데이터가 로드된 상태라면 → 이전 달 데이터 자동저장
+    if (prev !== yearMonth && didInitLoad.current) {
+      const s = prevStateRef.current
+      doSave(s.ops, s.sales, s.costs, s.rev, prev).catch(() => {})
+    }
+
+    handleLoad()
+  }, [yearMonth]) // eslint-disable-line
 
   // ── 업데이트 헬퍼 ─────────────────────────────────────────
   function updateOps(i: number, f: keyof OpsEmployee, v: string) {

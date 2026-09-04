@@ -33,6 +33,7 @@ export const INCOME_TAX_RATE      = 0.03
 export const LOCAL_TAX_RATE       = 0.003
 export const OPS_FEE_RATE         = 0.10 // 수수료 매출의 10%
 export const OPS_PUTO_RATE        = 0.40 // 뿌토 매출의 40%
+export const OPS_MONTHLY_SUB_RATE = 0.05 // 월정기권(수수료없음) 계약금의 5% → 관리팀장 보너스
 export const NET_RATE             = 0.967 // 원천징수(3.3%) 후 실수령율
 
 // ── 실시간 영업팀 계약 집계 ───────────────────────────────
@@ -43,6 +44,21 @@ export interface ContractEntry {
   weight:  number
   date:    string
   refund?: boolean
+}
+
+// 월정기권 계약 보너스 총액 계산 (contract_type === '월정기권' 이고 해당 월에 들어온 것)
+export function calcMonthlySubBonus(customers: any[], yearMonth: string): number {
+  const parseMon = (v: any) => parseInt(String(v || '0').replace(/[^0-9]/g, ''), 10) || 0
+  let total = 0
+  for (const c of customers) {
+    if (c.details?.contract_type !== '월정기권') continue
+    if (c.status !== 'contracted') continue
+    const cm = (c.details?.contract_date || c.created_at || '').slice(0, 7)
+    if (cm !== yearMonth) continue
+    const amt = parseMon(c.details?.payment_amount)
+    total += Math.round(amt * OPS_MONTHLY_SUB_RATE)
+  }
+  return total
 }
 
 export function buildSalesContractMap(

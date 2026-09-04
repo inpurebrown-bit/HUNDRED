@@ -935,7 +935,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
       </div>
 
       {/* ══ 최근 3개월 현황 ══ */}
-      <div ref={thisMonthRef}>
+      <div ref={thisMonthRef} className="grid grid-cols-3 gap-4 items-start">
         <MonthSection
           title={`${thisMonth}월 현황`}
           loading={loading}
@@ -949,9 +949,6 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           opsUserRows={thisMonthOpsUserRows}
           putoContractCount={revenueData?.putoContractCount ?? 0}
         />
-      </div>
-
-      <div ref={lastMonthRef}>
         <MonthSection
           title={`${lastMonth}월 현황`}
           loading={loading}
@@ -964,20 +961,19 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           vatRevenue={lastVatRevenue}
           opsUserRows={lastMonthOpsUserRows}
         />
+        <MonthSection
+          title={`${twoAgoMonth}월 현황`}
+          loading={loading}
+          contractCount={twoAgoContracts.reduce((s, c) => s + contractWeight(c.contract_amount, c.vat_included), 0)}
+          inProgressCount={twoAgoInProgress}
+          taxAmount={twoAgoTax}
+          employeeRows={twoAgoRows}
+          salesRevenueAmount={twoAgoSalesRaw}
+          opsRevenueAmount={twoAgoOpsRaw}
+          vatRevenue={twoAgoVatRevenue}
+          opsUserRows={twoAgoOpsUserRows}
+        />
       </div>
-
-      <MonthSection
-        title={`${twoAgoMonth}월 현황`}
-        loading={loading}
-        contractCount={twoAgoContracts.reduce((s, c) => s + contractWeight(c.contract_amount, c.vat_included), 0)}
-        inProgressCount={twoAgoInProgress}
-        taxAmount={twoAgoTax}
-        employeeRows={twoAgoRows}
-        salesRevenueAmount={twoAgoSalesRaw}
-        opsRevenueAmount={twoAgoOpsRaw}
-        vatRevenue={twoAgoVatRevenue}
-        opsUserRows={twoAgoOpsUserRows}
-      />
 
       {/* ══ 공지사항 ══ */}
       <NoticeSection />

@@ -3870,11 +3870,27 @@ interface OpsDailyReport {
 // ──────────────────────────────────────────────────────────────────────
 function OpsMiniRevenue({ userName }: { userName: string }) {
   const [rev, setRev] = useState<any>(null)
+  const [monthlySubCount, setMonthlySubCount] = useState<number | null>(null)
 
   useEffect(() => {
     fetch('/api/revenue')
       .then(r => r.json())
       .then(d => setRev(d))
+      .catch(() => {})
+    const ym = (() => {
+      const d = new Date()
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    })()
+    fetch('/api/customers')
+      .then(r => r.json())
+      .then(d => {
+        const count = (d.customers || []).filter((c: any) =>
+          c.details?.contract_type === '월정기권' &&
+          c.status === 'contracted' &&
+          (c.details?.contract_date || c.created_at || '').slice(0, 7) === ym
+        ).length
+        setMonthlySubCount(count)
+      })
       .catch(() => {})
   }, [])
 
@@ -3909,6 +3925,15 @@ function OpsMiniRevenue({ userName }: { userName: string }) {
           <p className="text-white/30 text-[9px] mt-0.5">{rev ? (rev.thisMonthOpsContracts?.length || 0) + '건' : ''}</p>
         </div>
       </div>
+      {monthlySubCount !== null && monthlySubCount > 0 && (
+        <div className="mt-2 bg-purple-600/40 rounded-lg px-3 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-purple-200 font-bold">월정기권</span>
+            <span className="text-[9px] text-purple-300">이달 진행중</span>
+          </div>
+          <span className="text-white font-black text-sm">{monthlySubCount}건</span>
+        </div>
+      )}
     </div>
   )
 }
