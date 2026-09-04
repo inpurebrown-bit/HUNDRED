@@ -267,11 +267,6 @@ function MonthSection({
   opsUserRows = [],
   putoContractCount = 0,
 }: MonthSectionProps) {
-  const [mgrTargetRevenue]   = useState(() => { try { return Number(localStorage.getItem('mgr-target-revenue') || 0) } catch { return 0 } })
-  const [mgrTargetContracts] = useState(() => { try { return Number(localStorage.getItem('mgr-target-contracts') || 0) } catch { return 0 } })
-  const commissionRevenue = Math.round(opsRevenueAmount * 0.1)
-  const revenueProgress   = mgrTargetRevenue > 0 ? Math.min(100, Math.round(commissionRevenue / mgrTargetRevenue * 100)) : 0
-  const contractProgress  = mgrTargetContracts > 0 ? Math.min(100, Math.round(putoContractCount / mgrTargetContracts * 100)) : 0
 
   return (
     <section className="bg-white rounded-2xl border border-[#E8E2D4] overflow-hidden">
@@ -291,39 +286,6 @@ function MonthSection({
             <div className="flex-1 min-w-0">
               <p className="text-[10px] font-bold text-[#1B2A45] bg-[#1B2A45]/8 inline-block px-2 py-0.5 rounded mb-2">영업팀</p>
               <EmployeeTable rows={employeeRows} loading={loading} />
-              {/* 관리실장 김윤지 현황 */}
-              <div className="mt-3 bg-teal-50 border border-teal-200 rounded-xl p-3">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <div className="w-5 h-5 rounded-full bg-teal-500 flex items-center justify-center text-white text-[9px] font-bold">김</div>
-                  <p className="text-[10px] font-bold text-teal-900">관리실장 김윤지</p>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-white/70 rounded-lg p-2">
-                    <p className="text-[9px] text-gray-400 mb-0.5">수수료매출 (×10%)</p>
-                    <p className="text-sm font-black text-teal-700 leading-none">{fmtKrw(commissionRevenue)}</p>
-                    {mgrTargetRevenue > 0 && (
-                      <div className="mt-1.5">
-                        <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
-                          <div className="h-full bg-teal-400 rounded-full" style={{ width: `${revenueProgress}%` }} />
-                        </div>
-                        <p className="text-[8px] text-gray-400 mt-0.5">{revenueProgress}% / 목표 {fmtKrw(mgrTargetRevenue)}</p>
-                      </div>
-                    )}
-                  </div>
-                  <div className="bg-white/70 rounded-lg p-2">
-                    <p className="text-[9px] text-gray-400 mb-0.5">뿌토 계약</p>
-                    <p className="text-sm font-black text-emerald-700 leading-none">{putoContractCount}건</p>
-                    {mgrTargetContracts > 0 && (
-                      <div className="mt-1.5">
-                        <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
-                          <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${contractProgress}%` }} />
-                        </div>
-                        <p className="text-[8px] text-gray-400 mt-0.5">{contractProgress}% / 목표 {mgrTargetContracts}건</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
             </div>
             {/* 구분선 */}
             <div className="hidden md:block w-px bg-[#E8E2D4] self-stretch shrink-0" />
