@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
 // ─── Types ────────────────────────────────────────────────
 
@@ -326,12 +326,204 @@ function SubRow({
   )
 }
 
+// ─── 스프레드시트 ─────────────────────────────────────────
+
+interface SheetData {
+  headers: string[]
+  rows: string[][]
+}
+
+const DEFAULT_COLS = 6
+const DEFAULT_ROWS = 30
+
+function makeDefaultSheet(): SheetData {
+  return {
+    headers: ['A', 'B', 'C', 'D', 'E', 'F'],
+    rows: Array.from({ length: DEFAULT_ROWS }, () => Array(DEFAULT_COLS).fill('')),
+  }
+}
+
+function SpreadsheetTab({
+  sheet, onChange,
+}: {
+  sheet: SheetData
+  onChange: (s: SheetData) => void
+}) {
+  const [sel, setSel] = useState<[number, number] | null>(null) // [row, col]
+  const [editingHeader, setEditingHeader] = useState<number | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const headerInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (sel && inputRef.current) inputRef.current.focus()
+  }, [sel])
+  useEffect(() => {
+    if (editingHeader !== null && headerInputRef.current) headerInputRef.current.focus()
+  }, [editingHeader])
+
+  function setCell(r: number, c: number, val: string) {
+    const rows = sheet.rows.map((row, ri) =>
+      ri === r ? row.map((cell, ci) => (ci === c ? val : cell)) : row
+    )
+    onChange({ ...sheet, rows })
+  }
+
+  function setHeader(c: number, val: string) {
+    const headers = sheet.headers.map((h, i) => (i === c ? val : h))
+    onChange({ ...sheet, headers })
+  }
+
+  function addRow() {
+    onChange({ ...sheet, rows: [...sheet.rows, Array(sheet.headers.length).fill('')] })
+  }
+
+  function addCol() {
+    onChange({
+      headers: [...sheet.headers, String.fromCharCode(65 + sheet.headers.length)],
+      rows: sheet.rows.map(row => [...row, '']),
+    })
+  }
+
+  function delLastRow() {
+    if (sheet.rows.length <= 1) return
+    onChange({ ...sheet, rows: sheet.rows.slice(0, -1) })
+  }
+
+  function delLastCol() {
+    if (sheet.headers.length <= 1) return
+    onChange({
+      headers: sheet.headers.slice(0, -1),
+      rows: sheet.rows.map(row => row.slice(0, -1)),
+    })
+  }
+
+  const numCols = sheet.headers.length
+
+  function handleKeyDown(e: React.KeyboardEvent, r: number, c: number) {
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      const nextC = e.shiftKey ? c - 1 : c + 1
+      if (nextC >= 0 && nextC < numCols) setSel([r, nextC])
+      else if (!e.shiftKey && r < sheet.rows.length - 1) setSel([r + 1, 0])
+      else if (e.shiftKey && r > 0) setSel([r - 1, numCols - 1])
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (r < sheet.rows.length - 1) setSel([r + 1, c])
+      else setSel(null)
+    } else if (e.key === 'Escape') {
+      setSel(null)
+    } else if (e.key === 'ArrowUp' && e.ctrlKey) {
+      e.preventDefault(); if (r > 0) setSel([r - 1, c])
+    } else if (e.key === 'ArrowDown' && e.ctrlKey) {
+      e.preventDefault(); if (r < sheet.rows.length - 1) setSel([r + 1, c])
+    }
+  }
+
+  const COL_W = 120
+  const ROW_NUM_W = 36
+
+  return (
+    <div className="space-y-2">
+      {/* 툴바 */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-gray-400 font-medium">
+          {sheet.rows.length}행 × {sheet.headers.length}열
+        </span>
+        <div className="flex items-center gap-1 ml-auto">
+          <button onClick={addRow} className="text-[11px] bg-gray-100 hover:bg-gray-200 text-gray-600 px-2.5 py-1 rounded-lg font-medium">+ 행</button>
+          <button onClick={delLastRow} className="text-[11px] bg-gray-100 hover:bg-red-50 text-gray-400 hover:text-red-500 px-2.5 py-1 rounded-lg font-medium">- 행</button>
+          <div className="w-px h-4 bg-gray-200 mx-1" />
+          <button onClick={addCol} className="text-[11px] bg-gray-100 hover:bg-gray-200 text-gray-600 px-2.5 py-1 rounded-lg font-medium">+ 열</button>
+          <button onClick={delLastCol} className="text-[11px] bg-gray-100 hover:bg-red-50 text-gray-400 hover:text-red-500 px-2.5 py-1 rounded-lg font-medium">- 열</button>
+        </div>
+      </div>
+
+      {/* 시트 */}
+      <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+        <div className="overflow-auto max-h-[60vh]" style={{ maxWidth: '100%' }}>
+          <table className="border-collapse" style={{ minWidth: ROW_NUM_W + numCols * COL_W }}>
+            {/* 헤더 행 */}
+            <thead className="sticky top-0 z-10">
+              <tr>
+                <th style={{ width: ROW_NUM_W, minWidth: ROW_NUM_W }}
+                  className="bg-gray-100 border-b border-r border-gray-200 text-[10px] text-gray-400 font-bold" />
+                {sheet.headers.map((h, ci) => (
+                  <th key={ci} style={{ width: COL_W, minWidth: COL_W }}
+                    className="bg-gray-100 border-b border-r border-gray-200 px-1 py-1">
+                    {editingHeader === ci ? (
+                      <input
+                        ref={headerInputRef}
+                        className="w-full bg-white border border-blue-300 rounded px-1 py-0.5 text-[11px] font-bold text-center focus:outline-none"
+                        value={h}
+                        onChange={e => setHeader(ci, e.target.value)}
+                        onBlur={() => setEditingHeader(null)}
+                        onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setEditingHeader(null) }}
+                      />
+                    ) : (
+                      <button
+                        className="w-full text-[11px] font-bold text-gray-500 hover:text-blue-600 text-center py-0.5 rounded hover:bg-blue-50 transition-colors"
+                        onDoubleClick={() => setEditingHeader(ci)}
+                        title="더블클릭으로 헤더 편집"
+                      >
+                        {h || String.fromCharCode(65 + ci)}
+                      </button>
+                    )}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {sheet.rows.map((row, ri) => (
+                <tr key={ri} className="group">
+                  {/* 행 번호 */}
+                  <td style={{ width: ROW_NUM_W }}
+                    className="bg-gray-50 border-b border-r border-gray-100 text-[10px] text-gray-400 text-center font-medium select-none sticky left-0 z-[1]">
+                    {ri + 1}
+                  </td>
+                  {row.map((cell, ci) => {
+                    const isSelected = sel?.[0] === ri && sel?.[1] === ci
+                    return (
+                      <td key={ci}
+                        style={{ width: COL_W, height: 28 }}
+                        className={`border-b border-r border-gray-100 p-0 ${isSelected ? 'ring-2 ring-inset ring-blue-400' : 'hover:bg-blue-50/30'}`}
+                        onClick={() => setSel([ri, ci])}
+                      >
+                        {isSelected ? (
+                          <input
+                            ref={inputRef}
+                            className="w-full h-full px-2 text-xs bg-white focus:outline-none"
+                            style={{ height: 28 }}
+                            value={cell}
+                            onChange={e => setCell(ri, ci, e.target.value)}
+                            onKeyDown={e => handleKeyDown(e, ri, ci)}
+                            onBlur={() => setSel(null)}
+                          />
+                        ) : (
+                          <div className="px-2 text-xs text-gray-700 leading-7 whitespace-nowrap overflow-hidden">
+                            {cell}
+                          </div>
+                        )}
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <p className="text-[10px] text-gray-300 text-right">클릭해서 편집 · Tab/Enter 이동 · 헤더 더블클릭으로 이름변경 · 자동저장</p>
+    </div>
+  )
+}
+
 // ─── 메인 컴포넌트 ────────────────────────────────────────
 
 export default function PersonalFinanceTab() {
-  const [activeTab, setActiveTab] = useState<'loans' | 'subs'>('loans')
+  const [activeTab, setActiveTab] = useState<'loans' | 'subs' | 'sheet'>('loans')
   const [loans, setLoans]         = useState<Loan[]>(DEFAULT_LOANS)
   const [subs, setSubs]           = useState<Subscription[]>(DEFAULT_SUBS)
+  const [sheet, setSheet]         = useState<SheetData>(makeDefaultSheet())
   const [phaseLabels, setPhaseLabels] = useState<[string, string]>(['28년 1월까지', '28년 2월부터'])
   const [editingLoan, setEditingLoan] = useState<Loan | null>(null)
   const [saving, setSaving]       = useState(false)
@@ -341,6 +533,16 @@ export default function PersonalFinanceTab() {
   const [quickAmtId, setQuickAmtId] = useState<string | null>(null)
   const [quickAmtVal, setQuickAmtVal] = useState('')
 
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const loansRef  = useRef(loans)
+  const subsRef   = useRef(subs)
+  const sheetRef  = useRef(sheet)
+  const labelsRef = useRef(phaseLabels)
+  useEffect(() => { loansRef.current = loans }, [loans])
+  useEffect(() => { subsRef.current = subs }, [subs])
+  useEffect(() => { sheetRef.current = sheet }, [sheet])
+  useEffect(() => { labelsRef.current = phaseLabels }, [phaseLabels])
+
   // 불러오기
   useEffect(() => {
     setLoading(true)
@@ -349,25 +551,42 @@ export default function PersonalFinanceTab() {
       .then(json => {
         if (json.record?.employees) {
           const d = json.record.employees
-          if (d.loans?.length) setLoans(d.loans)
-          if (d.subs?.length)  setSubs(d.subs)
-          if (d.phaseLabels)   setPhaseLabels(d.phaseLabels)
+          if (d.loans?.length)  setLoans(d.loans)
+          if (d.subs?.length)   setSubs(d.subs)
+          if (d.phaseLabels)    setPhaseLabels(d.phaseLabels)
+          if (d.sheet?.headers) setSheet(d.sheet)
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
 
-  // 저장
-  async function save() {
-    setSaving(true); setMsg('')
+  const doSaveRaw = useCallback(async (data: object) => {
+    setSaving(true)
     const res = await fetch('/api/personal-finance', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: { loans, subs, phaseLabels } }),
+      body: JSON.stringify({ data }),
     })
     const json = await res.json()
-    setMsg(json.record ? '저장 완료 ✓' : '저장 실패')
+    setMsg(json.record ? '자동저장 ✓' : '저장 실패')
     setSaving(false)
+    setTimeout(() => setMsg(''), 2000)
+  }, [])
+
+  // 수동 저장
+  async function save() {
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    await doSaveRaw({ loans, subs, phaseLabels, sheet })
+    setMsg('저장 완료 ✓')
+  }
+
+  // 시트 변경시 자동저장 (1.5초 debounce)
+  function handleSheetChange(next: SheetData) {
+    setSheet(next)
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = setTimeout(() => {
+      doSaveRaw({ loans: loansRef.current, subs: subsRef.current, phaseLabels: labelsRef.current, sheet: next })
+    }, 1500)
   }
 
   // 대출 집계
@@ -388,7 +607,7 @@ export default function PersonalFinanceTab() {
       {/* 헤더 */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex bg-gray-100 rounded-xl p-1 gap-1">
-          {([['loans','대출 현황'],['subs','정기구독']] as const).map(([k,l]) => (
+          {([['loans','대출 현황'],['subs','정기구독'],['sheet','메모 시트']] as const).map(([k,l]) => (
             <button key={k} onClick={() => setActiveTab(k)}
               className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === k ? 'bg-white text-[#1B2A45] shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>
               {l}
@@ -645,6 +864,11 @@ export default function PersonalFinanceTab() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ════════════════ 메모 시트 ════════════════ */}
+      {activeTab === 'sheet' && (
+        <SpreadsheetTab sheet={sheet} onChange={handleSheetChange} />
       )}
 
       {/* 대출 편집 모달 */}
