@@ -1864,10 +1864,14 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
 
   const morningReports = reports.filter(r => r.report_type === 'morning')
   const dailyReports   = reports.filter(r => r.report_type === 'daily')
-  const filtered = filter === 'all' ? reports : reports.filter(r => r.report_type === filter)
+  const opsReports     = reports.filter(r => r.report_type === 'ops_daily' || r.report_type === 'ops_morning')
+  const filtered = filter === 'all' ? reports
+    : filter === 'ops' ? opsReports
+    : reports.filter(r => r.report_type === filter)
   const todayStr = new Date().toISOString().slice(0, 10)
   const todayMorning = morningReports.filter(r => r.report_date === todayStr)
   const todayDaily   = dailyReports.filter(r => r.report_date === todayStr)
+  const todayOps     = opsReports.filter(r => r.report_date === todayStr)
 
   // 날짜별 그룹핑
   const groupedByDate = filtered.reduce((acc: Record<string, any[]>, r: any) => {
@@ -1925,7 +1929,7 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
   return (
     <div className="space-y-5 pb-8">
       {/* 오늘 현황 */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-3">
         <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
           <p className="text-xs text-amber-600 font-semibold mb-1">오늘 오전보고</p>
           {todayMorning.length === 0 ? <p className="text-sm text-amber-400">아직 제출 없음</p> : (
@@ -1952,6 +1956,19 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
             </div>
           )}
         </div>
+        <div className="bg-teal-50 border border-teal-100 rounded-xl p-4">
+          <p className="text-xs text-teal-600 font-semibold mb-1">오늘 관리팀보고</p>
+          {todayOps.length === 0 ? <p className="text-sm text-teal-400">아직 제출 없음</p> : (
+            <div className="space-y-1">
+              {todayOps.map(r => (
+                <div key={r.id} className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-teal-800">{r.user_name}</span>
+                  <button onClick={() => setViewReport(r)} className="text-xs text-teal-600 hover:text-teal-800">보기</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 탭 */}
@@ -1960,6 +1977,7 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
           { key: 'all',     label: `전체 (${reports.length})` },
           { key: 'morning', label: `오전보고 (${morningReports.length})` },
           { key: 'daily',   label: `마감보고 (${dailyReports.length})` },
+          { key: 'ops',     label: `관리팀보고 (${opsReports.length})` },
         ].map(f => (
           <button key={f.key} onClick={() => { setFilter(f.key as any); setSelected(new Set()) }}
             className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
@@ -2046,6 +2064,7 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
             const isToday = date === todayStr
             const morning = dayItems.filter((r:any) => r.report_type === 'morning')
             const daily   = dayItems.filter((r:any) => r.report_type === 'daily')
+            const opsDay  = dayItems.filter((r:any) => r.report_type === 'ops_daily' || r.report_type === 'ops_morning')
             // 전체 직원 이름 (모든 보고자)
             const names = [...new Set(dayItems.map((r:any) => r.user_name))] as string[]
             return (
@@ -2060,6 +2079,7 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
                     <div className="flex gap-1">
                       {morning.length > 0 && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">오전 {morning.length}건</span>}
                       {daily.length > 0   && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">마감 {daily.length}건</span>}
+                      {opsDay.length > 0  && <span className="text-[10px] bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full">관리팀 {opsDay.length}건</span>}
                     </div>
                   </div>
                   {isCeo && (
@@ -2082,37 +2102,44 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
                 {/* 직원별 요약 행 */}
                 <div className="divide-y divide-[#E8E2D4]/40">
                   {names.map(name => {
-                    const mr = morning.find((r:any) => r.user_name === name)
-                    const dr = daily.find((r:any) => r.user_name === name)
+                    const mr  = morning.find((r:any) => r.user_name === name)
+                    const dr  = daily.find((r:any) => r.user_name === name)
+                    const odr = opsDay.find((r:any) => r.user_name === name)
                     const tc = Number(mr?.data?.total_calls || 0)
                     const cn = Number(mr?.data?.connected || 0)
                     const oc = Number(mr?.data?.outbound_contracts || 0)
                     const db = Number(mr?.data?.db_secured || 0)
+                    const isOpsOnly = !mr && !dr && !!odr
                     return (
-                      <div key={name} className={`px-4 py-3 flex items-center gap-2 ${selected.has(mr?.id||'') || selected.has(dr?.id||'') ? 'bg-red-50' : 'hover:bg-[#FAF8F3]'} transition-colors`}>
+                      <div key={name} className={`px-4 py-3 flex items-center gap-2 ${selected.has(mr?.id||'') || selected.has(dr?.id||'') || selected.has(odr?.id||'') ? 'bg-red-50' : isOpsOnly ? 'bg-teal-50/30 hover:bg-teal-50' : 'hover:bg-[#FAF8F3]'} transition-colors`}>
                         {isCeo && (
                           <div className="flex gap-1 shrink-0">
-                            {mr && <input type="checkbox" checked={selected.has(mr.id)} onChange={() => toggleSelect(mr.id)} className="w-3.5 h-3.5 rounded" />}
-                            {dr && <input type="checkbox" checked={selected.has(dr.id)} onChange={() => toggleSelect(dr.id)} className="w-3.5 h-3.5 rounded" />}
+                            {mr  && <input type="checkbox" checked={selected.has(mr.id)}  onChange={() => toggleSelect(mr.id)}  className="w-3.5 h-3.5 rounded" />}
+                            {dr  && <input type="checkbox" checked={selected.has(dr.id)}  onChange={() => toggleSelect(dr.id)}  className="w-3.5 h-3.5 rounded" />}
+                            {odr && <input type="checkbox" checked={selected.has(odr.id)} onChange={() => toggleSelect(odr.id)} className="w-3.5 h-3.5 rounded" />}
                           </div>
                         )}
                         {/* 이름 */}
                         <div className="w-20 shrink-0">
                           <span className="text-sm font-bold text-[#1B2A45]">{name}</span>
+                          {isOpsOnly && <span className="block text-[9px] text-teal-600 font-semibold">관리팀</span>}
                         </div>
-                        {/* 오전보고 요약 */}
+                        {/* 보고 요약 */}
                         <div className="flex-1 min-w-0">
-                          {mr ? (
-                            <div className="flex items-center gap-3 flex-wrap">
-                              <span className="text-[10px] text-amber-600 font-bold">오전</span>
-                              <span className="text-xs text-gray-600">콜 <b>{tc}</b></span>
-                              <span className="text-xs text-gray-600">연결 <b className="text-amber-600">{cn}</b>{tc>0&&<span className="text-gray-400">({(cn/tc*100).toFixed(0)}%)</span>}</span>
-                              <span className="text-xs text-gray-600">DB <b>{db}</b></span>
-                              <span className="text-xs text-gray-600">계약 <b className="text-emerald-600">{oc}</b></span>
-                              <button onClick={() => setViewReport(mr)} className="text-[10px] text-blue-500 hover:underline ml-auto shrink-0">상세</button>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-300 italic">오전보고 미제출</span>
+                          {/* 영업팀 오전/마감 */}
+                          {(mr || (!odr)) && (
+                            mr ? (
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <span className="text-[10px] text-amber-600 font-bold">오전</span>
+                                <span className="text-xs text-gray-600">콜 <b>{tc}</b></span>
+                                <span className="text-xs text-gray-600">연결 <b className="text-amber-600">{cn}</b>{tc>0&&<span className="text-gray-400">({(cn/tc*100).toFixed(0)}%)</span>}</span>
+                                <span className="text-xs text-gray-600">DB <b>{db}</b></span>
+                                <span className="text-xs text-gray-600">계약 <b className="text-emerald-600">{oc}</b></span>
+                                <button onClick={() => setViewReport(mr)} className="text-[10px] text-blue-500 hover:underline ml-auto shrink-0">상세</button>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-gray-300 italic">오전보고 미제출</span>
+                            )
                           )}
                           {dr ? (
                             <div className="flex items-center gap-3 flex-wrap mt-0.5">
@@ -2125,8 +2152,21 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
                               <span className="text-xs text-gray-600">목표 <b>{dr.data?.goal||0}</b>건</span>
                               <button onClick={() => setViewReport(dr)} className="text-[10px] text-blue-500 hover:underline ml-auto shrink-0">상세</button>
                             </div>
-                          ) : (
+                          ) : !odr ? (
                             <span className="text-xs text-gray-300 italic mt-0.5 block">마감보고 미제출</span>
+                          ) : null}
+                          {/* 관리팀 일일보고 */}
+                          {odr && (
+                            <div className="flex items-center gap-3 flex-wrap mt-0.5">
+                              <span className="text-[10px] text-teal-600 font-bold">관리팀</span>
+                              <span className="text-xs text-gray-600">실사 <b className="text-teal-600">{odr.data?.auto_stats?.real_insp_count||0}</b>건</span>
+                              <span className="text-xs text-gray-600">승인 <b className="text-emerald-600">{odr.data?.auto_stats?.approval_count||0}</b>건</span>
+                              <span className="text-xs text-gray-600">입금전 <b className="text-blue-600">{odr.data?.auto_stats?.payment_count||0}</b>건</span>
+                              {odr.data?.auto_stats?.month_revenue > 0 && (
+                                <span className="text-xs text-gray-600">월매출 <b className="text-teal-700">{Math.round(odr.data.auto_stats.month_revenue/10000)}만</b></span>
+                              )}
+                              <button onClick={() => setViewReport(odr)} className="text-[10px] text-teal-500 hover:underline ml-auto shrink-0">상세</button>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -2146,7 +2186,7 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
             <div className="sticky top-0 bg-white px-6 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-gray-900">
-                  {viewReport.report_type === 'morning' ? '오전보고' : '마감보고'}
+                  {viewReport.report_type === 'morning' ? '오전보고' : viewReport.report_type === 'ops_daily' || viewReport.report_type === 'ops_morning' ? '관리팀보고' : '마감보고'}
                 </h3>
                 <p className="text-xs text-gray-400">{viewReport.user_name} · {viewReport.report_date}</p>
               </div>
@@ -2155,11 +2195,90 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
             <div className="p-6">
               {viewReport.report_type === 'morning' ? (
                 <MorningDetail data={viewReport.data} />
+              ) : viewReport.report_type === 'ops_daily' || viewReport.report_type === 'ops_morning' ? (
+                <OpsReportDetail data={viewReport.data} />
               ) : (
                 <DailyDetail data={viewReport.data} />
               )}
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function OpsReportDetail({ data }: { data: any }) {
+  const s = data?.auto_stats
+  return (
+    <div className="space-y-4 text-sm">
+      {s && (
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { label: '월매출', value: s.month_revenue != null ? s.month_revenue.toLocaleString('ko-KR') + '원' : '-' },
+            { label: '실사건', value: s.real_insp_count ?? 0 },
+            { label: '승인건', value: s.approval_count ?? 0 },
+            { label: '입금전', value: s.payment_count ?? 0 },
+            { label: '1차흡수', value: s.stage1_count ?? 0 },
+            { label: '2차흡수', value: s.stage2_count ?? 0 },
+          ].map(({ label, value }) => (
+            <div key={label} className="bg-teal-50 rounded-lg p-2 flex flex-col items-center">
+              <span className="text-[10px] text-teal-600 font-medium">{label}</span>
+              <span className="font-bold text-gray-800 text-sm">{value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {s?.real_insp_names?.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold text-gray-500 mb-1">실사건 업체</p>
+          <p className="text-xs text-gray-700">{s.real_insp_names.join(', ')}</p>
+        </div>
+      )}
+      {s?.approval_names?.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold text-gray-500 mb-1">승인 업체</p>
+          <p className="text-xs text-gray-700">{s.approval_names.join(', ')}</p>
+        </div>
+      )}
+      {s?.payment_names?.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold text-gray-500 mb-1">입금전 업체</p>
+          <p className="text-xs text-gray-700">{s.payment_names.join(', ')}</p>
+        </div>
+      )}
+      {data?.stage2_notes?.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold text-gray-500 mb-1">2차흡수 내역</p>
+          <div className="space-y-1">
+            {data.stage2_notes.map((n: any, i: number) => (
+              <div key={i} className="bg-gray-50 rounded p-2 text-xs">
+                <span className="font-semibold text-gray-800">{n.company}</span>
+                {n.fund && <span className="ml-2 text-teal-700">{n.fund}</span>}
+                {n.note && <p className="text-gray-500 mt-0.5">{n.note}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {data?.active_case_notes?.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold text-gray-500 mb-1">처리업체 특이사항</p>
+          <div className="space-y-1">
+            {data.active_case_notes.map((n: any, i: number) => (
+              <div key={i} className="bg-gray-50 rounded p-2 text-xs">
+                <span className="font-semibold text-gray-800">{n.company}</span>
+                {n.institution && <span className="ml-2 text-gray-500">{n.institution}</span>}
+                {n.note && <p className="text-gray-500 mt-0.5">{n.note}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {data?.special_notes && (
+        <div>
+          <p className="text-[10px] font-semibold text-gray-500 mb-1">특이사항</p>
+          <p className="text-xs text-gray-700 whitespace-pre-wrap">{data.special_notes}</p>
         </div>
       )}
     </div>
