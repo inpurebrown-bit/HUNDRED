@@ -343,6 +343,42 @@ function makeDefaultSheet(): SheetData {
   }
 }
 
+// 열 문자 → 인덱스 (A→0, B→1, AA→26 ...)
+function colLetterToIndex(s: string): number {
+  let n = 0
+  for (const ch of s.toUpperCase()) n = n * 26 + (ch.charCodeAt(0) - 64)
+  return n - 1
+}
+
+// =수식 평가 (셀 참조 + 사칙연산)
+function evalFormula(formula: string, rows: string[][]): string {
+  try {
+    // 셀 참조 치환: A1, B2, AA3 형태
+    const expr = formula.replace(/([A-Za-z]+)(\d+)/g, (_, col, row) => {
+      const ci = colLetterToIndex(col)
+      const ri = parseInt(row, 10) - 1
+      const raw = rows[ri]?.[ci] ?? '0'
+      // 참조 셀이 수식이면 재귀 평가
+      if (raw.startsWith('=')) {
+        const inner = evalFormula(raw.slice(1), rows)
+        return isNaN(Number(inner)) ? '0' : inner
+      }
+      const n = parseFloat(raw.replace(/,/g, ''))
+      return isNaN(n) ? '0' : String(n)
+    })
+    // 안전한 사칙연산만 허용
+    if (!/^[\d\s+\-*/().%,]+$/.test(expr)) return '#ERR'
+    // eslint-disable-next-line no-new-func
+    const result = Function('"use strict"; return (' + expr + ')')()
+    if (typeof result !== 'number' || !isFinite(result)) return '#ERR'
+    // 소수점 처리
+    const rounded = Math.round(result * 1e10) / 1e10
+    return Number.isInteger(rounded) ? rounded.toLocaleString('ko-KR') : rounded.toLocaleString('ko-KR', { maximumFractionDigits: 4 })
+  } catch {
+    return '#ERR'
+  }
+}
+
 function SpreadsheetTab({
   sheet, onChange,
 }: {
@@ -438,6 +474,17 @@ function SpreadsheetTab({
         </div>
       </div>
 
+      {/* 수식바 */}
+      <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[32px]">
+        <span className="text-[10px] font-bold text-gray-400 shrink-0 w-10">
+          {sel ? `${String.fromCharCode(65 + sel[1])}${sel[0] + 1}` : ''}
+        </span>
+        <div className="w-px h-4 bg-gray-200" />
+        <span className="text-xs text-gray-500 font-mono">
+          {sel ? (sheet.rows[sel[0]]?.[sel[1]] || '') : <span className="text-gray-300">셀을 클릭하세요</span>}
+        </span>
+      </div>
+
       {/* 시트 */}
       <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-auto max-h-[60vh]" style={{ maxWidth: '100%' }}>
@@ -482,6 +529,9 @@ function SpreadsheetTab({
                   </td>
                   {row.map((cell, ci) => {
                     const isSelected = sel?.[0] === ri && sel?.[1] === ci
+                    const isFormula = cell.startsWith('=')
+                    const displayed = isFormula ? evalFormula(cell.slice(1), sheet.rows) : cell
+                    const isErr = displayed === '#ERR'
                     return (
                       <td key={ci}
                         style={{ width: COL_W, height: 28 }}
@@ -499,8 +549,8 @@ function SpreadsheetTab({
                             onBlur={() => setSel(null)}
                           />
                         ) : (
-                          <div className="px-2 text-xs text-gray-700 leading-7 whitespace-nowrap overflow-hidden">
-                            {cell}
+                          <div className={`px-2 text-xs leading-7 whitespace-nowrap overflow-hidden ${isErr ? 'text-red-500 font-bold' : isFormula ? 'text-blue-700 text-right' : 'text-gray-700'}`}>
+                            {displayed}
                           </div>
                         )}
                       </td>
@@ -512,7 +562,7 @@ function SpreadsheetTab({
           </table>
         </div>
       </div>
-      <p className="text-[10px] text-gray-300 text-right">클릭해서 편집 · Tab/Enter 이동 · 헤더 더블클릭으로 이름변경 · 자동저장</p>
+      <p className="text-[10px] text-gray-300 text-right">클릭 편집 · Tab/Enter 이동 · 헤더 더블클릭 이름변경 · 수식: =A1+B2, =A1*0.1 · 자동저장</p>
     </div>
   )
 }
