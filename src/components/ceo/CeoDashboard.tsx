@@ -1847,7 +1847,7 @@ function EmployeeManageSection() {
 function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
   const [reports, setReports] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | 'morning' | 'daily'>('all')
+  const [filter, setFilter] = useState<'all' | 'morning' | 'daily' | 'ops'>('all')
   const [viewReport, setViewReport] = useState<any | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [deleting, setDeleting] = useState(false)
