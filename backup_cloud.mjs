@@ -39,6 +39,7 @@ const TABLES = [
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
+  realtime: { url: 'wss://dummy' },
 })
 
 const now = new Date()
