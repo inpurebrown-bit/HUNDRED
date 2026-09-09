@@ -19,7 +19,7 @@ jobs:
           node-version: '20'
 
       - name: 의존성 설치
-        run: npm ci
+        run: npm install @supabase/supabase-js
 
       - name: DB 백업 실행
         env:
