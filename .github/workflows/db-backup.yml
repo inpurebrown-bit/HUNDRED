@@ -1,0 +1,35 @@
+name: DB 자동 백업
+
+on:
+  schedule:
+    - cron: '0 18 * * *'  # 매일 한국시간 03:00 (UTC 18:00)
+  workflow_dispatch:       # 수동 실행 버튼
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: DB 백업 실행
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: node backup_cloud.mjs
+
+      - name: 백업 파일 아티팩트 저장 (90일 보관)
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: /tmp/db_backup/
+          retention-days: 90
