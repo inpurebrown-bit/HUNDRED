@@ -3900,7 +3900,9 @@ function OpsMiniRevenue({ userName }: { userName: string }) {
     return n.toLocaleString() + '원'
   }
 
-  const feeTotal = (rev?.thisMonthOps || []).reduce((s: number, e: any) => s + (e.amount || 0), 0)
+  // 대표(ceo/unknown) 직접 처리 케이스 제외 — 본인 귀속 매출만 표시
+  const myOps = (rev?.thisMonthOps || []).filter((e: any) => e.creator_role === 'ops' || e.creator_role === '')
+  const feeTotal = myOps.reduce((s: number, e: any) => s + (e.amount || 0), 0)
   const contractTotal = (rev?.thisMonthOpsContracts || []).reduce((s: number, e: any) => s + (e.amount || 0), 0)
   const total = feeTotal + contractTotal
   const monthLabel = new Date().getMonth() + 1
@@ -3917,7 +3919,7 @@ function OpsMiniRevenue({ userName }: { userName: string }) {
         <div className="flex-1 bg-white/10 rounded-lg px-3 py-2 text-center">
           <p className="text-white/50 text-[9px] mb-0.5">수수료 매출</p>
           <p className="text-emerald-300 font-black text-sm">{rev ? fmtMoney(feeTotal) : '—'}</p>
-          <p className="text-white/30 text-[9px] mt-0.5">{rev ? (rev.thisMonthOps?.length || 0) + '건' : ''}</p>
+          <p className="text-white/30 text-[9px] mt-0.5">{rev ? myOps.length + '건' : ''}</p>
         </div>
         <div className="flex-1 bg-white/10 rounded-lg px-3 py-2 text-center">
           <p className="text-white/50 text-[9px] mb-0.5">계약 매출</p>
@@ -3964,11 +3966,13 @@ function OpsRevenueTab({ userName }: { userName: string }) {
   const now = new Date()
   const monthLabel = now.getMonth() + 1
 
-  // 수수료 매출 (API가 이미 유저별 필터 완료 — 추가 필터 없음)
+  // 수수료 매출 — 대표(ceo/unknown) 직접 처리 케이스 제외, 본인 귀속 매출만 표시
   const feeEntries: { company: string; amount: number; date: string }[] =
-    (data?.thisMonthOps || []).map((e: any) => ({
-      company: e.company || '—', amount: e.amount, date: e.date || '',
-    }))
+    (data?.thisMonthOps || [])
+      .filter((e: any) => e.creator_role === 'ops' || e.creator_role === '')
+      .map((e: any) => ({
+        company: e.company || '—', amount: e.amount, date: e.date || '',
+      }))
   const feeTotal = feeEntries.reduce((s, e) => s + e.amount, 0)
 
   // 계약 매출

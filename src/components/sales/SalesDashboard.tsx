@@ -17,6 +17,7 @@ import {
   getRemainingBusinessDays,
 } from '@/lib/businessDays'
 import { SUPPLY_RATE_TABLE, calcRecommendedSupply, isActiveRow, contractWeight } from '@/lib/supplyRules'
+import { calcRefundDeductions } from '@/lib/payrollCalc'
 import SalesScheduleTab from './SalesScheduleTab'
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -761,7 +762,14 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   )
   const thisMonthTotalRevenue = thisMonthRevenue.reduce((sum, c) => sum + pNum((c as any).details?.my_revenue), 0)
   const thisMonthTotalPaid    = thisMonthRevenue.reduce((sum, c) => sum + pNum((c as any).details?.payment_amount), 0)
-  const thisMonthContractCount = thisMonthRevenue.reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0)
+  // 환불 차감 (단일 소스: payrollCalc.calcRefundDeductions)
+  const thisMonthRefunds = calcRefundDeductions(customers, thisMonth)
+  const thisMonthRefundWeight = thisMonthRefunds.reduce((s, d) => s + d.weight, 0)
+  const thisMonthContractCount = Math.max(
+    0,
+    thisMonthRevenue.reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0)
+    - thisMonthRefundWeight
+  )
 
   // 전체 합계
   const totalRevenue = revenueCustomers
@@ -1086,7 +1094,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               const dirCnt    = dirCntAuto  // DB 실시간
               const dirPay    = dirPayAuto  // DB 실시간
               const target    = Number(monthlyGoal)
-              const total     = supPay + dirPay
+              const total     = Math.max(0, supPay + dirPay - thisMonthRefundWeight)
               const supRate   = supCnt > 0 ? (supPay / supCnt * 100) : null
               const dirRate   = dirCnt > 0 ? (dirPay / dirCnt * 100) : null
               // 총결제율 = 총계약수(공가+직가) / 공급갯수 × 100
@@ -1149,6 +1157,18 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   </div>
 
                   <div className="p-4 space-y-3">
+                    {/* 환불 차감 알림 */}
+                    {thisMonthRefunds.length > 0 && (
+                      <div className="bg-red-50 border border-red-100 rounded-xl px-3 py-2 space-y-1">
+                        <p className="text-[9px] font-bold text-red-400 uppercase tracking-widest">이달 환불 차감</p>
+                        {thisMonthRefunds.map((d, i) => (
+                          <div key={i} className="flex items-center justify-between">
+                            <span className="text-xs text-red-600">{d.company || '업체명 없음'}</span>
+                            <span className="text-xs font-bold text-red-500">-{d.weight}개</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     {/* 공급 섹션 */}
                     <div>
                       <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-2">공급 채널</p>

@@ -63,6 +63,32 @@ export function calcMonthlySubBonus(customers: any[], yearMonth: string): number
   return total
 }
 
+// ── 환불 차감 목록 — 해당 월에 차감될 영업팀원별 건수
+// 단일 소스: OverviewTabNew / SalesDashboard / PayrollTab 모두 이 함수 사용
+export interface RefundDeduction {
+  name: string    // refund_deduction_sales (영업팀원 이름)
+  weight: number  // refund_deduction_weight (차감 가중치)
+  company: string // 환불 업체명
+}
+
+export function calcRefundDeductions(customers: any[], yearMonth: string): RefundDeduction[] {
+  const result: RefundDeduction[] = []
+  for (const c of customers) {
+    const dedMonth = (c.details?.refund_deduction_month || '').trim()
+    if (dedMonth !== yearMonth) continue
+    const name = (c.details?.refund_deduction_sales || '').trim()
+    if (!name) continue
+    const w = parseFloat(String(c.details?.refund_deduction_weight || 0)) || 0
+    if (w <= 0) continue
+    result.push({
+      name,
+      weight: w,
+      company: c.details?.company || c.details?.refund_company || c.name || '',
+    })
+  }
+  return result
+}
+
 export function buildSalesContractMap(
   customers: any[],
   yearMonth: string,

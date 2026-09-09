@@ -16,6 +16,7 @@ import {
   getRemainingBusinessDays as _bizRemaining,
 } from '@/lib/businessDays'
 import { SUPPLY_RATE_TABLE, isActiveRow, contractWeight, calcRecommendedSupply } from '@/lib/supplyRules'
+import { calcRefundDeductions } from '@/lib/payrollCalc'
 import PayRateTab from './PayRateTab'
 
 // ─── Interfaces ───────────────────────────────────────────
@@ -719,7 +720,8 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
     remaining: number,
     addBase = false,
     supplyStatsArg: { name: string; rate: number; supplied: number; totalContracted: number }[] = [],
-    payRateEmpsArg: typeof payRateEmps = payRateEmps
+    payRateEmpsArg: typeof payRateEmps = payRateEmps,
+    yearMonthStr = ''
   ): EmployeeRow[] {
     const userMap: Record<string, { name: string; count: number }> = {}
     for (const c of contracts) {
@@ -727,6 +729,23 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
       if (!uid) continue
       if (!userMap[uid]) userMap[uid] = { name: c.sales_user_name ?? uid, count: 0 }
       userMap[uid].count += contractWeight(c.contract_amount, c.vat_included)
+    }
+
+    // 환불 차감 적용 (단일 소스: payrollCalc.calcRefundDeductions)
+    if (yearMonthStr) {
+      const deductions = calcRefundDeductions(allCustomers, yearMonthStr)
+      for (const d of deductions) {
+        const uid = Object.keys(userMap).find(k => {
+          const n = userMap[k].name
+          return n === d.name || n.includes(d.name) || d.name.includes(n)
+        })
+        if (uid) {
+          userMap[uid].count = Math.max(0, userMap[uid].count - d.weight)
+        } else {
+          // 이번달 계약 없어도 차감 내역이 있으면 항목 추가
+          userMap[`__refund__${d.name}`] = { name: d.name, count: -d.weight }
+        }
+      }
     }
 
     // 직책 제거 이름 정규화 (payrate 목표 매칭용)
@@ -797,9 +816,9 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
     return { name, rate, totalContracted, recommended, supplied }
   })
 
-  const thisMonthRows = buildRows(thisMonthContracts, salesGoals, thisElapsed, thisRemaining, true, supplyStats, payRateEmps)
-  const lastMonthRows = buildRows(lastMonthContracts, lastMonthGoals, lastElapsed, lastRemaining, false, [], lastPayRateEmps)
-  const twoAgoRows    = buildRows(twoAgoContracts, twoAgoGoals, twoAgoElapsed, twoAgoRemaining, false, [], twoAgoPayRateEmps)
+  const thisMonthRows = buildRows(thisMonthContracts, salesGoals, thisElapsed, thisRemaining, true, supplyStats, payRateEmps, thisMonthStr)
+  const lastMonthRows = buildRows(lastMonthContracts, lastMonthGoals, lastElapsed, lastRemaining, false, [], lastPayRateEmps, lastMonthStr)
+  const twoAgoRows    = buildRows(twoAgoContracts, twoAgoGoals, twoAgoElapsed, twoAgoRemaining, false, [], twoAgoPayRateEmps, twoAgoMonthStr)
 
   // ── 관리팀 이달 직원별 집계 ───────────────────────────────
   function buildOpsUserRows(
