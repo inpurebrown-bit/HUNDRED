@@ -440,8 +440,10 @@ export default function PayrollTab() {
       const opsPutoByName: Record<string, number> = {}
       const opsFeeDetailsByName: Record<string, OpsFeeDetail[]> = {}
       for (const e of opsEntriesForMonth) {
-        // creator_role이 'ops'가 아닌 경우(대표 등) → 전체 매출에만 포함, 개인 급여 귀속 제외
-        if ((e as any).creator_role && (e as any).creator_role !== 'ops') continue
+        // creator_role이 'ops' 또는 레거시(owner 없음, '')인 경우만 개인 급여 귀속
+        // 'ceo'/'unknown' 등은 회사 매출에만 포함, 개인 귀속 제외
+        const cr = (e as any).creator_role
+        if (cr !== '' && cr !== 'ops') continue
         const name = (e.ops_user_name || '').trim()
         if (!name) continue
         opsFeeByName[name] = (opsFeeByName[name] || 0) + (e.amount || 0)
@@ -603,8 +605,9 @@ export default function PayrollTab() {
       const opsPutoByName: Record<string, number> = {}
       const opsFeeDetailsByName: Record<string, OpsFeeDetail[]> = {}
       for (const e of opsEntries) {
-        // creator_role이 없거나 'ops'가 아닌 경우(대표 등) → 전체 매출에는 포함, 개인 급여 귀속 제외
-        if ((e as any).creator_role && (e as any).creator_role !== 'ops') continue
+        // creator_role이 'ops' 또는 레거시(owner 없음, '')인 경우만 개인 급여 귀속
+        const cr = (e as any).creator_role
+        if (cr !== '' && cr !== 'ops') continue
         const name = (e.ops_user_name || '').trim()
         if (!name) continue
         opsFeeByName[name] = (opsFeeByName[name] || 0) + (e.amount || 0)

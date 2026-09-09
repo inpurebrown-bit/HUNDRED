@@ -85,7 +85,9 @@ export async function GET(req: NextRequest) {
     .flatMap((c: any) => {
       const d = c.details || {}
       const entries: OpsEntry[] = []
-      const creatorRole = userRoleMap[String(c.owner_id || '')] || ''
+      const ownerIdStr = String(c.owner_id || '')
+      // owner_id가 있지만 users 테이블에서 role을 못 찾으면 'unknown' (대표가 직접 입력한 케이스 등)
+      const creatorRole = ownerIdStr ? (userRoleMap[ownerIdStr] || 'unknown') : ''
       const fee1 = parseMoney(d.fee_amount)
       if (fee1 > 0) {
         // deposit_date 우선 → updated_at → created_at → 오늘 (반드시 날짜 있어야 월별 집계 가능)
@@ -125,7 +127,7 @@ export async function GET(req: NextRequest) {
       const entries: OpsContractEntry[] = []
       const ownerName    = c.ops_user_name || d.ops_user_name || ''
       const ownerId      = String(c.owner_id || '')
-      const creatorRoleC = userRoleMap[ownerId] || ''
+      const creatorRoleC = ownerId ? (userRoleMap[ownerId] || 'unknown') : ''
       // 뿌토 계약 (신규DB → 계약)
       const putoAmt = parseMoney(d.puto_contract_amount)
       if (putoAmt > 0) {

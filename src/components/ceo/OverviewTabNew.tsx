@@ -281,17 +281,16 @@ function MonthSection({
       <div className="px-5 py-4 border-b border-[#E8E2D4]/60">
         <p className="text-[11px] font-bold text-[#1B2A45]/40 uppercase tracking-widest mb-3">직원별 현황</p>
         {loading ? <Skeleton className="h-32 w-full" /> : (
-          <div className="flex flex-col md:flex-row gap-4 md:gap-5">
+          <div className="flex flex-col gap-4">
             {/* 영업팀 */}
-            <div className="flex-1 min-w-0">
+            <div className="min-w-0">
               <p className="text-[10px] font-bold text-[#1B2A45] bg-[#1B2A45]/8 inline-block px-2 py-0.5 rounded mb-2">영업팀</p>
               <EmployeeTable rows={employeeRows} loading={loading} />
             </div>
             {/* 구분선 */}
-            <div className="hidden md:block w-px bg-[#E8E2D4] self-stretch shrink-0" />
-            <div className="block md:hidden h-px bg-[#E8E2D4] w-full" />
+            <div className="h-px bg-[#E8E2D4] w-full" />
             {/* 관리팀 */}
-            <div className="md:shrink-0 md:w-64 w-full">
+            <div className="w-full">
               <p className="text-[10px] font-bold text-emerald-700 bg-emerald-50 inline-block px-2 py-0.5 rounded mb-2">관리팀</p>
               {opsUserRows.length > 0 ? (
                 <div className="space-y-2">
@@ -340,7 +339,7 @@ function MonthSection({
             {[...Array(2)].map((_, i) => <Skeleton key={i} className="h-24" />)}
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {/* 영업팀 총매출 */}
             <div className="bg-[#1B2A45] rounded-xl p-3">
               <p className="text-[9px] font-bold text-white/50 mb-1.5">영업팀 총매출</p>
@@ -846,7 +845,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
 
   // ─────────────────────────────────────────────────────────
   return (
-    <div className="space-y-5 pb-10">
+    <div className="space-y-5 pb-10 overflow-x-hidden">
 
       {/* ══ 퀵 액션 + 매출 요약 ══ */}
       <div className="flex flex-wrap items-center gap-2">
@@ -897,7 +896,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
       </div>
 
       {/* ══ 최근 3개월 현황 ══ */}
-      <div ref={thisMonthRef} className="grid grid-cols-3 gap-4 items-start">
+      <div ref={thisMonthRef} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <MonthSection
           title={`${thisMonth}월 현황`}
           loading={loading}
