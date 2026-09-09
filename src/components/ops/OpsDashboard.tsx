@@ -400,6 +400,7 @@ function CreditReportTab({ savedReport, onSaveReport }: {
     savedReport?.annualRevenue ? String(Math.round(savedReport.annualRevenue / 10000)) : ''
   )
   const [filterYear, setFilterYear] = useState<string>('전체')
+  const [dragOver, setDragOver] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const annualRevWan = parseInt(revenue.replace(/[^0-9]/g, ''), 10) * 10_000 || 0
@@ -438,23 +439,40 @@ function CreditReportTab({ savedReport, onSaveReport }: {
 
   return (
     <div className="space-y-4">
-      {/* 업로드 */}
-      <div className="flex items-center gap-2">
-        <input ref={fileRef} type="file" accept="application/pdf" className="hidden"
-          onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = '' }} />
-        <button type="button"
-          onClick={() => fileRef.current?.click()}
-          disabled={loading}
-          className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
-          {loading ? '분석중…' : '📄 채권자변동정보 PDF 첨부'}
-        </button>
-        {report && (
-          <span className="text-[10px] text-gray-400">
-            {report.name && `${report.name} · `}{report.reportDate && `조회일: ${report.reportDate}`}
-          </span>
+      {/* 업로드 — 클릭 or 드래그앤드롭 */}
+      <input ref={fileRef} type="file" accept="application/pdf" className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = '' }} />
+      <div
+        onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={e => {
+          e.preventDefault(); setDragOver(false)
+          const f = e.dataTransfer.files?.[0]
+          if (!f) return
+          if (f.type !== 'application/pdf') { setErr('PDF 파일만 첨부 가능합니다'); return }
+          handleFile(f)
+        }}
+        onClick={() => !loading && fileRef.current?.click()}
+        className={`border-2 border-dashed rounded-xl px-4 py-3 text-center cursor-pointer transition-all select-none
+          ${loading ? 'opacity-60 cursor-not-allowed' : ''}
+          ${dragOver ? 'border-indigo-400 bg-indigo-50 scale-[1.01]' : 'border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/40'}`}
+      >
+        {loading ? (
+          <p className="text-xs text-indigo-500 font-semibold animate-pulse">분석 중...</p>
+        ) : (
+          <>
+            <p className="text-sm font-bold text-indigo-600">📄 채권자변동정보 PDF 첨부</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">클릭해서 파일 선택 · 또는 여기로 끌어다 놓기</p>
+          </>
         )}
-        {err && <span className="text-[10px] text-red-500">{err}</span>}
+        {report && !loading && (
+          <p className="text-[10px] text-indigo-400 mt-1">
+            {report.name && `${report.name} · `}{report.reportDate && `조회일: ${report.reportDate}`}
+            <span className="text-gray-300 mx-1">·</span>재첨부 가능
+          </p>
+        )}
       </div>
+      {err && <p className="text-[11px] text-red-500 -mt-2">{err}</p>}
 
       {report && (
         <>
