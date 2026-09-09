@@ -55,8 +55,10 @@ export function calcMonthlySubBonus(customers: any[], yearMonth: string): number
     if (c.status !== 'contracted') continue
     const cm = (c.details?.contract_date || c.created_at || '').slice(0, 7)
     if (cm !== yearMonth) continue
-    const amt = parseMon(c.details?.payment_amount)
-    total += Math.round(amt * OPS_MONTHLY_SUB_RATE)
+    const rawAmt = parseMon(c.details?.payment_amount)
+    // 부가세 제외 금액으로 5% 계산 (부가세 포함 금액 ÷ 1.1)
+    const vatExcl = Math.round(rawAmt / 1.1)
+    total += Math.round(vatExcl * OPS_MONTHLY_SUB_RATE)
   }
   return total
 }
