@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 
 // ─── Types ────────────────────────────────────────────────
 
@@ -326,231 +326,507 @@ function SubRow({
   )
 }
 
-// ─── 스프레드시트 ─────────────────────────────────────────
+// ─── 스프레드시트 (전면 재작성) ──────────────────────────────
 
-interface SheetData {
-  headers: string[]
-  rows: string[][]
+interface CellStyle {
+  bg?: string
+  color?: string
+  bold?: boolean
+  italic?: boolean
+  align?: 'left' | 'center' | 'right'
+  borderTop?: boolean
+  borderRight?: boolean
+  borderBottom?: boolean
+  borderLeft?: boolean
 }
 
-const DEFAULT_COLS = 6
-const DEFAULT_ROWS = 30
+interface SheetPage {
+  id: string
+  name: string
+  title: string
+  headers: string[]
+  rows: string[][]
+  styles: Record<string, CellStyle>
+  colWidths: number[]
+}
 
-function makeDefaultSheet(): SheetData {
+interface SheetData {
+  pages: SheetPage[]
+  activeId: string
+}
+
+const DCOL = 8
+const DROW = 40
+const DEF_W = 100
+const RNW = 40
+const RH = 26
+
+const BG_PAL = [
+  '#ffffff','#f8fafc','#fef9c3','#fef3c7','#fde68a',
+  '#bbf7d0','#d1fae5','#bfdbfe','#dbeafe','#c7d2fe',
+  '#fce7f3','#fbcfe8','#fed7d7','#fee2e2','#fef2f2',
+  '#374151','#1e3a5f','#166534','#92400e','#991b1b',
+]
+const TX_PAL = [
+  '#111827','#374151','#6b7280','#9ca3af',
+  '#1d4ed8','#16a34a','#dc2626','#d97706',
+  '#7c3aed','#ffffff',
+]
+
+function mkPage(id: string, name: string): SheetPage {
   return {
-    headers: ['A', 'B', 'C', 'D', 'E', 'F'],
-    rows: Array.from({ length: DEFAULT_ROWS }, () => Array(DEFAULT_COLS).fill('')),
+    id, name, title: '',
+    headers: Array.from({ length: DCOL }, (_, i) => String.fromCharCode(65 + i)),
+    rows: Array.from({ length: DROW }, () => Array(DCOL).fill('')),
+    styles: {},
+    colWidths: Array(DCOL).fill(DEF_W),
   }
 }
 
-// 열 문자 → 인덱스 (A→0, B→1, AA→26 ...)
-function colLetterToIndex(s: string): number {
+function makeDefaultSheet(): SheetData {
+  const p = mkPage('1', '시트1')
+  return { pages: [p], activeId: '1' }
+}
+
+function normalizeSheet(raw: any): SheetData {
+  if (!raw) return makeDefaultSheet()
+  if (raw.pages?.length) return raw as SheetData
+  // migrate old format { headers, rows }
+  const cols = raw.headers?.length || DCOL
+  const p: SheetPage = {
+    id: '1', name: '시트1', title: '',
+    headers: raw.headers || Array.from({ length: cols }, (_: unknown, i: number) => String.fromCharCode(65 + i)),
+    rows: raw.rows || Array.from({ length: DROW }, () => Array(cols).fill('')),
+    styles: {},
+    colWidths: Array(cols).fill(DEF_W),
+  }
+  return { pages: [p], activeId: '1' }
+}
+
+// ─── 수식 평가기 ──────────────────────────────────────────
+
+function colIdx(s: string): number {
   let n = 0
   for (const ch of s.toUpperCase()) n = n * 26 + (ch.charCodeAt(0) - 64)
   return n - 1
 }
 
-// =수식 평가 (셀 참조 + 사칙연산)
-function evalFormula(formula: string, rows: string[][]): string {
-  try {
-    // 셀 참조 치환: A1, B2, AA3 형태
-    const expr = formula.replace(/([A-Za-z]+)(\d+)/g, (_, col, row) => {
-      const ci = colLetterToIndex(col)
-      const ri = parseInt(row, 10) - 1
-      const raw = rows[ri]?.[ci] ?? '0'
-      // 참조 셀이 수식이면 재귀 평가
-      if (raw.startsWith('=')) {
-        const inner = evalFormula(raw.slice(1), rows)
-        return isNaN(Number(inner)) ? '0' : inner
-      }
-      const n = parseFloat(raw.replace(/,/g, ''))
-      return isNaN(n) ? '0' : String(n)
-    })
-    // 안전한 사칙연산만 허용
-    if (!/^[\d\s+\-*/().%,]+$/.test(expr)) return '#ERR'
-    // eslint-disable-next-line no-new-func
-    const result = Function('"use strict"; return (' + expr + ')')()
-    if (typeof result !== 'number' || !isFinite(result)) return '#ERR'
-    // 소수점 처리
-    const rounded = Math.round(result * 1e10) / 1e10
-    return Number.isInteger(rounded) ? rounded.toLocaleString('ko-KR') : rounded.toLocaleString('ko-KR', { maximumFractionDigits: 4 })
-  } catch {
-    return '#ERR'
+function rawNum(cell: string, rows: string[][], depth: number): number {
+  if (!cell) return 0
+  if (cell.startsWith('=')) {
+    const v = compute(cell.slice(1), rows, depth + 1)
+    return parseFloat(v.replace(/,/g, '')) || 0
   }
+  return parseFloat(cell.replace(/,/g, '')) || 0
 }
 
-function SpreadsheetTab({
-  sheet, onChange,
-}: {
-  sheet: SheetData
-  onChange: (s: SheetData) => void
+function resolveCells(expr: string, rows: string[][], depth: number): string {
+  return expr.replace(/([A-Za-z]{1,3})(\d+)/g, (_, col, row) => {
+    const ci = colIdx(col), ri = parseInt(row) - 1
+    const raw = rows[ri]?.[ci] ?? '0'
+    const n = rawNum(raw, rows, depth)
+    return String(isNaN(n) ? 0 : n)
+  })
+}
+
+function compute(formula: string, rows: string[][], depth = 0): string {
+  if (depth > 8) return '#REF'
+  try {
+    let expr = formula.trim()
+
+    // SUM(A1:B5)
+    expr = expr.replace(/SUM\(([A-Za-z]+)(\d+):([A-Za-z]+)(\d+)\)/gi, (_, c1, r1, c2, r2) => {
+      let s = 0
+      const ci1 = colIdx(c1), ri1 = +r1 - 1, ci2 = colIdx(c2), ri2 = +r2 - 1
+      for (let ri = Math.min(ri1, ri2); ri <= Math.max(ri1, ri2); ri++)
+        for (let ci = Math.min(ci1, ci2); ci <= Math.max(ci1, ci2); ci++)
+          s += rawNum(rows[ri]?.[ci] ?? '', rows, depth)
+      return String(s)
+    })
+
+    // IF(cond, trueVal, falseVal)
+    expr = expr.replace(/IF\(([^,]+),([^,]+),([^)]*)\)/gi, (_, cond, tv, fv) => {
+      const resolvedCond = resolveCells(cond.trim(), rows, depth)
+      let condResult: unknown = false
+      try { condResult = Function('"use strict";return(' + resolvedCond + ')')() } catch {}
+      const chosen = (condResult && condResult !== '0' && condResult !== 'FALSE') ? tv.trim() : fv.trim()
+      if (chosen.startsWith('"') && chosen.endsWith('"')) return chosen.slice(1, -1)
+      return compute(chosen.replace(/^=/, ''), rows, depth + 1)
+    })
+
+    // cell refs
+    expr = resolveCells(expr, rows, depth)
+
+    if (!/^[\d\s+\-*/%().,<>=!&|"'?:]+$/.test(expr)) return '#ERR'
+    // eslint-disable-next-line no-new-func
+    const result = Function('"use strict";return(' + expr + ')')()
+    if (result === null || result === undefined) return ''
+    if (typeof result === 'boolean') return result ? 'TRUE' : 'FALSE'
+    if (typeof result === 'string') return result
+    if (typeof result !== 'number' || !isFinite(result)) return '#ERR'
+    const r = Math.round(result * 1e10) / 1e10
+    return Number.isInteger(r) ? r.toLocaleString('ko-KR') : r.toLocaleString('ko-KR', { maximumFractionDigits: 4 })
+  } catch { return '#ERR' }
+}
+
+// ─── 툴바 버튼 ────────────────────────────────────────────
+
+function TB({ active, onClick, title, children, cls = '' }: {
+  active?: boolean; onClick: () => void; title?: string; children: React.ReactNode; cls?: string
 }) {
-  const [sel, setSel] = useState<[number, number] | null>(null) // [row, col]
-  const [editingHeader, setEditingHeader] = useState<number | null>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const headerInputRef = useRef<HTMLInputElement>(null)
+  return (
+    <button title={title} onClick={onClick}
+      className={`h-6 min-w-[24px] px-1 rounded text-[11px] font-bold border transition-colors ${
+        active ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
+      } ${cls}`}>
+      {children}
+    </button>
+  )
+}
 
+// ─── SpreadsheetTab ────────────────────────────────────────
+
+function SpreadsheetTab({ data, onChange }: { data: SheetData; onChange: (d: SheetData) => void }) {
+  const page = data.pages.find(p => p.id === data.activeId) ?? data.pages[0]
+  const { headers, rows, styles, colWidths } = page
+
+  // Selection
+  const [sel, setSel] = useState<[number, number] | null>(null)
+  const [editMode, setEditMode] = useState(false)
+  const [editVal, setEditVal] = useState('')
+  const editInputRef = useRef<HTMLInputElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Drag
+  const [dragSrc, setDragSrc] = useState<[number, number] | null>(null)
+  const [dragOver, setDragOver] = useState<[number, number] | null>(null)
+
+  // Column resize
+  const [liveWidths, setLiveWidths] = useState<number[]>([])
+  const resizeRef = useRef<{ idx: number; startX: number; startW: number } | null>(null)
+  useEffect(() => { setLiveWidths(headers.map((_, i) => colWidths[i] ?? DEF_W)) }, [page.id])
+
+  // Toolbar dropdowns
+  const [showBg, setShowBg] = useState(false)
+  const [showTx, setShowTx] = useState(false)
+  const [showBdr, setShowBdr] = useState(false)
+
+  // Tab rename
+  const [renamingTab, setRenamingTab] = useState<string | null>(null)
+  const [renameVal, setRenameVal] = useState('')
+
+  const numCols = headers.length
+  const numRows = rows.length
+
+  // Computed display values (memoized for performance)
+  const displayedRows = useMemo(() =>
+    rows.map(row => row.map(cell =>
+      cell.startsWith('=') ? compute(cell.slice(1), rows) : cell
+    )),
+  [rows])
+
+  const selCell = sel ? rows[sel[0]]?.[sel[1]] ?? '' : ''
+  const selStyle: CellStyle = sel ? (styles[`${sel[0]},${sel[1]}`] ?? {}) : {}
+
+  // ── Page helpers ────────────────────────────────────────
+  function updPage(patch: Partial<SheetPage>) {
+    onChange({ ...data, pages: data.pages.map(p => p.id === page.id ? { ...p, ...patch } : p) })
+  }
+  function updCell(r: number, c: number, val: string) {
+    const nr = rows.map((row, ri) => ri === r ? row.map((v, ci) => ci === c ? val : v) : row)
+    updPage({ rows: nr })
+  }
+  function applyStyle(patch: Partial<CellStyle>) {
+    if (!sel) return
+    const key = `${sel[0]},${sel[1]}`
+    updPage({ styles: { ...styles, [key]: { ...styles[key], ...patch } } })
+  }
+  function getW(ci: number) { return liveWidths[ci] ?? colWidths[ci] ?? DEF_W }
+
+  // ── Column resize ────────────────────────────────────────
   useEffect(() => {
-    if (sel && inputRef.current) inputRef.current.focus()
-  }, [sel])
-  useEffect(() => {
-    if (editingHeader !== null && headerInputRef.current) headerInputRef.current.focus()
-  }, [editingHeader])
-
-  function setCell(r: number, c: number, val: string) {
-    const rows = sheet.rows.map((row, ri) =>
-      ri === r ? row.map((cell, ci) => (ci === c ? val : cell)) : row
-    )
-    onChange({ ...sheet, rows })
-  }
-
-  function setHeader(c: number, val: string) {
-    const headers = sheet.headers.map((h, i) => (i === c ? val : h))
-    onChange({ ...sheet, headers })
-  }
-
-  function addRow() {
-    onChange({ ...sheet, rows: [...sheet.rows, Array(sheet.headers.length).fill('')] })
-  }
-
-  function addCol() {
-    onChange({
-      headers: [...sheet.headers, String.fromCharCode(65 + sheet.headers.length)],
-      rows: sheet.rows.map(row => [...row, '']),
-    })
-  }
-
-  function delLastRow() {
-    if (sheet.rows.length <= 1) return
-    onChange({ ...sheet, rows: sheet.rows.slice(0, -1) })
-  }
-
-  function delLastCol() {
-    if (sheet.headers.length <= 1) return
-    onChange({
-      headers: sheet.headers.slice(0, -1),
-      rows: sheet.rows.map(row => row.slice(0, -1)),
-    })
-  }
-
-  const numCols = sheet.headers.length
-
-  function handleKeyDown(e: React.KeyboardEvent, r: number, c: number) {
-    if (e.key === 'Tab') {
-      e.preventDefault()
-      const nextC = e.shiftKey ? c - 1 : c + 1
-      if (nextC >= 0 && nextC < numCols) setSel([r, nextC])
-      else if (!e.shiftKey && r < sheet.rows.length - 1) setSel([r + 1, 0])
-      else if (e.shiftKey && r > 0) setSel([r - 1, numCols - 1])
-    } else if (e.key === 'Enter') {
-      e.preventDefault()
-      if (r < sheet.rows.length - 1) setSel([r + 1, c])
-      else setSel(null)
-    } else if (e.key === 'Escape') {
-      setSel(null)
-    } else if (e.key === 'ArrowUp' && e.ctrlKey) {
-      e.preventDefault(); if (r > 0) setSel([r - 1, c])
-    } else if (e.key === 'ArrowDown' && e.ctrlKey) {
-      e.preventDefault(); if (r < sheet.rows.length - 1) setSel([r + 1, c])
+    function onMove(e: MouseEvent) {
+      if (!resizeRef.current) return
+      const { idx, startX, startW } = resizeRef.current
+      const newW = Math.max(40, startW + e.clientX - startX)
+      setLiveWidths(prev => prev.map((w, i) => i === idx ? newW : w))
     }
+    function onUp() {
+      if (!resizeRef.current) return
+      const widths = liveWidths.length ? liveWidths : headers.map((_, i) => colWidths[i] ?? DEF_W)
+      updPage({ colWidths: widths })
+      resizeRef.current = null
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    return () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
+  }, [liveWidths])
+
+  // ── Commit edit ─────────────────────────────────────────
+  function commit(r: number, c: number, val: string, next?: [number, number]) {
+    updCell(r, c, val)
+    setEditMode(false)
+    setEditVal('')
+    if (next) { setSel(next); setTimeout(() => containerRef.current?.focus(), 0) }
+    else { setTimeout(() => containerRef.current?.focus(), 0) }
   }
 
-  const COL_W = 120
-  const ROW_NUM_W = 36
+  // ── Container keydown (non-edit navigation) ──────────────
+  function onContainerKey(e: React.KeyboardEvent) {
+    if (editMode || !sel) return
+    const [r, c] = sel
+    if (e.key === 'ArrowUp')    { e.preventDefault(); if (r > 0)        setSel([r-1, c]) }
+    else if (e.key === 'ArrowDown')  { e.preventDefault(); if (r < numRows-1) setSel([r+1, c]) }
+    else if (e.key === 'ArrowLeft')  { e.preventDefault(); if (c > 0)        setSel([r, c-1]) }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); if (c < numCols-1) setSel([r, c+1]) }
+    else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); updCell(r, c, '') }
+    else if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); setEditVal(rows[r][c]); setEditMode(true); setTimeout(() => editInputRef.current?.focus(), 0) }
+    else if (e.key === 'Tab') { e.preventDefault(); if (c < numCols-1) setSel([r, c+1]); else if (r < numRows-1) setSel([r+1, 0]) }
+    else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) { setEditVal(e.key); setEditMode(true); setTimeout(() => editInputRef.current?.focus(), 0) }
+  }
+
+  // ── Cell click / select ─────────────────────────────────
+  function onCellClick(r: number, c: number) {
+    if (editMode && sel) { commit(sel[0], sel[1], editVal) }
+    setSel([r, c])
+    setEditMode(false)
+    containerRef.current?.focus()
+  }
+  function onCellDbl(r: number, c: number) {
+    setSel([r, c]); setEditVal(rows[r][c]); setEditMode(true)
+    setTimeout(() => editInputRef.current?.focus(), 0)
+  }
+
+  // ── Drag & drop ─────────────────────────────────────────
+  function onDragStart(r: number, c: number, e: React.DragEvent) {
+    setDragSrc([r, c]); e.dataTransfer.effectAllowed = 'move'
+  }
+  function onDrop(r: number, c: number, e: React.DragEvent) {
+    e.preventDefault()
+    if (!dragSrc || (dragSrc[0] === r && dragSrc[1] === c)) return
+    const [sr, sc] = dragSrc
+    const nr = rows.map((row, ri) => row.map((v, ci) => {
+      if (ri === r && ci === c) return rows[sr][sc]
+      if (ri === sr && ci === sc) return ''
+      return v
+    }))
+    const ns = { ...styles }
+    if (styles[`${sr},${sc}`]) ns[`${r},${c}`] = styles[`${sr},${sc}`]
+    delete ns[`${sr},${sc}`]
+    updPage({ rows: nr, styles: ns })
+    setSel([r, c]); setDragSrc(null); setDragOver(null)
+  }
+
+  // close pickers on outside click
+  useEffect(() => {
+    if (!showBg && !showTx && !showBdr) return
+    const h = () => { setShowBg(false); setShowTx(false); setShowBdr(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [showBg, showTx, showBdr])
 
   return (
-    <div className="space-y-2">
-      {/* 툴바 */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs text-gray-400 font-medium">
-          {sheet.rows.length}행 × {sheet.headers.length}열
-        </span>
-        <div className="flex items-center gap-1 ml-auto">
-          <button onClick={addRow} className="text-[11px] bg-gray-100 hover:bg-gray-200 text-gray-600 px-2.5 py-1 rounded-lg font-medium">+ 행</button>
-          <button onClick={delLastRow} className="text-[11px] bg-gray-100 hover:bg-red-50 text-gray-400 hover:text-red-500 px-2.5 py-1 rounded-lg font-medium">- 행</button>
-          <div className="w-px h-4 bg-gray-200 mx-1" />
-          <button onClick={addCol} className="text-[11px] bg-gray-100 hover:bg-gray-200 text-gray-600 px-2.5 py-1 rounded-lg font-medium">+ 열</button>
-          <button onClick={delLastCol} className="text-[11px] bg-gray-100 hover:bg-red-50 text-gray-400 hover:text-red-500 px-2.5 py-1 rounded-lg font-medium">- 열</button>
+    <div className="space-y-1.5 select-none">
+
+      {/* 제목 */}
+      <input
+        value={page.title}
+        onChange={e => updPage({ title: e.target.value })}
+        placeholder="제목 없음"
+        className="w-full text-lg font-bold text-gray-800 bg-transparent outline-none border-b-2 border-transparent hover:border-gray-200 focus:border-blue-400 px-1 py-0.5 transition-colors"
+      />
+
+      {/* 도구상자 (Toolbar) */}
+      <div className="flex items-center gap-1 flex-wrap bg-[#f2f2f2] border border-gray-300 rounded-lg px-2 py-1.5" onMouseDown={e => e.preventDefault()}>
+        {/* Bold / Italic */}
+        <TB title="굵게" active={selStyle.bold} onClick={() => applyStyle({ bold: !selStyle.bold })} cls="font-black w-6">B</TB>
+        <TB title="기울임" active={selStyle.italic} onClick={() => applyStyle({ italic: !selStyle.italic })} cls="italic w-6">I</TB>
+        <div className="w-px h-5 bg-gray-300 mx-0.5" />
+
+        {/* Align */}
+        <TB title="왼쪽" active={!selStyle.align || selStyle.align === 'left'} onClick={() => applyStyle({ align: 'left' })} cls="text-[10px]">≡L</TB>
+        <TB title="가운데" active={selStyle.align === 'center'} onClick={() => applyStyle({ align: 'center' })} cls="text-[10px]">≡C</TB>
+        <TB title="오른쪽" active={selStyle.align === 'right'} onClick={() => applyStyle({ align: 'right' })} cls="text-[10px]">R≡</TB>
+        <div className="w-px h-5 bg-gray-300 mx-0.5" />
+
+        {/* BG color */}
+        <div className="relative" onMouseDown={e => e.stopPropagation()}>
+          <button title="배경색" onClick={() => { setShowBg(p => !p); setShowTx(false); setShowBdr(false) }}
+            className="w-7 h-6 rounded border border-gray-300 flex flex-col items-center justify-center gap-0 hover:border-gray-400 overflow-hidden">
+            <span className="text-[10px] font-bold text-gray-700 leading-none">A</span>
+            <div className="w-full h-1.5 mt-0.5" style={{ backgroundColor: selStyle.bg || '#fef9c3' }} />
+          </button>
+          {showBg && (
+            <div className="absolute top-7 left-0 z-50 bg-white border border-gray-200 rounded-xl shadow-2xl p-2 grid grid-cols-5 gap-1" style={{ width: 148 }} onMouseDown={e => e.stopPropagation()}>
+              {BG_PAL.map(col => (
+                <button key={col} onClick={() => { applyStyle({ bg: col }); setShowBg(false) }}
+                  title={col} className="w-6 h-6 rounded border border-gray-200 hover:scale-125 transition-transform"
+                  style={{ backgroundColor: col }} />
+              ))}
+              <button onClick={() => { applyStyle({ bg: undefined }); setShowBg(false) }}
+                className="w-6 h-6 rounded border border-gray-200 text-[9px] text-gray-400 hover:bg-gray-100">✕</button>
+            </div>
+          )}
         </div>
+
+        {/* Text color */}
+        <div className="relative" onMouseDown={e => e.stopPropagation()}>
+          <button title="글자색" onClick={() => { setShowTx(p => !p); setShowBg(false); setShowBdr(false) }}
+            className="w-7 h-6 rounded border border-gray-300 flex items-center justify-center hover:border-gray-400">
+            <span className="text-xs font-bold" style={{ color: selStyle.color || '#dc2626' }}>A</span>
+          </button>
+          {showTx && (
+            <div className="absolute top-7 left-0 z-50 bg-white border border-gray-200 rounded-xl shadow-2xl p-2 grid grid-cols-5 gap-1" style={{ width: 148 }} onMouseDown={e => e.stopPropagation()}>
+              {TX_PAL.map(col => (
+                <button key={col} onClick={() => { applyStyle({ color: col }); setShowTx(false) }}
+                  title={col} className="w-6 h-6 rounded border border-gray-200 hover:scale-125 transition-transform"
+                  style={{ backgroundColor: col }} />
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="w-px h-5 bg-gray-300 mx-0.5" />
+
+        {/* Borders */}
+        <div className="relative" onMouseDown={e => e.stopPropagation()}>
+          <button title="테두리" onClick={() => { setShowBdr(p => !p); setShowBg(false); setShowTx(false) }}
+            className="w-7 h-6 rounded border border-gray-300 text-sm text-gray-600 hover:border-gray-400">⊞</button>
+          {showBdr && (
+            <div className="absolute top-7 left-0 z-50 bg-white border border-gray-200 rounded-xl shadow-2xl p-1.5 w-36" onMouseDown={e => e.stopPropagation()}>
+              {([
+                ['없음',   { borderTop: false, borderBottom: false, borderLeft: false, borderRight: false }],
+                ['전체',   { borderTop: true,  borderBottom: true,  borderLeft: true,  borderRight: true }],
+                ['하단만', { borderTop: false, borderBottom: true,  borderLeft: false, borderRight: false }],
+                ['상단만', { borderTop: true,  borderBottom: false, borderLeft: false, borderRight: false }],
+                ['좌우만', { borderTop: false, borderBottom: false, borderLeft: true,  borderRight: true }],
+              ] as [string, Partial<CellStyle>][]).map(([label, patch]) => (
+                <button key={label} onClick={() => { applyStyle(patch); setShowBdr(false) }}
+                  className="w-full text-left text-[11px] px-2 py-1 rounded hover:bg-blue-50 text-gray-600">{label}</button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="w-px h-5 bg-gray-300 mx-0.5" />
+
+        {/* SUM / IF */}
+        <button title="SUM(범위) 삽입" onClick={() => { if (!sel) return; setEditVal('=SUM(A1:A1)'); setEditMode(true); setTimeout(() => editInputRef.current?.focus(), 0) }}
+          className="text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 h-6 rounded border border-emerald-200">Σ SUM</button>
+        <button title="IF(조건,참,거짓) 삽입" onClick={() => { if (!sel) return; setEditVal('=IF(,0,0)'); setEditMode(true); setTimeout(() => editInputRef.current?.focus(), 0) }}
+          className="text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 h-6 rounded border border-blue-200">IF</button>
+        <div className="w-px h-5 bg-gray-300 mx-0.5" />
+
+        {/* Add row/col */}
+        <button onClick={() => updPage({ rows: [...rows, Array(numCols).fill('')] })}
+          className="text-[11px] bg-white hover:bg-gray-100 text-gray-600 px-2 h-6 rounded border border-gray-200">+행</button>
+        <button onClick={() => updPage({ headers: [...headers, String.fromCharCode(65 + numCols)], rows: rows.map(r => [...r, '']), colWidths: [...(colWidths), DEF_W] })}
+          className="text-[11px] bg-white hover:bg-gray-100 text-gray-600 px-2 h-6 rounded border border-gray-200">+열</button>
+        <button onClick={() => { if (numRows <= 1) return; updPage({ rows: rows.slice(0, -1) }) }}
+          className="text-[11px] bg-white hover:bg-red-50 text-gray-400 hover:text-red-500 px-2 h-6 rounded border border-gray-200">-행</button>
+        <button onClick={() => { if (numCols <= 1) return; updPage({ headers: headers.slice(0, -1), rows: rows.map(r => r.slice(0, -1)), colWidths: colWidths.slice(0, -1) }) }}
+          className="text-[11px] bg-white hover:bg-red-50 text-gray-400 hover:text-red-500 px-2 h-6 rounded border border-gray-200">-열</button>
       </div>
 
       {/* 수식바 */}
-      <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[32px]">
-        <span className="text-[10px] font-bold text-gray-400 shrink-0 w-10">
-          {sel ? `${String.fromCharCode(65 + sel[1])}${sel[0] + 1}` : ''}
+      <div className="flex items-center gap-2 bg-white border border-gray-300 rounded px-2 py-1">
+        <span className="text-[10px] font-bold text-gray-500 w-12 text-center shrink-0 bg-gray-100 rounded px-1 py-0.5">
+          {sel ? `${headers[sel[1]] || String.fromCharCode(65 + sel[1])}${sel[0] + 1}` : ''}
         </span>
-        <div className="w-px h-4 bg-gray-200" />
-        <span className="text-xs text-gray-500 font-mono">
-          {sel ? (sheet.rows[sel[0]]?.[sel[1]] || '') : <span className="text-gray-300">셀을 클릭하세요</span>}
+        <div className="w-px h-4 bg-gray-200 shrink-0" />
+        <span className="text-xs text-gray-700 font-mono flex-1 min-w-0 truncate">
+          {editMode && sel ? editVal : selCell || <span className="text-gray-300">셀 선택</span>}
         </span>
       </div>
 
-      {/* 시트 */}
-      <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-        <div className="overflow-auto max-h-[60vh]" style={{ maxWidth: '100%' }}>
-          <table className="border-collapse" style={{ minWidth: ROW_NUM_W + numCols * COL_W }}>
-            {/* 헤더 행 */}
-            <thead className="sticky top-0 z-10">
-              <tr>
-                <th style={{ width: ROW_NUM_W, minWidth: ROW_NUM_W }}
-                  className="bg-gray-100 border-b border-r border-gray-200 text-[10px] text-gray-400 font-bold" />
-                {sheet.headers.map((h, ci) => (
-                  <th key={ci} style={{ width: COL_W, minWidth: COL_W }}
-                    className="bg-gray-100 border-b border-r border-gray-200 px-1 py-1">
-                    {editingHeader === ci ? (
-                      <input
-                        ref={headerInputRef}
-                        className="w-full bg-white border border-blue-300 rounded px-1 py-0.5 text-[11px] font-bold text-center focus:outline-none"
-                        value={h}
-                        onChange={e => setHeader(ci, e.target.value)}
-                        onBlur={() => setEditingHeader(null)}
-                        onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setEditingHeader(null) }}
-                      />
-                    ) : (
-                      <button
-                        className="w-full text-[11px] font-bold text-gray-500 hover:text-blue-600 text-center py-0.5 rounded hover:bg-blue-50 transition-colors"
-                        onDoubleClick={() => setEditingHeader(ci)}
-                        title="더블클릭으로 헤더 편집"
-                      >
-                        {h || String.fromCharCode(65 + ci)}
-                      </button>
-                    )}
+      {/* 그리드 */}
+      <div
+        ref={containerRef}
+        tabIndex={0}
+        onKeyDown={onContainerKey}
+        className="border border-gray-300 rounded-lg overflow-hidden shadow-sm focus:outline-none bg-white"
+      >
+        <div className="overflow-auto" style={{ maxHeight: '55vh' }}>
+          <table className="border-collapse" style={{ tableLayout: 'fixed', minWidth: RNW + headers.reduce((s, _, i) => s + getW(i), 0) }}>
+            <colgroup>
+              <col style={{ width: RNW, minWidth: RNW }} />
+              {headers.map((_, ci) => <col key={ci} style={{ width: getW(ci), minWidth: getW(ci) }} />)}
+            </colgroup>
+            <thead className="sticky top-0 z-20">
+              <tr style={{ height: RH }}>
+                <th className="bg-[#e8e8e8] border-b-2 border-r border-gray-300" />
+                {headers.map((h, ci) => (
+                  <th key={ci} className="bg-[#e8e8e8] border-b-2 border-r border-gray-300 relative text-center" style={{ width: getW(ci) }}>
+                    <span className="text-[11px] font-semibold text-gray-600">{h}</span>
+                    {/* col resize handle */}
+                    <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 z-10"
+                      onMouseDown={e => { e.preventDefault(); resizeRef.current = { idx: ci, startX: e.clientX, startW: getW(ci) } }} />
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {sheet.rows.map((row, ri) => (
-                <tr key={ri} className="group">
-                  {/* 행 번호 */}
-                  <td style={{ width: ROW_NUM_W }}
-                    className="bg-gray-50 border-b border-r border-gray-100 text-[10px] text-gray-400 text-center font-medium select-none sticky left-0 z-[1]">
+              {rows.map((row, ri) => (
+                <tr key={ri} style={{ height: RH }}>
+                  <td className="bg-[#e8e8e8] border-b border-r border-gray-200 text-[10px] text-gray-500 text-center font-medium select-none">
                     {ri + 1}
                   </td>
                   {row.map((cell, ci) => {
-                    const isSelected = sel?.[0] === ri && sel?.[1] === ci
-                    const isFormula = cell.startsWith('=')
-                    const displayed = isFormula ? evalFormula(cell.slice(1), sheet.rows) : cell
-                    const isErr = displayed === '#ERR'
+                    const isSel = sel?.[0] === ri && sel?.[1] === ci
+                    const isDO  = dragOver?.[0] === ri && dragOver?.[1] === ci
+                    const cs    = styles[`${ri},${ci}`] ?? {}
+                    const disp  = displayedRows[ri]?.[ci] ?? ''
+                    const isErr = disp === '#ERR' || disp === '#REF'
+                    const isFml = cell.startsWith('=')
+                    const w     = getW(ci)
                     return (
-                      <td key={ci}
-                        style={{ width: COL_W, height: 28 }}
-                        className={`border-b border-r border-gray-100 p-0 ${isSelected ? 'ring-2 ring-inset ring-blue-400' : 'hover:bg-blue-50/30'}`}
-                        onClick={() => setSel([ri, ci])}
+                      <td
+                        key={ci}
+                        draggable={isSel && !editMode}
+                        onDragStart={e => onDragStart(ri, ci, e)}
+                        onDragOver={e => { e.preventDefault(); setDragOver([ri, ci]) }}
+                        onDragLeave={() => setDragOver(null)}
+                        onDrop={e => onDrop(ri, ci, e)}
+                        onDragEnd={() => { setDragSrc(null); setDragOver(null) }}
+                        onClick={() => onCellClick(ri, ci)}
+                        onDoubleClick={() => onCellDbl(ri, ci)}
+                        style={{
+                          width: w,
+                          height: RH,
+                          backgroundColor: cs.bg || 'transparent',
+                          borderTop:    cs.borderTop    ? '1px solid #666' : undefined,
+                          borderBottom: cs.borderBottom ? '1px solid #666' : '1px solid #e5e7eb',
+                          borderLeft:   cs.borderLeft   ? '1px solid #666' : undefined,
+                          borderRight:  '1px solid #e5e7eb',
+                          outline:      isSel ? '2px solid #2563eb' : isDO ? '2px dashed #93c5fd' : undefined,
+                          outlineOffset: '-1px',
+                        }}
+                        className="p-0 relative"
                       >
-                        {isSelected ? (
+                        {isSel && editMode ? (
                           <input
-                            ref={inputRef}
-                            className="w-full h-full px-2 text-xs bg-white focus:outline-none"
-                            style={{ height: 28 }}
-                            value={cell}
-                            onChange={e => setCell(ri, ci, e.target.value)}
-                            onKeyDown={e => handleKeyDown(e, ri, ci)}
-                            onBlur={() => setSel(null)}
+                            ref={editInputRef}
+                            className="absolute inset-0 w-full h-full px-1.5 text-xs bg-white focus:outline-none font-mono z-10"
+                            value={editVal}
+                            onChange={e => setEditVal(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') { e.preventDefault(); commit(ri, ci, editVal, ri < numRows-1 ? [ri+1, ci] : undefined) }
+                              else if (e.key === 'Tab') { e.preventDefault(); commit(ri, ci, editVal, ci < numCols-1 ? [ri, ci+1] : ri < numRows-1 ? [ri+1, 0] : undefined) }
+                              else if (e.key === 'Escape') { setEditMode(false); setEditVal(''); setTimeout(() => containerRef.current?.focus(), 0) }
+                              else if (e.key === 'ArrowUp' && !editVal.startsWith('=')) { e.preventDefault(); commit(ri, ci, editVal, ri > 0 ? [ri-1, ci] : undefined) }
+                              else if (e.key === 'ArrowDown' && !editVal.startsWith('=')) { e.preventDefault(); commit(ri, ci, editVal, ri < numRows-1 ? [ri+1, ci] : undefined) }
+                            }}
+                            onBlur={() => { commit(ri, ci, editVal) }}
                           />
                         ) : (
-                          <div className={`px-2 text-xs leading-7 whitespace-nowrap overflow-hidden ${isErr ? 'text-red-500 font-bold' : isFormula ? 'text-blue-700 text-right' : 'text-gray-700'}`}>
-                            {displayed}
+                          <div className="px-1.5 overflow-hidden whitespace-nowrap"
+                            style={{
+                              fontSize: 12,
+                              lineHeight: `${RH}px`,
+                              color:      isErr ? '#ef4444' : cs.color || '#111827',
+                              fontWeight: cs.bold ? 700 : 400,
+                              fontStyle:  cs.italic ? 'italic' : 'normal',
+                              textAlign:  cs.align || (isFml ? 'right' : 'left'),
+                            }}>
+                            {disp}
                           </div>
                         )}
                       </td>
@@ -562,7 +838,37 @@ function SpreadsheetTab({
           </table>
         </div>
       </div>
-      <p className="text-[10px] text-gray-300 text-right">클릭 편집 · Tab/Enter 이동 · 헤더 더블클릭 이름변경 · 수식: =A1+B2, =A1*0.1 · 자동저장</p>
+
+      {/* 하단 시트 탭 */}
+      <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-[#f2f2f2]">
+        <div className="flex items-end flex-1 overflow-x-auto">
+          {data.pages.map(p => (
+            <div key={p.id} className={`relative flex items-center border-r border-gray-300 ${p.id === data.activeId ? 'bg-white border-t-2 border-t-blue-500 -mt-px' : 'hover:bg-gray-100'}`}>
+              {renamingTab === p.id ? (
+                <input autoFocus value={renameVal}
+                  onChange={e => setRenameVal(e.target.value)}
+                  onBlur={() => { if (renameVal.trim()) onChange({ ...data, pages: data.pages.map(pg => pg.id === p.id ? { ...pg, name: renameVal.trim() } : pg) }); setRenamingTab(null) }}
+                  onKeyDown={e => { if (e.key === 'Enter') { if (renameVal.trim()) onChange({ ...data, pages: data.pages.map(pg => pg.id === p.id ? { ...pg, name: renameVal.trim() } : pg) }); setRenamingTab(null) } else if (e.key === 'Escape') setRenamingTab(null) }}
+                  className="text-xs px-2 py-1.5 w-20 focus:outline-none bg-transparent"
+                />
+              ) : (
+                <button onClick={() => onChange({ ...data, activeId: p.id })}
+                  onDoubleClick={() => { setRenamingTab(p.id); setRenameVal(p.name) }}
+                  className="text-xs px-4 py-1.5 font-medium whitespace-nowrap">
+                  {p.name}
+                </button>
+              )}
+              {data.pages.length > 1 && (
+                <button onClick={() => { const ps = data.pages.filter(pg => pg.id !== p.id); onChange({ pages: ps, activeId: p.id === data.activeId ? ps[0].id : data.activeId }) }}
+                  className="text-[10px] text-gray-300 hover:text-red-400 pr-1.5 -ml-1">×</button>
+              )}
+            </div>
+          ))}
+        </div>
+        <button title="시트 추가" onClick={() => { const id = Date.now().toString(); onChange({ ...data, pages: [...data.pages, mkPage(id, `시트${data.pages.length + 1}`)], activeId: id }) }}
+          className="px-3 py-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-200 text-sm font-bold shrink-0">+</button>
+      </div>
+      <p className="text-[10px] text-gray-400 text-right">클릭 선택 · 더블클릭/타이핑 편집 · 방향키 이동 · 드래그로 셀 이동 · 열 헤더 우측 끝 드래그로 폭 조절 · 탭 더블클릭 이름변경</p>
     </div>
   )
 }
@@ -604,7 +910,7 @@ export default function PersonalFinanceTab() {
           if (d.loans?.length)  setLoans(d.loans)
           if (d.subs?.length)   setSubs(d.subs)
           if (d.phaseLabels)    setPhaseLabels(d.phaseLabels)
-          if (d.sheet?.headers) setSheet(d.sheet)
+          if (d.sheet) setSheet(normalizeSheet(d.sheet))
         }
       })
       .catch(() => {})
@@ -918,7 +1224,7 @@ export default function PersonalFinanceTab() {
 
       {/* ════════════════ 메모 시트 ════════════════ */}
       {activeTab === 'sheet' && (
-        <SpreadsheetTab sheet={sheet} onChange={handleSheetChange} />
+        <SpreadsheetTab data={sheet} onChange={handleSheetChange} />
       )}
 
       {/* 대출 편집 모달 */}
