@@ -1157,17 +1157,22 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   </div>
 
                   <div className="p-4 space-y-3">
-                    {/* 환불 차감 알림 */}
+                    {/* 환불 차감 알림 — 기본 접힌 상태 */}
                     {thisMonthRefunds.length > 0 && (
-                      <div className="bg-red-50 border border-red-100 rounded-xl px-3 py-2 space-y-1">
-                        <p className="text-[9px] font-bold text-red-400 uppercase tracking-widest">이달 환불 차감</p>
-                        {thisMonthRefunds.map((d, i) => (
-                          <div key={i} className="flex items-center justify-between">
-                            <span className="text-xs text-red-600">{d.company || '업체명 없음'}</span>
-                            <span className="text-xs font-bold text-red-500">-{d.weight}개</span>
-                          </div>
-                        ))}
-                      </div>
+                      <details className="bg-red-50 border border-red-100 rounded-xl overflow-hidden">
+                        <summary className="px-3 py-2 cursor-pointer select-none flex items-center justify-between">
+                          <span className="text-[9px] font-bold text-red-400 uppercase tracking-widest">이달 환불 차감</span>
+                          <span className="text-[9px] font-bold text-red-500">-{thisMonthRefundWeight}개</span>
+                        </summary>
+                        <div className="px-3 pb-2 space-y-1">
+                          {thisMonthRefunds.map((d, i) => (
+                            <div key={i} className="flex items-center justify-between">
+                              <span className="text-xs text-red-600">{d.company || '업체명 없음'}</span>
+                              <span className="text-xs font-bold text-red-500">-{d.weight}개</span>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
                     )}
                     {/* 공급 섹션 */}
                     <div>

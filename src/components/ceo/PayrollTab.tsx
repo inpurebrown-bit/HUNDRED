@@ -942,33 +942,42 @@ export default function PayrollTab() {
             <OpsCard key={i} emp={emp} idx={i} onChange={updateOps} onRemove={removeOps} />
           ))}
 
-          {/* 수수료 입금 내역 아코디언 — 전체 ops 케이스 표시 */}
-          {opsAllFeeEntries.length > 0 && (
-            <details className="mt-1 bg-sky-50 border border-sky-100 rounded-xl overflow-hidden">
-              <summary className="px-3 py-1.5 text-[10px] font-semibold text-sky-700 cursor-pointer select-none">
-                수수료 입금 내역 {opsAllFeeEntries.length}건 합계 {opsAllFeeEntries.reduce((s, e) => s + e.amount, 0).toLocaleString('ko-KR')}원 — 클릭해서 확인
-              </summary>
-              <div className="px-3 pb-2 space-y-0.5">
-                {opsAllFeeEntries
-                  .slice()
-                  .sort((a, b) => (a.date > b.date ? -1 : 1))
-                  .map((e, ci) => (
-                    <div key={ci} className="flex items-center justify-between text-[10px] py-0.5 border-b last:border-0 border-sky-100">
-                      <div className="flex items-center gap-2 min-w-0">
-                        {e.ops_user_name && (
-                          <span className="shrink-0 text-[9px] bg-sky-200/60 text-sky-800 rounded px-1 py-0.5 font-medium">{e.ops_user_name}</span>
-                        )}
-                        <span className="font-medium text-gray-700 truncate max-w-[120px]">{e.company}</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-gray-400 shrink-0 ml-1">
-                        <span>{e.date.slice(0, 10)}</span>
-                        <span className="font-semibold text-sky-600">{e.amount.toLocaleString('ko-KR')}원</span>
-                      </div>
+          {/* 수수료 입금 내역 — 직원별 아코디언 */}
+          {opsAllFeeEntries.length > 0 && (() => {
+            // 직원별 그룹핑
+            const grouped: Record<string, Array<OpsFeeDetail & { ops_user_name: string }>> = {}
+            for (const e of opsAllFeeEntries) {
+              const key = e.ops_user_name || '(이름 없음)'
+              if (!grouped[key]) grouped[key] = []
+              grouped[key].push(e)
+            }
+            return (
+              <div className="mt-1 space-y-1">
+                {Object.entries(grouped).map(([empName, entries]) => (
+                  <details key={empName} className="bg-sky-50 border border-sky-100 rounded-xl overflow-hidden">
+                    <summary className="px-3 py-1.5 text-[10px] font-semibold text-sky-700 cursor-pointer select-none flex items-center justify-between">
+                      <span>{empName} — {entries.length}건</span>
+                      <span className="font-bold text-sky-600">{entries.reduce((s, e) => s + e.amount, 0).toLocaleString('ko-KR')}원</span>
+                    </summary>
+                    <div className="px-3 pb-2 space-y-0.5">
+                      {entries
+                        .slice()
+                        .sort((a, b) => (a.date > b.date ? -1 : 1))
+                        .map((e, ci) => (
+                          <div key={ci} className="flex items-center justify-between text-[10px] py-0.5 border-b last:border-0 border-sky-100">
+                            <span className="font-medium text-gray-700 truncate max-w-[150px]">{e.company}</span>
+                            <div className="flex items-center gap-3 text-gray-400 shrink-0 ml-1">
+                              <span>{e.date.slice(0, 10)}</span>
+                              <span className="font-semibold text-sky-600">{e.amount.toLocaleString('ko-KR')}원</span>
+                            </div>
+                          </div>
+                        ))}
                     </div>
-                  ))}
+                  </details>
+                ))}
               </div>
-            </details>
-          )}
+            )
+          })()}
 
           <button onClick={() => setOpsEmps(prev => [...prev, defaultOps()])}
             className="w-full py-2 border border-dashed border-gray-300 rounded-xl text-xs text-gray-400 hover:border-[#1B2A45]/40 hover:text-[#1B2A45]/60 transition-colors">
