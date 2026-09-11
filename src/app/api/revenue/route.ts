@@ -28,8 +28,9 @@ export async function GET(req: NextRequest) {
     .from('ops_cases')
     .select('id, details, created_at, owner_id, ops_user_name, customer_name, phone')
 
-  const [{ data: custContracted }, { data: opsCasesRaw }, { data: usersRaw }] = await Promise.all([
+  const [{ data: custContracted }, { data: custRefunded }, { data: opsCasesRaw }, { data: usersRaw }] = await Promise.all([
     custQuery,
+    supabaseAdmin.from('customers').select('id, owner_id, name, details').eq('status', 'refunded'),
     opsQuery,
     supabaseAdmin.from('users').select('id, role, name'),
   ])
@@ -181,6 +182,16 @@ export async function GET(req: NextRequest) {
     if (key && monthlyMap[key]) monthlyMap[key].ops_contract += e.amount
   })
 
+  // ── 환불 차감: monthlyMap.sales 에서 차감 ───────────────────────────
+  ;(custRefunded || []).forEach((c: any) => {
+    const refundMonth = c.details?.refund_deduction_month
+    const refundAmt = parseFloat(String(c.details?.refund_deduction_amount || 0)) || 0
+    if (!refundMonth || !refundAmt) return
+    if (monthlyMap[refundMonth]) {
+      monthlyMap[refundMonth].sales = Math.max(0, monthlyMap[refundMonth].sales - refundAmt)
+    }
+  })
+
   const monthly = Object.entries(monthlyMap).map(([month, v]) => ({
     month: month.slice(5) + '월',
     fullMonth: month,
@@ -264,6 +275,16 @@ export async function GET(req: NextRequest) {
     salesByUser[id].count++
   })
 
+  // ── 환불 차감: salesByUser.amount 에서 차감 ─────────────────────────
+  ;(custRefunded || []).forEach((c: any) => {
+    const uid = String(c.owner_id || '')
+    const refundAmt = parseFloat(String(c.details?.refund_deduction_amount || 0)) || 0
+    if (!uid || !refundAmt) return
+    if (salesByUser[uid]) {
+      salesByUser[uid].amount = Math.max(0, salesByUser[uid].amount - refundAmt)
+    }
+  })
+
   const opsByUser: Record<string, { name: string; amount: number; count: number }> = {}
   opsEntries.forEach(e => {
     const id = e.ops_user_id || e.ops_user_name
@@ -273,12 +294,33 @@ export async function GET(req: NextRequest) {
     opsByUser[id].count++
   })
 
+  // ── 환불 엔트리 생성 (음수 amount로 thisMonthSales에 삽입) ───────────
+  const refundSalesEntries = (custRefunded || [])
+    .map((c: any) => {
+      const refundMonth = c.details?.refund_deduction_month
+      const refundAmt = parseFloat(String(c.details?.refund_deduction_amount || 0)) || 0
+      if (!refundMonth || !refundAmt) return null
+      return {
+        id: `refund_${c.id}`,
+        amount: -refundAmt,
+        date: refundMonth + '-01',
+        sales_user_id: String(c.owner_id || ''),
+        sales_user_name: c.details?.refund_deduction_sales || '',
+        company: c.details?.refund_company || c.name || '',
+        isRefund: true,
+      }
+    })
+    .filter(Boolean) as any[]
+
   // ── 특정 월 조회 (year_month 파라미터) — PayrollTab 과거 월 복구용 ──────
   const targetMonth = req.nextUrl.searchParams.get('year_month')
   if (targetMonth) {
     const targetOps      = opsEntries.filter(e => e.date?.startsWith(targetMonth))
     const targetContracts = opsContractEntries.filter(e => e.date?.startsWith(targetMonth))
-    const targetSales    = salesEntries.filter(e => e.date?.startsWith(targetMonth))
+    const targetSales    = [
+      ...salesEntries.filter(e => e.date?.startsWith(targetMonth)),
+      ...refundSalesEntries.filter((e: any) => e.date?.startsWith(targetMonth)),
+    ]
     return NextResponse.json({
       thisMonthOps:          targetOps,
       thisMonthOpsContracts: targetContracts,
@@ -291,7 +333,10 @@ export async function GET(req: NextRequest) {
   const lastMonthDate2 = new Date(now.getFullYear(), now.getMonth() - 1, 1)
   const lastMonthKey  = `${lastMonthDate2.getFullYear()}-${String(lastMonthDate2.getMonth() + 1).padStart(2, '0')}`
 
-  const thisMonthSales         = salesEntries.filter(e => e.date?.startsWith(thisMonthKey))
+  const thisMonthSales = [
+    ...salesEntries.filter(e => e.date?.startsWith(thisMonthKey)),
+    ...refundSalesEntries.filter((e: any) => e.date?.startsWith(thisMonthKey)),
+  ]
   const thisMonthOps           = opsEntries.filter(e => e.date?.startsWith(thisMonthKey))
   const thisMonthOpsContracts  = opsContractEntries.filter(e => e.date?.startsWith(thisMonthKey))
   const lastMonthOps           = opsEntries.filter(e => e.date?.startsWith(lastMonthKey))

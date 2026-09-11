@@ -477,10 +477,6 @@ function PayRateSubView() {
             }
           })
 
-        const stats = Object.entries(byPerson).map(([name, contracted]) => ({ name, contracted }))
-        setAutoStats(stats)
-        setPaymentCount(stats.reduce((s, v) => s + v.contracted, 0))
-
         // 인별 자동 집계 (직책 포함/미포함 이름 모두 지원)
         const allNames = new Set([
           ...Object.keys(supplyPayMap),
@@ -497,6 +493,26 @@ function PayRateSubView() {
             direct_payment: (directPayMap[n]  || 0) + (aMap[key]?.direct_payment  || 0),
           }
         })
+        // 환불 차감: aMap 및 byPerson에서 weight 제거
+        ;(custJson.customers || []).forEach((c: any) => {
+          const dedMonth = c.details?.refund_deduction_month
+          if (dedMonth !== month) return
+          const rawName = (c.details?.refund_deduction_sales || '').trim()
+          if (!rawName) return
+          const w = parseFloat(String(c.details?.refund_deduction_weight || 0)) || 0
+          if (w <= 0) return
+          const cName = cleanName(rawName)
+          if (aMap[cName]) {
+            const deductFrom = aMap[cName].supply_payment >= w ? 'supply_payment' : 'direct_payment'
+            aMap[cName][deductFrom] = Math.max(0, aMap[cName][deductFrom] - w)
+          }
+          const bpKey = Object.keys(byPerson).find(k => cleanName(k) === cName)
+          if (bpKey) byPerson[bpKey] = Math.max(0, byPerson[bpKey] - w)
+        })
+        const statsAfterRefund = Object.entries(byPerson).map(([name, contracted]) => ({ name, contracted }))
+        setAutoStats(statsAfterRefund)
+        setPaymentCount(statsAfterRefund.reduce((s, v) => s + v.contracted, 0))
+
         setAutoByPerson(aMap)
 
         // 결제율 레코드 (DB → localStorage 순으로 폴백)

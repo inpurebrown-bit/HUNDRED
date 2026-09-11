@@ -412,12 +412,14 @@ export default function PayrollTab() {
         if (!name) return
         const w = parseFloat(String(c.details?.refund_deduction_weight || 0)) || 0
         if (w <= 0) return
+        const deductAmt = parseFloat(String(c.details?.refund_deduction_amount || 0)) || Math.round(w * 500_000)
         if (!salesByName[name]) salesByName[name] = { amount: 0, count: 0 }
-        salesByName[name].count = Math.max(0, salesByName[name].count - w)
+        salesByName[name].count  = Math.max(0, salesByName[name].count - w)
+        salesByName[name].amount = Math.max(0, salesByName[name].amount - deductAmt)
         if (!contractDetails[name]) contractDetails[name] = []
         contractDetails[name].push({
           company: `[환불차감] ${c.details?.refund_company || c.details?.company || c.name || ''}`,
-          amount: 0, weight: -w, date: dedMonth, refund: true,
+          amount: -deductAmt, weight: -w, date: dedMonth, refund: true,
         })
       })
       setSalesContractMap(contractDetails)
@@ -457,9 +459,8 @@ export default function PayrollTab() {
       }
       const monthlySubBonusPrev = calcMonthlySubBonus(custJson.customers || [], yearMonth)
       const refundDeductions = calcRefundDeductions(custJson.customers || [], yearMonth)
-      const refundAmountTotal = refundDeductions.reduce((s: number, d) => s + d.amount, 0)
       const newRevTotals = {
-        sales:       Math.max(0, (revData.thisMonthSales || []).reduce((s: number, e: any) => s + (e.amount || 0), 0) - refundAmountTotal),
+        sales:       Math.max(0, (revData.thisMonthSales || []).reduce((s: number, e: any) => s + (e.amount || 0), 0)),
         ops:         opsEntriesForMonth.reduce((s: number, e: any) => s + (e.amount || 0), 0),
         opsContract: opsPutoForMonth.reduce((s: number, e: any) => s + (e.amount || 0), 0),
       }

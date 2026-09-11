@@ -918,9 +918,15 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
       ((c as any).details?.contract_date || c.created_at || '').slice(0, 7) === lastMonthStr),
   [customers, lastMonthStr])
 
+  const thisMonthRefundDeductAmt = useMemo(() =>
+    customers
+      .filter((c: any) => c.status === 'refunded' && c.details?.refund_deduction_month === thisMonthStr)
+      .reduce((s: number, c: any) => s + (parseFloat(String(c.details?.refund_deduction_amount || 0)) || 0), 0),
+  [customers, thisMonthStr])
+
   const thisMonthRevenue = useMemo(() =>
-    thisMonthContracted.reduce((s, c) => s + parseNum((c as any).details?.my_revenue), 0),
-  [thisMonthContracted])
+    Math.max(0, thisMonthContracted.reduce((s, c) => s + parseNum((c as any).details?.my_revenue), 0) - thisMonthRefundDeductAmt),
+  [thisMonthContracted, thisMonthRefundDeductAmt])
 
   const lastMonthRevenue = useMemo(() =>
     lastMonthContracted.reduce((s, c) => s + parseNum((c as any).details?.my_revenue), 0),
@@ -946,11 +952,25 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
       const m = c.details?.db010_month || (c.details?.is_direct ? (c.created_at || '').slice(0, 7) : null)
       return m === thisMonthStr
     }).length
+    const refundAmt = customers
+      .filter((c: any) =>
+        c.status === 'refunded' &&
+        c.details?.refund_deduction_month === thisMonthStr &&
+        (c.details?.refund_deduction_sales || '').trim() === name
+      )
+      .reduce((s: number, c: any) => s + (parseFloat(String(c.details?.refund_deduction_amount || 0)) || 0), 0)
+    const refundCount = customers
+      .filter((c: any) =>
+        c.status === 'refunded' &&
+        c.details?.refund_deduction_month === thisMonthStr &&
+        (c.details?.refund_deduction_sales || '').trim() === name
+      )
+      .reduce((s: number, c: any) => s + (parseFloat(String(c.details?.refund_deduction_weight || 0)) || 0), 0)
     return {
       name,
-      revenue: mine.reduce((s, c) => s + parseNum((c as any).details?.my_revenue), 0),
+      revenue: Math.max(0, mine.reduce((s, c) => s + parseNum((c as any).details?.my_revenue), 0) - refundAmt),
       payment: mine.reduce((s, c) => s + parseNum((c as any).details?.payment_amount), 0),
-      count:   mine.reduce((s, c) => s + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0),
+      count:   Math.max(0, mine.reduce((s, c) => s + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0) - refundCount),
       db010,
     }
   }), [salesPeople, thisMonthContracted, customers, thisMonthStr])
