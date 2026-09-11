@@ -1621,11 +1621,66 @@ function CustomerCard({
                 직가 전환
               </button>
             )}
+            {/* 인쇄 버튼 */}
+            <button
+              type="button"
+              onClick={e => {
+                e.stopPropagation()
+                const fields = buildLogFields(c)
+                const infoRows = fields.filter(f => f.value).map(f =>
+                  `<tr><td style="font-size:10px;color:#888;padding:3px 6px;border-bottom:1px solid #f0f0f0;white-space:nowrap">${f.label}</td><td style="font-size:11px;font-weight:600;padding:3px 6px;border-bottom:1px solid #f0f0f0">${f.value || '—'}</td></tr>`
+                ).join('')
+                const tl: any[] = [...(c.call_timeline || [])].sort((a, b) => (b.time || b.created_at || '') > (a.time || a.created_at || '') ? 1 : -1)
+                const memoRows = tl.length === 0
+                  ? '<tr><td colspan="2" style="color:#ccc;font-size:10px;padding:6px">통화 메모가 없습니다</td></tr>'
+                  : tl.map((e: any) => {
+                    const dt = new Date(e.time || e.created_at || '').toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+                    return `<tr><td style="font-size:10px;color:#888;padding:3px 6px;border-bottom:1px solid #f0f0f0;vertical-align:top;white-space:nowrap">${dt}<br/><b>${e.author || e.user || ''}</b></td><td style="font-size:11px;padding:3px 6px;border-bottom:1px solid #f0f0f0;white-space:pre-wrap">${e.content || ''}</td></tr>`
+                  }).join('')
+                const d = c.details || {} as any
+                const callResult = d.call_result || ''
+                const closingResult = d.closing_result || ''
+                const companyName = d.company || c.company || c.name || ''
+                const salesName = d.sales_user_name || c.sales_user_name || ''
+                const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${companyName} 인콜일지</title>
+                  <style>
+                    @page { margin:12mm; size:A4; }
+                    body { font-family:'Apple SD Gothic Neo','Noto Sans KR',sans-serif; margin:0; color:#1a1a1a; }
+                    h1 { font-size:16px; margin:0 0 4px; }
+                    .sub { font-size:11px; color:#666; margin-bottom:12px; }
+                    table { width:100%; border-collapse:collapse; margin-bottom:12px; }
+                    .section-title { font-size:12px; font-weight:700; border-bottom:2px solid #1B2A45; padding-bottom:3px; margin:12px 0 4px; }
+                    .result-box { display:inline-block; background:#f0fdf4; border:1px solid #86efac; border-radius:6px; padding:3px 10px; font-size:11px; font-weight:700; color:#15803d; margin-right:6px; }
+                    .result-label { font-size:10px; color:#888; margin-right:4px; }
+                    @media print { button { display:none !important; } }
+                  </style></head><body>
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+                    <div><h1>${companyName}</h1><div class="sub">담당: ${salesName} &nbsp;|&nbsp; 인쇄: ${new Date().toLocaleDateString('ko-KR')}</div></div>
+                    <button onclick="window.print()" style="padding:6px 16px;background:#1B2A45;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">인쇄</button>
+                  </div>
+                  <div class="section-title">고객 정보</div>
+                  <table><tbody>${infoRows}</tbody></table>
+                  ${(callResult || closingResult) ? `
+                    <div class="section-title">인콜 결과</div>
+                    <div style="padding:6px 0 10px">
+                      ${callResult ? `<span class="result-label">결정전</span><span class="result-box">${callResult}</span>` : ''}
+                      ${closingResult ? `<span class="result-label">클로징</span><span class="result-box">${closingResult}</span>` : ''}
+                    </div>` : ''}
+                  <div class="section-title">통화 메모</div>
+                  <table><tbody>${memoRows}</tbody></table>
+                </body></html>`
+                const w = window.open('', '_blank', 'width=800,height=900')
+                if (w) { w.document.write(html); w.document.close() }
+              }}
+              className="ml-auto px-2.5 py-1 rounded text-[11px] font-semibold bg-[#1B2A45] hover:bg-[#1B2A45]/80 text-white flex items-center gap-1"
+            >
+              인쇄
+            </button>
             {/* 미팅일지 출력 버튼 */}
             <button
               type="button"
               onClick={e => { e.stopPropagation(); setMeetingJournalOpen(true) }}
-              className="ml-auto px-2.5 py-1 rounded text-[11px] font-semibold bg-[#C5A258] hover:bg-[#b8923f] text-white flex items-center gap-1"
+              className="px-2.5 py-1 rounded text-[11px] font-semibold bg-[#C5A258] hover:bg-[#b8923f] text-white flex items-center gap-1"
             >
               미팅일지
             </button>
