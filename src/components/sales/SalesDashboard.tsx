@@ -1061,6 +1061,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         {/* ══════════ 메인보드 ══════════ */}
         {activeTab === 'board' && (
           <div className="space-y-4">
+            {/* ── 인사말 ── */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-400">{new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}</p>
+                <h2 className="font-black text-[#1B2A45] text-lg leading-tight">{userName}님, 안녕하세요 👋</h2>
+              </div>
+            </div>
             {/* ── 이번달 공급 현황 (분석 대시보드) ── */}
             {(() => {
               const pr = myPayrateRow
