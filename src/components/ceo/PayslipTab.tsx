@@ -447,6 +447,8 @@ export default function PayslipTab() {
   const [loading, setLoading]       = useState(false)
   const [msg, setMsg]               = useState('')
   const [editMode, setEditMode]     = useState(false)
+  const [userPicker, setUserPicker] = useState<{ id: string; name: string; role: string }[] | null>(null)
+  const [pickerQuery, setPickerQuery] = useState('')
 
   // 직원 개인정보 로드
   useEffect(() => {
@@ -651,11 +653,61 @@ export default function PayslipTab() {
     finally { setLoading(false) }
   }
 
-  function addEmployee() {
+  // 직원 추가: users 목록 불러와 피커 표시
+  async function addEmployee() {
+    const res = await fetch('/api/users')
+    const data = await res.json()
+    const allUsers: { id: string; name: string; role: string }[] = (data.users || [])
+      .filter((u: any) => u.role !== 'ceo')
+    setPickerQuery('')
+    setUserPicker(allUsers)
+  }
+
+  // 피커에서 user 선택 → 프로필 자동완성
+  async function pickUser(u: { id: string; name: string; role: string }) {
+    // 이미 등록된 직원인지 확인
+    const existing = employees.find((e: any) => e.user_id === u.id || e.name === u.name)
+    if (existing) {
+      setUserPicker(null)
+      setSelectedId(existing.id)
+      setEditMode(false)
+      return
+    }
+    const team: 'ops' | 'sales' = u.role === 'ops' ? 'ops' : 'sales'
+    const base: EmpPersonal & { user_id?: string } = {
+      ...newEmp(),
+      user_id: u.id,
+      name: u.name,
+      team,
+    }
+    // payslip_settings에서 이미 저장된 프로필 데이터 당겨오기
+    try {
+      const res = await fetch('/api/payslip-settings')
+      const j = await res.json()
+      const stored: any[] = j.settings?.employees || []
+      const match = stored.find((e: any) => e.user_id === u.id || e.name === u.name)
+      if (match) {
+        base.resident_id  = match.resident_id  || ''
+        base.address      = match.address      || ''
+        base.phone        = match.phone        || ''
+        base.bank_account = match.bank_account || ''
+        base.bank_name    = match.bank_name    || '카카오뱅크'
+        base.team         = match.team         || team
+      }
+    } catch {}
+    setEmployees(prev => [...prev, base])
+    setSelectedId(base.id)
+    setEditMode(!base.phone)  // 이미 프로필이 있으면 미리보기, 없으면 편집 모드
+    setUserPicker(null)
+  }
+
+  // 피커 없이 빈 항목 직접 추가
+  function addBlank() {
     const emp = newEmp()
     setEmployees(prev => [...prev, emp])
     setSelectedId(emp.id)
     setEditMode(true)
+    setUserPicker(null)
   }
 
   const inp = 'w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400'
@@ -709,6 +761,44 @@ export default function PayslipTab() {
                 <button onClick={addEmployee}
                   className="text-xs bg-[#1B2A45] text-white px-2 py-0.5 rounded-lg">+ 추가</button>
               </div>
+              {/* 직원 피커 */}
+              {userPicker !== null && (
+                <div className="border-b border-[#E8E2D4] px-3 py-2 bg-blue-50 space-y-1.5">
+                  <p className="text-[10px] font-bold text-blue-700">직원 선택 (자동완성)</p>
+                  <input
+                    type="text"
+                    placeholder="이름 검색..."
+                    value={pickerQuery}
+                    onChange={e => setPickerQuery(e.target.value)}
+                    autoFocus
+                    className="w-full px-2 py-1.5 text-xs border border-blue-200 rounded-lg focus:outline-none focus:border-blue-400"
+                  />
+                  <div className="max-h-36 overflow-y-auto space-y-0.5">
+                    {userPicker
+                      .filter(u => !pickerQuery || u.name.includes(pickerQuery))
+                      .map(u => {
+                        const alreadyAdded = employees.some(e => (e as any).user_id === u.id || e.name === u.name)
+                        const roleTag = u.role === 'ops' ? '관리팀' : u.role === 'dig' ? '발굴팀' : '영업팀'
+                        return (
+                          <button key={u.id} onClick={() => pickUser(u)}
+                            className="w-full text-left px-2 py-1.5 rounded-lg text-xs hover:bg-blue-100 flex items-center justify-between transition-colors">
+                            <span className="font-medium text-[#1B2A45]">{u.name}</span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${alreadyAdded ? 'bg-gray-100 text-gray-400' : 'bg-blue-100 text-blue-600'}`}>
+                              {alreadyAdded ? '이미 추가됨' : roleTag}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    {userPicker.filter(u => !pickerQuery || u.name.includes(pickerQuery)).length === 0 && (
+                      <p className="text-[10px] text-gray-400 text-center py-2">검색 결과 없음</p>
+                    )}
+                  </div>
+                  <div className="flex gap-1.5 pt-0.5">
+                    <button onClick={addBlank} className="flex-1 text-[10px] py-1 rounded-lg bg-white border border-gray-200 text-gray-500 hover:bg-gray-50">직접 입력</button>
+                    <button onClick={() => setUserPicker(null)} className="text-[10px] px-3 py-1 rounded-lg bg-white border border-gray-200 text-gray-400 hover:bg-gray-50">닫기</button>
+                  </div>
+                </div>
+              )}
               <div className="px-3 py-2 bg-gray-50 border-b border-[#E8E2D4] text-[10px] text-gray-400 leading-relaxed">
                 팀 선택 시 <b className="text-gray-500">영업팀·관리팀</b> 모두 지원<br/>급여·손익탭과 자동 연동
               </div>
