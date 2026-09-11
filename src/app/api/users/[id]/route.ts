@@ -43,6 +43,23 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     await supabaseAdmin.from('customers').update({ owner_id: null }).eq('owner_id', id)
   }
 
+  // 이름 변경 시 payslip_settings.employees 동기화
+  if (name && name !== target.name) {
+    try {
+      const { data: settingsRow } = await supabaseAdmin
+        .from('payslip_settings').select('*').eq('id', 'default').single()
+      if (settingsRow) {
+        const employees: any[] = settingsRow.employees || []
+        const idx = employees.findIndex((e: any) => e.user_id === id || e.name === target.name)
+        if (idx >= 0) {
+          const newEmployees = employees.map((e: any, i: number) => i === idx ? { ...e, name, user_id: id } : e)
+          await supabaseAdmin.from('payslip_settings')
+            .upsert({ ...settingsRow, employees: newEmployees, updated_at: new Date().toISOString() }, { onConflict: 'id' })
+        }
+      }
+    } catch {}
+  }
+
   return NextResponse.json({ user: updated, customersUnassigned: roleChanged })
 }
 
