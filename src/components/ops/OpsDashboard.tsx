@@ -767,6 +767,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
           customerPatch.details = {
             refund_deduction_month: kstMonth,
             refund_deduction_weight: contractW,
+            refund_deduction_amount: feeAmt,
             refund_deduction_sales: salesUser,
             refund_company: company,
           }

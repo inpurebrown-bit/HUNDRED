@@ -674,6 +674,8 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
   const lastMonthSalesRaw = lastMonthRevEntry?.영업팀 ?? 0
   const lastMonthOpsRaw   = (lastMonthRevEntry?.관리팀 ?? 0) + (lastMonthRevEntry?.관리팀계약 ?? 0)
   const thisMonthSalesRaw = thisMonthRevEntry?.영업팀 ?? 0
+  const thisMonthRefundSalesAmt = calcRefundDeductions(allCustomers, thisMonthStr).reduce((s, d) => s + d.amount, 0)
+  const lastMonthRefundSalesAmt = calcRefundDeductions(allCustomers, lastMonthStr).reduce((s, d) => s + d.amount, 0)
   const thisMonthTax = Math.round(thisMonthRevRaw * 0.1)
   const lastMonthTax = Math.round(lastMonthRevRaw * 0.1)
 
@@ -893,7 +895,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
             <span className="text-[10px] text-white/50 font-medium">영업</span>
             {loading ? <Skeleton className="h-4 w-12 bg-white/20" /> : (
               <span className="text-sm font-black text-white">
-                {(() => { const r = thisMonthSalesRaw; return r >= 10000 ? (r/10000).toFixed(0)+'만' : r > 0 ? r.toLocaleString() : '-' })()}
+                {(() => { const r = Math.max(0, thisMonthSalesRaw - thisMonthRefundSalesAmt); return r >= 10000 ? (r/10000).toFixed(0)+'만' : r > 0 ? r.toLocaleString() : '-' })()}
               </span>
             )}
           </div>
@@ -923,7 +925,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           inProgressCount={thisInProgress}
           taxAmount={thisMonthTax}
           employeeRows={thisMonthRows}
-          salesRevenueAmount={thisMonthSalesRaw}
+          salesRevenueAmount={Math.max(0, thisMonthSalesRaw - thisMonthRefundSalesAmt)}
           opsRevenueAmount={thisMonthOpsRaw}
           vatRevenue={thisVatRevenue}
           opsUserRows={thisMonthOpsUserRows}
@@ -936,7 +938,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           inProgressCount={lastInProgress}
           taxAmount={lastMonthTax}
           employeeRows={lastMonthRows}
-          salesRevenueAmount={lastMonthSalesRaw}
+          salesRevenueAmount={Math.max(0, lastMonthSalesRaw - lastMonthRefundSalesAmt)}
           opsRevenueAmount={lastMonthOpsRaw}
           vatRevenue={lastVatRevenue}
           opsUserRows={lastMonthOpsUserRows}

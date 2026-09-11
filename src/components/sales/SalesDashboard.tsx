@@ -765,11 +765,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   // 환불 차감 (단일 소스: payrollCalc.calcRefundDeductions)
   const thisMonthRefunds = calcRefundDeductions(customers, thisMonth)
   const thisMonthRefundWeight = thisMonthRefunds.reduce((s, d) => s + d.weight, 0)
+  const thisMonthRefundAmount = thisMonthRefunds.reduce((s, d) => s + d.amount, 0)
   const thisMonthContractCount = Math.max(
     0,
     thisMonthRevenue.reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0)
     - thisMonthRefundWeight
   )
+  const thisMonthTotalRevenueNet = Math.max(0, thisMonthTotalRevenue - thisMonthRefundAmount)
 
   // 전체 합계
   const totalRevenue = revenueCustomers
@@ -1139,10 +1141,10 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                       <p className="text-[10px] text-white/40">{thisMonth} · 영업일 {bizElapsed}/{bizTotal}일</p>
                       <p className="text-xs font-bold text-white/70 mt-0.5">잔여 {bizRemaining}일 · 목표까지 {fmtV(needed)}개</p>
                       <p className="text-[11px] text-[#C5A258] font-black mt-1">
-                        {thisMonthTotalRevenue > 0
-                          ? (thisMonthTotalRevenue >= 100000000
-                            ? (thisMonthTotalRevenue / 100000000).toFixed(1) + '억'
-                            : (thisMonthTotalRevenue / 10000).toFixed(0) + '만원')
+                        {thisMonthTotalRevenueNet > 0
+                          ? (thisMonthTotalRevenueNet >= 100000000
+                            ? (thisMonthTotalRevenueNet / 100000000).toFixed(1) + '억'
+                            : (thisMonthTotalRevenueNet / 10000).toFixed(0) + '만원')
                           : '매출 없음'}
                       </p>
                     </div>
@@ -1162,13 +1164,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                       <details className="bg-red-50 border border-red-100 rounded-xl overflow-hidden">
                         <summary className="px-3 py-2 cursor-pointer select-none flex items-center justify-between">
                           <span className="text-[9px] font-bold text-red-400 uppercase tracking-widest">이달 환불 차감</span>
-                          <span className="text-[9px] font-bold text-red-500">-{thisMonthRefundWeight}개</span>
+                          <span className="text-[9px] font-bold text-red-500">-{thisMonthRefundWeight}개 / -{thisMonthRefundAmount.toLocaleString('ko-KR')}원</span>
                         </summary>
                         <div className="px-3 pb-2 space-y-1">
                           {thisMonthRefunds.map((d, i) => (
                             <div key={i} className="flex items-center justify-between">
                               <span className="text-xs text-red-600">{d.company || '업체명 없음'}</span>
-                              <span className="text-xs font-bold text-red-500">-{d.weight}개</span>
+                              <span className="text-xs font-bold text-red-500">-{d.weight}개 / -{d.amount.toLocaleString('ko-KR')}원</span>
                             </div>
                           ))}
                         </div>
@@ -1808,7 +1810,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
                   { label: '계약 갯수', value: thisMonthContractCount % 1 === 0 ? `${thisMonthContractCount}개` : `${thisMonthContractCount.toFixed(1)}개`, color: 'text-[#C5A258]' },
-                  { label: '본인 매출', value: fmtWon(thisMonthTotalRevenue), color: 'text-emerald-600' },
+                  { label: '본인 매출', value: fmtWon(thisMonthTotalRevenueNet), color: 'text-emerald-600' },
                   { label: '입금액(VAT포함)', value: fmtWon(thisMonthTotalPaid), color: 'text-sky-600' },
                   { label: '취소건수', value: `${cancelledCount}건`, color: 'text-red-500' },
                 ].map(s => (

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, calcMonthlySubBonus } from '@/lib/payrollCalc'
+import { getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, calcMonthlySubBonus, calcRefundDeductions } from '@/lib/payrollCalc'
 import { contractWeight } from '@/lib/supplyRules'
 
 // ─── 타입 ─────────────────────────────────────────────────
@@ -456,8 +456,10 @@ export default function PayrollTab() {
         opsPutoByName[name] = (opsPutoByName[name] || 0) + (e.amount || 0)
       }
       const monthlySubBonusPrev = calcMonthlySubBonus(custJson.customers || [], yearMonth)
+      const refundDeductions = calcRefundDeductions(custJson.customers || [], yearMonth)
+      const refundAmountTotal = refundDeductions.reduce((s: number, d) => s + d.amount, 0)
       const newRevTotals = {
-        sales:       (revData.thisMonthSales || []).reduce((s: number, e: any) => s + (e.amount || 0), 0),
+        sales:       Math.max(0, (revData.thisMonthSales || []).reduce((s: number, e: any) => s + (e.amount || 0), 0) - refundAmountTotal),
         ops:         opsEntriesForMonth.reduce((s: number, e: any) => s + (e.amount || 0), 0),
         opsContract: opsPutoForMonth.reduce((s: number, e: any) => s + (e.amount || 0), 0),
       }
