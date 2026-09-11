@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, calcMonthlySubBonus, calcRefundDeductions } from '@/lib/payrollCalc'
+import { getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, calcMonthlySubBonus, calcRefundDeductions, calcDigSalary, DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
 import { contractWeight } from '@/lib/supplyRules'
 
 // ─── 타입 ─────────────────────────────────────────────────
@@ -26,6 +26,13 @@ interface SalesEmployee {
   contract_count: number
   performance_bonus: number
   awards: AwardItem[]
+}
+
+interface DigEmployee {
+  name: string
+  approved_count: number  // 해당 월 승인 건수 (자동)
+  join_date?: string      // 입사일 (일할계산용)
+  resign_date?: string    // 퇴사일 (일할계산용)
 }
 
 interface OtherCostItem { label: string; amount: number }
@@ -62,6 +69,27 @@ function calcSales(e: SalesEmployee) {
   return { contractInc, perfBonus, promo, awardsSum, before, after }
 }
 
+function calcDig(e: DigEmployee, yearMonth: string) {
+  // 일할 계산 여부 판단
+  let workedDays: number | undefined
+  let totalDays: number | undefined
+  const [yr, mo] = yearMonth.split('-').map(Number)
+  const daysInMonth = new Date(yr, mo, 0).getDate()
+  // 입사월이면 입사일부터 말일까지
+  if (e.join_date && e.join_date.slice(0, 7) === yearMonth) {
+    const joinDay = parseInt(e.join_date.slice(8, 10), 10) || 1
+    workedDays = daysInMonth - joinDay + 1
+    totalDays  = daysInMonth
+  }
+  // 퇴사월이면 1일부터 퇴사일까지
+  if (e.resign_date && e.resign_date.slice(0, 7) === yearMonth) {
+    const resignDay = parseInt(e.resign_date.slice(8, 10), 10) || daysInMonth
+    workedDays = resignDay
+    totalDays  = daysInMonth
+  }
+  return calcDigSalary(e.approved_count, workedDays, totalDays)
+}
+
 // ─── 유틸 ─────────────────────────────────────────────────
 
 const thisMonth = currentYearMonth
@@ -90,6 +118,9 @@ function defaultOps(): OpsEmployee {
 }
 function defaultSales(): SalesEmployee {
   return { name: '', contract_revenue: 0, contract_count: 0, performance_bonus: 0, awards: [] }
+}
+function defaultDig(): DigEmployee {
+  return { name: '', approved_count: 0 }
 }
 function defaultCosts(): OtherCosts {
   return { db_count: 0, db_unit_price: 40000, rent: 650000, mgmt: 400000, sales_fixed: 820000, sales_other_items: [],
@@ -265,6 +296,55 @@ function SalesCard({
   )
 }
 
+// ─── 발굴팀 직원 카드 ─────────────────────────────────────
+
+function DigCard({
+  emp, idx, yearMonth, onChange, onRemove,
+}: {
+  emp: DigEmployee; idx: number; yearMonth: string
+  onChange: (i: number, f: keyof DigEmployee, v: string) => void
+  onRemove: (i: number) => void
+}) {
+  const c = calcDig(emp, yearMonth)
+  return (
+    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+      <div className="bg-gradient-to-r from-orange-600 to-orange-500 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <input
+            type="text" value={emp.name}
+            onChange={e => onChange(idx, 'name', e.target.value)}
+            placeholder="직원명"
+            className="bg-transparent text-white font-bold text-sm placeholder-white/40 border-none outline-none w-full"
+          />
+          <button onClick={() => onRemove(idx)} className="text-white/30 hover:text-white/70 text-sm ml-2 shrink-0">✕</button>
+        </div>
+        <div className="flex items-center gap-3 mt-1.5">
+          <span className="text-[10px] text-white/50">공제전 <span className="text-white/80 font-semibold">{c.before > 0 ? c.before.toLocaleString('ko-KR') + '원' : '-'}</span></span>
+          <span className="text-white/20 text-[10px]">→</span>
+          <span className="text-[10px] text-white/50">공제후 <span className="text-yellow-200 font-bold">{c.after > 0 ? c.after.toLocaleString('ko-KR') + '원' : '-'}</span></span>
+        </div>
+      </div>
+      <div className="px-4 py-3 space-y-0">
+        <PayRow label={`기본급 (${DIG_BASE_SALARY.toLocaleString('ko-KR')}원)`} value={c.base} autoTag />
+        <div className="flex items-center justify-between py-1.5 border-b border-gray-50">
+          <span className="text-xs text-gray-400">이달 승인 건수</span>
+          <input
+            type="text" inputMode="numeric" value={emp.approved_count || ''}
+            onChange={e => onChange(idx, 'approved_count', e.target.value)}
+            placeholder="0"
+            className="w-20 text-right text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-400 text-gray-700"
+          />
+        </div>
+        <PayRow
+          label={`인센 (${DIG_DAILY_GOAL}건 초과 ×${DIG_BONUS_PER_EXTRA.toLocaleString()}원)`}
+          value={c.incentive}
+          colorClass={c.incentive > 0 ? 'text-orange-600' : undefined}
+        />
+      </div>
+    </div>
+  )
+}
+
 // ─── 메인 컴포넌트 ────────────────────────────────────────
 
 export default function PayrollTab() {
@@ -281,6 +361,7 @@ export default function PayrollTab() {
   const [salesEmps, setSalesEmps] = useState<SalesEmployee[]>([
     { ...defaultSales(), name: '손제후' },
   ])
+  const [digEmps, setDigEmps] = useState<DigEmployee[]>([])
   const [costs, setCosts]     = useState<OtherCosts>(defaultCosts())
   const [revTotals, setRevTotals] = useState<{ sales: number; ops: number; opsContract: number } | null>(null)
   const [perPersonSupply, setPerPersonSupply] = useState<{ name: string; count: number }[]>([])
@@ -332,13 +413,14 @@ export default function PayrollTab() {
     c: OtherCosts,
     rev: { sales: number; ops: number; opsContract: number } | null,
     ym?: string,
+    dig?: DigEmployee[],
   ) {
     await fetch('/api/payroll', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         year_month: ym ?? yearMonth,
-        employees: { ops_employees: ops, sales_employees: sales, other_costs: c, revenue_totals: rev },
+        employees: { ops_employees: ops, sales_employees: sales, dig_employees: dig ?? digEmps, other_costs: c, revenue_totals: rev },
         memo: '',
       }),
     })
@@ -351,10 +433,10 @@ export default function PayrollTab() {
     if (!didInitLoad.current) return
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
-      doSave(opsEmps, salesEmps, costs, revTotals)
+      doSave(opsEmps, salesEmps, costs, revTotals, undefined, digEmps)
     }, 1500)
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
-  }, [opsEmps, salesEmps, costs, revTotals]) // eslint-disable-line
+  }, [opsEmps, salesEmps, digEmps, costs, revTotals]) // eslint-disable-line
 
   // ── 과거 월 계약 목록만 로드 (집계된 계약 표시용, salesEmps/doSave 건드리지 않음) ──
   // 저장된 contract_count(이미 환수 반영된 값)는 그대로 두고 지급명세 목록만 채움
@@ -678,8 +760,32 @@ export default function PayrollTab() {
         // payrate 실패해도 revenue 반영은 성공
       }
 
+      // 발굴팀 승인 건수 자동 반영
+      let newDigEmps = digEmps
+      try {
+        const digRes  = await fetch(`/api/dig-prospects?year_month=${yearMonth}`)
+        const digJson = await digRes.json()
+        const digProspects: any[] = digJson.prospects || digJson.data || []
+        const monthKey = yearMonth
+        const countByUser: Record<string, number> = {}
+        for (const p of digProspects) {
+          if ((p.status === 'approved' || p.status === 'assigned') && (p.call_date || '').startsWith(monthKey)) {
+            const uid = String(p.user_id || '')
+            const uname = (p.user_name || p.dig_user_name || '').trim()
+            const key = uname || uid
+            if (key) countByUser[key] = (countByUser[key] || 0) + 1
+          }
+        }
+        newDigEmps = digEmps.map(e => {
+          if (!e.name) return e
+          const key = Object.keys(countByUser).find(k => k === e.name || k.includes(e.name) || e.name.includes(k))
+          return key ? { ...e, approved_count: countByUser[key] } : e
+        })
+        setDigEmps(newDigEmps)
+      } catch { /* 발굴팀 로드 실패해도 계속 */ }
+
       // 자동저장
-      await doSave(newOpsEmps, newSalesEmps, newCosts, newRevTotals)
+      await doSave(newOpsEmps, newSalesEmps, newCosts, newRevTotals, undefined, newDigEmps)
 
       const ts = nowTimestamp()
       setLastUpdated(ts)
@@ -731,6 +837,7 @@ export default function PayrollTab() {
       // 새로 로드한 값을 변수에 먼저 저장 — autoLoad에 직접 전달해 stale closure 방지
       const freshOps   = d.ops_employees  || opsEmps
       const freshSales = d.sales_employees || salesEmps
+      const freshDig   = d.dig_employees  || []
       const rawCosts   = d.other_costs ? { ...defaultCosts(), ...d.other_costs } : costs
       // payrate 실계산값이 있으면 db_count를 실계산값으로 덮어씀 (저장값과 배지가 항상 일치)
       const freshCosts = payrateTotalSupply > 0
@@ -738,6 +845,7 @@ export default function PayrollTab() {
         : rawCosts
       setOpsEmps(freshOps)
       setSalesEmps(freshSales)
+      setDigEmps(freshDig)
       setCosts(freshCosts)
       if (d.revenue_totals) setRevTotals(d.revenue_totals)
       // 현재 월이면 저장된 레코드 로드 후 자동으로 최신 계약 데이터 반영
@@ -796,15 +904,23 @@ export default function PayrollTab() {
     setSalesEmps(prev => { const n = [...prev]; n[ei] = { ...n[ei], awards: n[ei].awards.filter((_, j) => j !== ai) }; return n })
   }
 
+  function updateDig(i: number, f: keyof DigEmployee, v: string) {
+    setDigEmps(prev => { const n = [...prev]; n[i] = { ...n[i], [f]: f === 'name' ? v : (f === 'approved_count' ? (parseInt(v.replace(/[^0-9]/g, ''), 10) || 0) : v) }; return n })
+  }
+  function removeDig(i: number) { setDigEmps(prev => prev.filter((_, j) => j !== i)) }
+
   // ── 손익 집계 ─────────────────────────────────────────────
   const opsCalcs   = opsEmps.map(calcOps)
   const salesCalcs = salesEmps.map(calcSales)
+  const digCalcs   = digEmps.map(e => calcDig(e, yearMonth))
 
   const opsTotalBefore   = opsCalcs.reduce((s, c) => s + c.before, 0)
   const opsTotalAfter    = opsCalcs.reduce((s, c) => s + c.after,  0)
   const salesTotalBefore = salesCalcs.reduce((s, c) => s + c.before, 0)
   const salesTotalAfter  = salesCalcs.reduce((s, c) => s + c.after,  0)
-  const laborCost = opsTotalBefore + salesTotalBefore
+  const digTotalBefore   = digCalcs.reduce((s, c) => s + c.before, 0)
+  const digTotalAfter    = digCalcs.reduce((s, c) => s + c.after,  0)
+  const laborCost = opsTotalBefore + salesTotalBefore + digTotalBefore
 
   const autoSalesFixed = pfFixed.loans + pfFixed.subs
 
@@ -820,6 +936,7 @@ export default function PayrollTab() {
 
   const namedOps   = opsEmps.filter(e => e.name.trim())
   const namedSales = salesEmps.filter(e => e.name.trim())
+  const namedDig   = digEmps.filter(e => e.name.trim())
 
   return (
     <div className="space-y-6 pb-10 max-w-4xl mx-auto">
@@ -984,6 +1101,32 @@ export default function PayrollTab() {
 
           <button onClick={() => setOpsEmps(prev => [...prev, defaultOps()])}
             className="w-full py-2 border border-dashed border-gray-300 rounded-xl text-xs text-gray-400 hover:border-[#1B2A45]/40 hover:text-[#1B2A45]/60 transition-colors">
+            + 직원 추가
+          </button>
+        </div>
+
+        {/* 구분선 */}
+        <div className="w-px bg-gray-200 self-stretch mx-1 shrink-0" />
+
+        {/* 발굴팀 */}
+        <div className="flex-1 min-w-0 pl-5 space-y-3">
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-sm font-bold text-orange-600">발굴팀</h3>
+            {namedDig.length > 0 && (
+              <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                <span>전 <span className="font-bold text-blue-600">{digTotalBefore.toLocaleString('ko-KR')}원</span></span>
+                <span className="text-gray-300">|</span>
+                <span>후 <span className="font-bold text-orange-600">{digTotalAfter.toLocaleString('ko-KR')}원</span></span>
+              </div>
+            )}
+          </div>
+
+          {digEmps.map((emp, i) => (
+            <DigCard key={i} emp={emp} idx={i} yearMonth={yearMonth} onChange={updateDig} onRemove={removeDig} />
+          ))}
+
+          <button onClick={() => setDigEmps(prev => [...prev, defaultDig()])}
+            className="w-full py-2 border border-dashed border-gray-300 rounded-xl text-xs text-gray-400 hover:border-orange-400/60 hover:text-orange-500/80 transition-colors">
             + 직원 추가
           </button>
         </div>

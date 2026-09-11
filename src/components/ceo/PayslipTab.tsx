@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { getPromo, PROMO_TIERS, PERF_BONUS_MIN_COUNT, PERF_BONUS_RATE, INCOME_TAX_RATE, LOCAL_TAX_RATE, OPS_FEE_RATE, OPS_PUTO_RATE, currentYearMonth, buildSalesContractMap } from '@/lib/payrollCalc'
+import { getPromo, PROMO_TIERS, PERF_BONUS_MIN_COUNT, PERF_BONUS_RATE, INCOME_TAX_RATE, LOCAL_TAX_RATE, OPS_FEE_RATE, OPS_PUTO_RATE, currentYearMonth, buildSalesContractMap, DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
 
 // ─── 타입 ─────────────────────────────────────────────────
 
@@ -13,7 +13,8 @@ interface EmpPersonal {
   phone: string
   bank_account: string
   bank_name: string
-  team: 'ops' | 'sales'
+  team: 'ops' | 'sales' | 'dig'
+  user_id?: string
 }
 
 interface AwardItem { reason: string; amount: number }
@@ -124,8 +125,24 @@ function PayslipDocument({ emp, financial, yearMonth }: {
     return { feeInc, putoInc, subBonus, allowSum, subtotal, beforeTax, incomeTax, localTax, actualPay }
   })()
 
+  // ── 발굴팀 계산 ──
+  const digCalc = (() => {
+    const base      = Number(financial.base_salary) || DIG_BASE_SALARY
+    const approved  = Number(financial.contract_count) || 0
+    const extraCnt  = Math.max(0, approved - DIG_DAILY_GOAL)
+    const incentive = extraCnt * DIG_BONUS_PER_EXTRA
+    const allowSum  = (financial.allowance_details || []).reduce((s, a) => s + Number(a.amount || 0), 0)
+    const subtotal  = base + incentive + allowSum
+    const beforeTax = subtotal - financial.deduction
+    const incomeTax = Math.round(beforeTax * INCOME_TAX_RATE)
+    const localTax  = Math.round(beforeTax * LOCAL_TAX_RATE)
+    const actualPay = beforeTax - incomeTax - localTax
+    return { base, incentive, extraCnt, allowSum, subtotal, beforeTax, incomeTax, localTax, actualPay }
+  })()
+
   const isSales = emp.team === 'sales'
-  const { beforeTax, incomeTax, localTax, actualPay } = isSales ? salesCalc : opsCalc
+  const isDig   = emp.team === 'dig'
+  const { beforeTax, incomeTax, localTax, actualPay } = isSales ? salesCalc : isDig ? digCalc : opsCalc
 
   return (
     <div
@@ -160,7 +177,7 @@ function PayslipDocument({ emp, financial, yearMonth }: {
         </div>
         <div className="text-right space-y-0.5">
           <div>기준월: <b className="text-gray-800">{yearMonth}</b></div>
-          <div>팀: <b className="text-gray-800">{isSales ? '영업팀' : '관리팀'}</b></div>
+          <div>팀: <b className="text-gray-800">{isSales ? '영업팀' : isDig ? '발굴팀' : '관리팀'}</b></div>
         </div>
       </div>
 
@@ -208,7 +225,34 @@ function PayslipDocument({ emp, financial, yearMonth }: {
           </tr>
         </thead>
         <tbody>
-          {isSales ? (
+          {isDig ? (
+            <>
+              {/* 발굴팀 */}
+              <tr>
+                <td className={tdL}>① 기본급</td>
+                <td className={tdV}>{DIG_BASE_SALARY.toLocaleString('ko-KR')}원 (월)</td>
+                <td className={tdN}>{fmt(digCalc.base)}</td>
+              </tr>
+              <tr>
+                <td className={tdL}>② 인센티브</td>
+                <td className={tdV}>
+                  {financial.contract_count > 0
+                    ? `${financial.contract_count}건 (${DIG_DAILY_GOAL}건 초과 ${digCalc.extraCnt}건 × ${DIG_BONUS_PER_EXTRA.toLocaleString()}원)`
+                    : `${DIG_DAILY_GOAL}건 초과분 × ${DIG_BONUS_PER_EXTRA.toLocaleString()}원`}
+                </td>
+                <td className={tdN + (digCalc.incentive > 0 ? ' text-orange-700 font-semibold' : '')}>
+                  {digCalc.incentive > 0 ? fmt(digCalc.incentive) : '-'}
+                </td>
+              </tr>
+              {(financial.allowance_details || []).map((a, i) => (
+                <tr key={i}>
+                  <td className={tdL}>제수당</td>
+                  <td className={tdV}>{a.name || '-'}</td>
+                  <td className={tdN}>{fmt(a.amount)}</td>
+                </tr>
+              ))}
+            </>
+          ) : isSales ? (
             <>
               {/* 영업팀 */}
               <tr>
@@ -308,7 +352,7 @@ function PayslipDocument({ emp, financial, yearMonth }: {
           <tr className="bg-gray-50">
             <td className="border border-gray-400 px-2 py-1 text-xs font-bold">소계</td>
             <td className={tdV}></td>
-            <td className={tdN + ' font-bold'}>{fmt(isSales ? salesCalc.subtotal : opsCalc.subtotal)}</td>
+            <td className={tdN + ' font-bold'}>{fmt(isDig ? digCalc.subtotal : isSales ? salesCalc.subtotal : opsCalc.subtotal)}</td>
           </tr>
 
           {/* 환수금 */}
@@ -560,6 +604,14 @@ export default function PayslipTab() {
               awards: savedMatch.awards || [],
             }
           }
+        } else if (emp.team === 'dig') {
+          // 발굴팀: payroll dig_employees에서 승인 건수 로드, 기본급 고정
+          const digEmpsFromPayroll: any[] = emps?.dig_employees || []
+          const match = digEmpsFromPayroll.find((e: any) => nameMatch(emp.name, e.name || ''))
+          updates[emp.id] = {
+            base_salary:    DIG_BASE_SALARY,
+            contract_count: match ? Number(match.approved_count || 0) : 0,
+          }
         } else {
           const match = opsList.find((e: any) => nameMatch(emp.name, e.name || ''))
           if (match) {
@@ -673,8 +725,8 @@ export default function PayslipTab() {
       setEditMode(false)
       return
     }
-    const team: 'ops' | 'sales' = u.role === 'ops' ? 'ops' : 'sales'
-    const base: EmpPersonal & { user_id?: string } = {
+    const team: 'ops' | 'sales' | 'dig' = u.role === 'ops' ? 'ops' : u.role === 'dig' ? 'dig' : 'sales'
+    const base: EmpPersonal = {
       ...newEmp(),
       user_id: u.id,
       name: u.name,
@@ -825,6 +877,14 @@ export default function PayslipTab() {
                     <EmpListItem key={emp.id} emp={emp} fin={financials[emp.id]} selectedId={selectedId}
                       onSelect={() => { setSelectedId(emp.id); setEditMode(false) }} />
                   ))}
+                  {/* 발굴팀 */}
+                  {employees.filter(e => e.team === 'dig').length > 0 && (
+                    <div className="px-3 pt-2 pb-0.5 text-[10px] font-bold text-gray-400 uppercase">발굴팀</div>
+                  )}
+                  {employees.filter(e => e.team === 'dig').map(emp => (
+                    <EmpListItem key={emp.id} emp={emp} fin={financials[emp.id]} selectedId={selectedId}
+                      onSelect={() => { setSelectedId(emp.id); setEditMode(false) }} />
+                  ))}
                 </div>
               )}
             </div>
@@ -843,7 +903,7 @@ export default function PayslipTab() {
                 <div className="no-print bg-white rounded-xl border border-[#E8E2D4] px-5 py-3 flex items-center justify-between">
                   <div>
                     <h3 className="font-bold text-gray-900">{selectedEmp.name || '(이름 없음)'}</h3>
-                    <p className="text-xs text-gray-400 mt-0.5">{selectedEmp.team === 'ops' ? '관리팀' : '영업팀'} · {yearMonth}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{selectedEmp.team === 'ops' ? '관리팀' : selectedEmp.team === 'dig' ? '발굴팀' : '영업팀'} · {yearMonth}</p>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setEditMode(m => !m)}

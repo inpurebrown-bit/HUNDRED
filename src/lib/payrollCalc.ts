@@ -93,6 +93,31 @@ export function calcRefundDeductions(customers: any[], yearMonth: string): Refun
   return result
 }
 
+// ── 발굴팀 급여 상수 ──────────────────────────────────────
+export const DIG_BASE_SALARY     = 2_100_000  // 기본급 (월)
+export const DIG_DAILY_GOAL      = 8          // 무인센 기준
+export const DIG_BONUS_PER_EXTRA = 10_000     // 초과 1건당 인센
+
+/** 발굴팀 월 급여 계산
+ *  @param approvedCount  해당 월 승인 건수
+ *  @param workedDays     실제 근무일 (퇴사자용, 없으면 풀월)
+ *  @param totalDays      해당 월 영업일 (퇴사자용)
+ */
+export function calcDigSalary(
+  approvedCount: number,
+  workedDays?: number,
+  totalDays?: number,
+): { base: number; incentive: number; total: number; before: number; after: number } {
+  const ratio = (workedDays != null && totalDays && totalDays > 0)
+    ? workedDays / totalDays : 1
+  const base      = Math.round(DIG_BASE_SALARY * ratio)
+  const extraCnt  = Math.max(0, approvedCount - DIG_DAILY_GOAL)
+  const incentive = extraCnt * DIG_BONUS_PER_EXTRA
+  const before    = base + incentive
+  const after     = Math.round(before * NET_RATE)
+  return { base, incentive, total: before, before, after }
+}
+
 export function buildSalesContractMap(
   customers: any[],
   yearMonth: string,

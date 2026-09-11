@@ -90,10 +90,17 @@ export async function PATCH(req: NextRequest) {
 
   const currentName = dbUser.name
   const finalName = newName || currentName
-  const roleTeam = dbUser.role === 'ops' ? 'ops' : dbUser.role === 'dig' ? 'sales' : 'sales'
+  const roleTeam = dbUser.role === 'ops' ? 'ops' : dbUser.role === 'dig' ? 'dig' : 'sales'
   const employees: any[] = settingsRow?.employees || []
   const idx = employees.findIndex((e: any) => e.user_id === userId || e.name === currentName)
   const existing = idx >= 0 ? employees[idx] : { id: userId, team: roleTeam }
+
+  // 이름 최초 설정 시 join_date 자동 세팅 (기존 이름 없거나 비어있을 때)
+  const isFirstNameSet = newName && (!currentName || currentName.trim() === '')
+  const autoJoinDate = isFirstNameSet && !existing.join_date
+    ? new Date().toISOString().slice(0, 10)
+    : undefined
+
   const merged = {
     ...existing,
     user_id: userId,
@@ -102,7 +109,7 @@ export async function PATCH(req: NextRequest) {
     address: address !== undefined ? address : (existing.address || ''),
     bank_account: bank_account !== undefined ? bank_account : (existing.bank_account || ''),
     bank_name: bank_name !== undefined ? bank_name : (existing.bank_name || '카카오뱅크'),
-    join_date: join_date !== undefined ? join_date : (existing.join_date || ''),
+    join_date: join_date !== undefined ? join_date : (autoJoinDate || existing.join_date || ''),
     team: existing.team || roleTeam,
   }
   const newEmployees = idx >= 0

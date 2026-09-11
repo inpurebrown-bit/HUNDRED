@@ -1603,6 +1603,7 @@ function EmployeeManageSection() {
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
   const [blockingId, setBlockingId] = useState<string | null>(null)
+  const [resigningId, setResigningId] = useState<string | null>(null)
 
   const roleLabel: Record<string, string> = { sales: '영업팀', ops: '관리팀', dig: '발굴팀', ceo: '대표' }
   const roleBg: Record<string, string> = { sales: 'bg-sky-100 text-sky-700', ops: 'bg-violet-100 text-violet-700', dig: 'bg-orange-100 text-orange-700', ceo: 'bg-amber-100 text-amber-700' }
@@ -1673,6 +1674,43 @@ function EmployeeManageSection() {
     setBlockingId(null)
   }
 
+  async function resignEmployee(emp: EmpRow) {
+    const today = new Date().toISOString().slice(0, 10)
+    const resignDate = prompt(`${emp.name} 퇴사 처리\n퇴사일을 입력하세요 (기본: 오늘)`, today)
+    if (resignDate === null) return  // 취소
+    const dateToUse = resignDate.trim() || today
+    if (!confirm(`${emp.name} (${emp.username})\n퇴사일: ${dateToUse}\n\n퇴사 처리하시겠습니까?\n계정이 블락되고 급여명세에 일할계산이 적용됩니다.`)) return
+
+    setResigningId(emp.id)
+    try {
+      // 1. 계정 블락
+      const blockRes = await fetch(`/api/users/${emp.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ blocked: true }),
+      })
+      if (!blockRes.ok) { const d = await blockRes.json(); alert(`블락 실패: ${d.error}`); return }
+
+      // 2. payslip_settings.employees에 resign_date 기록
+      const psRes = await fetch('/api/payslip-settings')
+      if (psRes.ok) {
+        const psData = await psRes.json()
+        const employees: any[] = psData.record?.employees || []
+        const idx = employees.findIndex((e: any) => e.user_id === emp.id || e.name === emp.name)
+        if (idx >= 0) {
+          const updated = employees.map((e: any, i: number) => i === idx ? { ...e, resign_date: dateToUse } : e)
+          await fetch('/api/payslip-settings', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ employees: updated }),
+          })
+        }
+      }
+
+      setEmployees(p => p.map(e => e.id === emp.id ? { ...e, blocked: true } : e))
+      alert(`${emp.name} 퇴사 처리 완료 (${dateToUse})\n급여탭에서 일할계산이 자동 적용됩니다.`)
+    } catch { alert('퇴사 처리 중 오류가 발생했습니다.') }
+    finally { setResigningId(null) }
+  }
+
   async function createEmployee() {
     setCreateError('')
     if (!createForm.name.trim() || !createForm.username.trim() || !createForm.password.trim()) {
@@ -1741,7 +1779,7 @@ function EmployeeManageSection() {
           {createError && <p className="text-xs text-red-500 font-medium">{createError}</p>}
           <button onClick={createEmployee} disabled={creating}
             className="w-full py-2.5 bg-[#1B2A45] hover:bg-[#1B2A45]/90 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50">
-            {creating ? '생성 중...' : `${createForm.role === 'sales' ? '영업팀' : '관리팀'} 직원 계정 생성`}
+            {creating ? '생성 중...' : `${createForm.role === 'sales' ? '영업팀' : createForm.role === 'ops' ? '관리팀' : '발굴팀'} 직원 계정 생성`}
           </button>
         </div>
       )}
@@ -1815,7 +1853,7 @@ function EmployeeManageSection() {
                       {emp.id === newlyCreatedId && <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-green-100 text-green-700">방금 생성</span>}
                     </div>
                   </div>
-                  <div className="flex gap-2 shrink-0">
+                  <div className="flex gap-2 shrink-0 flex-wrap justify-end">
                     <button onClick={() => toggleBlock(emp)} disabled={blockingId === emp.id}
                       className={`text-xs px-3 py-1.5 rounded-xl border transition-colors font-medium disabled:opacity-50 ${
                         emp.blocked
@@ -1824,6 +1862,12 @@ function EmployeeManageSection() {
                       }`}>
                       {blockingId === emp.id ? '처리 중...' : emp.blocked ? '해제' : '블락'}
                     </button>
+                    {!emp.blocked && (
+                      <button onClick={() => resignEmployee(emp)} disabled={resigningId === emp.id}
+                        className="text-xs text-rose-500 hover:text-rose-700 hover:bg-rose-50 px-3 py-1.5 rounded-xl border border-transparent hover:border-rose-200 transition-colors font-medium disabled:opacity-50">
+                        {resigningId === emp.id ? '처리 중...' : '퇴사'}
+                      </button>
+                    )}
                     <button onClick={() => openEdit(emp)}
                       className="text-xs text-[#1B2A45] hover:text-[#1B2A45]/80 px-3 py-1.5 rounded-xl hover:bg-[#1B2A45]/10 border border-transparent hover:border-[#1B2A45]/20 transition-colors font-medium">
                       수정
