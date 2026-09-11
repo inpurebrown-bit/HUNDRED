@@ -1441,19 +1441,98 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
               },
             ]
 
+            function handlePrintIncall() {
+              const timeline: any[] = local.timeline || []
+              const custTimeline: any[] = (local as any).customers?.call_timeline || []
+              const allTimeline = [...timeline, ...custTimeline].sort((a, b) =>
+                (b.created_at || b.time || '') > (a.created_at || a.time || '') ? 1 : -1
+              )
+              const companyName = gv('company', (local as any).customers?.company || (local as any).customers?.name || '')
+              const salesName   = gv('sales_user_name', (local as any).customers?.details?.sales_user_name || local.ops_user_name || '')
+
+              const sectionRows = sections.flatMap(sec => [
+                `<tr><td colspan="4" style="background:${
+                  sec.bg.includes('amber') ? '#d97706' : sec.bg.includes('violet') ? '#6d28d9' : '#1B2A45'
+                };color:#fff;font-size:10px;font-weight:700;padding:4px 8px;letter-spacing:.05em">${sec.title}</td></tr>`,
+                ...sec.fields.map(row =>
+                  `<tr>${row.map(([lbl, , v]: any) =>
+                    `<td style="font-size:10px;color:#888;padding:4px 6px;white-space:nowrap;border-bottom:1px solid #f0f0f0">${lbl}</td><td style="font-size:11px;font-weight:600;padding:4px 6px;border-bottom:1px solid #f0f0f0">${v || '—'}</td>`
+                  ).join('')}</tr>`
+                ),
+              ]).join('')
+
+              const timelineRows = allTimeline.length === 0
+                ? '<tr><td colspan="2" style="color:#ccc;font-size:10px;padding:6px">통화 메모가 없습니다</td></tr>'
+                : allTimeline.map((t: any) => {
+                  const dt = t.created_at || t.time || ''
+                  const author = t.user || t.author || ''
+                  const content = t.content || ''
+                  const dateStr = dt ? new Date(dt).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''
+                  return `<tr>
+                    <td style="font-size:10px;color:#888;padding:4px 6px;white-space:nowrap;border-bottom:1px solid #f0f0f0;vertical-align:top">${dateStr}<br/><b>${author}</b></td>
+                    <td style="font-size:11px;padding:4px 6px;border-bottom:1px solid #f0f0f0;white-space:pre-wrap">${content}</td>
+                  </tr>`
+                }).join('')
+
+              const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+                <title>${companyName} 인콜일지</title>
+                <style>
+                  @page { margin: 12mm; size: A4; }
+                  body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; margin: 0; color: #1a1a1a; }
+                  h1 { font-size: 16px; margin: 0 0 4px; }
+                  .sub { font-size: 11px; color: #666; margin-bottom: 12px; }
+                  table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+                  .section-title { font-size: 12px; font-weight: 700; border-bottom: 2px solid #1B2A45; padding-bottom: 3px; margin: 12px 0 4px; }
+                  .result-box { display: inline-block; background: #f0fdf4; border: 1px solid #86efac; border-radius: 6px; padding: 3px 10px; font-size: 11px; font-weight: 700; color: #15803d; margin-right: 6px; }
+                  .result-label { font-size: 10px; color: #888; margin-right: 4px; }
+                  @media print { button { display: none !important; } }
+                </style>
+              </head><body>
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+                  <div>
+                    <h1>${companyName}</h1>
+                    <div class="sub">담당: ${salesName} &nbsp;|&nbsp; 인쇄: ${new Date().toLocaleDateString('ko-KR')}</div>
+                  </div>
+                  <button onclick="window.print()" style="padding:6px 16px;background:#1B2A45;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">인쇄</button>
+                </div>
+
+                <div class="section-title">기업 정보</div>
+                <table><tbody>${sectionRows}</tbody></table>
+
+                <div class="section-title">인콜 결과</div>
+                <div style="padding:6px 0 10px">
+                  <span class="result-label">결정전</span><span class="result-box">${callResult || '—'}</span>
+                  <span class="result-label">클로징</span><span class="result-box">${closingResult || '—'}</span>
+                  ${subcallDate ? `<span class="result-label" style="margin-left:8px">재통화</span><span class="result-box">${subcallDate}</span>` : ''}
+                </div>
+
+                <div class="section-title">통화 메모</div>
+                <table><tbody>${timelineRows}</tbody></table>
+              </body></html>`
+
+              const w = window.open('', '_blank', 'width=800,height=900')
+              if (w) { w.document.write(html); w.document.close() }
+            }
+
             return (
               <div>
-                {/* ── 헤더: 수정 버튼 ── */}
+                {/* ── 헤더: 수정 / 인쇄 버튼 ── */}
                 <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-100 sticky top-0 z-10">
                   <span className="text-[11px] font-bold text-gray-600">인콜일지</span>
-                  <button type="button" onClick={() => setIncallEditing(e => !e)}
-                    className={`text-[10px] px-3 py-1 rounded-full font-bold transition-colors ${
-                      incallEditing
-                        ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
-                        : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-                    }`}>
-                    {incallEditing ? '✓ 저장완료' : '수정'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={handlePrintIncall}
+                      className="text-[10px] px-3 py-1 rounded-full font-bold bg-[#1B2A45] hover:bg-[#1B2A45]/80 text-white transition-colors">
+                      인쇄
+                    </button>
+                    <button type="button" onClick={() => setIncallEditing(e => !e)}
+                      className={`text-[10px] px-3 py-1 rounded-full font-bold transition-colors ${
+                        incallEditing
+                          ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                          : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                      }`}>
+                      {incallEditing ? '✓ 저장완료' : '수정'}
+                    </button>
+                  </div>
                 </div>
 
                 {/* ── 섹션별 필드 그리드 ── */}

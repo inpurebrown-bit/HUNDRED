@@ -742,7 +742,64 @@ export default function CustomerCard({
               className="text-xs text-red-400 hover:text-red-600 transition-colors">
               삭제
             </button>
-            <p className="text-[10px] text-gray-300">수정: {new Date(customer.updated_at).toLocaleString('ko-KR')}</p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  const d = details
+                  const rows = [
+                    ['접수일', d.reception_date || '—'], ['담당자', d.assignee || customer.sales_user_name || '—'],
+                    ['상호명', company || '—'], ['법인/개인', d.corp_type || '—'],
+                    ['지역', d.region || '—'], ['사업자번호', d.business_reg_no || '—'],
+                    ['고객명', name || '—'], ['연락처', phone || '—'],
+                    ['업종', d.business_type || '—'], ['업력', d.years_in_business || '—'],
+                    ['직원수', d.employee_count || '—'], ['기대출(정책)', d.loan_kibo || d.loan_policy || '—'],
+                    ['기대출(신용)', d.loan_credit || '—'],
+                    ['26년 매출', d.revenue_2026 || '—'], ['25년 매출', d.revenue_2025 || '—'],
+                    ['24년 매출', d.revenue_2024 || '—'], ['23년 매출', d.revenue_2023 || '—'],
+                    ['신용점수', d.credit_score || '—'], ['세금체납', d.tax_delinquency || '—'],
+                    ['자산', d.assets || '—'], ['필요자금', d.required_funds || '—'],
+                    ...(d.contract_fee ? [['계약금', d.contract_fee], ['입금액', d.payment_amount || '—'], ['미입금', d.unpaid_amount || '—'], ['수수료율', d.commission_rate || '—']] : []),
+                  ]
+                  const infoRows = rows.map(([l, v]) =>
+                    `<tr><td style="font-size:10px;color:#888;padding:3px 6px;border-bottom:1px solid #f0f0f0;white-space:nowrap">${l}</td><td style="font-size:11px;font-weight:600;padding:3px 6px;border-bottom:1px solid #f0f0f0">${v}</td></tr>`
+                  ).join('')
+                  const tl = callTimeline.slice().sort((a, b) => b.time > a.time ? 1 : -1)
+                  const memoRows = tl.length === 0
+                    ? '<tr><td colspan="2" style="color:#ccc;font-size:10px;padding:6px">통화 메모가 없습니다</td></tr>'
+                    : tl.map(e => {
+                        const dt = new Date(e.time).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+                        return `<tr><td style="font-size:10px;color:#888;padding:3px 6px;border-bottom:1px solid #f0f0f0;vertical-align:top;white-space:nowrap">${dt}<br/><b>${e.author}</b></td><td style="font-size:11px;padding:3px 6px;border-bottom:1px solid #f0f0f0;white-space:pre-wrap">${e.content}</td></tr>`
+                      }).join('')
+                  const asReq = d.as_request ? `<div style="font-size:11px;padding:6px;background:#fafafa;border:1px solid #eee;border-radius:6px;white-space:pre-wrap">${d.as_request}</div>` : '<p style="color:#ccc;font-size:10px">없음</p>'
+                  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${company} 고객카드</title>
+                    <style>
+                      @page { margin:12mm; size:A4; }
+                      body { font-family:'Apple SD Gothic Neo','Noto Sans KR',sans-serif; margin:0; color:#1a1a1a; }
+                      h1 { font-size:16px; margin:0 0 4px; }
+                      .sub { font-size:11px; color:#666; margin-bottom:12px; }
+                      table { width:100%; border-collapse:collapse; margin-bottom:12px; }
+                      .section-title { font-size:12px; font-weight:700; border-bottom:2px solid #1B2A45; padding-bottom:3px; margin:12px 0 4px; }
+                      @media print { button { display:none !important; } }
+                    </style></head><body>
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+                      <div><h1>${company || '(업체명 없음)'}</h1><div class="sub">담당: ${d.assignee || customer.sales_user_name || '—'} &nbsp;|&nbsp; 인쇄: ${new Date().toLocaleDateString('ko-KR')}</div></div>
+                      <button onclick="window.print()" style="padding:6px 16px;background:#1B2A45;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">인쇄</button>
+                    </div>
+                    <div class="section-title">고객 정보</div>
+                    <table><tbody>${infoRows}</tbody></table>
+                    ${notes ? `<div class="section-title">메모</div><div style="font-size:11px;white-space:pre-wrap;margin-bottom:12px">${notes}</div>` : ''}
+                    <div class="section-title">A/S 요청</div>${asReq}
+                    <div class="section-title" style="margin-top:12px">통화 메모</div>
+                    <table><tbody>${memoRows}</tbody></table>
+                  </body></html>`
+                  const w = window.open('', '_blank', 'width=800,height=900')
+                  if (w) { w.document.write(html); w.document.close() }
+                }}
+                className="text-[10px] text-[#1B2A45] border border-[#1B2A45]/30 hover:bg-[#1B2A45] hover:text-white px-3 py-1 rounded-full font-semibold transition-colors">
+                인쇄
+              </button>
+              <p className="text-[10px] text-gray-300">수정: {new Date(customer.updated_at).toLocaleString('ko-KR')}</p>
+            </div>
           </div>
 
         </div>
