@@ -2,7 +2,7 @@
 
 export interface PrintSection {
   title: string
-  color: string   // hex 색상값
+  color: string
   fields: Array<{ label: string; value?: string | null }>
 }
 
@@ -29,22 +29,22 @@ export interface PrintIncallData {
 export function printIncall(data: PrintIncallData) {
   const { companyName, salesName, sections, callResult, closingResult, subcallDate, timeline = [], notes, asRequest } = data
 
+  // 모든 필드 표시 (빈 값 포함) — 빈 항목도 확인할 수 있도록
   const sectionsHtml = sections.map(sec => {
-    const rows = sec.fields
-      .filter(f => f.value !== undefined && f.value !== null && f.value !== '')
-      .map(f => `
-        <div class="frow">
-          <span class="flabel">${f.label}</span>
-          <span class="fval">${(f.value || '—').replace(/\n/g, '<br/>')}</span>
-        </div>`)
-      .join('')
-    if (!rows) return ''
-    return `
-      <div class="sec">
-        <div class="sec-head" style="background:${sec.color}">${sec.title}</div>
-        <div class="sec-body">${rows}</div>
+    if (!sec.fields.length) return ''
+    const rows = sec.fields.map(f => {
+      const val = (f.value || '').toString().trim()
+      const display = val ? val.replace(/\n/g, '<br/>') : ''
+      return `<div class="frow${val ? '' : ' empty'}">
+        <span class="flabel">${f.label}</span>
+        <span class="fval">${display || '<span class="dash">—</span>'}</span>
       </div>`
-  }).join('')
+    }).join('')
+    return `<div class="sec">
+      <div class="sec-head" style="background:${sec.color}">${sec.title}</div>
+      <div class="sec-body">${rows}</div>
+    </div>`
+  }).filter(Boolean).join('')
 
   const sortedTl = [...timeline].sort((a, b) => {
     const ta = a.time || a.created_at || ''
@@ -53,110 +53,228 @@ export function printIncall(data: PrintIncallData) {
   })
 
   const tlHtml = sortedTl.length === 0
-    ? '<p style="color:#ccc;font-size:9.5px;text-align:center;padding:12px 0">통화 메모 없음</p>'
+    ? '<div class="tl-empty">통화 메모 없음</div>'
     : sortedTl.map(e => {
       const raw = e.time || e.created_at || ''
       let dt = ''
       if (raw) {
         try {
-          dt = new Date(raw).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+          const d = new Date(raw)
+          const mo  = String(d.getMonth() + 1).padStart(2, '0')
+          const day = String(d.getDate()).padStart(2, '0')
+          const hh  = String(d.getHours()).padStart(2, '0')
+          const mm  = String(d.getMinutes()).padStart(2, '0')
+          dt = `${mo}/${day} ${hh}:${mm}`
         } catch {}
       }
       const author = e.author || e.user || ''
       return `<div class="tl">
-        <div class="tl-meta">${dt}<br/><b>${author}</b></div>
+        <div class="tl-meta"><span class="tl-date">${dt}</span><span class="tl-author">${author}</span></div>
         <div class="tl-body">${(e.content || '').replace(/\n/g, '<br/>')}</div>
       </div>`
     }).join('')
 
   const chips: string[] = []
-  if (callResult)    chips.push(`<div class="chip-row"><span class="chip-label">결정전</span><span class="chip chip-green">${callResult}</span></div>`)
-  if (closingResult) chips.push(`<div class="chip-row"><span class="chip-label">클로징</span><span class="chip chip-blue">${closingResult}</span></div>`)
-  if (subcallDate)   chips.push(`<div class="chip-row"><span class="chip-label">재통화</span><span class="chip chip-gray">${subcallDate}</span></div>`)
+  if (callResult)    chips.push(`<div class="chip-row"><span class="clabel">결정전</span><span class="chip chip-green">${callResult}</span></div>`)
+  if (closingResult) chips.push(`<div class="chip-row"><span class="clabel">클로징</span><span class="chip chip-blue">${closingResult}</span></div>`)
+  if (subcallDate)   chips.push(`<div class="chip-row"><span class="clabel">재통화</span><span class="chip chip-gray">${subcallDate}</span></div>`)
+
   const resultHtml = chips.length
-    ? `<div class="result-box">${chips.join('')}</div>`
-    : '<p style="color:#ccc;font-size:9.5px;padding:4px 0">결과 없음</p>'
+    ? chips.join('')
+    : '<span class="no-data">결과 미입력</span>'
 
   const extraHtml = [
-    notes    ? `<div class="sec"><div class="sec-head" style="background:#374151">메모</div><div class="sec-body"><div class="frow"><span class="fval" style="padding:6px">${notes.replace(/\n/g, '<br/>')}</span></div></div></div>` : '',
-    asRequest ? `<div class="sec"><div class="sec-head" style="background:#374151">A/S 요청</div><div class="sec-body"><div class="frow"><span class="fval" style="padding:6px">${asRequest.replace(/\n/g, '<br/>')}</span></div></div></div>` : '',
-  ].join('')
+    notes     ? `<div class="sec"><div class="sec-head" style="background:#4b5563">메모</div><div class="sec-body"><div class="frow"><span class="fval extra-text">${notes.replace(/\n/g, '<br/>')}</span></div></div></div>` : '',
+    asRequest ? `<div class="sec"><div class="sec-head" style="background:#4b5563">A/S 요청</div><div class="sec-body"><div class="frow"><span class="fval extra-text">${asRequest.replace(/\n/g, '<br/>')}</span></div></div></div>` : '',
+  ].filter(Boolean).join('')
+
+  const printDate = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
 
   const html = `<!DOCTYPE html>
-<html><head>
+<html lang="ko"><head>
   <meta charset="utf-8">
   <title>${companyName} 인콜일지</title>
   <style>
-    @page { margin:10mm; size:A4 portrait; }
-    *{ box-sizing:border-box; margin:0; padding:0; }
-    body{ font-family:'Apple SD Gothic Neo','Noto Sans KR',Arial,sans-serif; font-size:11px; color:#1a1a1a; background:#fff; }
+    @page { margin: 8mm 10mm; size: A4 portrait; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', Arial, sans-serif;
+      font-size: 10.5px;
+      color: #111827;
+      background: #fff;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
 
-    .top{ display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:8px; border-bottom:2.5px solid #1B2A45; margin-bottom:10px; }
-    .top-name{ font-size:18px; font-weight:900; color:#1B2A45; }
-    .top-sub{ font-size:10px; color:#666; margin-top:3px; }
-    .print-btn{ padding:5px 14px; background:#1B2A45; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:11px; }
+    /* ── 헤더 ── */
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding-bottom: 8px;
+      margin-bottom: 10px;
+      border-bottom: 2px solid #1B2A45;
+    }
+    .top-left { display: flex; flex-direction: column; gap: 3px; }
+    .top-badge {
+      display: inline-block;
+      background: #1B2A45;
+      color: #fff;
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      padding: 2px 7px;
+      border-radius: 20px;
+      margin-bottom: 2px;
+    }
+    .top-name { font-size: 20px; font-weight: 900; color: #1B2A45; letter-spacing: -.3px; }
+    .top-sub { font-size: 9.5px; color: #6b7280; margin-top: 1px; }
+    .top-sub b { color: #374151; }
+    .print-btn {
+      padding: 6px 18px;
+      background: #1B2A45;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .03em;
+    }
 
-    .layout{ display:grid; grid-template-columns:1fr 260px; gap:10px; align-items:start; }
+    /* ── 2단 레이아웃 ── */
+    .layout {
+      display: grid;
+      grid-template-columns: 1.65fr 1fr;
+      gap: 10px;
+      align-items: start;
+    }
 
-    /* 섹션 */
-    .sec{ border:1px solid #e5e7eb; border-radius:5px; overflow:hidden; margin-bottom:6px; }
-    .sec-head{ padding:4px 8px; color:#fff; font-size:9.5px; font-weight:700; letter-spacing:.06em; }
-    .sec-body{ }
-    .frow{ display:grid; grid-template-columns:62px 1fr; border-bottom:1px solid #f3f4f6; }
-    .frow:last-child{ border-bottom:none; }
-    .flabel{ padding:3px 6px; font-size:9px; color:#9ca3af; background:#fafafa; border-right:1px solid #f3f4f6; line-height:1.4; }
-    .fval{ padding:3px 6px; font-size:10.5px; font-weight:600; color:#1B2A45; word-break:break-all; line-height:1.5; }
+    /* ── 섹션 ── */
+    .sec { border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; margin-bottom: 7px; }
+    .sec-head {
+      padding: 4px 9px;
+      color: #fff;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+    }
+    .frow {
+      display: grid;
+      grid-template-columns: 58px 1fr;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .frow:last-child { border-bottom: none; }
+    .frow.empty .fval { opacity: .38; }
+    .flabel {
+      padding: 3.5px 7px;
+      font-size: 8.5px;
+      color: #9ca3af;
+      background: #f9fafb;
+      border-right: 1px solid #f3f4f6;
+      display: flex;
+      align-items: center;
+      line-height: 1.3;
+    }
+    .fval {
+      padding: 3.5px 7px;
+      font-size: 10px;
+      font-weight: 600;
+      color: #1B2A45;
+      word-break: break-all;
+      line-height: 1.5;
+    }
+    .fval .dash { color: #d1d5db; font-weight: 400; }
+    .extra-text { font-weight: 400; color: #374151; white-space: pre-wrap; }
 
-    /* 우측 */
-    .right-title{ font-size:9.5px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.06em; border-bottom:1px solid #e5e7eb; padding-bottom:3px; margin-bottom:6px; margin-top:10px; }
-    .right-title:first-child{ margin-top:0; }
+    /* ── 우측 ── */
+    .panel-title {
+      font-size: 8.5px;
+      font-weight: 800;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      padding-bottom: 4px;
+      margin-bottom: 6px;
+      border-bottom: 1.5px solid #e5e7eb;
+    }
+    .panel-block { margin-bottom: 12px; }
 
-    .result-box{ background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px; padding:8px; margin-bottom:4px; }
-    .chip-row{ display:flex; align-items:center; gap:6px; margin-bottom:5px; }
-    .chip-row:last-child{ margin-bottom:0; }
-    .chip-label{ font-size:9.5px; color:#9ca3af; width:40px; flex-shrink:0; }
-    .chip{ font-size:10.5px; font-weight:700; padding:2px 10px; border-radius:20px; }
-    .chip-green{ background:#d1fae5; color:#065f46; }
-    .chip-blue { background:#dbeafe; color:#1e40af; }
-    .chip-gray { background:#f3f4f6; color:#374151; }
+    /* 인콜 결과 */
+    .chip-row { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
+    .chip-row:last-child { margin-bottom: 0; }
+    .clabel { font-size: 8.5px; color: #9ca3af; width: 36px; flex-shrink: 0; }
+    .chip { font-size: 10px; font-weight: 700; padding: 2.5px 10px; border-radius: 20px; }
+    .chip-green { background: #d1fae5; color: #065f46; }
+    .chip-blue  { background: #dbeafe; color: #1e40af; }
+    .chip-gray  { background: #f3f4f6; color: #374151; }
+    .no-data { font-size: 9px; color: #d1d5db; }
 
-    .tl{ display:grid; grid-template-columns:64px 1fr; gap:4px; border-bottom:1px solid #f3f4f6; padding:4px 2px; }
-    .tl:last-child{ border-bottom:none; }
-    .tl-meta{ font-size:8.5px; color:#9ca3af; line-height:1.5; }
-    .tl-meta b{ color:#374151; font-weight:700; }
-    .tl-body{ font-size:10px; color:#1f2937; word-break:break-all; line-height:1.5; }
+    /* 타임라인 */
+    .tl {
+      display: grid;
+      grid-template-columns: 54px 1fr;
+      gap: 5px;
+      padding: 5px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .tl:last-child { border-bottom: none; }
+    .tl-meta { display: flex; flex-direction: column; gap: 1px; padding-top: 1px; }
+    .tl-date { font-size: 8px; color: #9ca3af; }
+    .tl-author { font-size: 8.5px; font-weight: 700; color: #374151; }
+    .tl-body { font-size: 9.5px; color: #111827; line-height: 1.55; word-break: break-all; white-space: pre-wrap; }
+    .tl-empty { font-size: 9px; color: #d1d5db; text-align: center; padding: 10px 0; }
 
-    @media print{ .print-btn{ display:none!important; } }
+    @media print { .print-btn { display: none !important; } }
   </style>
 </head>
 <body>
   <div class="top">
-    <div>
+    <div class="top-left">
+      <span class="top-badge">인콜일지</span>
       <div class="top-name">${companyName}</div>
-      <div class="top-sub">담당: ${salesName} &nbsp;|&nbsp; 인쇄: ${new Date().toLocaleDateString('ko-KR')}</div>
+      <div class="top-sub">담당 <b>${salesName || '—'}</b> &nbsp;·&nbsp; ${printDate}</div>
     </div>
-    <button class="print-btn" onclick="window.print()">인쇄</button>
+    <button class="print-btn" onclick="window.print()">🖨 인쇄</button>
   </div>
+
   <div class="layout">
-    <div>
-      ${sectionsHtml}${extraHtml}
+    <div class="left-col">
+      ${sectionsHtml}
+      ${extraHtml}
     </div>
-    <div>
-      <div class="right-title">인콜 결과</div>
-      ${resultHtml}
-      <div class="right-title">통화 메모</div>
-      ${tlHtml}
+    <div class="right-col">
+      <div class="panel-block">
+        <div class="panel-title">인콜 결과</div>
+        ${resultHtml}
+      </div>
+      <div class="panel-block">
+        <div class="panel-title">통화 메모</div>
+        ${tlHtml}
+      </div>
     </div>
   </div>
 </body></html>`
 
-  const w = window.open('', '_blank', 'width=920,height=1060')
+  const w = window.open('', '_blank', 'width=940,height=1080')
   if (w) { w.document.write(html); w.document.close() }
 }
 
-/** 고객 데이터 → 인콜일지 섹션 배열로 변환 (InCallTableView / CustomerCard 공용) */
+/** 고객 데이터 → 인콜일지 섹션 배열로 변환 */
 export function buildCustomerSections(d: Record<string, any>, base: { name?: string; phone?: string; company?: string }): PrintSection[] {
   const v = (k: string, fallback?: string) => (d[k] || fallback || '') as string
+
+  const assetHome =
+    d.asset_home_type === 'owned'  ? `자가 · 시세 ${d.asset_home_value || '—'}` :
+    d.asset_home_type === 'rented' ? `임차 · 보증금 ${d.asset_home_value || '—'}` :
+    d.asset_home_type              ? d.asset_home_type : ''
+
+  const assetBiz =
+    d.asset_biz_type === 'owned'   ? `자가 · 시세 ${d.asset_biz_value || '—'}` :
+    d.asset_biz_type === 'rented'  ? `임차 · 보증금 ${d.asset_biz_value || '—'}` :
+    d.asset_biz_type               ? d.asset_biz_type : ''
+
   return [
     {
       title: '기업 기본정보', color: '#1B2A45',
@@ -203,16 +321,8 @@ export function buildCustomerSections(d: Record<string, any>, base: { name?: str
     {
       title: '자산여부', color: '#0f766e',
       fields: [
-        {
-          label: '자택',
-          value: d.asset_home_type === 'owned'  ? `자가 · 시세 ${d.asset_home_value || '—'}`
-               : d.asset_home_type === 'rented' ? `임차 · 보증금 ${d.asset_home_value || '—'}` : '',
-        },
-        {
-          label: '사업장',
-          value: d.asset_biz_type === 'owned'   ? `자가 · 시세 ${d.asset_biz_value || '—'}`
-               : d.asset_biz_type === 'rented'  ? `임차 · 보증금 ${d.asset_biz_value || '—'}` : '',
-        },
+        { label: '자택',     value: assetHome },
+        { label: '사업장',   value: assetBiz },
         { label: '기타자산', value: v('asset_other') || v('assets') },
       ],
     },
