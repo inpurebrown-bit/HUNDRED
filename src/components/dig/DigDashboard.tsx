@@ -111,6 +111,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
   const [phoneSearch, setPhoneSearch]       = useState('')
   const [phoneResults, setPhoneResults]     = useState<any[] | null>(null)
   const [phoneSearching, setPhoneSearching] = useState(false)
+  const [phoneVerified, setPhoneVerified]   = useState(false) // 중복검색 통과 여부
 
   const [form, setForm] = useState({
     company: '', ceo_name: '', phone: '', phone_010: '',
@@ -155,10 +156,18 @@ export default function DigDashboard({ userId, userName, username }: Props) {
     if (clean.length < 9) { showToast('번호를 9자리 이상 입력하세요', 'error'); return }
     setPhoneSearching(true)
     setPhoneResults(null)
+    setPhoneVerified(false)
     try {
       const res  = await fetch(`/api/phone-search?phone=${clean}`)
       const data = await res.json()
-      setPhoneResults(data.results || [])
+      const results = data.results || []
+      setPhoneResults(results)
+      if (results.length === 0) {
+        // 중복 없음 → 폼 010번호 자동 입력 + 활성화
+        setPhoneVerified(true)
+        const formatted = clean.replace(/^(\d{3})(\d{4})(\d{4})$/, '$1-$2-$3')
+        setForm(p => ({ ...p, phone_010: formatted || clean }))
+      }
     } catch { showToast('검색 중 오류', 'error') }
     setPhoneSearching(false)
   }
@@ -447,9 +456,22 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                     placeholder="(주)헌드레드컨설팅" className={inputCls} />
                 </div>
                 <div>
-                  <label className={lblCls}>010 번호 <span className="text-red-500">*</span></label>
-                  <input value={form.phone_010} onChange={e => setForm(p => ({ ...p, phone_010: e.target.value }))}
-                    placeholder="010-0000-0000" required type="tel" className={inputCls} />
+                  <label className={lblCls}>
+                    010 번호 <span className="text-red-500">*</span>
+                    {phoneVerified
+                      ? <span className="ml-1.5 text-emerald-600 font-bold">✅ 중복검색 완료</span>
+                      : <span className="ml-1.5 text-amber-500 font-bold">🔒 우측에서 번호 검색 먼저!</span>
+                    }
+                  </label>
+                  <input
+                    value={form.phone_010}
+                    onChange={e => setForm(p => ({ ...p, phone_010: e.target.value }))}
+                    placeholder={phoneVerified ? '자동 입력됨' : '→ 우측에서 번호 검색 후 활성화'}
+                    required
+                    type="tel"
+                    disabled={!phoneVerified}
+                    className={`${inputCls} ${!phoneVerified ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-50 border-emerald-300'}`}
+                  />
                 </div>
                 <div>
                   <label className={lblCls}>대표 성함</label>
@@ -497,15 +519,15 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                   ))}
                 </div>
 
-                <button type="submit" disabled={!form.phone_010.trim()}
+                <button type="submit" disabled={!phoneVerified || !form.phone_010.trim()}
                   className={`w-full py-4 rounded-xl font-black text-sm transition-colors ${
-                    !form.phone_010.trim()
+                    !phoneVerified || !form.phone_010.trim()
                       ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                       : checklistAllDone
                         ? 'bg-[#1B2A45] text-white hover:bg-[#1B2A45]/90'
                         : 'bg-amber-500 text-white hover:bg-amber-600'
                   }`}>
-                  {checklistAllDone ? '전송 →' : '전송 (체크리스트 미완료)'}
+                  {!phoneVerified ? '🔒 번호 중복검색 먼저' : checklistAllDone ? '전송 →' : '전송 (체크리스트 미완료)'}
                 </button>
               </form>
             </div>
@@ -523,7 +545,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                   <input
                     type="tel"
                     value={phoneSearch}
-                    onChange={e => { setPhoneSearch(e.target.value); setPhoneResults(null) }}
+                    onChange={e => { setPhoneSearch(e.target.value); setPhoneResults(null); setPhoneVerified(false) }}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); doPhoneSearch() } }}
                     placeholder="010-0000-0000"
                     className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#1B2A45]/40 bg-white"
@@ -536,9 +558,9 @@ export default function DigDashboard({ userId, userName, username }: Props) {
 
                 {phoneResults !== null && (
                   phoneResults.length === 0 ? (
-                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
-                      <p className="text-emerald-700 font-bold text-sm">✅ 없는 번호입니다</p>
-                      <p className="text-emerald-600 text-xs mt-0.5">바로 인콜 진행 가능!</p>
+                    <div className="bg-emerald-50 border-2 border-emerald-400 rounded-xl px-4 py-3">
+                      <p className="text-emerald-700 font-bold text-sm">✅ 없는 번호 — 등록 가능!</p>
+                      <p className="text-emerald-600 text-xs mt-0.5">번호가 좌측 폼에 자동 입력됐습니다.</p>
                     </div>
                   ) : (
                     <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-2">
