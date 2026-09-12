@@ -392,7 +392,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
           </div>
 
           {/* ─────────── 3컬럼 본문 ─────────── */}
-          <div className="grid grid-cols-[220px_1fr_220px] gap-3 items-start">
+          <div className="grid grid-cols-[3fr_5fr_3fr] gap-3 items-start">
 
             {/* ━━ 좌 : 현황 박스 ━━ */}
             <div className="space-y-3">
