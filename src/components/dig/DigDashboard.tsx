@@ -211,18 +211,6 @@ export default function DigDashboard({ userId, userName, username }: Props) {
     setPhoneSearching(false)
   }
 
-  function fillFromSearch(r: any) {
-    setForm(p => ({
-      ...p,
-      phone_010: r.phone_010 || p.phone_010,
-      company:   r.company   || p.company,
-      ceo_name:  r.ceo_name  || p.ceo_name,
-    }))
-    setPhoneResults(null)
-    setPhoneSearch('')
-    showToast('폼에 자동 입력됐습니다')
-  }
-
   async function handleRecordingChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -642,19 +630,16 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                       <p className="text-emerald-600 text-xs mt-0.5">번호가 좌측 폼에 자동 입력됐습니다.</p>
                     </div>
                   ) : (
-                    <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-2">
-                      <p className="text-red-700 font-bold text-xs">⚠️ 이미 DB에 있음 ({phoneResults.length}건)</p>
+                    <div className="bg-red-50 border-2 border-red-400 rounded-xl p-3 space-y-2">
+                      <p className="text-red-700 font-black text-sm">🚫 등록 불가 — 이미 DB에 있음 ({phoneResults.length}건)</p>
+                      <p className="text-red-600 text-xs">이 번호는 등록할 수 없습니다. 다른 번호를 검색하세요.</p>
                       {phoneResults.map((r, i) => (
-                        <div key={i} className="bg-white border border-red-100 rounded-lg px-3 py-2">
+                        <div key={i} className="bg-white border border-red-200 rounded-lg px-3 py-2">
                           <p className="font-bold text-xs text-gray-800 truncate">{r.company || '(업체명 없음)'}</p>
-                          <p className="text-[11px] text-gray-400 mt-0.5 truncate">
+                          <p className="text-[11px] text-gray-500 mt-0.5 truncate">
                             {r.source === 'customer' ? '영업 고객' : '발굴 가망'} · {r.phone_010}
                           </p>
                           <p className="text-[11px] text-gray-400">{r.status}</p>
-                          <button onClick={() => fillFromSearch(r)}
-                            className="mt-1 text-[10px] text-[#1B2A45] border border-[#1B2A45]/30 rounded px-2 py-0.5 hover:bg-[#1B2A45]/10">
-                            폼에 입력
-                          </button>
                         </div>
                       ))}
                     </div>
