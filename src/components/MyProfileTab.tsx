@@ -66,6 +66,7 @@ export default function MyProfileTab() {
   const [profile, setProfile] = useState({
     name: '', username: '', role: '',
     phone: '', address: '', bank_account: '', bank_name: '카카오뱅크', join_date: '',
+    info_locked: false,
   })
   const [loadingProfile, setLoadingProfile] = useState(true)
 
@@ -121,10 +122,10 @@ export default function MyProfileTab() {
       })
       const data = await res.json()
       if (data.ok) {
-        setProfile(prev => ({ ...prev, ...infoForm, name: data.name || infoForm.name }))
+        setProfile(prev => ({ ...prev, ...infoForm, name: data.name || infoForm.name, info_locked: true }))
         setInfoEditing(false)
-        setInfoMsg({ type: 'ok', text: '저장되었습니다' })
-        setTimeout(() => setInfoMsg(null), 3000)
+        setInfoMsg({ type: 'ok', text: '저장되었습니다. 이후 수정은 대표에게 요청하세요.' })
+        setTimeout(() => setInfoMsg(null), 4000)
       } else {
         setInfoMsg({ type: 'err', text: data.error || '저장 실패' })
       }
@@ -225,10 +226,16 @@ export default function MyProfileTab() {
             <p className="text-[11px] text-[#1B2A45]/40 mt-0.5">이름·연락처·계좌 등 대표에게 공유되는 정보</p>
           </div>
           {!infoEditing && (
-            <button onClick={() => { setInfoEditing(true); setInfoForm({ ...profile }) }}
-              className="text-xs px-3 py-1.5 rounded-xl bg-[#1B2A45]/10 text-[#1B2A45] hover:bg-[#1B2A45]/20 font-medium transition-colors">
-              수정
-            </button>
+            profile.info_locked ? (
+              <span className="text-xs px-3 py-1.5 rounded-xl bg-gray-100 text-gray-400 font-medium flex items-center gap-1">
+                🔒 수정 잠금 (대표 해제 필요)
+              </span>
+            ) : (
+              <button onClick={() => { setInfoEditing(true); setInfoForm({ ...profile }) }}
+                className="text-xs px-3 py-1.5 rounded-xl bg-[#1B2A45]/10 text-[#1B2A45] hover:bg-[#1B2A45]/20 font-medium transition-colors">
+                수정
+              </button>
+            )
           )}
         </div>
 

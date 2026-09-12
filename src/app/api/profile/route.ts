@@ -42,6 +42,7 @@ export async function GET() {
       bank_account: entry.bank_account || '',
       bank_name: entry.bank_name || '카카오뱅크',
       join_date: entry.join_date || '',
+      info_locked: entry.info_locked === true,
     },
   })
 }
@@ -101,6 +102,10 @@ export async function PATCH(req: NextRequest) {
     ? new Date().toISOString().slice(0, 10)
     : undefined
 
+  // 기본정보 저장 후 잠금 (비밀번호/PIN 변경은 이 경로를 타지 않으므로 영향 없음)
+  const isBasicInfoSave = !!(name !== undefined || phone !== undefined || address !== undefined || bank_account !== undefined)
+  const shouldLock = isBasicInfoSave && !existing.info_locked
+
   const merged = {
     ...existing,
     user_id: userId,
@@ -111,6 +116,7 @@ export async function PATCH(req: NextRequest) {
     bank_name: bank_name !== undefined ? bank_name : (existing.bank_name || '카카오뱅크'),
     join_date: join_date !== undefined ? join_date : (autoJoinDate || existing.join_date || ''),
     team: existing.team || roleTeam,
+    info_locked: shouldLock ? true : (existing.info_locked ?? false),
   }
   const newEmployees = idx >= 0
     ? employees.map((e: any, i: number) => i === idx ? merged : e)

@@ -1589,7 +1589,7 @@ function DuplicateOnlyTab() {
 }
 
 // ─── 직원 관리 섹션 (생성·수정·팀이관) ──────────────────────
-interface EmpRow { id: string; name: string; username: string; role: string; blocked?: boolean }
+interface EmpRow { id: string; name: string; username: string; role: string; blocked?: boolean; info_locked?: boolean }
 function EmployeeManageSection() {
   const [employees, setEmployees] = useState<EmpRow[]>([])
   const [loading, setLoading] = useState(false)
@@ -1604,15 +1604,41 @@ function EmployeeManageSection() {
   const [createError, setCreateError] = useState('')
   const [blockingId, setBlockingId] = useState<string | null>(null)
   const [resigningId, setResigningId] = useState<string | null>(null)
+  const [unlockingId, setUnlockingId] = useState<string | null>(null)
+
+  async function unlockInfo(emp: EmpRow) {
+    if (!confirm(`${emp.name}의 기본정보 수정 잠금을 해제하시겠습니까?\n해제 후 직원이 1회 수정할 수 있습니다.`)) return
+    setUnlockingId(emp.id)
+    const res = await fetch('/api/unlock-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target_user_id: emp.id }),
+    })
+    if (res.ok) {
+      setEmployees(p => p.map(e => e.id === emp.id ? { ...e, info_locked: false } : e))
+    } else {
+      alert('잠금 해제 중 오류가 발생했습니다.')
+    }
+    setUnlockingId(null)
+  }
 
   const roleLabel: Record<string, string> = { sales: '영업팀', ops: '관리팀', dig: '발굴팀', ceo: '대표' }
   const roleBg: Record<string, string> = { sales: 'bg-sky-100 text-sky-700', ops: 'bg-violet-100 text-violet-700', dig: 'bg-orange-100 text-orange-700', ceo: 'bg-amber-100 text-amber-700' }
 
   const load = async () => {
     setLoading(true)
-    const res = await fetch('/api/users')
-    const data = await res.json()
-    setEmployees((data.users || []).filter((u: EmpRow) => u.role !== 'ceo'))
+    const [usersRes, psRes] = await Promise.all([
+      fetch('/api/users'),
+      fetch('/api/payslip-settings'),
+    ])
+    const usersData = await usersRes.json()
+    const psData    = await psRes.json()
+    const psEmps: any[] = psData.record?.employees || []
+    const users = (usersData.users || []).filter((u: EmpRow) => u.role !== 'ceo')
+    setEmployees(users.map((u: EmpRow) => {
+      const match = psEmps.find((e: any) => e.user_id === u.id || e.name === u.name)
+      return { ...u, info_locked: match?.info_locked === true }
+    }))
     setLoading(false)
   }
   useEffect(() => { load() }, [])
@@ -1854,6 +1880,12 @@ function EmployeeManageSection() {
                     </div>
                   </div>
                   <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+                    {emp.info_locked && (
+                      <button onClick={() => unlockInfo(emp)} disabled={unlockingId === emp.id}
+                        className="text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-3 py-1.5 rounded-xl border border-transparent hover:border-amber-200 transition-colors font-medium disabled:opacity-50">
+                        {unlockingId === emp.id ? '해제 중...' : '🔓 정보수정 허용'}
+                      </button>
+                    )}
                     <button onClick={() => toggleBlock(emp)} disabled={blockingId === emp.id}
                       className={`text-xs px-3 py-1.5 rounded-xl border transition-colors font-medium disabled:opacity-50 ${
                         emp.blocked

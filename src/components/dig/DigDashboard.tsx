@@ -111,7 +111,14 @@ export default function DigDashboard({ userId, userName, username }: Props) {
   const [phoneSearch, setPhoneSearch]       = useState('')
   const [phoneResults, setPhoneResults]     = useState<any[] | null>(null)
   const [phoneSearching, setPhoneSearching] = useState(false)
-  const [phoneVerified, setPhoneVerified]   = useState(false) // 중복검색 통과 여부
+  const [phoneVerified, setPhoneVerified]   = useState(false)
+
+  // 직원정보 탭 비밀번호 게이트
+  const [profileUnlocked, setProfileUnlocked] = useState(false)
+  const [showPwGate, setShowPwGate]           = useState(false)
+  const [pwGateInput, setPwGateInput]         = useState('')
+  const [pwGateError, setPwGateError]         = useState('')
+  const [pwGateLoading, setPwGateLoading]     = useState(false)
 
   const [form, setForm] = useState({
     company: '', ceo_name: '', phone: '', phone_010: '',
@@ -150,6 +157,38 @@ export default function DigDashboard({ userId, userName, username }: Props) {
   const bonusAmount   = bonusCount * BONUS_PER_EXTRA
   const checkDoneCount   = Object.values(checklist).filter(Boolean).length
   const checklistAllDone = checkDoneCount === CHECKLIST_ITEMS.length
+
+  function handleTabClick(key: Tab) {
+    if (key === 'profile' && !profileUnlocked) {
+      setPwGateInput('')
+      setPwGateError('')
+      setShowPwGate(true)
+      return
+    }
+    setActiveTab(key)
+  }
+
+  async function verifyPwGate() {
+    if (!pwGateInput) { setPwGateError('비밀번호를 입력하세요'); return }
+    setPwGateLoading(true)
+    setPwGateError('')
+    try {
+      const res  = await fetch('/api/verify-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pwGateInput }),
+      })
+      if (res.ok) {
+        setProfileUnlocked(true)
+        setShowPwGate(false)
+        setActiveTab('profile')
+      } else {
+        const d = await res.json()
+        setPwGateError(d.error || '비밀번호가 틀렸습니다')
+      }
+    } catch { setPwGateError('서버 오류가 발생했습니다') }
+    setPwGateLoading(false)
+  }
 
   async function doPhoneSearch() {
     const clean = phoneSearch.replace(/[^0-9]/g, '')
@@ -331,6 +370,46 @@ export default function DigDashboard({ userId, userName, username }: Props) {
         </div>
       )}
 
+      {/* 직원정보 비밀번호 게이트 모달 */}
+      {showPwGate && (
+        <div className="fixed inset-0 z-[9997] flex items-center justify-center bg-black/60 px-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 space-y-4 shadow-2xl">
+            <div>
+              <h3 className="text-base font-black text-[#1B2A45]">🔒 직원정보 확인</h3>
+              <p className="text-xs text-gray-400 mt-1">개인정보 보호를 위해 비밀번호를 입력하세요</p>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1.5">비밀번호</label>
+              <input
+                type="password"
+                value={pwGateInput}
+                onChange={e => { setPwGateInput(e.target.value); setPwGateError('') }}
+                onKeyDown={e => { if (e.key === 'Enter') verifyPwGate() }}
+                placeholder="로그인 비밀번호 입력"
+                autoFocus
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A45]/30"
+              />
+              {pwGateError && <p className="text-xs text-red-500 mt-1.5">{pwGateError}</p>}
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={verifyPwGate}
+                disabled={pwGateLoading}
+                className="flex-1 py-3 bg-[#1B2A45] text-white text-sm font-bold rounded-xl hover:bg-[#1B2A45]/90 disabled:opacity-50">
+                {pwGateLoading ? '확인 중...' : '확인'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowPwGate(false)}
+                className="px-5 py-3 bg-gray-100 text-gray-600 text-sm rounded-xl hover:bg-gray-200">
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 헤더 */}
       <header className="bg-[#1B2A45] px-4 py-3 flex items-center justify-between sticky top-0 z-30 shadow-md">
         <Link href="/" className="relative h-8 w-24 shrink-0 block">
@@ -369,9 +448,9 @@ export default function DigDashboard({ userId, userName, username }: Props) {
           { key: 'dig'     as Tab, label: '발굴탭' },
           { key: 'profile' as Tab, label: '직원정보' },
         ] as const).map(t => (
-          <button key={t.key} onClick={() => setActiveTab(t.key)}
+          <button key={t.key} onClick={() => handleTabClick(t.key)}
             className={`flex-1 py-3 text-base font-semibold transition-colors relative ${activeTab === t.key ? 'text-[#1B2A45]' : 'text-gray-400 hover:text-gray-600'}`}>
-            {t.label}
+            {t.label}{t.key === 'profile' && !profileUnlocked ? ' 🔒' : ''}
             {activeTab === t.key && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1B2A45] rounded-t-full" />}
           </button>
         ))}
