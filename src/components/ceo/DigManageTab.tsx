@@ -265,6 +265,15 @@ export default function DigManageTab() {
                         {p.recording_url && (
                           <span className="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">녹취 있음</span>
                         )}
+                        {p.recording_analysis?.needs_level && (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            p.recording_analysis.needs_level === '상' ? 'bg-red-100 text-red-700' :
+                            p.recording_analysis.needs_level === '중' ? 'bg-orange-100 text-orange-700' :
+                            'bg-blue-100 text-blue-600'
+                          }`}>
+                            니즈 {p.recording_analysis.needs_level}
+                          </span>
+                        )}
                       </div>
                       <p className="text-[11px] text-gray-400 mt-0.5">
                         {p.ceo_name} · {p.phone_010} · {p.call_date}
@@ -317,17 +326,36 @@ export default function DigManageTab() {
                     {/* AI 분석 결과 */}
                     {p.recording_analysis && !p.recording_analysis.parse_error && (
                       <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-2">
-                        <p className="text-[11px] font-bold text-emerald-700">AI 통화 분석 결과</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-[11px] font-bold text-emerald-700">AI 통화 분석 결과</p>
+                          {p.recording_analysis.needs_level && (
+                            <span className={`text-xs font-black px-3 py-1 rounded-full ${
+                              p.recording_analysis.needs_level === '상' ? 'bg-red-500 text-white' :
+                              p.recording_analysis.needs_level === '중' ? 'bg-orange-400 text-white' :
+                              'bg-blue-400 text-white'
+                            }`}>
+                              니즈 {p.recording_analysis.needs_level}
+                            </span>
+                          )}
+                        </div>
                         {p.recording_analysis.summary && (
                           <p className="text-xs text-gray-700">{p.recording_analysis.summary}</p>
                         )}
+                        {p.recording_analysis.checklist && (
+                          <div className="grid grid-cols-2 gap-1">
+                            {Object.entries(CHECKLIST_LABELS).map(([k, label]) => {
+                              const passed = p.recording_analysis.checklist[k]
+                              return (
+                                <div key={k} className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg ${passed ? 'bg-emerald-100 text-emerald-700' : 'bg-red-50 text-red-500'}`}>
+                                  <span>{passed ? '✅' : '❌'}</span>
+                                  <span className="font-medium">{label}</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
                         {p.recording_analysis.feedback && (
                           <p className="text-[11px] text-amber-700 bg-amber-50 rounded-lg px-2 py-1.5">{p.recording_analysis.feedback}</p>
-                        )}
-                        {p.recording_analysis.all_passed !== undefined && (
-                          <p className={`text-[11px] font-semibold ${p.recording_analysis.all_passed ? 'text-emerald-700' : 'text-red-600'}`}>
-                            {p.recording_analysis.all_passed ? '✅ AI 체크: 모든 항목 통과' : '⚠️ AI 체크: 일부 항목 미완료'}
-                          </p>
                         )}
                       </div>
                     )}

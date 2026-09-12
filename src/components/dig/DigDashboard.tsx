@@ -108,6 +108,13 @@ export default function DigDashboard({ userId, userName, username }: Props) {
   const [analysis, setAnalysis]     = useState<any>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
+  const [resubmitProspect, setResubmitProspect] = useState<Prospect | null>(null)
+  const [resubmitFile, setResubmitFile]         = useState<File | null>(null)
+  const [resubmitAnalysis, setResubmitAnalysis] = useState<any>(null)
+  const [resubmitAnalyzing, setResubmitAnalyzing] = useState(false)
+  const [resubmitting, setResubmitting]         = useState(false)
+  const resubmitFileRef = useRef<HTMLInputElement>(null)
+
   const [phoneSearch, setPhoneSearch]       = useState('')
   const [phoneResults, setPhoneResults]     = useState<any[] | null>(null)
   const [phoneSearching, setPhoneSearching] = useState(false)
@@ -251,6 +258,73 @@ export default function DigDashboard({ userId, userName, username }: Props) {
     }
   }
 
+  async function handleResubmitFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setResubmitFile(file)
+    setResubmitAnalysis(null)
+    if (file.size > 50 * 1024 * 1024) { showToast('파일이 너무 큽니다 (최대 50MB)', 'error'); return }
+    if (file.size <= 20 * 1024 * 1024) {
+      setResubmitAnalyzing(true)
+      try {
+        const fd = new FormData()
+        fd.append('file', file)
+        const res = await fetch('/api/analyze-recording', { method: 'POST', body: fd })
+        const data = await res.json()
+        if (data.analysis && !data.analysis.parse_error) {
+          setResubmitAnalysis(data.analysis)
+          showToast('AI 재분석 완료!')
+        } else {
+          showToast('AI 분석 실패 — 그대로 재제출 가능합니다', 'error')
+        }
+      } catch { showToast('AI 분석 중 오류', 'error') }
+      setResubmitAnalyzing(false)
+    }
+  }
+
+  async function handleResubmitSubmit() {
+    if (!resubmitProspect) return
+    setResubmitting(true)
+    let recording_url: string | null = resubmitProspect.recording_url || null
+    let recording_filename: string | null = resubmitProspect.recording_filename || null
+    let recording_analysis: any = resubmitAnalysis || resubmitProspect.recording_analysis || null
+
+    if (resubmitFile) {
+      try {
+        const fd = new FormData()
+        fd.append('file', resubmitFile)
+        const res = await fetch('/api/upload-recording', { method: 'POST', body: fd })
+        const data = await res.json()
+        if (data.url) {
+          recording_url = data.url
+          recording_filename = data.filename
+        } else {
+          showToast(data.error || '녹취 업로드 실패', 'error')
+          setResubmitting(false)
+          return
+        }
+      } catch { showToast('녹취 업로드 중 오류', 'error'); setResubmitting(false); return }
+    }
+
+    const res = await fetch(`/api/dig-prospects/${resubmitProspect.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'resubmit', recording_url, recording_filename, recording_analysis }),
+    })
+    if (res.ok) {
+      showToast('재심사 제출 완료! 대표님 심사를 기다려주세요')
+      setResubmitProspect(null)
+      setResubmitFile(null)
+      setResubmitAnalysis(null)
+      if (resubmitFileRef.current) resubmitFileRef.current.value = ''
+      loadProspects()
+    } else {
+      const d = await res.json()
+      showToast(d.error || '재제출 실패', 'error')
+    }
+    setResubmitting(false)
+  }
+
   function handleSubmitClick(e: React.FormEvent) {
     e.preventDefault()
     if (!form.phone_010.trim()) { showToast('010 번호는 필수입니다', 'error'); return }
@@ -353,6 +427,71 @@ export default function DigDashboard({ userId, userName, username }: Props) {
             <button type="button" onClick={handleFinalSubmit} disabled={submitting || analyzing}
               className="w-full py-4 bg-[#1B2A45] text-white text-sm font-bold rounded-xl hover:bg-[#1B2A45]/90 transition-colors disabled:opacity-50">
               {uploading ? '업로드 중...' : submitting ? '제출 중...' : recordingFile ? '녹취 포함 제출' : '녹취 없이 제출'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 재심사 모달 */}
+      {resubmitProspect && (
+        <div className="fixed inset-0 z-[9998] flex items-end justify-center bg-black/60">
+          <div className="bg-white rounded-t-2xl w-full max-w-lg px-5 pt-5 pb-8 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-[#1B2A45]">재심사 제출</h3>
+                <p className="text-xs text-gray-400 mt-0.5">{resubmitProspect.company || resubmitProspect.ceo_name}</p>
+              </div>
+              <button type="button" onClick={() => { setResubmitProspect(null); setResubmitFile(null); setResubmitAnalysis(null) }}
+                className="text-gray-400 hover:text-gray-600 text-xl p-1">✕</button>
+            </div>
+
+            {/* 부결 사유 */}
+            {resubmitProspect.ceo_comment && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                <p className="text-[10px] text-red-500 font-bold mb-1">부결 사유</p>
+                <p className="text-sm text-red-700">{resubmitProspect.ceo_comment}</p>
+              </div>
+            )}
+
+            <p className="text-xs text-gray-500">새 녹취 파일을 첨부하면 AI가 재분석합니다. 없이 제출도 가능합니다.</p>
+
+            <input ref={resubmitFileRef} type="file" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg"
+              onChange={handleResubmitFileChange} className="hidden" />
+            <button type="button" onClick={() => resubmitFileRef.current?.click()}
+              className="w-full border-2 border-dashed border-gray-200 rounded-xl py-4 text-center hover:border-[#1B2A45]/30 transition-colors">
+              {resubmitFile
+                ? <span className="text-sm text-gray-700 font-medium">{resubmitFile.name}</span>
+                : <><p className="text-sm text-gray-400">+ 새 녹취 파일 선택 (선택)</p><p className="text-xs text-gray-300 mt-0.5">mp3, m4a, wav, aac 등</p></>}
+            </button>
+
+            {resubmitAnalyzing && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm text-blue-700">AI 재분석 중...</p>
+              </div>
+            )}
+            {resubmitAnalysis && !resubmitAnalysis.parse_error && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-emerald-700">AI 재분석 결과</p>
+                  {resubmitAnalysis.needs_level && (
+                    <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
+                      resubmitAnalysis.needs_level === '상' ? 'bg-red-500 text-white' :
+                      resubmitAnalysis.needs_level === '중' ? 'bg-orange-400 text-white' :
+                      'bg-blue-400 text-white'
+                    }`}>니즈 {resubmitAnalysis.needs_level}</span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-700">{resubmitAnalysis.summary}</p>
+                <p className={`text-xs font-semibold ${resubmitAnalysis.all_passed ? 'text-emerald-700' : 'text-amber-600'}`}>
+                  {resubmitAnalysis.all_passed ? '✅ 모든 체크리스트 통과' : '⚠ 일부 체크리스트 미완료'}
+                </p>
+              </div>
+            )}
+
+            <button type="button" onClick={handleResubmitSubmit} disabled={resubmitting || resubmitAnalyzing}
+              className="w-full py-4 bg-[#1B2A45] text-white text-sm font-bold rounded-xl hover:bg-[#1B2A45]/90 transition-colors disabled:opacity-50">
+              {resubmitting ? '제출 중...' : '재심사 제출 →'}
             </button>
           </div>
         </div>
@@ -508,6 +647,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                 icon="❌" label="승인부결" count={rejectedList.length}
                 colorCls="bg-red-50 border-red-200" headerCls="bg-red-100/60" textCls="text-red-600"
                 dotCls="bg-red-400" items={rejectedList} showComment
+                onItemClick={p => setResubmitProspect(p as Prospect)}
               />
 
             </div>
@@ -699,12 +839,13 @@ export default function DigDashboard({ userId, userName, username }: Props) {
 
 /* 현황 박스 컴포넌트 */
 function StatusBox({
-  icon, label, count, colorCls, headerCls, textCls, dotCls, items, showComment,
+  icon, label, count, colorCls, headerCls, textCls, dotCls, items, showComment, onItemClick,
 }: {
   icon: string; label: string; count: number
   colorCls: string; headerCls: string; textCls: string; dotCls: string
   items: { id: string; company: string; ceo_name: string; phone_010: string; ceo_comment?: string }[]
   showComment?: boolean
+  onItemClick?: (item: { id: string; company: string; ceo_name: string; phone_010: string; ceo_comment?: string }) => void
 }) {
   return (
     <div className={`border-2 rounded-2xl overflow-hidden ${colorCls}`}>
@@ -718,12 +859,17 @@ function StatusBox({
         {items.length === 0
           ? <p className={`text-xs py-1 opacity-50 ${textCls}`}>없음</p>
           : items.slice(0, 5).map(p => (
-            <div key={p.id} className="flex items-start gap-1.5">
+            <div key={p.id}
+              className={`flex items-start gap-1.5 ${onItemClick ? 'cursor-pointer group' : ''}`}
+              onClick={() => onItemClick?.(p)}>
               <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${dotCls}`} />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-xs text-gray-700 truncate">{p.company || p.ceo_name || p.phone_010}</p>
                 {showComment && p.ceo_comment && (
                   <p className="text-[10px] text-red-400 truncate">{p.ceo_comment}</p>
+                )}
+                {onItemClick && (
+                  <p className="text-[10px] text-red-500 font-semibold group-hover:underline">재심사 제출 →</p>
                 )}
               </div>
             </div>

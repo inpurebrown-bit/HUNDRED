@@ -93,6 +93,29 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     updateData = {
       recording_analysis: body.analysis,
     }
+  } else if (action === 'resubmit') {
+    if (user.role !== 'dig' && user.role !== 'ceo') {
+      return NextResponse.json({ error: '권한 없음' }, { status: 403 })
+    }
+    const { data: existing } = await supabaseAdmin
+      .from('dig_prospects')
+      .select('status, dig_user_id')
+      .eq('id', id)
+      .single()
+    if (!existing) return NextResponse.json({ error: '가망 없음' }, { status: 404 })
+    if (existing.status !== 'rejected') {
+      return NextResponse.json({ error: '부결된 가망만 재심사 가능합니다' }, { status: 400 })
+    }
+    if (user.role === 'dig' && existing.dig_user_id !== user.id) {
+      return NextResponse.json({ error: '권한 없음' }, { status: 403 })
+    }
+    updateData = {
+      status: 'pending',
+      ceo_comment: null,
+      recording_url: body.recording_url ?? null,
+      recording_filename: body.recording_filename ?? null,
+      recording_analysis: body.recording_analysis ?? null,
+    }
   } else {
     return NextResponse.json({ error: '알 수 없는 action' }, { status: 400 })
   }
