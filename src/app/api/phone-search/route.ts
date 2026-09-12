@@ -10,12 +10,14 @@ export async function GET(req: NextRequest) {
   const phone = req.nextUrl.searchParams.get('phone')?.replace(/[^0-9]/g, '') || ''
   if (phone.length < 9) return NextResponse.json({ results: [] })
 
-  // DB 서버에서 JSONB 필터로 직접 검색 (limit 없음 — 전체 DB)
+  // customers.phone = 최상위 컬럼 (핵심)
+  // customers.details->>phone_010 = JSONB 안 추가 번호 (있으면)
+  // dig_prospects.phone_010 = 발굴팀 가망 번호
   const [{ data: customers }, { data: prospects }] = await Promise.all([
     supabaseAdmin
       .from('customers')
-      .select('id, name, details, status, created_at')
-      .or(`details->>phone_010.ilike.%${phone}%,details->>phone.ilike.%${phone}%`),
+      .select('id, name, phone, details, status, created_at')
+      .or(`phone.ilike.%${phone}%,details->>phone_010.ilike.%${phone}%`),
     supabaseAdmin
       .from('dig_prospects')
       .select('id, company, ceo_name, phone_010, status, created_at')
@@ -26,9 +28,9 @@ export async function GET(req: NextRequest) {
     source: 'customer',
     id: c.id,
     company: c.details?.company || c.name || '',
-    ceo_name: c.details?.ceo_name || c.details?.sales_user_name || '',
-    phone_010: c.details?.phone_010 || c.details?.phone || '',
-    status: c.status || '',
+    ceo_name: c.name || '',
+    phone_010: c.phone || c.details?.phone_010 || '',
+    status: c.details?.sub_status || c.status || '',
     created_at: c.created_at,
   }))
 
