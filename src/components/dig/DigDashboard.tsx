@@ -586,15 +586,18 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                   ))}
                 </div>
 
-                <button type="submit" disabled={!phoneVerified || !form.phone_010.trim()}
+                {!checklistAllDone && (
+                  <p className="text-xs text-amber-600 font-semibold text-center">
+                    ⚠ 체크리스트 {checkDoneCount}/5 — 모두 완료해야 전송 가능합니다
+                  </p>
+                )}
+                <button type="submit" disabled={!phoneVerified || !form.phone_010.trim() || !checklistAllDone}
                   className={`w-full py-4 rounded-xl font-black text-sm transition-colors ${
-                    !phoneVerified || !form.phone_010.trim()
+                    !phoneVerified || !form.phone_010.trim() || !checklistAllDone
                       ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                      : checklistAllDone
-                        ? 'bg-[#1B2A45] text-white hover:bg-[#1B2A45]/90'
-                        : 'bg-amber-500 text-white hover:bg-amber-600'
+                      : 'bg-[#1B2A45] text-white hover:bg-[#1B2A45]/90'
                   }`}>
-                  {!phoneVerified ? '🔒 번호 중복검색 먼저' : checklistAllDone ? '전송 →' : '전송 (체크리스트 미완료)'}
+                  {!phoneVerified ? '🔒 번호 중복검색 먼저' : !checklistAllDone ? `🔒 체크리스트 ${checkDoneCount}/5 미완료` : '전송 →'}
                 </button>
               </form>
             </div>
