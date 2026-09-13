@@ -146,6 +146,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const [goalEditValue, setGoalEditValue] = useState('')
   const [goalSaving, setGoalSaving] = useState(false)
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([])
+  const [digProspects, setDigProspects]     = useState<any[]>([])
 
   async function saveGoal() {
     const num = parseInt(goalEditValue)
@@ -217,13 +218,15 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   // ── Data loading ──────────────────────────────────────────────────
   async function loadAll(silent = false) {
     if (!silent) setLoading(true)
-    const [cRes, conRes, nRes, scRes] = await Promise.all([
+    const [cRes, conRes, nRes, scRes, dpRes] = await Promise.all([
       fetch('/api/customers'),
       fetch('/api/contracts'),
       fetch('/api/notices?team=sales&_t=' + Date.now()),
       fetch('/api/supply-config'),
+      fetch('/api/dig-prospects'),
     ])
-    const [cData, conData, nData, scData] = await Promise.all([cRes.json(), conRes.json(), nRes.json(), scRes.json()])
+    const [cData, conData, nData, scData, dpData] = await Promise.all([cRes.json(), conRes.json(), nRes.json(), scRes.json(), dpRes.json()])
+    setDigProspects(dpData.prospects || [])
     const loadedCustomers: Customer[] = cData.customers || []
     setCustomers(loadedCustomers)
     setContracts(conData.contracts || [])
@@ -1922,10 +1925,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
 
         {/* ══════════ 일정관리 ══════════ */}
         {activeTab === 'schedule' && (
-          <SalesScheduleTab customers={customers.filter(c => {
-            const d = (c as any).details || {}
-            return d.sales_user_name === userName || (c as any).sales_user_name === userName
-          })} />
+          <SalesScheduleTab
+            customers={customers.filter(c => {
+              const d = (c as any).details || {}
+              return d.sales_user_name === userName || (c as any).sales_user_name === userName
+            })}
+            digProspects={digProspects}
+          />
         )}
 
         {/* ══════════ 사원정보 ══════════ */}

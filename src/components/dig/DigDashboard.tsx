@@ -300,28 +300,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
       const data = await res.json()
       if (data.analysis) {
         setAnalysis(data.analysis)
-        if (!data.analysis.parse_error) {
-          if (data.analysis.checklist) setChecklist(prev => ({ ...prev, ...data.analysis.checklist }))
-          if (data.analysis.customer_info) {
-            const ci = data.analysis.customer_info
-            setForm(prev => ({
-              ...prev,
-              company:            ci.company        || prev.company,
-              ceo_name:           ci.ceo_name       || prev.ceo_name,
-              phone_010:          ci.phone_010       || prev.phone_010,
-              business_age:       ci.business_age   || prev.business_age,
-              annual_revenue:     ci.annual_revenue  || prev.annual_revenue,
-              industry:           ci.industry        || prev.industry,
-              credit_score:       ci.credit_score    || prev.credit_score,
-              required_fund:      ci.required_fund   || prev.required_fund,
-              delinquency_detail: ci.has_delinquency != null ? (ci.has_delinquency ? '있음' : '없음') : prev.delinquency_detail,
-            }))
-          }
-          showToast('녹취 처리 완료')
-        } else {
-          if (data.analysis.checklist) setChecklist(prev => ({ ...prev, ...data.analysis.checklist }))
-          showToast('녹취 업로드 완료')
-        }
+        showToast('녹취 분석 완료 — 아래 비교표를 확인하세요')
       }
     } catch (err: any) {
       console.error('processRecordingFile error:', err)
@@ -534,14 +513,46 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                 <p className="text-sm text-blue-700">처리 중... 잠시 기다려주세요</p>
               </div>
             )}
-            {analysis && !analysis.parse_error && (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-2">
-                <p className="text-xs font-bold text-emerald-700">검토 완료</p>
-                <p className="text-sm text-gray-700">{analysis.summary}</p>
-                {analysis.feedback && <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">{analysis.feedback}</p>}
-                <p className={`text-xs font-semibold ${analysis.all_passed ? 'text-emerald-700' : 'text-amber-600'}`}>
-                  {analysis.all_passed ? '✅ 모든 체크리스트 통과' : '⚠ 일부 체크리스트 미완료'}
-                </p>
+            {analysis && (
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex items-center justify-between">
+                  <p className="text-xs font-bold text-gray-700">AI 분석 비교표</p>
+                  <p className="text-xs text-gray-400">내가 입력한 내용 기준 — 틀린 부분만 직접 수정</p>
+                </div>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      <th className="py-2 px-3 text-left text-gray-500 font-medium w-1/4">항목</th>
+                      <th className="py-2 px-3 text-left text-gray-600 font-semibold w-[37.5%]">내가 입력</th>
+                      <th className="py-2 px-3 text-left text-gray-500 font-medium w-[37.5%]">AI 추출</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { label: '회사명', myVal: form.company, aiVal: analysis.customer_info?.company },
+                      { label: '대표자', myVal: form.ceo_name, aiVal: analysis.customer_info?.ceo_name },
+                      { label: '연락처', myVal: form.phone_010, aiVal: analysis.customer_info?.phone_010 },
+                      { label: '업력', myVal: form.business_age, aiVal: analysis.customer_info?.business_age },
+                      { label: '연매출', myVal: form.annual_revenue, aiVal: analysis.customer_info?.annual_revenue },
+                      { label: '업종', myVal: form.industry, aiVal: analysis.customer_info?.industry },
+                      { label: '신용점수', myVal: form.credit_score, aiVal: analysis.customer_info?.credit_score },
+                      { label: '필요자금', myVal: form.required_fund, aiVal: analysis.customer_info?.required_fund },
+                      { label: '연체여부', myVal: form.delinquency_detail || '-', aiVal: analysis.customer_info?.has_delinquency == null ? '-' : analysis.customer_info.has_delinquency ? '있음' : '없음' },
+                    ].map(({ label, myVal, aiVal }) => {
+                      const mismatch = myVal && aiVal && myVal !== aiVal && aiVal !== '-'
+                      return (
+                        <tr key={label} className={`border-b border-gray-50 ${mismatch ? 'bg-amber-50' : ''}`}>
+                          <td className="py-2 px-3 text-gray-500">{label}</td>
+                          <td className="py-2 px-3 text-gray-800 font-medium">{myVal || <span className="text-gray-300">미입력</span>}</td>
+                          <td className={`py-2 px-3 ${mismatch ? 'text-amber-700 font-semibold' : 'text-gray-500'}`}>{aiVal || '-'}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+                {analysis.parse_error && (
+                  <p className="text-xs text-amber-600 px-4 py-2 bg-amber-50">AI 분석 일부 실패 — 직접 확인 후 제출하세요</p>
+                )}
               </div>
             )}
             <button type="button" onClick={handleFinalSubmit} disabled={submitting || analyzing || !recordingFile}
@@ -828,25 +839,30 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                     { key: 'credit_score',       label: '신용점수',       ph: '780점' },
                     { key: 'delinquency_detail', label: '연체·체납',      ph: '없음 / 500만원' },
                     { key: 'required_fund',      label: '필요자금',       ph: '1억' },
-                    { key: 'preferred_call_time', label: '통화 희망시간', ph: '내일 오전 10시' },
                   ] as const).map(f => (
-                    <div key={f.key} className={f.key === 'preferred_call_time' ? 'col-span-2' : ''}>
-                      <label className={lblCls}>{f.label}{f.key === 'preferred_call_time' && <span className="text-amber-500 ml-1">★ 체크요건</span>}</label>
+                    <div key={f.key}>
+                      <label className={lblCls}>{f.label}</label>
                       <input value={(form as any)[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
                         placeholder={f.ph} className={inputCls} />
-                      {f.key === 'preferred_call_time' && (
-                        <label className={`mt-2 flex items-center gap-2 cursor-pointer select-none ${urgentAssign ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
-                          <input
-                            type="checkbox"
-                            checked={urgentAssign}
-                            onChange={e => setUrgentAssign(e.target.checked)}
-                            className="w-4 h-4 accent-red-500"
-                          />
-                          <span className="text-sm">🚨 긴급 배정 요청 — 바로 연락 필요 (대표님께 즉시 알림)</span>
-                        </label>
-                      )}
                     </div>
                   ))}
+                </div>
+
+                {/* 통화 희망시간 + 긴급배정 */}
+                <div className="col-span-2 space-y-2">
+                  <div>
+                    <label className={lblCls}>통화 희망시간 <span className="text-amber-500 ml-1">★ 영업팀 일정에 표시됨</span></label>
+                    <input
+                      type="datetime-local"
+                      value={form.preferred_call_time}
+                      onChange={e => setForm(p => ({ ...p, preferred_call_time: e.target.value }))}
+                      className={inputCls}
+                    />
+                  </div>
+                  <label className={`flex items-center gap-2 cursor-pointer select-none ${urgentAssign ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
+                    <input type="checkbox" checked={urgentAssign} onChange={e => setUrgentAssign(e.target.checked)} className="w-4 h-4 accent-red-500" />
+                    <span className="text-sm">🚨 긴급 배정 요청 — 바로 연락 필요 (대표님께 즉시 알림)</span>
+                  </label>
                 </div>
 
                 {/* 체크리스트 */}

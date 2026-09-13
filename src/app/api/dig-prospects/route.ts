@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
   const user = session.user as any
-  if (user.role !== 'dig' && user.role !== 'ceo') {
+  if (user.role !== 'dig' && user.role !== 'ceo' && user.role !== 'sales') {
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
 
@@ -25,9 +25,12 @@ export async function GET(req: NextRequest) {
 
   if (user.role === 'dig') {
     query = query.eq('dig_user_id', user.id)
+  } else if (user.role === 'sales') {
+    // 영업팀: 본인에게 배정된 건만
+    query = query.eq('assigned_to', user.id).eq('status', 'assigned')
   }
 
-  if (status && status !== 'all') {
+  if (user.role !== 'sales' && status && status !== 'all') {
     query = query.eq('status', status)
   }
 
