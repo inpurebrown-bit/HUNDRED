@@ -418,14 +418,29 @@ export default function DigDashboard({ userId, userName, username }: Props) {
     if (recordingFile) {
       setUploading(true)
       try {
-        const fd = new FormData()
-        fd.append('file', recordingFile)
-        const res  = await fetch('/api/upload-recording', { method: 'POST', body: fd })
-        let data: any = {}
-        try { data = await res.json() } catch { data = { error: `서버 오류 (${res.status})` } }
-        if (data.url) { recording_url = data.url; recording_filename = data.filename }
-        else { showToast(data.error || `업로드 실패 (${res.status})`, 'error'); setSubmitting(false); setUploading(false); return }
-      } catch (e: any) { showToast('네트워크 오류: ' + (e?.message || '알 수 없음'), 'error'); setSubmitting(false); setUploading(false); return }
+        // 1단계: 서버에서 서명된 업로드 URL 발급
+        const signRes = await fetch('/api/storage-sign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: recordingFile.name }),
+        })
+        const signData = await signRes.json()
+        if (!signData.signedUrl) { showToast(signData.error || '업로드 준비 실패', 'error'); setSubmitting(false); setUploading(false); return }
+
+        // 2단계: 브라우저에서 Supabase에 직접 업로드 (Vercel 크기 제한 우회)
+        const ext = (recordingFile.name.split('.').pop() || 'mp3').toLowerCase()
+        const mimeMap: Record<string, string> = { m4a: 'audio/mp4', mp3: 'audio/mpeg', wav: 'audio/wav', aac: 'audio/aac', ogg: 'audio/ogg', mp4: 'audio/mp4' }
+        const contentType = (recordingFile.type && recordingFile.type !== 'audio/x-m4a') ? recordingFile.type : (mimeMap[ext] || 'audio/mpeg')
+        const putRes = await fetch(signData.signedUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': contentType },
+          body: recordingFile,
+        })
+        if (!putRes.ok) { showToast(`업로드 실패 (${putRes.status})`, 'error'); setSubmitting(false); setUploading(false); return }
+
+        recording_url = signData.publicUrl
+        recording_filename = recordingFile.name
+      } catch (e: any) { showToast('업로드 오류: ' + (e?.message || '알 수 없음'), 'error'); setSubmitting(false); setUploading(false); return }
       setUploading(false)
     }
     try {
