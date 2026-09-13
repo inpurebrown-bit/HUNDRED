@@ -125,6 +125,10 @@ export default function DigManageTab() {
   // 긴급 미배정 건수
   const urgentCount = approvedList.filter(p => p.urgent_assign).length
 
+  const thisMonth = today.slice(0, 7) // "YYYY-MM"
+  const MONTHLY_GOAL = 160
+  const DAILY_GOAL   = 8
+
   // 오늘 승인 건수 (dig 직원별)
   const todayApproved = prospects.filter(p =>
     (p.status === 'approved' || p.status === 'assigned') && p.call_date === today
@@ -135,8 +139,22 @@ export default function DigManageTab() {
       byUser[p.dig_user_id] = { name: p.dig_user_name, count: 0, bonus: 0 }
     }
     byUser[p.dig_user_id].count++
-    byUser[p.dig_user_id].bonus = Math.max(0, byUser[p.dig_user_id].count - 8) * 10000
+    byUser[p.dig_user_id].bonus = Math.max(0, byUser[p.dig_user_id].count - DAILY_GOAL) * 10000
   })
+
+  // 이번달 승인 건수 (dig 직원별)
+  const monthApproved = prospects.filter(p =>
+    (p.status === 'approved' || p.status === 'assigned') && p.call_date?.startsWith(thisMonth)
+  )
+  const byUserMonth: Record<string, { name: string; count: number }> = {}
+  monthApproved.forEach(p => {
+    if (!byUserMonth[p.dig_user_id]) {
+      byUserMonth[p.dig_user_id] = { name: p.dig_user_name, count: 0 }
+    }
+    byUserMonth[p.dig_user_id].count++
+  })
+  const monthTotal = monthApproved.length
+  const monthPct   = Math.min(100, Math.round((monthTotal / MONTHLY_GOAL) * 100))
 
   async function approve(id: string) {
     setProcessing(id)
@@ -553,24 +571,57 @@ export default function DigManageTab() {
         </div>
       )}
 
-      {/* 오늘 성과 요약 */}
-      <div className="bg-[#1B2A45] rounded-xl px-5 py-4">
-        <p className="text-white/50 text-[11px] mb-3">오늘 {today} · 발굴팀 성과</p>
-        {Object.keys(byUser).length === 0 ? (
-          <p className="text-white/40 text-sm">오늘 승인된 가망이 없습니다</p>
-        ) : (
-          <div className="flex flex-wrap gap-3">
-            {Object.entries(byUser).map(([uid, info]) => (
-              <div key={uid} className="bg-white/10 rounded-xl px-4 py-2.5">
-                <p className="text-white text-sm font-bold">{info.name}</p>
-                <p className="text-white/60 text-[11px]">승인 {info.count}건 / 목표 8건</p>
-                {info.bonus > 0 && (
-                  <p className="text-[#C5A258] text-[11px] font-semibold">인센티브 +{info.bonus.toLocaleString()}원</p>
-                )}
-              </div>
-            ))}
+      {/* 성과 요약 */}
+      <div className="bg-[#1B2A45] rounded-xl px-5 py-4 space-y-4">
+        {/* 이번달 전체 진행률 */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-white/50 text-[11px]">{thisMonth} · 이번달 총 목표</p>
+            <p className="text-white text-xs font-bold">{monthTotal} / {MONTHLY_GOAL}건</p>
+          </div>
+          <div className="w-full bg-white/10 rounded-full h-2">
+            <div
+              className={`h-2 rounded-full transition-all ${monthPct >= 100 ? 'bg-emerald-400' : monthPct >= 70 ? 'bg-[#C5A258]' : 'bg-white/40'}`}
+              style={{ width: `${monthPct}%` }}
+            />
+          </div>
+          <p className="text-white/40 text-[10px] mt-1">{monthPct}% 달성 · 남은 목표 {Math.max(0, MONTHLY_GOAL - monthTotal)}건</p>
+        </div>
+
+        {/* 이번달 개인별 */}
+        {Object.keys(byUserMonth).length > 0 && (
+          <div>
+            <p className="text-white/40 text-[10px] mb-2">개인별 이번달 승인</p>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(byUserMonth).map(([uid, info]) => (
+                <div key={uid} className="bg-white/10 rounded-lg px-3 py-1.5 flex items-center gap-2">
+                  <p className="text-white text-xs font-bold">{info.name}</p>
+                  <p className="text-white/60 text-[11px]">{info.count}건</p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
+
+        {/* 오늘 현황 */}
+        <div>
+          <p className="text-white/40 text-[10px] mb-2">오늘 {today} · 일별 목표 {DAILY_GOAL}건</p>
+          {Object.keys(byUser).length === 0 ? (
+            <p className="text-white/30 text-xs">오늘 승인된 가망이 없습니다</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(byUser).map(([uid, info]) => (
+                <div key={uid} className="bg-white/10 rounded-lg px-3 py-1.5">
+                  <p className="text-white text-xs font-bold">{info.name}</p>
+                  <p className="text-white/60 text-[11px]">오늘 {info.count}건 / {DAILY_GOAL}건</p>
+                  {info.bonus > 0 && (
+                    <p className="text-[#C5A258] text-[11px] font-semibold">인센티브 +{info.bonus.toLocaleString()}원</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 뷰 탭 */}

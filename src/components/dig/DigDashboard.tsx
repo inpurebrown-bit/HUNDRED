@@ -813,7 +813,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-xs font-black text-[#1B2A45]">체크리스트</p>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${checklistAllDone ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-500'}`}>
-                      {checkDoneCount}/5{checklistAllDone ? ' ✓' : ''}
+                      {checkDoneCount}/{CHECKLIST_ITEMS.length}{checklistAllDone ? ' ✓' : ''}
                     </span>
                   </div>
                   {/* 법적 고지 3항목 (상단 강조) */}
