@@ -1354,11 +1354,15 @@ function CustomerCard({
             trash:      { label: '자체거절', cls: 'bg-gray-100 text-gray-500' },
           }
           const badge = STATUS_BADGE[c.status]
+          const isSelfSupply = (c as any).details?.supply_source === 'self_supply'
           return badge ? (
-            <div className="mb-1 flex justify-center gap-1">
+            <div className="mb-1 flex justify-center gap-1 flex-wrap">
               <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${badge.cls}`}>
                 {badge.label}
               </span>
+              {isSelfSupply && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">자체공급</span>
+              )}
               {leadType && (
                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${leadType === '직가' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
                   {leadType}
@@ -1366,10 +1370,17 @@ function CustomerCard({
               )}
             </div>
           ) : leadType ? (
-            <div className="mb-1 flex justify-center">
+            <div className="mb-1 flex justify-center gap-1 flex-wrap">
+              {isSelfSupply && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">자체공급</span>
+              )}
               <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${leadType === '직가' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
                 {leadType}
               </span>
+            </div>
+          ) : isSelfSupply ? (
+            <div className="mb-1 flex justify-center">
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">자체공급</span>
             </div>
           ) : null
         })()}

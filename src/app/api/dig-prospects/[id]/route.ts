@@ -53,11 +53,15 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       .insert({
         name: prospect.ceo_name || '(미입력)',
         phone: prospect.phone_010 || prospect.phone,
-        status: 'lead',
+        source: 'self',          // DB CHECK: 'self'|'lead'
+        status: 'active',        // DB CHECK: 'active'|'contracted'
         owner_id: assigned_to,
         details: {
+          sub_status: 'lead',    // 공가DB 상태 (프론트 상태)
+          supply_source: 'self_supply',  // 자체공급 식별자
           company: prospect.company,
-          // 영업팀 CustomerCard 필드명으로 매핑
+          sales_user_name: assigned_to_name,
+          // 영업팀 InCallCard 필드명으로 매핑
           years_in_business: prospect.business_age,
           business_type: prospect.industry,
           revenue_2026: prospect.annual_revenue,
@@ -71,7 +75,6 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
           has_delinquency: prospect.has_delinquency,
           required_fund: prospect.required_fund,
           // 출처 정보
-          source: 'dig',
           dig_prospect_id: prospect.id,
           dig_user_name: prospect.dig_user_name,
           dig_phone_010: prospect.phone_010,
@@ -81,6 +84,26 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       .single()
 
     if (custErr) return NextResponse.json({ error: custErr.message }, { status: 500 })
+
+    // 자체공급 카운트 자동 증가 (supply-config self_supplied)
+    const { data: cfgRow } = await supabaseAdmin
+      .from('notices')
+      .select('id, content')
+      .eq('notice_type', 'supply_config')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (cfgRow) {
+      try {
+        const cfg = JSON.parse(cfgRow.content || '{}')
+        const people = cfg.people || {}
+        const emp = people[assigned_to_name] || { supplied: 0, goal: 30, base: 0, self_supplied: 0 }
+        emp.self_supplied = (emp.self_supplied || 0) + 1
+        people[assigned_to_name] = emp
+        cfg.people = people
+        await supabaseAdmin.from('notices').update({ content: JSON.stringify(cfg) }).eq('id', cfgRow.id)
+      } catch {}
+    }
 
     updateData = {
       status: 'assigned',
