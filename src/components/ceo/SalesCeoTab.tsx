@@ -979,19 +979,28 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
   const supplyStats = useMemo(() => {
     return salesPeople.map(name => {
       const cfg = supplyConfig[name] || { supplied: 0, goal: 30, base: 0 }
-      // 전체 계약된 고객 중 해당 영업사원의 계약 가중치 합산 (월 필터 없음)
-      const dbContracted = customers
-        .filter(c =>
-          c.status === 'contracted' &&
-          (c.sales_user_name === name || (c as any).details?.sales_user_name === name)
-        )
+      const selfSupplied: number = (cfg as any).self_supplied || 0
+
+      // 모든 계약된 고객 (해당 영업사원)
+      const myContracted = customers.filter(c =>
+        c.status === 'contracted' &&
+        (c.sales_user_name === name || (c as any).details?.sales_user_name === name)
+      )
+      // 자체공급 고객 중 계약된 것
+      const selfContracted = myContracted
+        .filter(c => (c as any).details?.supply_source === 'self_supply')
         .reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0)
-      const totalContracted = cfg.base + dbContracted
+      // 한경연 등 일반 공급 계약
+      const dbContracted = myContracted
+        .filter(c => (c as any).details?.supply_source !== 'self_supply')
+        .reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0)
+      const totalContracted = cfg.base + dbContracted + selfContracted
       // floor(소수점 2자리 버림) — 반올림 시 12.999...→13.00이 되어 공급 오계산 방지
-      const rate = cfg.supplied > 0 ? Math.floor(totalContracted / cfg.supplied * 10000) / 100 : 0
+      const rate = cfg.supplied > 0 ? Math.floor((cfg.base + dbContracted) / cfg.supplied * 10000) / 100 : 0
+      const selfRate = selfSupplied > 0 ? Math.floor(selfContracted / selfSupplied * 10000) / 100 : 0
       const recommended = calcRecommendedSupply(rate, bizElapsed)
       const achievePct = cfg.goal > 0 ? Math.floor(totalContracted / cfg.goal * 10000) / 100 : 0
-      return { name, cfg, dbContracted, totalContracted, rate, recommended, achievePct }
+      return { name, cfg, selfSupplied, dbContracted, selfContracted, totalContracted, rate, selfRate, recommended, achievePct }
     })
   }, [salesPeople, supplyConfig, customers, thisMonthStr, bizElapsed])
 
@@ -1601,6 +1610,67 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
           <span className="text-[10px] text-white/30">계약 {customers.filter(c => c.status === 'contracted').length}개</span>
         </div>
       </div>
+
+      {/* ── 공급 현황 패널 (한경연 vs 자체공급) ── */}
+      {supplyStats.length > 0 && (
+        <div className="bg-white border border-[#E8E2D4] rounded-2xl overflow-hidden">
+          <div className="px-5 py-3 bg-gray-50 border-b border-[#E8E2D4] flex items-center justify-between">
+            <span className="text-sm font-bold text-gray-700">공급 현황</span>
+            <span className="text-[10px] text-gray-400">한경연 DB vs 자체공급 · 이번달 누계</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="text-left px-4 py-2 text-gray-500 font-semibold">영업사원</th>
+                  <th className="text-center px-3 py-2 text-sky-600 font-semibold">한경연<br/>공급수</th>
+                  <th className="text-center px-3 py-2 text-sky-600 font-semibold">한경연<br/>결제율</th>
+                  <th className="text-center px-3 py-2 text-emerald-600 font-semibold">자체공급<br/>건수</th>
+                  <th className="text-center px-3 py-2 text-emerald-600 font-semibold">자체공급<br/>결제율</th>
+                  <th className="text-center px-3 py-2 text-gray-500 font-semibold">목표달성</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {supplyStats.filter(s => s.name !== DIARY_TESTER).map(s => (
+                  <tr key={s.name} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-[#1B2A45] text-white flex items-center justify-center text-[10px] font-bold shrink-0">{s.name.charAt(0)}</div>
+                        <span className="font-semibold text-gray-800">{s.name.replace(' 수석팀장', '')}</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <span className="font-black text-sky-700 text-sm">{s.cfg.supplied}</span>
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <span className={`font-bold text-sm ${s.rate >= 17 ? 'text-emerald-600' : s.rate >= 13 ? 'text-amber-500' : s.cfg.supplied > 0 ? 'text-red-500' : 'text-gray-300'}`}>
+                        {s.cfg.supplied > 0 ? s.rate.toFixed(1) + '%' : '—'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      {s.selfSupplied > 0 ? (
+                        <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 font-black text-sm px-2 py-0.5 rounded-full">{s.selfSupplied}</span>
+                      ) : (
+                        <span className="text-gray-300 text-sm">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <span className={`font-bold text-sm ${s.selfSupplied > 0 ? (s.selfRate >= 17 ? 'text-emerald-600' : s.selfRate >= 13 ? 'text-amber-500' : 'text-red-500') : 'text-gray-300'}`}>
+                        {s.selfSupplied > 0 ? s.selfRate.toFixed(1) + '%' : '—'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${s.achievePct >= 100 ? 'bg-emerald-100 text-emerald-700' : s.achievePct >= 60 ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {s.achievePct.toFixed(0)}%
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* ── A/S 승인 → 공급 DB 보충 알림 배너 ── */}
       {asApprovedList.length > 0 && !supplyBannerDismissed && (

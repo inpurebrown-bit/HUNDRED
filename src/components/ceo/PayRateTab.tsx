@@ -143,12 +143,13 @@ function NumInput({
 }
 
 function EmpCard({
-  row, idx, we, tw, onChange, onRemove, autoData,
+  row, idx, we, tw, onChange, onRemove, autoData, selfSupplied = 0,
 }: {
   row: EmployeeRow; idx: number; we: number; tw: number
   onChange: (i: number, f: string, v: number | string | Record<string, number>) => void
   onRemove: (i: number) => void
   autoData: AutoEmpData
+  selfSupplied?: number
   // target은 supply-config에서 읽어온 값이 row.target에 반영되어 있음 (읽기전용)
 }) {
   const [showDaily, setShowDaily] = useState(false)
@@ -250,10 +251,15 @@ function EmpCard({
         </div>
         {/* 공급수 - 일별 합산 자동 */}
         <div className="flex flex-col items-center gap-0.5">
-          <p className="text-[9px] text-sky-500 font-medium">공급수</p>
+          <p className="text-[9px] text-sky-500 font-medium">한경연</p>
           <div className="w-full text-center text-sm font-bold text-sky-700 bg-sky-50 rounded-xl border border-sky-100 px-1 py-2">
             {supplyCount}
           </div>
+          {selfSupplied > 0 && (
+            <span className="text-[8px] bg-emerald-100 text-emerald-700 rounded-full px-1.5 py-0.5 font-bold mt-0.5 whitespace-nowrap">
+              자체 {selfSupplied}건
+            </span>
+          )}
         </div>
         {/* 공급결제 - 수동 (DB자동값 참고) */}
         <EditableAutoField label="공급결제" field="supply_payment"
@@ -397,6 +403,7 @@ function PayRateSubView() {
   const [opsCases,   setOpsCases]   = useState<any[]>([])
   // 인별 자동집계: 공급결제(공가) / 직접수(직가DB) / 직접결제(직가계약)
   const [autoByPerson,  setAutoByPerson] = useState<Record<string, AutoEmpData>>({})
+  const [selfSuppliedMap, setSelfSuppliedMap] = useState<Record<string, number>>({})
 
   const mkRow = (name = ''): EmployeeRow => ({ name, target: 0, supply_count: 0, supply_payment: 0, direct_count: 0, direct_payment: 0 })
   const [employees, setEmployees] = useState<EmployeeRow[]>([])
@@ -422,9 +429,12 @@ function PayRateSubView() {
         // 직원별 목표 (supply-config.people[이름].goal)
         const goalMap: Record<string, number> = {}
         const scPeople = scJson?.config?.people || {}
+        const selfMap: Record<string, number> = {}
         Object.entries(scPeople).forEach(([name, cfg]: [string, any]) => {
           goalMap[cleanName(name)] = Number(cfg.goal) || 0
+          if ((cfg as any).self_supplied > 0) selfMap[cleanName(name)] = Number((cfg as any).self_supplied)
         })
+        setSelfSuppliedMap(selfMap)
         setOpsCases(casesJson.cases || [])
 
         // 관리팀 이번달 매출 집계
@@ -900,6 +910,7 @@ function PayRateSubView() {
               key={i} row={row} idx={i} we={we} tw={tw}
               onChange={updateEmp} onRemove={removeEmp}
               autoData={autoByPerson[cleanName(row.name)] || autoByPerson[row.name] || { supply_payment: 0, direct_count: 0, direct_payment: 0 }}
+              selfSupplied={selfSuppliedMap[cleanName(row.name)] || 0}
             />
           ))}
         </div>
