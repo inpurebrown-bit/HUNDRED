@@ -55,6 +55,7 @@ export default function DigManageTab() {
   const [commentMap, setCommentMap] = useState<Record<string, string>>({})
   const [assignTarget, setAssignTarget] = useState<Record<string, string>>({})
   const [processing, setProcessing] = useState<string | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
 
   // 오늘 날짜
   const today = new Date().toISOString().slice(0, 10)
@@ -138,6 +139,21 @@ export default function DigManageTab() {
     } else {
       const d = await res.json()
       showToast(d.error || '오류', 'error')
+    }
+    setProcessing(null)
+  }
+
+  async function deleteProspect(id: string) {
+    setProcessing(id)
+    const res = await fetch(`/api/dig-prospects/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      showToast('삭제 완료')
+      setExpanded(null)
+      setDeleteConfirm(null)
+      await load()
+    } else {
+      const d = await res.json()
+      showToast(d.error || '삭제 실패', 'error')
     }
     setProcessing(null)
   }
@@ -423,6 +439,32 @@ export default function DigManageTab() {
                         <p className="font-semibold">→ {p.assigned_to_name} 배정 완료 (영업팀 직가DB)</p>
                       </div>
                     )}
+
+                    {/* 삭제 (CEO 전용, 모든 상태) */}
+                    <div className="border-t border-gray-100 pt-3">
+                      {deleteConfirm === p.id ? (
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs text-red-600 font-semibold flex-1">정말 삭제하시겠습니까?</p>
+                          <button
+                            onClick={() => deleteProspect(p.id)}
+                            disabled={processing === p.id}
+                            className="px-3 py-1.5 bg-red-500 text-white text-xs font-bold rounded-lg hover:bg-red-600 disabled:opacity-50">
+                            {processing === p.id ? '삭제 중...' : '삭제 확인'}
+                          </button>
+                          <button
+                            onClick={() => setDeleteConfirm(null)}
+                            className="px-3 py-1.5 bg-gray-100 text-gray-600 text-xs rounded-lg hover:bg-gray-200">
+                            취소
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setDeleteConfirm(p.id)}
+                          className="text-xs text-gray-400 hover:text-red-500 font-medium transition-colors">
+                          🗑 DB 삭제
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

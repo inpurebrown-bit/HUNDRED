@@ -131,7 +131,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   return NextResponse.json({ prospect: data })
 }
 
-// DELETE: dig 본인 것만 (pending 상태에서만 취소)
+// DELETE: CEO는 모든 상태 삭제 가능, dig는 본인 것 pending만 취소 가능
 export async function DELETE(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
@@ -146,6 +146,7 @@ export async function DELETE(req: NextRequest, context: { params: Promise<{ id: 
   if (user.role === 'dig') {
     query = query.eq('dig_user_id', user.id).eq('status', 'pending') as typeof query
   }
+  // CEO는 조건 없이 어떤 상태든 삭제 가능
 
   const { error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
