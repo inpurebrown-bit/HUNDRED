@@ -73,7 +73,7 @@ export default function RootLayout({
   children: ReactNode
 }) {
   return (
-    <html lang="ko" className={`${geist.variable} ${notoSerifKR.variable} ${nanumBrush.variable} h-full antialiased`}>
+    <html lang="ko" data-color-scheme="light" className={`${geist.variable} ${notoSerifKR.variable} ${nanumBrush.variable} h-full antialiased`} style={{ colorScheme: 'light' }}>
       <head>
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
         <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
