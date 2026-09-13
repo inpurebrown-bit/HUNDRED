@@ -91,22 +91,22 @@ export async function POST(req: NextRequest) {
       autoStatus = 'pending'
       const dangerDesc = dangerItems.map((d: any) => `${d.time} ${d.label}`).join(' / ')
       autoComment = `🚨 위험 감지 — 직접 들어보세요\n${dangerDesc}${ceoSummary ? '\n' + ceoSummary : ''}`
-    } else if (verdict === '통과' || score >= 85) {
+    } else if (verdict === '통과' || score >= 70) {
       // 인콜 잘 땄음 → 자동 승인
       autoStatus = 'approved'
       autoComment = `자동 승인 (${score}점)${ceoSummary ? ' — ' + ceoSummary : ''}`
-    } else if (verdict === '즉시 면담 필요' || score < 60) {
+    } else if (verdict === '즉시 면담 필요' || score < 50) {
       // 심각한 문제 → 대표 직접 확인
       autoStatus = 'pending'
       autoComment = `🚨 즉시 면담 필요 (${score}점) — 직접 들어보세요${missingItems.length > 0 ? '\n미흡: ' + missingItems.join(', ') : ''}${ceoSummary ? '\n' + ceoSummary : ''}`
     } else {
-      // 재교육 필요 — 대표 검토
+      // 50-69점 재교육 구간 → 대표 검토
       autoStatus = 'pending'
       autoComment = `재교육 필요 (${score}점)${missingItems.length > 0 ? ' — 미흡: ' + missingItems.join(', ') : ''}${ceoSummary ? '\n' + ceoSummary : ''}`
     }
 
-    // 체크리스트만 있고 verdict 없는 구버전 녹취 호환
-    if (!verdict && !score && passed >= Math.ceil(total * 0.78)) {
+    // 구버전 녹취 호환 (verdict/score 없는 경우)
+    if (!verdict && !score && passed >= Math.ceil(total * 0.67)) {
       autoStatus = 'approved'
       autoComment = `자동 승인 (${passed}/${total} 통과)`
     }
