@@ -6,21 +6,29 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
 const CHECKLIST_PROMPT = `
-당신은 정책자금 컨설팅 영업 통화를 분석하는 전문가입니다 (개인정보보호법·정보통신망법 준수 여부 포함).
-아래 녹취 내용을 분석해서 다음 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만 출력하세요.
+당신은 정책자금 컨설팅 영업 통화를 심사하는 수석 감독관입니다.
+아래 녹취 파일을 처음부터 끝까지 꼼꼼히 듣고, 다음 JSON 형식으로만 응답하세요. 다른 텍스트 없이 순수 JSON만 출력하세요.
 
-분석 항목 (9개):
-1. identity_disclosed: 소속 고지 여부 (발신자가 "헌드레드컨설팅" 또는 회사명과 이름을 밝혔는지)
-2. purpose_disclosed: 목적 고지 여부 (정책자금 무료 상담 안내 목적을 밝혔는지)
-3. source_disclosed: 출처 고지 여부 (연락처 수집 경로 — 네이버 플레이스 등 — 를 밝혔는지)
-4. needs_check: 정책자금 니즈 확인 여부 (고객이 정책자금 필요성/관심을 표현했거나 확인 질문했는지)
-5. basic_info: 기본 정보 수집 여부 (업력/연매출/업종/연체체납/신용점수 중 3개 이상 확인)
-6. cancel_checked: 캔슬조건 확인 여부 (거절 의사 표명 시 즉시 종료했는지, 또는 단순 호기심 케이스에서 대환/캐피탈 여부를 체크했는지)
-7. check_requirements: 체크요건 확인 여부 (통화 희망 시간대 확인 + 실제 자금 필요 여부 확인)
-8. closing_done: 클로징 멘트 여부 (전문 컨설턴트 내일 안내 예고)
-9. phone_secured: 010 번호 확보 여부
+━━━ 체크리스트 9개 항목 ━━━
+1. identity_disclosed: 소속 고지 (회사명·이름 밝혔는지)
+2. purpose_disclosed: 목적 고지 (정책자금 무료 상담 안내라고 밝혔는지)
+3. source_disclosed: 출처 고지 (네이버 등 수집경로 밝혔는지)
+4. needs_check: 니즈 확인 (정책자금 필요성·관심 확인했는지)
+5. basic_info: 기본 정보 수집 (업력/연매출/업종/연체·체납/신용점수 중 3개 이상)
+6. cancel_checked: 캔슬조건 처리 (거절 1회에 즉시 종료 or 호기심 케이스 대환/캐피탈 체크)
+7. check_requirements: 체크요건 (통화 희망 시간대 + 실제 자금 필요 여부 확인)
+8. closing_done: 클로징 멘트 (내일 전문 컨설턴트 안내 예고)
+9. phone_secured: 010 번호 확보
 
-응답 JSON 형식:
+━━━ 타임라인 분석 지침 ━━━
+통화 전체를 들으면서 다음 유형의 이벤트를 모두 기록하세요:
+- "legal_violation": 법적 고지 누락 또는 위반 발언 (소속/목적/출처 고지 없이 진행, 개인정보 언급 등)
+- "risk": 법적 위험 발언 (확정적 수익 보장, 허위 정보 제공, 욕설/비하, 허위 기관 사칭 등)
+- "script_miss": 스크립트 미준수 (캔슬조건 미처리, 클로징 없이 종료, 정보수집 건너뜀 등)
+- "audio_issue": 음질 문제 (잡음 심함, 상담사 목소리 끊김, 내용 불명확 구간)
+- "good": 잘 된 부분 (법적 고지 완료, 자연스러운 정보 수집, 깔끔한 클로징 등)
+
+━━━ 응답 JSON 형식 ━━━
 {
   "checklist": {
     "identity_disclosed": true/false,
@@ -35,8 +43,9 @@ const CHECKLIST_PROMPT = `
   },
   "all_passed": true/false,
   "summary": "통화 내용 3-5문장 요약 (법적 고지 여부 포함)",
+  "needs_level": "상 또는 중 또는 하",
   "customer_info": {
-    "company": "업체명 (들렸으면)",
+    "company": "업체명",
     "ceo_name": "대표자 성함",
     "phone_010": "확보한 010번호",
     "business_age": "업력",
@@ -46,14 +55,28 @@ const CHECKLIST_PROMPT = `
     "credit_score": "신용점수",
     "required_fund": "필요자금"
   },
-  "needs_level": "상 또는 중 또는 하",
-  "feedback": "통화 개선 피드백 1-2문장 (법적 고지 누락 시 반드시 언급)"
+  "timeline": [
+    {
+      "time": "00:12",
+      "type": "legal_violation 또는 risk 또는 script_miss 또는 audio_issue 또는 good",
+      "label": "한 줄 제목 (예: 소속 고지 완료, 캔슬조건 미처리)",
+      "detail": "구체적 설명 — 실제로 한 말이나 놓친 행동을 인용하거나 묘사 (1-2문장)"
+    }
+  ],
+  "overall_score": 0~100,
+  "verdict": "통과 또는 재교육 필요 또는 즉시 면담 필요",
+  "ceo_comment": "대표에게 보내는 한 줄 총평"
 }
 
-니즈 수준 판단 기준:
-- 상: 고객이 정책자금에 적극적 관심 표명, 정보 제공에 협조적, 항목 대부분 충족
-- 중: 어느 정도 관심 있으나 확신 없음, 절반 이상 항목 충족
-- 하: 관심이 낮거나 정보 수집이 어려웠음, 절반 이하 항목 충족
+타임라인 작성 규칙:
+- time은 반드시 실제 오디오 타임스탬프 (mm:ss 형식)
+- 이벤트가 없으면 빈 배열 []
+- good 이벤트도 반드시 포함 (잘 한 것도 기록)
+- 법적 위반(legal_violation)·위험 발언(risk)은 하나도 빠짐없이 기록
+
+니즈 수준: 상=적극적 관심·협조적, 중=관심 있으나 불확실, 하=관심 낮음·정보수집 어려움
+overall_score: 9개 항목 통과율 + 법적 고지 가중치 + 스크립트 준수도 종합
+verdict: 85점 이상=통과, 60-84=재교육 필요, 59 이하=즉시 면담 필요
 `
 
 // POST: 녹취 파일 → Gemini 분석
@@ -74,12 +97,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '파일이 없습니다' }, { status: 400 })
     }
 
-    const maxSize = 20 * 1024 * 1024 // 20MB
+    const maxSize = 50 * 1024 * 1024 // 50MB
     if (file.size > maxSize) {
-      return NextResponse.json({ error: '파일이 너무 큽니다 (최대 20MB)' }, { status: 400 })
+      return NextResponse.json({ error: '파일이 너무 큽니다 (최대 50MB)' }, { status: 400 })
     }
 
-    const mimeType = file.type || 'audio/mpeg'
+    const ext = (file.name.split('.').pop() || 'mp3').toLowerCase()
+    const mimeMap: Record<string, string> = {
+      m4a: 'audio/mp4', mp3: 'audio/mpeg', wav: 'audio/wav',
+      aac: 'audio/aac', ogg: 'audio/ogg', mp4: 'audio/mp4',
+    }
+    const mimeType = (file.type && file.type !== 'audio/x-m4a') ? file.type : (mimeMap[ext] || 'audio/mpeg')
     const bytes = await file.arrayBuffer()
     const base64 = Buffer.from(bytes).toString('base64')
 

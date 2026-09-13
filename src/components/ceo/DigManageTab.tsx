@@ -337,41 +337,97 @@ export default function DigManageTab() {
             )}
 
             {/* AI 분석 결과 */}
-            {p.recording_analysis && !p.recording_analysis.parse_error && (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-[11px] font-bold text-emerald-700">AI 통화 분석 결과</p>
-                  {p.recording_analysis.needs_level && (
-                    <span className={`text-xs font-black px-3 py-1 rounded-full ${
-                      p.recording_analysis.needs_level === '상' ? 'bg-red-500 text-white' :
-                      p.recording_analysis.needs_level === '중' ? 'bg-orange-400 text-white' :
-                      'bg-blue-400 text-white'
-                    }`}>
-                      니즈 {p.recording_analysis.needs_level}
-                    </span>
-                  )}
-                </div>
-                {p.recording_analysis.summary && (
-                  <p className="text-xs text-gray-700">{p.recording_analysis.summary}</p>
-                )}
-                {p.recording_analysis.checklist && (
-                  <div className="grid grid-cols-2 gap-1">
-                    {Object.entries(CHECKLIST_LABELS).map(([k, label]) => {
-                      const passed = p.recording_analysis.checklist[k]
-                      return (
-                        <div key={k} className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg ${passed ? 'bg-emerald-100 text-emerald-700' : 'bg-red-50 text-red-500'}`}>
-                          <span>{passed ? '✅' : '❌'}</span>
-                          <span className="font-medium">{label}</span>
-                        </div>
-                      )
-                    })}
+            {p.recording_analysis && !p.recording_analysis.parse_error && (() => {
+              const ra = p.recording_analysis
+              const verdict = ra.verdict || ''
+              const verdictColor = verdict === '통과' ? 'emerald' : verdict === '재교육 필요' ? 'amber' : 'red'
+              const timelineTypeStyle: Record<string, { bg: string; text: string; icon: string }> = {
+                legal_violation: { bg: 'bg-red-100', text: 'text-red-700', icon: '🚨' },
+                risk:            { bg: 'bg-red-50',  text: 'text-red-600', icon: '⚠️' },
+                script_miss:     { bg: 'bg-amber-50', text: 'text-amber-700', icon: '📋' },
+                audio_issue:     { bg: 'bg-gray-100', text: 'text-gray-600', icon: '🎙️' },
+                good:            { bg: 'bg-emerald-50', text: 'text-emerald-700', icon: '✅' },
+              }
+              return (
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  {/* 헤더 — 종합 판정 */}
+                  <div className={`px-4 py-3 flex items-center justify-between ${
+                    verdictColor === 'emerald' ? 'bg-emerald-500' :
+                    verdictColor === 'amber'   ? 'bg-amber-500' : 'bg-red-500'
+                  } text-white`}>
+                    <div>
+                      <p className="text-xs font-black">통화 심사 리포트</p>
+                      {verdict && <p className="text-sm font-black mt-0.5">{verdict}</p>}
+                    </div>
+                    <div className="text-right">
+                      {ra.overall_score != null && (
+                        <p className="text-2xl font-black">{ra.overall_score}<span className="text-sm font-normal">점</span></p>
+                      )}
+                      {ra.needs_level && (
+                        <p className="text-xs font-semibold opacity-90">니즈 {ra.needs_level}</p>
+                      )}
+                    </div>
                   </div>
-                )}
-                {p.recording_analysis.feedback && (
-                  <p className="text-[11px] text-amber-700 bg-amber-50 rounded-lg px-2 py-1.5">{p.recording_analysis.feedback}</p>
-                )}
-              </div>
-            )}
+
+                  <div className="p-3 space-y-3">
+                    {/* 총평 */}
+                    {ra.ceo_comment && (
+                      <div className="bg-gray-50 rounded-lg px-3 py-2">
+                        <p className="text-[10px] text-gray-400 mb-0.5 font-semibold">총평</p>
+                        <p className="text-xs text-gray-800 font-medium">{ra.ceo_comment}</p>
+                      </div>
+                    )}
+
+                    {/* 요약 */}
+                    {ra.summary && (
+                      <p className="text-xs text-gray-600 leading-relaxed">{ra.summary}</p>
+                    )}
+
+                    {/* 체크리스트 */}
+                    {ra.checklist && (
+                      <div>
+                        <p className="text-[10px] font-bold text-gray-500 mb-1">체크리스트</p>
+                        <div className="grid grid-cols-3 gap-1">
+                          {Object.entries(CHECKLIST_LABELS).map(([k, label]) => {
+                            const passed = ra.checklist[k]
+                            return (
+                              <div key={k} className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg ${passed ? 'bg-emerald-100 text-emerald-700' : 'bg-red-50 text-red-500'}`}>
+                                <span>{passed ? '✅' : '❌'}</span>
+                                <span className="font-medium truncate">{label}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 타임라인 */}
+                    {ra.timeline && ra.timeline.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-bold text-gray-500 mb-1.5">타임라인 분석</p>
+                        <div className="space-y-1.5">
+                          {ra.timeline.map((item: any, i: number) => {
+                            const style = timelineTypeStyle[item.type] || timelineTypeStyle.audio_issue
+                            return (
+                              <div key={i} className={`${style.bg} rounded-lg px-3 py-2`}>
+                                <div className="flex items-center gap-2 mb-0.5">
+                                  <span className="text-[10px] font-black text-gray-500 tabular-nums shrink-0">{item.time}</span>
+                                  <span className="text-[10px]">{style.icon}</span>
+                                  <span className={`text-[10px] font-bold ${style.text} truncate`}>{item.label}</span>
+                                </div>
+                                {item.detail && (
+                                  <p className={`text-[10px] ${style.text} opacity-80 leading-snug pl-10`}>{item.detail}</p>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* 심사 대기: 승인/거절 액션 */}
             {p.status === 'pending' && (
