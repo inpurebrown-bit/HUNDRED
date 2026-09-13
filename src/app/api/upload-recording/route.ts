@@ -24,18 +24,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '최대 50MB까지 업로드 가능합니다' }, { status: 400 })
     }
 
-    const ext = file.name.split('.').pop() || 'mp3'
+    const ext = (file.name.split('.').pop() || 'mp3').toLowerCase()
     const timestamp = Date.now()
     const path = `recordings/${user.id}/${timestamp}.${ext}`
 
     const bytes = await file.arrayBuffer()
 
+    // m4a MIME 타입 정규화 (브라우저마다 audio/x-m4a, audio/mp4, 빈 값 등 다름)
+    const mimeMap: Record<string, string> = {
+      m4a: 'audio/mp4', mp3: 'audio/mpeg', wav: 'audio/wav',
+      aac: 'audio/aac', ogg: 'audio/ogg', wma: 'audio/x-ms-wma',
+    }
+    const contentType = file.type && file.type !== 'audio/x-m4a'
+      ? file.type
+      : mimeMap[ext] || 'audio/mpeg'
+
     const { data, error } = await supabaseAdmin.storage
       .from('dig-recordings')
-      .upload(path, bytes, {
-        contentType: file.type || 'audio/mpeg',
-        upsert: false,
-      })
+      .upload(path, bytes, { contentType, upsert: false })
 
     if (error) {
       // 버킷 없을 시 명확한 에러 메시지

@@ -265,9 +265,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
     setPhoneSearching(false)
   }
 
-  async function handleRecordingChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+  async function processRecordingFile(file: File) {
     setRecordingFile(file)
     setAnalysis(null)
     if (file.size > 50 * 1024 * 1024) { showToast('파일이 너무 큽니다 (최대 50MB)', 'error'); return }
@@ -303,6 +301,25 @@ export default function DigDashboard({ userId, userName, username }: Props) {
       } catch { showToast('AI 분석 중 오류 — 직접 입력해주세요', 'error') }
       setAnalyzing(false)
     }
+  }
+
+  function handleRecordingChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    processRecordingFile(file)
+  }
+
+  function handleRecordingDrop(e: React.DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    const file = e.dataTransfer.files?.[0]
+    if (!file) return
+    // 오디오 파일이 아닌 경우 거부
+    if (!file.type.startsWith('audio/') && !/\.(mp3|m4a|wav|aac|ogg|mp4|wma)$/i.test(file.name)) {
+      showToast('오디오 파일만 업로드 가능합니다 (mp3, m4a, wav 등)', 'error')
+      return
+    }
+    processRecordingFile(file)
   }
 
   async function handleResubmitFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -381,6 +398,10 @@ export default function DigDashboard({ userId, userName, username }: Props) {
   }
 
   async function handleFinalSubmit() {
+    if (!recordingFile) {
+      showToast('녹취 파일을 반드시 첨부해주세요', 'error')
+      return
+    }
     setSubmitting(true)
     let recording_url = ''
     let recording_filename = ''
@@ -443,21 +464,27 @@ export default function DigDashboard({ userId, userName, username }: Props) {
 
       {/* 녹취 모달 */}
       {showRecordingModal && (
-        <div className="fixed inset-0 z-[9998] flex items-end justify-center bg-black/60">
+        <div
+          className="fixed inset-0 z-[9998] flex items-end justify-center bg-black/60"
+          onDragOver={e => e.preventDefault()}
+          onDrop={handleRecordingDrop}>
           <div className="bg-white rounded-t-2xl w-full max-w-lg px-5 pt-5 pb-8 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-[#1B2A45]">녹취 파일 첨부</h3>
-                <p className="text-xs text-gray-400 mt-0.5">첨부 시 AI 분석 + 대표님 심사에 활용됩니다 (선택)</p>
-              </div>
-              <button type="button" onClick={() => setShowRecordingModal(false)} className="text-gray-400 hover:text-gray-600 text-xl p-1">✕</button>
+            <div>
+              <h3 className="text-base font-bold text-[#1B2A45]">녹취 파일 첨부 <span className="text-red-500 text-sm">* 필수</span></h3>
+              <p className="text-xs text-gray-400 mt-0.5">AI가 통화 내용을 분석해 자동 심사합니다 — 파일 없이는 제출할 수 없습니다</p>
             </div>
-            <input ref={fileRef} type="file" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg" onChange={handleRecordingChange} className="hidden" />
-            <button type="button" onClick={() => fileRef.current?.click()}
-              className="w-full border-2 border-dashed border-gray-200 rounded-xl py-5 text-center hover:border-[#1B2A45]/30 transition-colors">
+            <input ref={fileRef} type="file" accept=".mp3,.m4a,.wav,.aac,.ogg,.mp4,.wma,audio/*" onChange={handleRecordingChange} className="hidden" />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              onDragOver={e => e.preventDefault()}
+              onDrop={handleRecordingDrop}
+              className={`w-full border-2 border-dashed rounded-xl py-6 text-center transition-colors ${
+                recordingFile ? 'border-emerald-400 bg-emerald-50' : 'border-gray-300 hover:border-[#1B2A45]/40'
+              }`}>
               {recordingFile
-                ? <span className="text-sm text-gray-700 font-medium">{recordingFile.name}</span>
-                : <><p className="text-sm text-gray-400">+ 녹취 파일 선택</p><p className="text-xs text-gray-300 mt-0.5">mp3, m4a, wav, aac 등</p></>}
+                ? <><p className="text-sm text-emerald-700 font-bold">{recordingFile.name}</p><p className="text-xs text-emerald-500 mt-0.5">✓ 파일 선택됨 — 다시 클릭하면 교체</p></>
+                : <><p className="text-sm text-gray-500 font-medium">+ 녹취 파일 선택 또는 여기에 드래그</p><p className="text-xs text-gray-300 mt-1">mp3, m4a, wav, aac 지원 · 최대 50MB</p></>}
             </button>
             {analyzing && (
               <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center gap-2">
@@ -475,9 +502,11 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                 </p>
               </div>
             )}
-            <button type="button" onClick={handleFinalSubmit} disabled={submitting || analyzing}
-              className="w-full py-4 bg-[#1B2A45] text-white text-sm font-bold rounded-xl hover:bg-[#1B2A45]/90 transition-colors disabled:opacity-50">
-              {uploading ? '업로드 중...' : submitting ? '제출 중...' : recordingFile ? '녹취 포함 제출' : '녹취 없이 제출'}
+            <button type="button" onClick={handleFinalSubmit} disabled={submitting || analyzing || !recordingFile}
+              className={`w-full py-4 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50 ${
+                recordingFile ? 'bg-[#1B2A45] hover:bg-[#1B2A45]/90' : 'bg-gray-300 cursor-not-allowed'
+              }`}>
+              {uploading ? '📤 녹취 업로드 중...' : submitting ? '제출 중...' : analyzing ? 'AI 분석 중 — 잠시 후 제출 가능' : !recordingFile ? '녹취 파일을 먼저 첨부해주세요' : '녹취 포함 제출 →'}
             </button>
           </div>
         </div>
