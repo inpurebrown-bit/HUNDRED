@@ -672,12 +672,11 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                   </label>
                   <input
                     value={form.phone_010}
-                    onChange={e => setForm(p => ({ ...p, phone_010: e.target.value }))}
-                    placeholder={phoneVerified ? '자동 입력됨' : '→ 우측에서 번호 검색 후 활성화'}
+                    readOnly
+                    placeholder="→ 우측에서 번호 검색 후 자동 입력"
                     required
                     type="tel"
-                    disabled={!phoneVerified}
-                    className={`${inputCls} ${!phoneVerified ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-50 border-emerald-300'}`}
+                    className={`${inputCls} cursor-not-allowed ${!phoneVerified ? 'bg-gray-100 text-gray-400' : 'bg-emerald-50 border-emerald-300 text-emerald-800 font-semibold'}`}
                   />
                 </div>
                 <div>
