@@ -56,6 +56,7 @@ function Field({ label, value, onChange, placeholder, type = 'text', readOnly }:
 }
 
 const BANKS = ['카카오뱅크', '토스뱅크', '국민은행', '신한은행', '하나은행', '우리은행', '농협', '기업은행', '케이뱅크', '씨티은행', '기타']
+const BANKS_PRESET = BANKS.filter(b => b !== '기타')
 
 // ── 메인 ─────────────────────────────────────────────────────────────
 export default function MyProfileTab() {
@@ -247,11 +248,20 @@ export default function MyProfileTab() {
             <div>
               <label className="block text-xs font-semibold text-[#1B2A45]/60 mb-1.5">은행</label>
               <select
-                value={infoForm.bank_name}
-                onChange={e => setInfoForm(f => ({ ...f, bank_name: e.target.value }))}
+                value={BANKS_PRESET.includes(infoForm.bank_name) ? infoForm.bank_name : '기타'}
+                onChange={e => setInfoForm(f => ({ ...f, bank_name: e.target.value === '기타' ? '' : e.target.value }))}
                 className="w-full px-3 py-2.5 bg-[#F5F3EE] border border-[#E8E2D4] rounded-xl text-sm text-[#1B2A45] focus:outline-none focus:border-[#1B2A45]/40">
                 {BANKS.map(b => <option key={b} value={b}>{b}</option>)}
               </select>
+              {!BANKS_PRESET.includes(infoForm.bank_name) && (
+                <input
+                  type="text"
+                  value={infoForm.bank_name}
+                  onChange={e => setInfoForm(f => ({ ...f, bank_name: e.target.value }))}
+                  placeholder="은행명 직접 입력 (예: 수협, 새마을금고 등)"
+                  className="mt-2 w-full px-3 py-2.5 bg-[#F5F3EE] border border-[#E8E2D4] rounded-xl text-sm text-[#1B2A45] focus:outline-none focus:border-[#1B2A45]/40"
+                />
+              )}
             </div>
             <Field label="계좌번호" value={infoForm.bank_account} onChange={v => setInfoForm(f => ({ ...f, bank_account: v }))} placeholder="000-000000-00-000" />
             <Field label="입사일" value={infoForm.join_date} onChange={v => setInfoForm(f => ({ ...f, join_date: v }))} type="date" />
