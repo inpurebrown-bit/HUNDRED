@@ -62,29 +62,53 @@ export async function POST(req: NextRequest) {
   }
 
   // AI 분석 결과로 자동 승인 여부 결정
-  // 9개 중 7개 이상 통과 → 자동 승인
+  // verdict=통과 → 자동 승인 / 위험 감지 → 대표에게 플래그
   let autoStatus = 'pending'
   let autoComment: string | null = null
-  if (recording_analysis && !recording_analysis.parse_error && recording_analysis.checklist) {
-    const cl = recording_analysis.checklist as Record<string, boolean>
+  if (recording_analysis && !recording_analysis.parse_error) {
+    const verdict: string = recording_analysis.verdict || ''
+    const score: number = recording_analysis.overall_score ?? 0
+    const timeline: any[] = recording_analysis.timeline || []
+    const ceoSummary: string = recording_analysis.ceo_comment || ''
+
+    // 위험 이벤트 감지
+    const dangerItems = timeline.filter((t: any) => t.type === 'legal_violation' || t.type === 'risk')
+    const hasDanger = dangerItems.length > 0
+
+    // 체크리스트 미흡 항목
     const CHECKLIST_KO: Record<string, string> = {
       identity_disclosed: '소속 고지', purpose_disclosed: '목적 고지', source_disclosed: '출처 고지',
-      needs_check: '니즈 확인', basic_info: '기본 정보 수집', cancel_checked: '캔슬조건 확인',
-      check_requirements: '체크요건 확인', closing_done: '클로징 멘트', phone_secured: '010 번호 확보',
+      needs_check: '니즈 확인', basic_info: '기본정보', cancel_checked: '캔슬조건',
+      check_requirements: '체크요건', closing_done: '클로징', phone_secured: '010 확보',
     }
-    const passed = Object.entries(cl).filter(([, v]) => v).length
-    const total = Object.keys(CHECKLIST_KO).length // 9
-    const missingItems = Object.entries(cl)
-      .filter(([, v]) => !v)
-      .map(([k]) => CHECKLIST_KO[k] || k)
-    if (passed >= Math.ceil(total * 0.78)) { // 7/9 이상
-      autoStatus = 'approved'
-      autoComment = `AI 자동 승인 (${passed}/${total} 통과)`
-    } else {
+    const cl = (recording_analysis.checklist || {}) as Record<string, boolean>
+    const passed = Object.values(cl).filter(Boolean).length
+    const total = Object.keys(CHECKLIST_KO).length
+    const missingItems = Object.entries(cl).filter(([, v]) => !v).map(([k]) => CHECKLIST_KO[k] || k)
+
+    if (hasDanger) {
+      // 위험 발언 감지 → 대표 직접 확인 요청
       autoStatus = 'pending'
-      autoComment = missingItems.length > 0
-        ? `AI 검토 필요 — 미흡 항목: ${missingItems.join(', ')}`
-        : `AI 검토 필요 (${passed}/${total} 통과)`
+      const dangerDesc = dangerItems.map((d: any) => `${d.time} ${d.label}`).join(' / ')
+      autoComment = `🚨 위험 감지 — 직접 들어보세요\n${dangerDesc}${ceoSummary ? '\n' + ceoSummary : ''}`
+    } else if (verdict === '통과' || score >= 85) {
+      // 인콜 잘 땄음 → 자동 승인
+      autoStatus = 'approved'
+      autoComment = `자동 승인 (${score}점)${ceoSummary ? ' — ' + ceoSummary : ''}`
+    } else if (verdict === '즉시 면담 필요' || score < 60) {
+      // 심각한 문제 → 대표 직접 확인
+      autoStatus = 'pending'
+      autoComment = `🚨 즉시 면담 필요 (${score}점) — 직접 들어보세요${missingItems.length > 0 ? '\n미흡: ' + missingItems.join(', ') : ''}${ceoSummary ? '\n' + ceoSummary : ''}`
+    } else {
+      // 재교육 필요 — 대표 검토
+      autoStatus = 'pending'
+      autoComment = `재교육 필요 (${score}점)${missingItems.length > 0 ? ' — 미흡: ' + missingItems.join(', ') : ''}${ceoSummary ? '\n' + ceoSummary : ''}`
+    }
+
+    // 체크리스트만 있고 verdict 없는 구버전 녹취 호환
+    if (!verdict && !score && passed >= Math.ceil(total * 0.78)) {
+      autoStatus = 'approved'
+      autoComment = `자동 승인 (${passed}/${total} 통과)`
     }
   }
 
