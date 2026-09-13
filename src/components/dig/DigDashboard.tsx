@@ -276,29 +276,34 @@ export default function DigDashboard({ userId, userName, username }: Props) {
         fd.append('file', file)
         const res  = await fetch('/api/analyze-recording', { method: 'POST', body: fd })
         const data = await res.json()
-        if (data.analysis && !data.analysis.parse_error) {
+        if (data.analysis) {
           setAnalysis(data.analysis)
-          if (data.analysis.checklist)     setChecklist(prev => ({ ...prev, ...data.analysis.checklist }))
-          if (data.analysis.customer_info) {
-            const ci = data.analysis.customer_info
-            setForm(prev => ({
-              ...prev,
-              company:            ci.company        || prev.company,
-              ceo_name:           ci.ceo_name       || prev.ceo_name,
-              phone_010:          ci.phone_010       || prev.phone_010,
-              business_age:       ci.business_age   || prev.business_age,
-              annual_revenue:     ci.annual_revenue  || prev.annual_revenue,
-              industry:           ci.industry        || prev.industry,
-              credit_score:       ci.credit_score    || prev.credit_score,
-              required_fund:      ci.required_fund   || prev.required_fund,
-              delinquency_detail: ci.has_delinquency != null ? (ci.has_delinquency ? '있음' : '없음') : prev.delinquency_detail,
-            }))
+          if (!data.analysis.parse_error) {
+            // 정상 파싱 — 체크리스트·고객정보 자동 입력
+            if (data.analysis.checklist) setChecklist(prev => ({ ...prev, ...data.analysis.checklist }))
+            if (data.analysis.customer_info) {
+              const ci = data.analysis.customer_info
+              setForm(prev => ({
+                ...prev,
+                company:            ci.company        || prev.company,
+                ceo_name:           ci.ceo_name       || prev.ceo_name,
+                phone_010:          ci.phone_010       || prev.phone_010,
+                business_age:       ci.business_age   || prev.business_age,
+                annual_revenue:     ci.annual_revenue  || prev.annual_revenue,
+                industry:           ci.industry        || prev.industry,
+                credit_score:       ci.credit_score    || prev.credit_score,
+                required_fund:      ci.required_fund   || prev.required_fund,
+                delinquency_detail: ci.has_delinquency != null ? (ci.has_delinquency ? '있음' : '없음') : prev.delinquency_detail,
+              }))
+            }
+            // 부분 체크리스트 복구된 경우에도 적용
+            showToast('녹취 처리 완료')
+          } else {
+            if (data.analysis.checklist) setChecklist(prev => ({ ...prev, ...data.analysis.checklist }))
+            showToast('녹취 업로드 완료')
           }
-          showToast('체크리스트·정보가 자동 입력됐습니다')
-        } else {
-          showToast('자동 입력 실패 — 직접 입력해주세요', 'error')
         }
-      } catch { showToast('처리 중 오류 — 직접 입력해주세요', 'error') }
+      } catch { showToast('녹취 처리 중 오류가 발생했습니다', 'error') }
       setAnalyzing(false)
     }
   }

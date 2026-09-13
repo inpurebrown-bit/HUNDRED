@@ -121,29 +121,50 @@ export async function POST(req: NextRequest) {
     const bytes = await file.arrayBuffer()
     const base64 = Buffer.from(bytes).toString('base64')
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    // JSON 강제 출력 모드 사용
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-1.5-flash',
+      generationConfig: { responseMimeType: 'application/json' } as any,
+    })
 
     const result = await model.generateContent([
-      {
-        inlineData: {
-          data: base64,
-          mimeType,
-        },
-      },
+      { inlineData: { data: base64, mimeType } },
       CHECKLIST_PROMPT,
     ])
 
     const text = result.response.text().trim()
 
-    // JSON 파싱 (```json ``` 감싸진 경우 처리)
-    const jsonMatch = text.match(/```json\n?([\s\S]*?)\n?```/) || text.match(/(\{[\s\S]*\})/)
-    const jsonStr = jsonMatch ? jsonMatch[1] : text
+    // JSON 파싱 — 여러 패턴 시도
+    let analysis: any = null
+    const attempts = [
+      text,
+      (() => { const m = text.match(/```json\n?([\s\S]*?)\n?```/); return m?.[1] })(),
+      (() => { const m = text.match(/(\{[\s\S]*\})/); return m?.[1] })(),
+    ]
+    for (const candidate of attempts) {
+      if (!candidate) continue
+      try { analysis = JSON.parse(candidate); break } catch { /* try next */ }
+    }
 
-    let analysis: any
-    try {
-      analysis = JSON.parse(jsonStr)
-    } catch {
-      analysis = { raw: text, parse_error: true }
+    // 파싱 완전 실패 시 부분 복구 시도
+    if (!analysis) {
+      // checklist만이라도 추출
+      const clMatch = text.match(/"checklist"\s*:\s*(\{[^}]+\})/)
+      const partialCl: Record<string, boolean> = {}
+      if (clMatch) {
+        const keys = ['identity_disclosed','purpose_disclosed','source_disclosed','needs_check',
+                      'basic_info','cancel_checked','check_requirements','closing_done','phone_secured']
+        for (const k of keys) {
+          const m = clMatch[1].match(new RegExp(`"${k}"\\s*:\\s*(true|false)`))
+          if (m) partialCl[k] = m[1] === 'true'
+        }
+      }
+      analysis = {
+        parse_error: true,
+        raw_snippet: text.slice(0, 300),
+        checklist: Object.keys(partialCl).length > 0 ? partialCl : undefined,
+      }
+      console.error('analyze-recording: JSON parse failed. Raw:', text.slice(0, 500))
     }
 
     return NextResponse.json({ analysis })
