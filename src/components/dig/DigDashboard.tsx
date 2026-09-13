@@ -294,11 +294,11 @@ export default function DigDashboard({ userId, userName, username }: Props) {
               delinquency_detail: ci.has_delinquency != null ? (ci.has_delinquency ? '있음' : '없음') : prev.delinquency_detail,
             }))
           }
-          showToast('AI 분석 완료! 체크리스트·정보가 자동 입력됐습니다')
+          showToast('체크리스트·정보가 자동 입력됐습니다')
         } else {
-          showToast('AI 분석 실패 — 직접 입력해주세요', 'error')
+          showToast('자동 입력 실패 — 직접 입력해주세요', 'error')
         }
-      } catch { showToast('AI 분석 중 오류 — 직접 입력해주세요', 'error') }
+      } catch { showToast('처리 중 오류 — 직접 입력해주세요', 'error') }
       setAnalyzing(false)
     }
   }
@@ -337,11 +337,11 @@ export default function DigDashboard({ userId, userName, username }: Props) {
         const data = await res.json()
         if (data.analysis && !data.analysis.parse_error) {
           setResubmitAnalysis(data.analysis)
-          showToast('AI 재분석 완료!')
+          showToast('처리 완료!')
         } else {
-          showToast('AI 분석 실패 — 그대로 재제출 가능합니다', 'error')
+          showToast('처리 실패 — 그대로 재제출 가능합니다', 'error')
         }
-      } catch { showToast('AI 분석 중 오류', 'error') }
+      } catch { showToast('처리 중 오류', 'error') }
       setResubmitAnalyzing(false)
     }
   }
@@ -434,7 +434,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
       const data = await res.json()
       if (res.ok) {
         const autoApproved = data.auto_approved
-        showToast(autoApproved ? '✅ AI 심사 통과 — 자동 승인 처리됐습니다!' : '가망 등록 완료! 대표님 심사를 기다려주세요')
+        showToast(autoApproved ? '✅ 승인 처리됐습니다!' : '가망 등록 완료! 대표님 심사를 기다려주세요')
         setForm({ company: '', ceo_name: '', phone: '', phone_010: '', business_age: '', annual_revenue: '', industry: '', delinquency_detail: '', credit_score: '', required_fund: '', preferred_call_time: '' })
         setChecklist({ identity_disclosed: false, purpose_disclosed: false, source_disclosed: false, needs_check: false, basic_info: false, cancel_checked: false, check_requirements: false, closing_done: false, phone_secured: false })
         setRecordingFile(null); setAnalysis(null)
@@ -471,7 +471,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
           <div className="bg-white rounded-t-2xl w-full max-w-lg px-5 pt-5 pb-8 space-y-4">
             <div>
               <h3 className="text-base font-bold text-[#1B2A45]">녹취 파일 첨부 <span className="text-red-500 text-sm">* 필수</span></h3>
-              <p className="text-xs text-gray-400 mt-0.5">AI가 통화 내용을 분석해 자동 심사합니다 — 파일 없이는 제출할 수 없습니다</p>
+              <p className="text-xs text-gray-400 mt-0.5">통화 녹취를 첨부해야 제출할 수 있습니다</p>
             </div>
             <input ref={fileRef} type="file" accept=".mp3,.m4a,.wav,.aac,.ogg,.mp4,.wma,audio/*" onChange={handleRecordingChange} className="hidden" />
             <button
@@ -489,12 +489,12 @@ export default function DigDashboard({ userId, userName, username }: Props) {
             {analyzing && (
               <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center gap-2">
                 <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-                <p className="text-sm text-blue-700">AI가 통화 내용 분석 중...</p>
+                <p className="text-sm text-blue-700">처리 중... 잠시 기다려주세요</p>
               </div>
             )}
             {analysis && !analysis.parse_error && (
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-2">
-                <p className="text-xs font-bold text-emerald-700">AI 분석 결과</p>
+                <p className="text-xs font-bold text-emerald-700">검토 완료</p>
                 <p className="text-sm text-gray-700">{analysis.summary}</p>
                 {analysis.feedback && <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">{analysis.feedback}</p>}
                 <p className={`text-xs font-semibold ${analysis.all_passed ? 'text-emerald-700' : 'text-amber-600'}`}>
@@ -506,7 +506,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
               className={`w-full py-4 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50 ${
                 recordingFile ? 'bg-[#1B2A45] hover:bg-[#1B2A45]/90' : 'bg-gray-300 cursor-not-allowed'
               }`}>
-              {uploading ? '📤 녹취 업로드 중...' : submitting ? '제출 중...' : analyzing ? 'AI 분석 중 — 잠시 후 제출 가능' : !recordingFile ? '녹취 파일을 먼저 첨부해주세요' : '녹취 포함 제출 →'}
+              {uploading ? '📤 업로드 중...' : submitting ? '제출 중...' : analyzing ? '처리 중 — 잠시 후 제출 가능' : !recordingFile ? '녹취 파일을 먼저 첨부해주세요' : '제출 →'}
             </button>
           </div>
         </div>
