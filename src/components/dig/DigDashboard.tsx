@@ -488,11 +488,15 @@ export default function DigDashboard({ userId, userName, username }: Props) {
         <div
           className="fixed inset-0 z-[9998] flex items-end justify-center bg-black/60"
           onDragOver={e => e.preventDefault()}
-          onDrop={handleRecordingDrop}>
+          onDrop={handleRecordingDrop}
+          onClick={e => { if (e.target === e.currentTarget) setShowRecordingModal(false) }}>
           <div className="bg-white rounded-t-2xl w-full max-w-lg px-5 pt-5 pb-8 space-y-4">
-            <div>
-              <h3 className="text-base font-bold text-[#1B2A45]">녹취 파일 첨부 <span className="text-red-500 text-sm">* 필수</span></h3>
-              <p className="text-xs text-gray-400 mt-0.5">통화 녹취를 첨부해야 제출할 수 있습니다</p>
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-base font-bold text-[#1B2A45]">녹취 파일 첨부 <span className="text-red-500 text-sm">* 필수</span></h3>
+                <p className="text-xs text-gray-400 mt-0.5">통화 녹취를 첨부해야 제출할 수 있습니다</p>
+              </div>
+              <button onClick={() => setShowRecordingModal(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none p-1">✕</button>
             </div>
             <input ref={fileRef} type="file" accept=".mp3,.m4a,.wav,.aac,.ogg,.mp4,.wma,audio/*" onChange={handleRecordingChange} className="hidden" />
             <button
