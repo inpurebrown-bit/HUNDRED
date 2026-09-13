@@ -207,6 +207,8 @@ export default function DigDashboard({ userId, userName, username }: Props) {
   const approvedList  = prospects.filter(p => p.status === 'approved' || p.status === 'assigned')
   const rejectedList  = prospects.filter(p => p.status === 'rejected')
   const todayApproved = prospects.filter(p => p.call_date === today && (p.status === 'approved' || p.status === 'assigned')).length
+  const monthApproved = prospects.filter(p => p.call_date?.startsWith(currentMonth) && (p.status === 'approved' || p.status === 'assigned')).length
+  const MONTHLY_GOAL  = 160
   const bonusCount    = Math.max(0, todayApproved - DAILY_GOAL)
   const bonusAmount   = bonusCount * BONUS_PER_EXTRA
   const checkDoneCount   = Object.values(checklist).filter(Boolean).length
@@ -720,6 +722,10 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                   ? <p className="text-emerald-600 text-xs font-bold">🎉 오늘 목표 달성!</p>
                   : <p className="text-gray-400 text-xs">목표까지 {DAILY_GOAL - todayApproved}건 남음</p>
                 }
+                <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between">
+                  <p className="text-gray-400 text-xs">이달 총 ({currentMonth})</p>
+                  <p className="text-xs font-bold text-gray-700">{monthApproved} / {MONTHLY_GOAL}건</p>
+                </div>
               </div>
 
               {/* 승인요청중 */}

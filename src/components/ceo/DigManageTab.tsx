@@ -354,6 +354,14 @@ export default function DigManageTab() {
               </div>
             )}
 
+            {/* AI 분석 실패 fallback */}
+            {p.recording_analysis?.parse_error && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800">
+                <p className="font-bold mb-1">⚠ 자동 분석 미완료 — 직접 녹취 확인 필요</p>
+                <p className="text-amber-700 opacity-80">녹취는 정상 업로드됐습니다. 위 플레이어로 직접 들어보고 승인/거절 판단해주세요.</p>
+              </div>
+            )}
+
             {/* AI 분석 결과 */}
             {p.recording_analysis && !p.recording_analysis.parse_error && (() => {
               const ra = p.recording_analysis
