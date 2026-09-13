@@ -305,7 +305,10 @@ export default function DigDashboard({ userId, userName, username }: Props) {
             showToast('녹취 업로드 완료')
           }
         }
-      } catch { showToast('녹취 처리 중 오류가 발생했습니다', 'error') }
+      } catch (err: any) {
+        console.error('analyze-recording catch:', err)
+        showToast('녹취 업로드 완료 (분석 실패 — 직접 입력)')
+      }
       setAnalyzing(false)
     }
   }

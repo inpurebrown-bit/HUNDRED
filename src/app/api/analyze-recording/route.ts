@@ -121,15 +121,11 @@ export async function POST(req: NextRequest) {
     const bytes = await file.arrayBuffer()
     const base64 = Buffer.from(bytes).toString('base64')
 
-    // JSON 강제 출력 모드 사용
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
-      generationConfig: { responseMimeType: 'application/json' } as any,
-    })
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
 
     const result = await model.generateContent([
       { inlineData: { data: base64, mimeType } },
-      CHECKLIST_PROMPT,
+      CHECKLIST_PROMPT + '\n\n반드시 순수 JSON만 출력하세요. ```json 마크다운 없이, 중괄호로 시작하고 중괄호로 끝내세요.',
     ])
 
     const text = result.response.text().trim()
