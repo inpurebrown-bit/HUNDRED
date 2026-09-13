@@ -36,11 +36,15 @@ interface SalesUser {
 }
 
 const CHECKLIST_LABELS: Record<string, string> = {
-  needs_check: '니즈 확인',
-  basic_info: '기본정보',
-  purpose_explained: '취지 설명',
-  closing_done: '클로징',
-  phone_secured: '010 확보',
+  identity_disclosed:  '소속 고지',
+  purpose_disclosed:   '목적 고지',
+  source_disclosed:    '출처 고지',
+  needs_check:         '니즈 확인',
+  basic_info:          '기본정보',
+  cancel_checked:      '캔슬확인',
+  check_requirements:  '체크요건',
+  closing_done:        '클로징',
+  phone_secured:       '010 확보',
 }
 
 type ViewTab = 'pending' | 'approved' | 'rejected' | 'assigned'
@@ -258,7 +262,8 @@ export default function DigManageTab() {
         <div className="space-y-3">
           {filtered.map(p => {
             const checkCount = Object.values(p.checklist || {}).filter(Boolean).length
-            const allPassed = checkCount === 5
+            const totalItems = Object.keys(CHECKLIST_LABELS).length
+            const allPassed = checkCount === totalItems
             const isExpanded = expanded === p.id
 
             return (
@@ -276,7 +281,7 @@ export default function DigManageTab() {
                         {allPassed ? (
                           <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-semibold">체크리스트 완료</span>
                         ) : (
-                          <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{checkCount}/5 완료</span>
+                          <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{checkCount}/{totalItems} 완료</span>
                         )}
                         {p.recording_url && (
                           <span className="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">녹취 있음</span>

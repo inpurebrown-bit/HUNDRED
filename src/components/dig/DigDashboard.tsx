@@ -17,12 +17,17 @@ type Tab = 'dig' | 'profile'
 const DAILY_GOAL        = 8
 const BONUS_PER_EXTRA   = 10000
 
+// ⚖️ 개인정보보호법·정보통신망법 준수 체크리스트 (9항목 전부 필수)
 const CHECKLIST_ITEMS = [
-  { key: 'needs_check',       label: '정책자금 니즈 확인',  desc: '"혹시 정책자금 알아보신 적 있으시거나 필요하세요?"' },
-  { key: 'basic_info',        label: '기본 정보 수집',      desc: '업력 / 연매출 / 업종 / 연체·체납 / 신용점수 / 대표자 성함' },
-  { key: 'purpose_explained', label: '취지 설명',           desc: '무료 컨설팅, 들어보고 좋으면 비용 지불, 아니면 자료만 받아도 됨' },
-  { key: 'closing_done',      label: '클로징 멘트',         desc: '"저희 매니저님이 내일 연락드려서 무료 상담 진행해드릴 겁니다"' },
-  { key: 'phone_secured',     label: '010 번호 확보',       desc: '통화 가능한 010 번호 확보 필수' },
+  { key: 'identity_disclosed',  label: '소속 고지',         desc: '✅ "저희는 헌드레드컨설팅 OOO입니다" — 이름·소속 반드시 먼저 고지', legal: true },
+  { key: 'purpose_disclosed',   label: '목적 고지',         desc: '✅ "정책자금 관련 무료 상담 안내차 연락드렸습니다" — 목적 고지', legal: true },
+  { key: 'source_disclosed',    label: '출처 고지',         desc: '✅ "연락처는 네이버 플레이스를 통해 확인했습니다" — 수집 경로 고지', legal: true },
+  { key: 'needs_check',         label: '니즈 확인',         desc: '"혹시 정책자금 알아보신 적 있으시거나 사용하고 계신 게 있으세요?"' },
+  { key: 'basic_info',          label: '기본 정보 수집',    desc: '업력 / 연매출 / 업종 / 연체·체납 여부 / 신용점수 / 대표자 성함 (5가지 이상)' },
+  { key: 'cancel_checked',      label: '캔슬조건 확인',     desc: '❌ 거절 의사 1회라도 → 즉시 종료 | 단순 호기심 → 대환/캐피탈 여부 체크 후 판단' },
+  { key: 'check_requirements',  label: '체크요건 확인',     desc: '① 통화 희망 시간대 확인 ② 실제 자금 필요 여부 확인 (대환 포함)' },
+  { key: 'closing_done',        label: '클로징 멘트',       desc: '"내일 전문 컨설턴트가 결과 안내드릴 건데, 통화 편한 시간이 언제이실까요?"' },
+  { key: 'phone_secured',       label: '010 번호 확보',     desc: '통화 가능한 010 번호 확보 (문자·카카오톡 발송 금지 — 유선 통화만)' },
 ]
 
 interface Prospect {
@@ -50,48 +55,87 @@ interface Prospect {
 
 const SCRIPT_SECTIONS = [
   {
-    label: 'STEP 1 — 도입부', color: 'blue' as const,
+    label: 'STEP 1 — 도입부 (소속·목적·출처 고지 필수)', color: 'blue' as const,
     content: [
-      { bold: true,  text: '"안녕하세요 대표님~ 000 기업 대표님 맞으실까요~?"' },
-      { bold: false, text: '(대표 아닌 경우) → "아 그러세요~ 그럼 다음에 연락드릴게요~"' },
-      { bold: false, text: '"최근 정부에서 사업가·기업들을 대상으로 여러 지원 혜택들이 많이 나와서 연락드렸습니다. 저희는 헌드레드컨설팅이라는 경영자문 회사입니다."' },
-      { bold: false, text: '"최근 000 업종에 대해서 나라에서 많은 지원을 해주고 있는데요! 정책자금이 업종별로 하반기 막받이라서 혜택 못 받고 지나치시는 분들이 많아서 안내드리고 있거든요~"' },
+      { bold: true,  text: '"안녕하세요 대표님~ (회사명) 대표님 맞으실까요~?"' },
+      { bold: false, text: '(대표 아닌 경우) → "아 네ㅎㅎ~ 그럼 다음에 연락드릴게요~"' },
+      { bold: true,  text: '⚠ 법적 필수 — 반드시 순서대로 고지:' },
+      { bold: true,  text: '"저희는 헌드레드컨설팅이라는 경영자문회사 OOO입니다."  ← 소속+이름' },
+      { bold: true,  text: '"네이버 플레이스 보고 대표님 업체에 해당되는 정책자금 관련 무료 상담 도와드리려 전화드렸는데 잠깐 통화 괜찮으실까요?"  ← 목적+출처' },
+      { bold: false, text: '(통화 가능 확인 후) "요새 나라 경제가 많이 어렵잖아요.. 최근 정부에서 사업자들 대상으로 지원 혜택들이 4000개 넘게 나오고 있는데 대표님 업종도 해당되는 게 많은 거 알고 계실까요? 이런 게 있는지 몰라서 못 받으시거나, 절차가 어렵고 까다로워서 못 하시는 분들이 많아서 그런 대표님들께 무료 자문을 도와드리고 있거든요~"' },
       { bold: true,  text: '"혹시 지금 정책자금 알아보신 적 있으시거나 사용하고 계신 게 있으세요?"' },
-    ],
-  },
-  {
-    label: '초반 반론 대응', color: 'red' as const,
-    rows: [
-      { q: '바빠요 / 됐어요',  a: '"아 바쁘시죠~ 연락처만 주시면 편한 시간에 매니저가 연락드릴게요."' },
-      { q: '필요없어요',        a: '"무료라서 자료만 받아보셔도 되시구요~ 미리 진단만 받아 놓으셔도 나중에 정부자금 사용하실 때 큰 도움이 됩니다!"' },
-      { q: '이미 쓰고 있어요', a: '"기관마다 중복으로 추가 가능한 것도 있어서 보통 1년에 3~4번씩 받아가신다고 하는데요~"' },
-      { q: '사기 같아요',       a: '"먼저 무료 컨설팅이고 진행 원하실 때만 비용 발생해요~ 결정은 자금이 나올 수 있는지 듣고 결정하시는 거라서 마음 편하실 거에요~"' },
-      { q: '문자 남겨주세요',   a: '"문자로는 정확한 안내가 어려워서요~ 연락처 주시면 상담사가 딱 5분만 설명드릴게요."' },
     ],
   },
   {
     label: 'STEP 2 — 니즈 분기 & 정보 수집', color: 'green' as const,
     content: [
-      { bold: false, text: '(니즈 있을 때) "아 그러세요~ 그럼 혹시 어디서 받으셨어요? 기관마다 추가로 활용 가능 자금도 많이있거든요~"' },
-      { bold: false, text: '(니즈 없을 때) "시중 은행보다도 금리가 낮은 정부정책자금을 활용하시면 1년에 수백만 원 이자비용 아끼실 수 있어요~"' },
-      { bold: true,  text: '순서: 업력 → 연매출 → 연체·체납 → 업종 → 필요자금 → 신용점수' },
+      { bold: false, text: '▶ 있다고 할 경우: "아~ 그럼 어디서 어떻게 받으셨는지 잘 기억 안 나시죠ㅎㅎ (너무 딥하게 파악 X, 인폼 진행이 더 중요) 한번 받았다고 더 못 받는 게 아니라, 기관마다 추가로 가능한 게 다 다르거든요~"' },
+      { bold: false, text: '▶ 없다/모른다: "아~ 사업하시면서 자금이 계속 필요하실 텐데, 캐피탈 같은 고금리가 아니라 시중 은행보다 금리가 낮은 정책자금을 활용하시면 이자비용을 아끼실 수 있거든요~"' },
+      { bold: true,  text: '정보 수집 순서: 업력 → 연매출 → 연체·체납 → 업종 → 필요자금 → 신용점수' },
+      { bold: false, text: '"혹시 사업 시작하신 지 얼마나 되셨어요?" / "연매출은 대략 어느 정도 되세요?" / "세금 체납이나 대출·카드 연체 같은 건 없으시죠?" / "업종이 OOO 맞나요?" / "필요하신 자금은 얼마 정도이실까요?" / "신용점수는 대략 몇 점이실까요~?"' },
+      { bold: true,  text: '▶ 니즈 불명확 시 반드시 확인:' },
+      { bold: false, text: '[대환 체크] "혹시 지금 쓰고 계신 대출을 더 낮은 금리로 갈아타실 목적이신가요, 아니면 새로 필요하신 건가요?"' },
+      { bold: false, text: '[캐피탈 체크] "혹시 캐피탈이나 카드론 같은 것도 쓰고 계신 게 있으실까요?"' },
+      { bold: true,  text: '→ 대환 or 캐피탈 사용 중이면 니즈 있는 것으로 보고 인폼 이어가기. 둘 다 해당 없고 실제 니즈도 없으면 캔슬조건 처리.' },
     ],
   },
   {
-    label: 'STEP 3 — 취지 설명 + 번호 확보', color: 'purple' as const,
+    label: 'STEP 3 — 취지 설명 + 번호 확보 + 통화시간', color: 'purple' as const,
     content: [
-      { bold: false, text: '"말씀 감사드려요~ 우선 대표님이 정책자금 어떤 기관에서 어떤 상품으로 들어가고, 한도는 얼마나 나올 것 같은지, 금리는 몇%대로 나올 것 같은지에 대해 저희 컨설턴트님이 자세히 무료상담 도와드릴거에요!"' },
-      { bold: true,  text: '"저희 전문 컨설턴트님이 내일 오후에 자세히 안내드릴건데, 받아보실 번호가 010에 몇번이실까요?"' },
-      { bold: true,  text: '"아 그리고 대표님 성함은 어떻게 되세요~?"' },
+      { bold: false, text: '"말씀 감사드려요~ 우선 대표님이 정책자금 어떤 기관에서 어떤 상품으로 들어가고, 한도는 얼마나 나올 것 같은지, 금리는 몇%대로 나올 것 같은지에 대해 저희 컨설팅 매니저님이 자세히 무료 상담을 도와드릴 거예요! 대신 안내받아 보시고 요건이 되셔서 컨설팅을 맡기고 싶으시면 그때 문의 주시면 됩니다~"' },
+      { bold: false, text: '(갑자기 끊으려 할 때) "당장 계약하자는 게 아니라, 우선 가능한 정책자금이 있는지 무료 진단받아 보신 후에 조건 들어보시고 결정하셔도 되니까 걱정 마세요~"' },
+      { bold: false, text: '(수수료 물어볼 때) "다 들어보신 후에 진행하신다고 하시면 그때 업종·자금마다 착수금이 달라서 안내드립니다."' },
+      { bold: true,  text: '"저희 전문 컨설턴트님이 내일 자세히 안내드릴 건데, 받아보실 번호가 010에 몇 번이실까요?"' },
+      { bold: true,  text: '"내일 통화 편하신 시간대가 언제쯤이실까요?" ← 체크요건 ① 통화 희망시간 반드시 확인' },
+      { bold: true,  text: '"대표님 성함은 어떻게 되실까요~? 네, 알겠습니다! 좋은 하루 보내세요~"' },
+      { bold: false, text: '※ 문자·카카오톡으로 자료를 전송하지 않습니다. 후속 연락은 확보한 시간대에 유선으로만 진행합니다.' },
+    ],
+  },
+  {
+    label: '반론 대응', color: 'red' as const,
+    rows: [
+      { q: '바빠요 / 됐어요',     a: '"아 바쁘시죠~ 연락처만 주시면 편한 시간에 매니저가 연락드릴게요. 010~"' },
+      { q: '필요없어요',           a: '"아 그러세요~ 무료로 진단만 받아 놓으셔도 나중에 필요하실 때 도움이 되실 거예요." → 한 번이라도 명확히 거절 시 캔슬조건 ①' },
+      { q: '이미 쓰고 있어요',    a: '"기관마다 중복으로 추가 가능한 것도 있어서 무료 진단 한번 받아보시면 좋은 정보 얻으실 거예요!"' },
+      { q: '사기 같아요',          a: '"무료 컨설팅이고 진행 원하실 때만 비용 발생해요~ 부담 없이 상담만 받아보세요."' },
+      { q: '문자 남겨주세요',      a: '"문자로는 정확한 안내가 어려워서요~ 연락처 주시면 상담사가 5분만 설명드릴게요."' },
+      { q: '나중에요',             a: '"아 그러세요~ 언제가 편하세요? 그때 맞춰서 연락드릴게요. 010~"' },
+      { q: '모르는 질문',          a: '"그 부분은 제가 전문적으로 답변드리기 어려워서요~ 상담사분이 정확히 설명드릴 수 있어요."' },
+      { q: '비용 물어볼 때',       a: '"비용은 업종·상황에 따라 달라지는데요, 우선 무료 컨설팅이니 받아보시고 상담 이후에 정확하게 안내드릴 거예요."' },
+      { q: '안 된다던데',          a: '"자금마다 기준이 달라서요~ 무료니까 일단 상담만 받아보시면 정확히 확인해드려요."' },
+    ],
+  },
+  {
+    label: '🚫 캔슬조건 — 해당 시 즉시 가망 등록 금지', color: 'cancel' as const,
+    content: [
+      { bold: true,  text: '① 대표님이 "안 한다 / 필요 없다" 취지의 말을 한 번이라도 한 경우 → 즉시 종료' },
+      { bold: true,  text: '② 확실하게 정책자금이 필요하지 않다고 판단되는 경우' },
+      { bold: true,  text: '③ 단순 호기심 / 가볍게 알아보는 경우 → 아래 두 가지 체크 후에도 니즈 없으면 캔슬' },
+      { bold: false, text: '  ③-1. 대환(기존 대출 금리 갈아타기) 목적 여부 확인' },
+      { bold: false, text: '  ③-2. 캐피탈·카드론 사용 여부 확인' },
+      { bold: true,  text: '④ 어거지로 유도해서 가망 등록하는 것 금지 — 자발적 답변만 인정' },
+    ],
+  },
+  {
+    label: '⚠ 주의사항 — 절대 하면 안 되는 행동', color: 'warning' as const,
+    content: [
+      { bold: true,  text: '❌ 지원금·공짜 표현으로 후킹하는 것' },
+      { bold: true,  text: '❌ 정책자금 니즈 없는 고객을 억지로 확보하는 것' },
+      { bold: true,  text: '❌ 두리뭉실한 유도 질문으로 번호만 받는 것' },
+      { bold: true,  text: '❌ 확정·과장 표현 — "무조건 나옵니다", "100% 된다" 등 금지' },
+      { bold: true,  text: '❌ 문자·카카오톡으로 자료·안내 전송 — 후속 연락은 반드시 유선 통화로만' },
+      { bold: true,  text: '❌ 소속·목적·출처 고지를 생략하거나 얼버무리는 것' },
     ],
   },
 ]
 
 const SCRIPT_COLOR: Record<string, { header: string; border: string }> = {
-  blue:   { header: 'bg-blue-50 text-blue-800',     border: 'border-blue-200' },
-  red:    { header: 'bg-red-50 text-red-800',        border: 'border-red-200' },
-  green:  { header: 'bg-emerald-50 text-emerald-800', border: 'border-emerald-200' },
-  purple: { header: 'bg-purple-50 text-purple-800', border: 'border-purple-200' },
+  blue:    { header: 'bg-blue-50 text-blue-800',       border: 'border-blue-200' },
+  red:     { header: 'bg-red-50 text-red-800',          border: 'border-red-200' },
+  green:   { header: 'bg-emerald-50 text-emerald-800',  border: 'border-emerald-200' },
+  purple:  { header: 'bg-purple-50 text-purple-800',    border: 'border-purple-200' },
+  cancel:  { header: 'bg-red-100 text-red-900',         border: 'border-red-400' },
+  warning: { header: 'bg-orange-50 text-orange-800',    border: 'border-orange-300' },
 }
 
 export default function DigDashboard({ userId, userName, username }: Props) {
@@ -131,10 +175,12 @@ export default function DigDashboard({ userId, userName, username }: Props) {
     company: '', ceo_name: '', phone: '', phone_010: '',
     business_age: '', annual_revenue: '', industry: '',
     delinquency_detail: '', credit_score: '', required_fund: '',
+    preferred_call_time: '',
   })
   const [checklist, setChecklist] = useState<Record<string, boolean>>({
-    needs_check: false, basic_info: false, purpose_explained: false,
-    closing_done: false, phone_secured: false,
+    identity_disclosed: false, purpose_disclosed: false, source_disclosed: false,
+    needs_check: false, basic_info: false, cancel_checked: false,
+    check_requirements: false, closing_done: false, phone_secured: false,
   })
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -357,15 +403,16 @@ export default function DigDashboard({ userId, userName, username }: Props) {
           company: form.company, ceo_name: form.ceo_name, phone: form.phone, phone_010: form.phone_010,
           business_age: form.business_age, annual_revenue: form.annual_revenue, industry: form.industry,
           has_delinquency: !!form.delinquency_detail.trim(), credit_score: form.credit_score,
-          required_fund: form.required_fund, memo: form.delinquency_detail.trim(), checklist,
+          required_fund: form.required_fund, preferred_call_time: form.preferred_call_time,
+          memo: form.delinquency_detail.trim(), checklist,
           recording_url, recording_filename, recording_analysis: analysis || null,
         }),
       })
       const data = await res.json()
       if (res.ok) {
         showToast('가망 등록 완료! 대표님 심사를 기다려주세요')
-        setForm({ company: '', ceo_name: '', phone: '', phone_010: '', business_age: '', annual_revenue: '', industry: '', delinquency_detail: '', credit_score: '', required_fund: '' })
-        setChecklist({ needs_check: false, basic_info: false, purpose_explained: false, closing_done: false, phone_secured: false })
+        setForm({ company: '', ceo_name: '', phone: '', phone_010: '', business_age: '', annual_revenue: '', industry: '', delinquency_detail: '', credit_score: '', required_fund: '', preferred_call_time: '' })
+        setChecklist({ identity_disclosed: false, purpose_disclosed: false, source_disclosed: false, needs_check: false, basic_info: false, cancel_checked: false, check_requirements: false, closing_done: false, phone_secured: false })
         setRecordingFile(null); setAnalysis(null)
         if (fileRef.current) fileRef.current.value = ''
         setShowRecordingModal(false)
@@ -606,6 +653,15 @@ export default function DigDashboard({ userId, userName, username }: Props) {
             )}
           </div>
 
+          {/* ⚖️ 법적 고지 배너 */}
+          <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl px-4 py-3">
+            <p className="text-amber-800 text-xs font-black mb-1">⚖️ 개인정보보호법·정보통신망법 준수 필수 공지</p>
+            <p className="text-amber-700 text-[11px] leading-relaxed">
+              통화 시작 즉시 <strong>소속(헌드레드컨설팅 OOO)·목적(무료 상담 안내)·출처(네이버 플레이스)</strong>를 반드시 고지하세요.
+              거절 의사 1회라도 표현 시 즉시 통화 종료. 문자·카카오톡 자료 전송 금지. 확정·과장 표현 금지.
+            </p>
+          </div>
+
           {/* ─────────── 3컬럼 본문 ─────────── */}
           <div className="grid grid-cols-[3fr_5fr_3fr] gap-3 items-start">
 
@@ -687,15 +743,16 @@ export default function DigDashboard({ userId, userName, username }: Props) {
 
                 <div className="grid grid-cols-2 gap-2">
                   {([
-                    { key: 'business_age',     label: '업력',     ph: '3년' },
-                    { key: 'annual_revenue',   label: '연매출',   ph: '5억' },
-                    { key: 'industry',         label: '업종',     ph: '제조업' },
-                    { key: 'credit_score',     label: '신용점수', ph: '780점' },
-                    { key: 'delinquency_detail', label: '연체·체납', ph: '없음 / 500만원' },
-                    { key: 'required_fund',    label: '필요자금', ph: '1억' },
+                    { key: 'business_age',       label: '업력',           ph: '3년' },
+                    { key: 'annual_revenue',     label: '연매출',         ph: '5억' },
+                    { key: 'industry',           label: '업종',           ph: '제조업' },
+                    { key: 'credit_score',       label: '신용점수',       ph: '780점' },
+                    { key: 'delinquency_detail', label: '연체·체납',      ph: '없음 / 500만원' },
+                    { key: 'required_fund',      label: '필요자금',       ph: '1억' },
+                    { key: 'preferred_call_time', label: '통화 희망시간', ph: '내일 오전 10시' },
                   ] as const).map(f => (
-                    <div key={f.key}>
-                      <label className={lblCls}>{f.label}</label>
+                    <div key={f.key} className={f.key === 'preferred_call_time' ? 'col-span-2' : ''}>
+                      <label className={lblCls}>{f.label}{f.key === 'preferred_call_time' && <span className="text-amber-500 ml-1">★ 체크요건</span>}</label>
                       <input value={(form as any)[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
                         placeholder={f.ph} className={inputCls} />
                     </div>
@@ -710,7 +767,25 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                       {checkDoneCount}/5{checklistAllDone ? ' ✓' : ''}
                     </span>
                   </div>
-                  {CHECKLIST_ITEMS.map(item => (
+                  {/* 법적 고지 3항목 (상단 강조) */}
+                  <div className="border border-amber-300 rounded-lg px-2 py-1.5 mb-1 bg-amber-50">
+                    <p className="text-[10px] text-amber-700 font-black mb-1">⚖️ 법적 필수 — 통화 시작 즉시 고지</p>
+                    {CHECKLIST_ITEMS.filter(i => i.legal).map(item => (
+                      <label key={item.key} className={`flex items-start gap-2 p-1.5 rounded-lg border cursor-pointer transition-colors mb-1 last:mb-0 ${
+                        checklist[item.key] ? 'bg-amber-100 border-amber-400' : 'bg-white border-amber-200'
+                      }`}>
+                        <input type="checkbox" checked={checklist[item.key]}
+                          onChange={e => setChecklist(prev => ({ ...prev, [item.key]: e.target.checked }))}
+                          className="w-4 h-4 accent-amber-600 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <p className={`text-xs font-bold leading-snug ${checklist[item.key] ? 'text-amber-800' : 'text-amber-700'}`}>{item.label}</p>
+                          <p className="text-[10px] text-amber-600 leading-snug mt-0.5">{item.desc}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                  {/* 나머지 체크리스트 항목 */}
+                  {CHECKLIST_ITEMS.filter(i => !i.legal).map(item => (
                     <label key={item.key} className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
                       checklist[item.key] ? 'bg-emerald-50 border-emerald-300' : 'bg-white border-gray-200'
                     }`}>
@@ -727,7 +802,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
 
                 {!checklistAllDone && (
                   <p className="text-xs text-amber-600 font-semibold text-center">
-                    ⚠ 체크리스트 {checkDoneCount}/5 — 모두 완료해야 전송 가능합니다
+                    ⚠ 체크리스트 {checkDoneCount}/{CHECKLIST_ITEMS.length} — 모두 완료해야 전송 가능합니다
                   </p>
                 )}
                 <button type="submit" disabled={!phoneVerified || !form.phone_010.trim() || !checklistAllDone}
@@ -736,7 +811,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                       ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                       : 'bg-[#1B2A45] text-white hover:bg-[#1B2A45]/90'
                   }`}>
-                  {!phoneVerified ? '🔒 번호 중복검색 먼저' : !checklistAllDone ? `🔒 체크리스트 ${checkDoneCount}/5 미완료` : '전송 →'}
+                  {!phoneVerified ? '🔒 번호 중복검색 먼저' : !checklistAllDone ? `🔒 체크리스트 ${checkDoneCount}/${CHECKLIST_ITEMS.length} 미완료` : '전송 →'}
                 </button>
               </form>
             </div>
