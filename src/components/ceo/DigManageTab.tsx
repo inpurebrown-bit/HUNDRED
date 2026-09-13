@@ -16,6 +16,8 @@ interface Prospect {
   has_delinquency: boolean
   credit_score: string
   required_fund: string
+  preferred_call_time: string
+  urgent_assign: boolean
   checklist: Record<string, boolean>
   memo: string
   recording_url: string
@@ -47,7 +49,7 @@ const CHECKLIST_LABELS: Record<string, string> = {
   phone_secured:       '010 확보',
 }
 
-type ViewTab = 'pending' | 'approved' | 'rejected' | 'assigned'
+type ViewTab = 'pending' | 'approved' | 'rejected'
 
 export default function DigManageTab() {
   const [viewTab, setViewTab] = useState<ViewTab>('pending')
@@ -61,7 +63,6 @@ export default function DigManageTab() {
   const [processing, setProcessing] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
 
-  // 오늘 날짜
   const today = new Date().toISOString().slice(0, 10)
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -84,15 +85,45 @@ export default function DigManageTab() {
 
   useEffect(() => { load() }, [load])
 
-  const filtered = prospects.filter(p => p.status === viewTab)
+  // 긴급배정 건 도착 시 브라우저 알림
+  useEffect(() => {
+    const urgentUnassigned = prospects.filter(p => p.urgent_assign && p.status === 'approved')
+    if (urgentUnassigned.length > 0 && 'Notification' in window) {
+      if (Notification.permission === 'granted') {
+        new Notification(`🚨 긴급 배정 요청 ${urgentUnassigned.length}건`, {
+          body: urgentUnassigned.map(p => `${p.company} (${p.ceo_name})`).join(', '),
+          tag: 'urgent-assign',
+        })
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission()
+      }
+    }
+  }, [prospects])
 
-  // 탭별 카운트
+  // 탭별 필터 (approved탭 = approved + assigned 둘 다, 긴급배정 최상단 정렬)
+  const pendingList  = prospects.filter(p => p.status === 'pending')
+  const approvedListRaw = prospects.filter(p => p.status === 'approved')
+  const assignedList = prospects.filter(p => p.status === 'assigned')
+  const rejectedList = prospects.filter(p => p.status === 'rejected')
+
+  // 긴급배정 건을 맨 위로
+  const approvedList = [
+    ...approvedListRaw.filter(p => p.urgent_assign),
+    ...approvedListRaw.filter(p => !p.urgent_assign),
+  ]
+
+  const filtered = viewTab === 'pending'  ? pendingList
+                 : viewTab === 'approved' ? [...approvedList, ...assignedList]
+                 : rejectedList
+
   const counts = {
-    pending: prospects.filter(p => p.status === 'pending').length,
-    approved: prospects.filter(p => p.status === 'approved').length,
-    rejected: prospects.filter(p => p.status === 'rejected').length,
-    assigned: prospects.filter(p => p.status === 'assigned').length,
+    pending:  pendingList.length,
+    approved: approvedList.length + assignedList.length,
+    rejected: rejectedList.length,
   }
+
+  // 긴급 미배정 건수
+  const urgentCount = approvedList.filter(p => p.urgent_assign).length
 
   // 오늘 승인 건수 (dig 직원별)
   const todayApproved = prospects.filter(p =>
@@ -190,6 +221,257 @@ export default function DigManageTab() {
     setProcessing(null)
   }
 
+  function renderCard(p: Prospect) {
+    const checkCount = Object.values(p.checklist || {}).filter(Boolean).length
+    const totalItems = Object.keys(CHECKLIST_LABELS).length
+    const allPassed = checkCount === totalItems
+    const isExpanded = expanded === p.id
+
+    return (
+      <div key={p.id} className={`bg-white rounded-xl border overflow-hidden ${
+        p.urgent_assign && p.status === 'approved' ? 'border-red-400 ring-2 ring-red-300' : 'border-gray-100'
+      }`}>
+        {/* 긴급배정 배너 */}
+        {p.urgent_assign && p.status === 'approved' && (
+          <div className="bg-red-500 text-white px-4 py-1.5 text-xs font-black flex items-center gap-2">
+            🚨 긴급 배정 요청
+            {p.preferred_call_time && (
+              <span className="font-normal opacity-90">— 통화 희망: {p.preferred_call_time}</span>
+            )}
+          </div>
+        )}
+
+        {/* 카드 헤더 */}
+        <button
+          type="button"
+          onClick={() => setExpanded(isExpanded ? null : p.id)}
+          className="w-full text-left px-4 py-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-sm font-bold text-gray-800">{p.company || '(업체명 없음)'}</p>
+                <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">{p.dig_user_name}</span>
+                {p.urgent_assign && (
+                  <span className="text-[10px] bg-red-500 text-white px-2 py-0.5 rounded-full font-black">🚨 긴급</span>
+                )}
+                {allPassed ? (
+                  <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-semibold">체크리스트 완료</span>
+                ) : (
+                  <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{checkCount}/{totalItems} 완료</span>
+                )}
+                {p.recording_url && (
+                  <span className="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">녹취 있음</span>
+                )}
+                {p.recording_analysis?.needs_level && (
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    p.recording_analysis.needs_level === '상' ? 'bg-red-100 text-red-700' :
+                    p.recording_analysis.needs_level === '중' ? 'bg-orange-100 text-orange-700' :
+                    'bg-blue-100 text-blue-600'
+                  }`}>
+                    니즈 {p.recording_analysis.needs_level}
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                {p.ceo_name} · {p.phone_010} · {p.call_date}
+                {p.preferred_call_time && !p.urgent_assign && (
+                  <span className="ml-1 text-gray-500">· 통화희망: {p.preferred_call_time}</span>
+                )}
+              </p>
+            </div>
+            <span className="text-gray-300 text-xs shrink-0">{isExpanded ? '▲' : '▼'}</span>
+          </div>
+
+          {/* 체크리스트 도트 */}
+          <div className="flex items-center gap-1 mt-2 flex-wrap">
+            {Object.entries(CHECKLIST_LABELS).map(([k, label]) => (
+              <span key={k} title={label}
+                className={`text-[9px] px-1.5 py-0.5 rounded-full ${
+                  p.checklist?.[k] ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'
+                }`}>
+                {label}
+              </span>
+            ))}
+          </div>
+        </button>
+
+        {isExpanded && (
+          <div className="border-t border-gray-100 px-4 py-4 space-y-4">
+            {/* 업체 정보 */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
+              {p.business_age && <p><span className="text-gray-400">업력</span> {p.business_age}</p>}
+              {p.annual_revenue && <p><span className="text-gray-400">연매출</span> {p.annual_revenue}</p>}
+              {p.industry && <p><span className="text-gray-400">업종</span> {p.industry}</p>}
+              {p.credit_score && <p><span className="text-gray-400">신용점수</span> {p.credit_score}</p>}
+              {p.required_fund && <p><span className="text-gray-400">필요자금</span> {p.required_fund}</p>}
+              {p.preferred_call_time && <p><span className="text-gray-400">통화희망</span> {p.preferred_call_time}</p>}
+              <p><span className="text-gray-400">연체·체납</span> {p.has_delinquency ? '있음' : '없음'}</p>
+              {p.phone && <p><span className="text-gray-400">원번호</span> {p.phone}</p>}
+            </div>
+
+            {/* AI 코멘트 (심사 대기에서 미흡 항목 보고) */}
+            {p.status === 'pending' && p.ceo_comment && (
+              <div className={`rounded-lg px-3 py-2 text-xs ${
+                p.ceo_comment.startsWith('AI 검토 필요')
+                  ? 'bg-amber-50 border border-amber-200 text-amber-800'
+                  : 'bg-blue-50 border border-blue-100 text-blue-700'
+              }`}>
+                <p className="font-semibold mb-0.5">AI 리포트</p>
+                {p.ceo_comment}
+              </div>
+            )}
+
+            {p.memo && (
+              <div className="bg-gray-50 rounded-lg px-3 py-2 text-xs text-gray-600">
+                <p className="text-[10px] text-gray-400 mb-0.5">메모</p>
+                {p.memo}
+              </div>
+            )}
+
+            {/* 녹취 플레이어 */}
+            {p.recording_url && (
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                <p className="text-[11px] text-slate-600 font-semibold mb-2">녹취 파일 — {p.recording_filename}</p>
+                <audio controls src={p.recording_url} className="w-full" />
+              </div>
+            )}
+
+            {/* AI 분석 결과 */}
+            {p.recording_analysis && !p.recording_analysis.parse_error && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-bold text-emerald-700">AI 통화 분석 결과</p>
+                  {p.recording_analysis.needs_level && (
+                    <span className={`text-xs font-black px-3 py-1 rounded-full ${
+                      p.recording_analysis.needs_level === '상' ? 'bg-red-500 text-white' :
+                      p.recording_analysis.needs_level === '중' ? 'bg-orange-400 text-white' :
+                      'bg-blue-400 text-white'
+                    }`}>
+                      니즈 {p.recording_analysis.needs_level}
+                    </span>
+                  )}
+                </div>
+                {p.recording_analysis.summary && (
+                  <p className="text-xs text-gray-700">{p.recording_analysis.summary}</p>
+                )}
+                {p.recording_analysis.checklist && (
+                  <div className="grid grid-cols-2 gap-1">
+                    {Object.entries(CHECKLIST_LABELS).map(([k, label]) => {
+                      const passed = p.recording_analysis.checklist[k]
+                      return (
+                        <div key={k} className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg ${passed ? 'bg-emerald-100 text-emerald-700' : 'bg-red-50 text-red-500'}`}>
+                          <span>{passed ? '✅' : '❌'}</span>
+                          <span className="font-medium">{label}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                {p.recording_analysis.feedback && (
+                  <p className="text-[11px] text-amber-700 bg-amber-50 rounded-lg px-2 py-1.5">{p.recording_analysis.feedback}</p>
+                )}
+              </div>
+            )}
+
+            {/* 심사 대기: 승인/거절 액션 */}
+            {p.status === 'pending' && (
+              <div className="space-y-3 border-t border-gray-100 pt-3">
+                <textarea
+                  value={commentMap[p.id] || ''}
+                  onChange={e => setCommentMap(prev => ({ ...prev, [p.id]: e.target.value }))}
+                  placeholder="코멘트 입력 (거절 시 필수)"
+                  rows={2}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A45]/20 resize-none"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => approve(p.id)}
+                    disabled={processing === p.id}
+                    className="flex-1 py-2.5 bg-emerald-500 text-white text-sm font-bold rounded-xl hover:bg-emerald-600 disabled:opacity-50 transition-colors">
+                    {processing === p.id ? '처리 중...' : '✓ 승인'}
+                  </button>
+                  <button
+                    onClick={() => reject(p.id)}
+                    disabled={processing === p.id}
+                    className="flex-1 py-2.5 bg-red-500 text-white text-sm font-bold rounded-xl hover:bg-red-600 disabled:opacity-50 transition-colors">
+                    {processing === p.id ? '처리 중...' : '✗ 거절'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 승인됨 (배정 대기): 영업팀 배정 */}
+            {p.status === 'approved' && (
+              <div className={`space-y-3 border-t pt-3 ${p.urgent_assign ? 'border-red-200' : 'border-gray-100'}`}>
+                <p className={`text-xs font-semibold ${p.urgent_assign ? 'text-red-600' : 'text-gray-700'}`}>
+                  {p.urgent_assign ? '🚨 긴급 — 즉시 배정 필요 → 공급DB 이동' : '영업팀 직원 배정 → 공급DB로 이동'}
+                </p>
+                <select
+                  value={assignTarget[p.id] || ''}
+                  onChange={e => setAssignTarget(prev => ({ ...prev, [p.id]: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                  <option value="">배정할 직원 선택...</option>
+                  {salesUsers.map(u => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => assign(p.id)}
+                  disabled={processing === p.id || !assignTarget[p.id]}
+                  className={`w-full py-2.5 text-white text-sm font-bold rounded-xl disabled:opacity-50 transition-colors ${
+                    p.urgent_assign ? 'bg-red-500 hover:bg-red-600' : 'bg-[#1B2A45] hover:bg-[#1B2A45]/90'
+                  }`}>
+                  {processing === p.id ? '배정 중...' : '배정 확정 → 영업팀 직가DB 이동'}
+                </button>
+              </div>
+            )}
+
+            {/* 배정 완료 */}
+            {p.status === 'assigned' && (
+              <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 text-xs text-blue-700">
+                <p className="font-semibold">→ {p.assigned_to_name} 배정 완료 (영업팀 직가DB)</p>
+              </div>
+            )}
+
+            {/* 거절됨: 코멘트 표시 */}
+            {p.status === 'rejected' && p.ceo_comment && (
+              <div className="bg-red-50 border border-red-100 rounded-lg px-3 py-2 text-xs text-red-700">
+                <p className="font-semibold mb-0.5">거절 사유</p>
+                {p.ceo_comment}
+              </div>
+            )}
+
+            {/* 삭제 (CEO 전용, 모든 상태) */}
+            <div className="border-t border-gray-100 pt-3">
+              {deleteConfirm === p.id ? (
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-red-600 font-semibold flex-1">정말 삭제하시겠습니까?</p>
+                  <button
+                    onClick={() => deleteProspect(p.id)}
+                    disabled={processing === p.id}
+                    className="px-3 py-1.5 bg-red-500 text-white text-xs font-bold rounded-lg hover:bg-red-600 disabled:opacity-50">
+                    {processing === p.id ? '삭제 중...' : '삭제 확인'}
+                  </button>
+                  <button
+                    onClick={() => setDeleteConfirm(null)}
+                    className="px-3 py-1.5 bg-gray-100 text-gray-600 text-xs rounded-lg hover:bg-gray-200">
+                    취소
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setDeleteConfirm(p.id)}
+                  className="text-xs text-gray-400 hover:text-red-500 font-medium transition-colors">
+                  🗑 DB 삭제
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-5">
       {/* 토스트 */}
@@ -198,6 +480,20 @@ export default function DigManageTab() {
           toast.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'
         }`}>
           {toast.msg}
+        </div>
+      )}
+
+      {/* 긴급배정 알림 배너 */}
+      {urgentCount > 0 && (
+        <div
+          className="bg-red-500 text-white rounded-xl px-5 py-3.5 flex items-center gap-3 cursor-pointer shadow-lg"
+          onClick={() => setViewTab('approved')}>
+          <span className="text-2xl">🚨</span>
+          <div className="flex-1">
+            <p className="font-black text-sm">긴급 배정 요청 {urgentCount}건</p>
+            <p className="text-red-100 text-xs mt-0.5">즉시 배정이 필요한 가망입니다 — 탭을 눌러 확인하세요</p>
+          </div>
+          <span className="text-red-200 text-xs font-semibold">승인됨 탭 →</span>
         </div>
       )}
 
@@ -224,25 +520,25 @@ export default function DigManageTab() {
       {/* 뷰 탭 */}
       <div className="flex bg-white border border-gray-200 rounded-xl overflow-hidden">
         {([
-          { key: 'pending', label: '심사 대기', color: 'amber' },
-          { key: 'approved', label: '승인됨', color: 'emerald' },
-          { key: 'rejected', label: '거절됨', color: 'red' },
-          { key: 'assigned', label: '배정 완료', color: 'blue' },
+          { key: 'pending',  label: '심사 대기', activeCls: 'bg-amber-500 text-white' },
+          { key: 'approved', label: `승인됨 (미배정 ${approvedList.length} / 배정완료 ${assignedList.length})`, activeCls: 'bg-emerald-500 text-white' },
+          { key: 'rejected', label: '거절됨',    activeCls: 'bg-red-500 text-white' },
         ] as const).map(t => (
           <button key={t.key}
             onClick={() => setViewTab(t.key)}
             className={`flex-1 py-2.5 text-xs font-semibold transition-colors relative ${
-              viewTab === t.key
-                ? t.key === 'pending' ? 'bg-amber-500 text-white'
-                  : t.key === 'approved' ? 'bg-emerald-500 text-white'
-                  : t.key === 'rejected' ? 'bg-red-500 text-white'
-                  : 'bg-blue-500 text-white'
-                : 'text-gray-500 hover:bg-gray-50'
+              viewTab === t.key ? t.activeCls : 'text-gray-500 hover:bg-gray-50'
             }`}>
             {t.label}
-            {counts[t.key] > 0 && (
+            {t.key !== 'approved' && counts[t.key] > 0 && (
               <span className={`ml-1 ${viewTab === t.key ? 'text-white/80' : 'text-gray-400'}`}>
                 ({counts[t.key]})
+              </span>
+            )}
+            {/* 긴급 뱃지 */}
+            {t.key === 'approved' && urgentCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
+                🚨{urgentCount}
               </span>
             )}
           </button>
@@ -251,230 +547,47 @@ export default function DigManageTab() {
 
       {loading ? (
         <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
+      ) : viewTab === 'approved' ? (
+        <div className="space-y-5">
+          {/* 미배정 섹션 */}
+          <div>
+            <div className="flex items-center gap-2 mb-2 px-1">
+              <span className="text-xs font-black text-emerald-700">▶ 배정 대기 ({approvedList.length}건)</span>
+              <span className="text-[10px] text-gray-400">— 영업팀 배정 전</span>
+              {urgentCount > 0 && (
+                <span className="text-[10px] bg-red-500 text-white px-2 py-0.5 rounded-full font-black">🚨 긴급 {urgentCount}건</span>
+              )}
+            </div>
+            {approvedList.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-100 px-4 py-6 text-center text-gray-400 text-sm">배정 대기 중인 가망이 없습니다</div>
+            ) : (
+              <div className="space-y-3">
+                {approvedList.map(p => renderCard(p))}
+              </div>
+            )}
+          </div>
+          {/* 배정완료 섹션 */}
+          <div>
+            <div className="flex items-center gap-2 mb-2 px-1">
+              <span className="text-xs font-black text-blue-600">▶ 배정 완료 ({assignedList.length}건)</span>
+              <span className="text-[10px] text-gray-400">— 영업팀으로 이동됨</span>
+            </div>
+            {assignedList.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-100 px-4 py-6 text-center text-gray-400 text-sm">배정 완료된 가망이 없습니다</div>
+            ) : (
+              <div className="space-y-3">
+                {assignedList.map(p => renderCard(p))}
+              </div>
+            )}
+          </div>
+        </div>
       ) : filtered.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
-          {viewTab === 'pending' ? '심사 대기 중인 가망이 없습니다' :
-           viewTab === 'approved' ? '승인된 가망이 없습니다' :
-           viewTab === 'rejected' ? '거절된 가망이 없습니다' :
-           '배정 완료된 가망이 없습니다'}
+          {viewTab === 'pending' ? '심사 대기 중인 가망이 없습니다' : '거절된 가망이 없습니다'}
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map(p => {
-            const checkCount = Object.values(p.checklist || {}).filter(Boolean).length
-            const totalItems = Object.keys(CHECKLIST_LABELS).length
-            const allPassed = checkCount === totalItems
-            const isExpanded = expanded === p.id
-
-            return (
-              <div key={p.id} className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-                {/* 카드 헤더 */}
-                <button
-                  type="button"
-                  onClick={() => setExpanded(isExpanded ? null : p.id)}
-                  className="w-full text-left px-4 py-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-bold text-gray-800">{p.company || '(업체명 없음)'}</p>
-                        <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">{p.dig_user_name}</span>
-                        {allPassed ? (
-                          <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-semibold">체크리스트 완료</span>
-                        ) : (
-                          <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{checkCount}/{totalItems} 완료</span>
-                        )}
-                        {p.recording_url && (
-                          <span className="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">녹취 있음</span>
-                        )}
-                        {p.recording_analysis?.needs_level && (
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            p.recording_analysis.needs_level === '상' ? 'bg-red-100 text-red-700' :
-                            p.recording_analysis.needs_level === '중' ? 'bg-orange-100 text-orange-700' :
-                            'bg-blue-100 text-blue-600'
-                          }`}>
-                            니즈 {p.recording_analysis.needs_level}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-gray-400 mt-0.5">
-                        {p.ceo_name} · {p.phone_010} · {p.call_date}
-                      </p>
-                    </div>
-                    <span className="text-gray-300 text-xs shrink-0">{isExpanded ? '▲' : '▼'}</span>
-                  </div>
-
-                  {/* 체크리스트 도트 */}
-                  <div className="flex items-center gap-1 mt-2">
-                    {Object.entries(CHECKLIST_LABELS).map(([k, label]) => (
-                      <span key={k} title={label}
-                        className={`text-[9px] px-1.5 py-0.5 rounded-full ${
-                          p.checklist?.[k] ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'
-                        }`}>
-                        {label}
-                      </span>
-                    ))}
-                  </div>
-                </button>
-
-                {isExpanded && (
-                  <div className="border-t border-gray-100 px-4 py-4 space-y-4">
-                    {/* 업체 정보 */}
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
-                      {p.business_age && <p><span className="text-gray-400">업력</span> {p.business_age}</p>}
-                      {p.annual_revenue && <p><span className="text-gray-400">연매출</span> {p.annual_revenue}</p>}
-                      {p.industry && <p><span className="text-gray-400">업종</span> {p.industry}</p>}
-                      {p.credit_score && <p><span className="text-gray-400">신용점수</span> {p.credit_score}</p>}
-                      {p.required_fund && <p><span className="text-gray-400">필요자금</span> {p.required_fund}</p>}
-                      <p><span className="text-gray-400">연체·체납</span> {p.has_delinquency ? '있음' : '없음'}</p>
-                      {p.phone && <p><span className="text-gray-400">원번호</span> {p.phone}</p>}
-                    </div>
-
-                    {p.memo && (
-                      <div className="bg-gray-50 rounded-lg px-3 py-2 text-xs text-gray-600">
-                        <p className="text-[10px] text-gray-400 mb-0.5">메모</p>
-                        {p.memo}
-                      </div>
-                    )}
-
-                    {/* 녹취 플레이어 */}
-                    {p.recording_url && (
-                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                        <p className="text-[11px] text-slate-600 font-semibold mb-2">녹취 파일 — {p.recording_filename}</p>
-                        <audio controls src={p.recording_url} className="w-full" />
-                      </div>
-                    )}
-
-                    {/* AI 분석 결과 */}
-                    {p.recording_analysis && !p.recording_analysis.parse_error && (
-                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <p className="text-[11px] font-bold text-emerald-700">AI 통화 분석 결과</p>
-                          {p.recording_analysis.needs_level && (
-                            <span className={`text-xs font-black px-3 py-1 rounded-full ${
-                              p.recording_analysis.needs_level === '상' ? 'bg-red-500 text-white' :
-                              p.recording_analysis.needs_level === '중' ? 'bg-orange-400 text-white' :
-                              'bg-blue-400 text-white'
-                            }`}>
-                              니즈 {p.recording_analysis.needs_level}
-                            </span>
-                          )}
-                        </div>
-                        {p.recording_analysis.summary && (
-                          <p className="text-xs text-gray-700">{p.recording_analysis.summary}</p>
-                        )}
-                        {p.recording_analysis.checklist && (
-                          <div className="grid grid-cols-2 gap-1">
-                            {Object.entries(CHECKLIST_LABELS).map(([k, label]) => {
-                              const passed = p.recording_analysis.checklist[k]
-                              return (
-                                <div key={k} className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg ${passed ? 'bg-emerald-100 text-emerald-700' : 'bg-red-50 text-red-500'}`}>
-                                  <span>{passed ? '✅' : '❌'}</span>
-                                  <span className="font-medium">{label}</span>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
-                        {p.recording_analysis.feedback && (
-                          <p className="text-[11px] text-amber-700 bg-amber-50 rounded-lg px-2 py-1.5">{p.recording_analysis.feedback}</p>
-                        )}
-                      </div>
-                    )}
-
-                    {/* 심사 대기: 승인/거절 액션 */}
-                    {viewTab === 'pending' && (
-                      <div className="space-y-3 border-t border-gray-100 pt-3">
-                        <textarea
-                          value={commentMap[p.id] || ''}
-                          onChange={e => setCommentMap(prev => ({ ...prev, [p.id]: e.target.value }))}
-                          placeholder="코멘트 입력 (거절 시 필수)"
-                          rows={2}
-                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A45]/20 resize-none"
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => approve(p.id)}
-                            disabled={processing === p.id}
-                            className="flex-1 py-2.5 bg-emerald-500 text-white text-sm font-bold rounded-xl hover:bg-emerald-600 disabled:opacity-50 transition-colors">
-                            {processing === p.id ? '처리 중...' : '✓ 승인'}
-                          </button>
-                          <button
-                            onClick={() => reject(p.id)}
-                            disabled={processing === p.id}
-                            className="flex-1 py-2.5 bg-red-500 text-white text-sm font-bold rounded-xl hover:bg-red-600 disabled:opacity-50 transition-colors">
-                            {processing === p.id ? '처리 중...' : '✗ 거절'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 승인됨: 영업팀 배정 */}
-                    {viewTab === 'approved' && (
-                      <div className="space-y-3 border-t border-gray-100 pt-3">
-                        <p className="text-xs font-semibold text-gray-700">영업팀 직원 배정 → 공급DB로 이동</p>
-                        <select
-                          value={assignTarget[p.id] || ''}
-                          onChange={e => setAssignTarget(prev => ({ ...prev, [p.id]: e.target.value }))}
-                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
-                          <option value="">배정할 직원 선택...</option>
-                          {salesUsers.map(u => (
-                            <option key={u.id} value={u.id}>{u.name}</option>
-                          ))}
-                        </select>
-                        <button
-                          onClick={() => assign(p.id)}
-                          disabled={processing === p.id || !assignTarget[p.id]}
-                          className="w-full py-2.5 bg-[#1B2A45] text-white text-sm font-bold rounded-xl hover:bg-[#1B2A45]/90 disabled:opacity-50 transition-colors">
-                          {processing === p.id ? '배정 중...' : '배정 확정 → 영업팀 직가DB 이동'}
-                        </button>
-                      </div>
-                    )}
-
-                    {/* 거절됨: 코멘트 표시 */}
-                    {viewTab === 'rejected' && p.ceo_comment && (
-                      <div className="bg-red-50 border border-red-100 rounded-lg px-3 py-2 text-xs text-red-700">
-                        <p className="font-semibold mb-0.5">거절 사유</p>
-                        {p.ceo_comment}
-                      </div>
-                    )}
-
-                    {/* 배정 완료 */}
-                    {viewTab === 'assigned' && (
-                      <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 text-xs text-blue-700">
-                        <p className="font-semibold">→ {p.assigned_to_name} 배정 완료 (영업팀 직가DB)</p>
-                      </div>
-                    )}
-
-                    {/* 삭제 (CEO 전용, 모든 상태) */}
-                    <div className="border-t border-gray-100 pt-3">
-                      {deleteConfirm === p.id ? (
-                        <div className="flex items-center gap-2">
-                          <p className="text-xs text-red-600 font-semibold flex-1">정말 삭제하시겠습니까?</p>
-                          <button
-                            onClick={() => deleteProspect(p.id)}
-                            disabled={processing === p.id}
-                            className="px-3 py-1.5 bg-red-500 text-white text-xs font-bold rounded-lg hover:bg-red-600 disabled:opacity-50">
-                            {processing === p.id ? '삭제 중...' : '삭제 확인'}
-                          </button>
-                          <button
-                            onClick={() => setDeleteConfirm(null)}
-                            className="px-3 py-1.5 bg-gray-100 text-gray-600 text-xs rounded-lg hover:bg-gray-200">
-                            취소
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setDeleteConfirm(p.id)}
-                          className="text-xs text-gray-400 hover:text-red-500 font-medium transition-colors">
-                          🗑 DB 삭제
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
+          {filtered.map(p => renderCard(p))}
         </div>
       )}
     </div>

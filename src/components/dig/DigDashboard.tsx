@@ -17,11 +17,11 @@ type Tab = 'dig' | 'profile'
 const DAILY_GOAL        = 8
 const BONUS_PER_EXTRA   = 10000
 
-// ⚖️ 개인정보보호법·정보통신망법 준수 체크리스트 (9항목 전부 필수)
+// 통화 전 체크리스트 (9항목 전부 필수)
 const CHECKLIST_ITEMS = [
   { key: 'identity_disclosed',  label: '소속 고지',         desc: '✅ "저희는 헌드레드컨설팅 OOO입니다" — 이름·소속 반드시 먼저 고지', legal: true },
   { key: 'purpose_disclosed',   label: '목적 고지',         desc: '✅ "정책자금 관련 무료 상담 안내차 연락드렸습니다" — 목적 고지', legal: true },
-  { key: 'source_disclosed',    label: '출처 고지',         desc: '✅ "연락처는 네이버 플레이스를 통해 확인했습니다" — 수집 경로 고지', legal: true },
+  { key: 'source_disclosed',    label: '출처 고지',         desc: '✅ "연락처는 네이버를 통해 확인했습니다" — 수집 경로 고지', legal: true },
   { key: 'needs_check',         label: '니즈 확인',         desc: '"혹시 정책자금 알아보신 적 있으시거나 사용하고 계신 게 있으세요?"' },
   { key: 'basic_info',          label: '기본 정보 수집',    desc: '업력 / 연매출 / 업종 / 연체·체납 여부 / 신용점수 / 대표자 성함 (5가지 이상)' },
   { key: 'cancel_checked',      label: '캔슬조건 확인',     desc: '❌ 거절 의사 1회라도 → 즉시 종료 | 단순 호기심 → 대환/캐피탈 여부 체크 후 판단' },
@@ -61,7 +61,7 @@ const SCRIPT_SECTIONS = [
       { bold: false, text: '(대표 아닌 경우) → "아 네ㅎㅎ~ 그럼 다음에 연락드릴게요~"' },
       { bold: true,  text: '⚠ 법적 필수 — 반드시 순서대로 고지:' },
       { bold: true,  text: '"저희는 헌드레드컨설팅이라는 경영자문회사 OOO입니다."  ← 소속+이름' },
-      { bold: true,  text: '"네이버 플레이스 보고 대표님 업체에 해당되는 정책자금 관련 무료 상담 도와드리려 전화드렸는데 잠깐 통화 괜찮으실까요?"  ← 목적+출처' },
+      { bold: true,  text: '"네이버 보고 대표님 업체에 해당되는 정책자금 관련 무료 상담 도와드리려 전화드렸는데 잠깐 통화 괜찮으실까요?"  ← 목적+출처' },
       { bold: false, text: '(통화 가능 확인 후) "요새 나라 경제가 많이 어렵잖아요.. 최근 정부에서 사업자들 대상으로 지원 혜택들이 4000개 넘게 나오고 있는데 대표님 업종도 해당되는 게 많은 거 알고 계실까요? 이런 게 있는지 몰라서 못 받으시거나, 절차가 어렵고 까다로워서 못 하시는 분들이 많아서 그런 대표님들께 무료 자문을 도와드리고 있거든요~"' },
       { bold: true,  text: '"혹시 지금 정책자금 알아보신 적 있으시거나 사용하고 계신 게 있으세요?"' },
     ],
@@ -150,6 +150,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
   const [recordingFile, setRecordingFile]           = useState<File | null>(null)
   const [analyzing, setAnalyzing]   = useState(false)
   const [analysis, setAnalysis]     = useState<any>(null)
+  const [urgentAssign, setUrgentAssign] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [resubmitProspect, setResubmitProspect] = useState<Prospect | null>(null)
@@ -404,16 +405,19 @@ export default function DigDashboard({ userId, userName, username }: Props) {
           business_age: form.business_age, annual_revenue: form.annual_revenue, industry: form.industry,
           has_delinquency: !!form.delinquency_detail.trim(), credit_score: form.credit_score,
           required_fund: form.required_fund, preferred_call_time: form.preferred_call_time,
+          urgent_assign: urgentAssign,
           memo: form.delinquency_detail.trim(), checklist,
           recording_url, recording_filename, recording_analysis: analysis || null,
         }),
       })
       const data = await res.json()
       if (res.ok) {
-        showToast('가망 등록 완료! 대표님 심사를 기다려주세요')
+        const autoApproved = data.auto_approved
+        showToast(autoApproved ? '✅ AI 심사 통과 — 자동 승인 처리됐습니다!' : '가망 등록 완료! 대표님 심사를 기다려주세요')
         setForm({ company: '', ceo_name: '', phone: '', phone_010: '', business_age: '', annual_revenue: '', industry: '', delinquency_detail: '', credit_score: '', required_fund: '', preferred_call_time: '' })
         setChecklist({ identity_disclosed: false, purpose_disclosed: false, source_disclosed: false, needs_check: false, basic_info: false, cancel_checked: false, check_requirements: false, closing_done: false, phone_secured: false })
         setRecordingFile(null); setAnalysis(null)
+        setUrgentAssign(false)
         if (fileRef.current) fileRef.current.value = ''
         setShowRecordingModal(false)
         loadProspects()
@@ -655,9 +659,9 @@ export default function DigDashboard({ userId, userName, username }: Props) {
 
           {/* ⚖️ 법적 고지 배너 */}
           <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl px-4 py-3">
-            <p className="text-amber-800 text-xs font-black mb-1">⚖️ 개인정보보호법·정보통신망법 준수 필수 공지</p>
+            <p className="text-amber-800 text-xs font-black mb-1">📢 통화 전 필수 공지사항</p>
             <p className="text-amber-700 text-[11px] leading-relaxed">
-              통화 시작 즉시 <strong>소속(헌드레드컨설팅 OOO)·목적(무료 상담 안내)·출처(네이버 플레이스)</strong>를 반드시 고지하세요.
+              통화 시작 즉시 <strong>소속(헌드레드컨설팅 OOO)·목적(무료 상담 안내)·출처(네이버)</strong>를 반드시 먼저 고지하세요.
               거절 의사 1회라도 표현 시 즉시 통화 종료. 문자·카카오톡 자료 전송 금지. 확정·과장 표현 금지.
             </p>
           </div>
@@ -755,6 +759,17 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                       <label className={lblCls}>{f.label}{f.key === 'preferred_call_time' && <span className="text-amber-500 ml-1">★ 체크요건</span>}</label>
                       <input value={(form as any)[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
                         placeholder={f.ph} className={inputCls} />
+                      {f.key === 'preferred_call_time' && (
+                        <label className={`mt-2 flex items-center gap-2 cursor-pointer select-none ${urgentAssign ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
+                          <input
+                            type="checkbox"
+                            checked={urgentAssign}
+                            onChange={e => setUrgentAssign(e.target.checked)}
+                            className="w-4 h-4 accent-red-500"
+                          />
+                          <span className="text-sm">🚨 긴급 배정 요청 — 바로 연락 필요 (대표님께 즉시 알림)</span>
+                        </label>
+                      )}
                     </div>
                   ))}
                 </div>
