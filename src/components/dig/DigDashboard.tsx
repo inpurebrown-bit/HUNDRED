@@ -300,7 +300,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
       const data = await res.json()
       if (data.analysis) {
         setAnalysis(data.analysis)
-        showToast('녹취 분석 완료 — 아래 비교표를 확인하세요')
+        showToast('녹취 처리 완료')
       }
     } catch (err: any) {
       console.error('processRecordingFile error:', err)
@@ -513,46 +513,9 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                 <p className="text-sm text-blue-700">처리 중... 잠시 기다려주세요</p>
               </div>
             )}
-            {analysis && (
-              <div className="border border-gray-200 rounded-xl overflow-hidden">
-                <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex items-center justify-between">
-                  <p className="text-xs font-bold text-gray-700">AI 분석 비교표</p>
-                  <p className="text-xs text-gray-400">내가 입력한 내용 기준 — 틀린 부분만 직접 수정</p>
-                </div>
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
-                      <th className="py-2 px-3 text-left text-gray-500 font-medium w-1/4">항목</th>
-                      <th className="py-2 px-3 text-left text-gray-600 font-semibold w-[37.5%]">내가 입력</th>
-                      <th className="py-2 px-3 text-left text-gray-500 font-medium w-[37.5%]">AI 추출</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      { label: '회사명', myVal: form.company, aiVal: analysis.customer_info?.company },
-                      { label: '대표자', myVal: form.ceo_name, aiVal: analysis.customer_info?.ceo_name },
-                      { label: '연락처', myVal: form.phone_010, aiVal: analysis.customer_info?.phone_010 },
-                      { label: '업력', myVal: form.business_age, aiVal: analysis.customer_info?.business_age },
-                      { label: '연매출', myVal: form.annual_revenue, aiVal: analysis.customer_info?.annual_revenue },
-                      { label: '업종', myVal: form.industry, aiVal: analysis.customer_info?.industry },
-                      { label: '신용점수', myVal: form.credit_score, aiVal: analysis.customer_info?.credit_score },
-                      { label: '필요자금', myVal: form.required_fund, aiVal: analysis.customer_info?.required_fund },
-                      { label: '연체여부', myVal: form.delinquency_detail || '-', aiVal: analysis.customer_info?.has_delinquency == null ? '-' : analysis.customer_info.has_delinquency ? '있음' : '없음' },
-                    ].map(({ label, myVal, aiVal }) => {
-                      const mismatch = myVal && aiVal && myVal !== aiVal && aiVal !== '-'
-                      return (
-                        <tr key={label} className={`border-b border-gray-50 ${mismatch ? 'bg-amber-50' : ''}`}>
-                          <td className="py-2 px-3 text-gray-500">{label}</td>
-                          <td className="py-2 px-3 text-gray-800 font-medium">{myVal || <span className="text-gray-300">미입력</span>}</td>
-                          <td className={`py-2 px-3 ${mismatch ? 'text-amber-700 font-semibold' : 'text-gray-500'}`}>{aiVal || '-'}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-                {analysis.parse_error && (
-                  <p className="text-xs text-amber-600 px-4 py-2 bg-amber-50">AI 분석 일부 실패 — 직접 확인 후 제출하세요</p>
-                )}
+            {analysis && !analyzing && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-xs text-emerald-700 font-semibold">
+                ✅ 녹취 업로드 완료 — 제출하면 대표님이 확인합니다
               </div>
             )}
             <button type="button" onClick={handleFinalSubmit} disabled={submitting || analyzing || !recordingFile}

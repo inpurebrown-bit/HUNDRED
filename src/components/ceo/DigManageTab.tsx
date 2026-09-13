@@ -362,6 +362,51 @@ export default function DigManageTab() {
               </div>
             )}
 
+            {/* 직원 입력 vs AI 추출 비교표 */}
+            {p.recording_analysis && (
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex items-center justify-between">
+                  <p className="text-xs font-bold text-gray-700">직원 입력 vs AI 분석 비교</p>
+                  <p className="text-xs text-gray-400">황색 = 불일치 항목</p>
+                </div>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      <th className="py-1.5 px-3 text-left text-gray-400 font-medium w-1/4">항목</th>
+                      <th className="py-1.5 px-3 text-left text-gray-600 font-semibold">직원 입력</th>
+                      <th className="py-1.5 px-3 text-left text-gray-400 font-medium">AI 추출</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const ci = p.recording_analysis?.customer_info || {}
+                      const rows = [
+                        { label: '회사명',   emp: p.company,        ai: ci.company },
+                        { label: '대표자',   emp: p.ceo_name,       ai: ci.ceo_name },
+                        { label: '연락처',   emp: p.phone_010,      ai: ci.phone_010 },
+                        { label: '업력',     emp: p.business_age,   ai: ci.business_age },
+                        { label: '연매출',   emp: p.annual_revenue, ai: ci.annual_revenue },
+                        { label: '업종',     emp: p.industry,       ai: ci.industry },
+                        { label: '신용점수', emp: p.credit_score,   ai: ci.credit_score },
+                        { label: '필요자금', emp: p.required_fund,  ai: ci.required_fund },
+                        { label: '연체여부', emp: p.has_delinquency ? '있음' : '없음', ai: ci.has_delinquency == null ? '-' : ci.has_delinquency ? '있음' : '없음' },
+                      ]
+                      return rows.map(({ label, emp, ai }) => {
+                        const mismatch = emp && ai && ai !== '-' && emp !== ai
+                        return (
+                          <tr key={label} className={`border-b border-gray-50 ${mismatch ? 'bg-amber-50' : ''}`}>
+                            <td className="py-1.5 px-3 text-gray-400">{label}</td>
+                            <td className="py-1.5 px-3 text-gray-800 font-medium">{emp || <span className="text-gray-300">미입력</span>}</td>
+                            <td className={`py-1.5 px-3 ${mismatch ? 'text-amber-700 font-semibold' : 'text-gray-400'}`}>{ai || '-'}</td>
+                          </tr>
+                        )
+                      })
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
             {/* AI 분석 결과 */}
             {p.recording_analysis && !p.recording_analysis.parse_error && (() => {
               const ra = p.recording_analysis
