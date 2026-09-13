@@ -421,10 +421,11 @@ export default function DigDashboard({ userId, userName, username }: Props) {
         const fd = new FormData()
         fd.append('file', recordingFile)
         const res  = await fetch('/api/upload-recording', { method: 'POST', body: fd })
-        const data = await res.json()
+        let data: any = {}
+        try { data = await res.json() } catch { data = { error: `서버 오류 (${res.status})` } }
         if (data.url) { recording_url = data.url; recording_filename = data.filename }
-        else { showToast(data.error || '녹취 업로드 실패', 'error'); setSubmitting(false); setUploading(false); return }
-      } catch { showToast('녹취 업로드 중 오류', 'error'); setSubmitting(false); setUploading(false); return }
+        else { showToast(data.error || `업로드 실패 (${res.status})`, 'error'); setSubmitting(false); setUploading(false); return }
+      } catch (e: any) { showToast('네트워크 오류: ' + (e?.message || '알 수 없음'), 'error'); setSubmitting(false); setUploading(false); return }
       setUploading(false)
     }
     try {
