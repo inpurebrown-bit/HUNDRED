@@ -1245,7 +1245,6 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                         0
                       )
                       const selfRate = selfSupplied > 0 ? (selfPay / selfSupplied * 100) : null
-                      if (selfSupplied === 0 && selfContracted.length === 0) return null
                       return (
                         <div>
                           <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest mb-2">자체공급 채널</p>
