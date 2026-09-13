@@ -148,8 +148,9 @@ export default function DigDashboard({ userId, userName, username }: Props) {
   const [showRecordingModal, setShowRecordingModal] = useState(false)
   const [openScriptIdx, setOpenScriptIdx]           = useState<number | null>(null)
   const [recordingFile, setRecordingFile]           = useState<File | null>(null)
-  const [analyzing, setAnalyzing]   = useState(false)
-  const [analysis, setAnalysis]     = useState<any>(null)
+  const [analyzing, setAnalyzing]         = useState(false)
+  const [analysis, setAnalysis]           = useState<any>(null)
+  const [uploadedRecordingUrl, setUploadedRecordingUrl] = useState('')
   const [urgentAssign, setUrgentAssign] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -270,47 +271,63 @@ export default function DigDashboard({ userId, userName, username }: Props) {
   async function processRecordingFile(file: File) {
     setRecordingFile(file)
     setAnalysis(null)
+    setUploadedRecordingUrl('')
     if (file.size > 50 * 1024 * 1024) { showToast('파일이 너무 큽니다 (최대 50MB)', 'error'); return }
-    if (file.size <= 20 * 1024 * 1024) {
-      setAnalyzing(true)
-      try {
-        const fd = new FormData()
-        fd.append('file', file)
-        const res  = await fetch('/api/analyze-recording', { method: 'POST', body: fd })
-        const data = await res.json()
-        if (data.analysis) {
-          setAnalysis(data.analysis)
-          if (!data.analysis.parse_error) {
-            // 정상 파싱 — 체크리스트·고객정보 자동 입력
-            if (data.analysis.checklist) setChecklist(prev => ({ ...prev, ...data.analysis.checklist }))
-            if (data.analysis.customer_info) {
-              const ci = data.analysis.customer_info
-              setForm(prev => ({
-                ...prev,
-                company:            ci.company        || prev.company,
-                ceo_name:           ci.ceo_name       || prev.ceo_name,
-                phone_010:          ci.phone_010       || prev.phone_010,
-                business_age:       ci.business_age   || prev.business_age,
-                annual_revenue:     ci.annual_revenue  || prev.annual_revenue,
-                industry:           ci.industry        || prev.industry,
-                credit_score:       ci.credit_score    || prev.credit_score,
-                required_fund:      ci.required_fund   || prev.required_fund,
-                delinquency_detail: ci.has_delinquency != null ? (ci.has_delinquency ? '있음' : '없음') : prev.delinquency_detail,
-              }))
-            }
-            // 부분 체크리스트 복구된 경우에도 적용
-            showToast('녹취 처리 완료')
-          } else {
-            if (data.analysis.checklist) setChecklist(prev => ({ ...prev, ...data.analysis.checklist }))
-            showToast('녹취 업로드 완료')
+    setAnalyzing(true)
+    try {
+      // 1단계: Supabase에 직접 업로드 (Vercel 크기 제한 우회)
+      const signRes = await fetch('/api/storage-sign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name }),
+      })
+      const signData = await signRes.json()
+      if (!signData.signedUrl) throw new Error(signData.error || '업로드 URL 발급 실패')
+
+      const ext = (file.name.split('.').pop() || 'mp3').toLowerCase()
+      const mimeMap: Record<string, string> = { m4a: 'audio/mp4', mp3: 'audio/mpeg', wav: 'audio/wav', aac: 'audio/aac', ogg: 'audio/ogg', mp4: 'audio/mp4' }
+      const contentType = (file.type && file.type !== 'audio/x-m4a') ? file.type : (mimeMap[ext] || 'audio/mpeg')
+      const putRes = await fetch(signData.signedUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: file })
+      if (!putRes.ok) throw new Error(`스토리지 업로드 실패 (${putRes.status})`)
+      setUploadedRecordingUrl(signData.publicUrl)
+
+      // 2단계: URL로 AI 분석 요청 (파일 본문 없이 소형 JSON 요청)
+      const res = await fetch('/api/analyze-recording', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileUrl: signData.publicUrl, filename: file.name }),
+      })
+      const data = await res.json()
+      if (data.analysis) {
+        setAnalysis(data.analysis)
+        if (!data.analysis.parse_error) {
+          if (data.analysis.checklist) setChecklist(prev => ({ ...prev, ...data.analysis.checklist }))
+          if (data.analysis.customer_info) {
+            const ci = data.analysis.customer_info
+            setForm(prev => ({
+              ...prev,
+              company:            ci.company        || prev.company,
+              ceo_name:           ci.ceo_name       || prev.ceo_name,
+              phone_010:          ci.phone_010       || prev.phone_010,
+              business_age:       ci.business_age   || prev.business_age,
+              annual_revenue:     ci.annual_revenue  || prev.annual_revenue,
+              industry:           ci.industry        || prev.industry,
+              credit_score:       ci.credit_score    || prev.credit_score,
+              required_fund:      ci.required_fund   || prev.required_fund,
+              delinquency_detail: ci.has_delinquency != null ? (ci.has_delinquency ? '있음' : '없음') : prev.delinquency_detail,
+            }))
           }
+          showToast('녹취 처리 완료')
+        } else {
+          if (data.analysis.checklist) setChecklist(prev => ({ ...prev, ...data.analysis.checklist }))
+          showToast('녹취 업로드 완료')
         }
-      } catch (err: any) {
-        console.error('analyze-recording catch:', err)
-        showToast('녹취 업로드 완료 (분석 실패 — 직접 입력)')
       }
-      setAnalyzing(false)
+    } catch (err: any) {
+      console.error('processRecordingFile error:', err)
+      showToast('녹취 업로드 완료 (분석 실패 — 직접 입력)')
     }
+    setAnalyzing(false)
   }
 
   function handleRecordingChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -416,32 +433,31 @@ export default function DigDashboard({ userId, userName, username }: Props) {
     let recording_url = ''
     let recording_filename = ''
     if (recordingFile) {
-      setUploading(true)
-      try {
-        // 1단계: 서버에서 서명된 업로드 URL 발급
-        const signRes = await fetch('/api/storage-sign', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename: recordingFile.name }),
-        })
-        const signData = await signRes.json()
-        if (!signData.signedUrl) { showToast(signData.error || '업로드 준비 실패', 'error'); setSubmitting(false); setUploading(false); return }
-
-        // 2단계: 브라우저에서 Supabase에 직접 업로드 (Vercel 크기 제한 우회)
-        const ext = (recordingFile.name.split('.').pop() || 'mp3').toLowerCase()
-        const mimeMap: Record<string, string> = { m4a: 'audio/mp4', mp3: 'audio/mpeg', wav: 'audio/wav', aac: 'audio/aac', ogg: 'audio/ogg', mp4: 'audio/mp4' }
-        const contentType = (recordingFile.type && recordingFile.type !== 'audio/x-m4a') ? recordingFile.type : (mimeMap[ext] || 'audio/mpeg')
-        const putRes = await fetch(signData.signedUrl, {
-          method: 'PUT',
-          headers: { 'Content-Type': contentType },
-          body: recordingFile,
-        })
-        if (!putRes.ok) { showToast(`업로드 실패 (${putRes.status})`, 'error'); setSubmitting(false); setUploading(false); return }
-
-        recording_url = signData.publicUrl
+      if (uploadedRecordingUrl) {
+        // 파일 선택 시 이미 업로드됨 — 재사용
+        recording_url = uploadedRecordingUrl
         recording_filename = recordingFile.name
-      } catch (e: any) { showToast('업로드 오류: ' + (e?.message || '알 수 없음'), 'error'); setSubmitting(false); setUploading(false); return }
-      setUploading(false)
+      } else {
+        // 혹시 업로드 안 됐으면 다시 시도
+        setUploading(true)
+        try {
+          const signRes = await fetch('/api/storage-sign', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: recordingFile.name }),
+          })
+          const signData = await signRes.json()
+          if (!signData.signedUrl) { showToast(signData.error || '업로드 준비 실패', 'error'); setSubmitting(false); setUploading(false); return }
+          const ext = (recordingFile.name.split('.').pop() || 'mp3').toLowerCase()
+          const mimeMap: Record<string, string> = { m4a: 'audio/mp4', mp3: 'audio/mpeg', wav: 'audio/wav', aac: 'audio/aac', ogg: 'audio/ogg', mp4: 'audio/mp4' }
+          const contentType = (recordingFile.type && recordingFile.type !== 'audio/x-m4a') ? recordingFile.type : (mimeMap[ext] || 'audio/mpeg')
+          const putRes = await fetch(signData.signedUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: recordingFile })
+          if (!putRes.ok) { showToast(`업로드 실패 (${putRes.status})`, 'error'); setSubmitting(false); setUploading(false); return }
+          recording_url = signData.publicUrl
+          recording_filename = recordingFile.name
+        } catch (e: any) { showToast('업로드 오류: ' + (e?.message || '알 수 없음'), 'error'); setSubmitting(false); setUploading(false); return }
+        setUploading(false)
+      }
     }
     try {
       const res  = await fetch('/api/dig-prospects', {
