@@ -59,6 +59,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
         details: {
           sub_status: 'lead',    // 공가DB 상태 (프론트 상태)
           supply_source: 'self_supply',  // 자체공급 식별자
+          reception_date: new Date().toISOString().slice(0, 10),  // 공급일 자동 설정
           company: prospect.company,
           sales_user_name: assigned_to_name,
           // 영업팀 InCallCard 필드명으로 매핑
