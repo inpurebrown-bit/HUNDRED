@@ -53,7 +53,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       .insert({
         name: prospect.ceo_name || '(미입력)',
         phone: prospect.phone_010 || prospect.phone,
-        source: 'self',          // DB CHECK: 'self'|'lead'
+        source: 'lead',          // DB CHECK: 'self'|'lead' — 자체공급도 공급파이프라인(공가) 경로
         status: 'active',        // DB CHECK: 'active'|'contracted'
         owner_id: assigned_to,
         details: {

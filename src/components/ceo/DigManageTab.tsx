@@ -229,7 +229,7 @@ export default function DigManageTab() {
       }),
     })
     if (res.ok) {
-      showToast(`${salesUser?.name}에게 배정 완료 — 직가DB로 이동됩니다`)
+      showToast(`${salesUser?.name}에게 배정 완료 — 공급DB로 이동됩니다`)
       setExpanded(null)
       await load()
     } else {
@@ -548,7 +548,7 @@ export default function DigManageTab() {
                   className={`w-full py-2.5 text-white text-sm font-bold rounded-xl disabled:opacity-50 transition-colors ${
                     p.urgent_assign ? 'bg-red-500 hover:bg-red-600' : 'bg-[#1B2A45] hover:bg-[#1B2A45]/90'
                   }`}>
-                  {processing === p.id ? '배정 중...' : '배정 확정 → 영업팀 직가DB 이동'}
+                  {processing === p.id ? '배정 중...' : '배정 확정 → 영업팀 공급DB 이동'}
                 </button>
               </div>
             )}
@@ -556,7 +556,7 @@ export default function DigManageTab() {
             {/* 배정 완료 */}
             {p.status === 'assigned' && (
               <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 text-xs text-blue-700">
-                <p className="font-semibold">→ {p.assigned_to_name} 배정 완료 (영업팀 직가DB)</p>
+                <p className="font-semibold">→ {p.assigned_to_name} 배정 완료 (영업팀 공급DB)</p>
               </div>
             )}
 
