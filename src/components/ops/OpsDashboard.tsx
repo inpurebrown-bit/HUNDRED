@@ -583,6 +583,19 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
   // 1차 입금 저장 상태
   const [feeSaving, setFeeSaving] = useState(false)
   const [feeSaved,  setFeeSaved]  = useState(false)
+  // 매출 귀속 담당자 선택용 ops + ceo 목록
+  const [revenueOwnerOptions, setRevenueOwnerOptions] = useState<string[]>([])
+  useEffect(() => {
+    fetch('/api/users?role=ops')
+      .then(r => r.json())
+      .then(data => {
+        const names: string[] = (data.users || []).map((u: any) => u.name)
+        // CEO 백승협 포함 (중복 제거)
+        if (!names.includes('백승협')) names.unshift('백승협')
+        setRevenueOwnerOptions(names)
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     const next = { ...c }
@@ -1870,6 +1883,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                   /* 잠금 상태 — 읽기 전용 표시 */
                   <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-xs">
                     {d.deposit_date && <div className="col-span-2"><span className="text-gray-400">날짜</span> <span className="font-medium text-gray-700">{d.deposit_date}</span></div>}
+                    {d.revenue_owner && <div className="col-span-2 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5"><span className="text-amber-600 text-[10px] font-bold">매출 귀속</span><br/><span className="font-bold text-amber-800 text-sm">{d.revenue_owner}</span></div>}
                     {d.deposit_institution && <div><span className="text-gray-400">기관명</span><br/><span className="font-medium text-gray-700">{d.deposit_institution}</span></div>}
                     {d.deposit_product    && <div><span className="text-gray-400">상품명</span><br/><span className="font-medium text-gray-700">{d.deposit_product}</span></div>}
                     {d.approval_amount && <div><span className="text-gray-400">승인금액</span><br/><span className="font-medium text-gray-700">{formatComma(d.approval_amount)}원</span></div>}
@@ -1949,6 +1963,20 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                         setLocal(next)
                         schedule({ details: { ...(local.details || {}), fee_rate: val, fee_amount: newFee } })
                       }} className={inp} placeholder="%" /></div>
+                    {/* 매출 귀속 담당자 */}
+                    <div className="col-span-2">
+                      <label className={lbl}>매출 귀속 담당자 <span className="text-amber-600 font-bold">(성공보수 실적 반영)</span></label>
+                      <select
+                        value={d.revenue_owner || ''}
+                        onChange={e => detailField('revenue_owner', e.target.value)}
+                        className={inp}
+                      >
+                        <option value="">— 담당자 선택 —</option>
+                        {revenueOwnerOptions.map(name => (
+                          <option key={name} value={name}>{name}</option>
+                        ))}
+                      </select>
+                    </div>
                     <div className="col-span-2">
                       <label className={lbl}>매출액 <span className="text-emerald-600 font-bold">(공급가액 · 자동산정)</span></label>
                       <div className="relative">
