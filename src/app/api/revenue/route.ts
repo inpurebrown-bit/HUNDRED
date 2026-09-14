@@ -47,16 +47,18 @@ export async function GET(req: NextRequest) {
     const isLeader = myName.includes('팀장')
     if (!isLeader) {
       opsCases = opsCases.filter((c: any) => {
-        const ownerMatch        = c.owner_id != null && String(c.owner_id).trim() === myId
-        const nameMatch         = c.ops_user_name && c.ops_user_name.trim() === myName
-        const detailsMatch      = c.details?.ops_user_name && String(c.details.ops_user_name).trim() === myName
-        // revenue_owner 설정된 경우 — CEO가 대신 입금해도 귀속 담당자에게 매출 표시
         const revenueOwnerMatch = c.details?.revenue_owner && String(c.details.revenue_owner).trim() === myName
-        // payment_entries 중 revenue_owner가 나인 것도 포함
         const peOwnerMatch = (c.details?.payment_entries || []).some(
           (pe: any) => pe.revenue_owner && String(pe.revenue_owner).trim() === myName
         )
-        return ownerMatch || nameMatch || detailsMatch || revenueOwnerMatch || peOwnerMatch
+        // ops_user_name이 있으면 반드시 그것으로 매칭 (owner_id는 팀 공유 계정일 수 있음)
+        const effectiveName = (c.ops_user_name || c.details?.ops_user_name || '').trim()
+        if (effectiveName) {
+          return effectiveName.includes(myName) || revenueOwnerMatch || peOwnerMatch
+        }
+        // ops_user_name이 없으면 owner_id로 fallback
+        const ownerMatch = c.owner_id != null && String(c.owner_id).trim() === myId
+        return ownerMatch || revenueOwnerMatch || peOwnerMatch
       })
     }
   }
