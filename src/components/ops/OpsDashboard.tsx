@@ -4219,6 +4219,7 @@ function OpsReportTab({ userId, userName, activeCases }: { userId: string; userN
   const [pastReports, setPastReports] = useState<any[]>([])
   const [viewReport, setViewReport] = useState<any | null>(null)
   const [monthRevenue, setMonthRevenue] = useState<number | null>(null)
+  const [putoCount, setPutoCount] = useState<number | null>(null)
 
   // 2차흡수 업체별 자금 입력
   const [stage2Notes, setStage2Notes] = useState<Record<string, { fund: string; note: string }>>({})
@@ -4266,9 +4267,42 @@ function OpsReportTab({ userId, userName, activeCases }: { userId: string; userN
     fetch('/api/revenue').then(r => r.json()).then(d => {
       const total = (d.thisMonthOps || []).reduce((s: number, e: any) => s + (e.amount || 0), 0)
       setMonthRevenue(total)
+      setPutoCount(d.thisMonthPutoCount ?? null)
     }).catch(() => {})
     fetch('/api/reports').then(r => r.json()).then(d => setPastReports(d.reports || []))
   }, [submitted])
+
+  // 어제와 동일: 최근 보고 내용을 현재 폼에 불러오기
+  function loadYesterdayReport() {
+    const opsR = pastReports.filter(r => r.report_type === 'ops_daily' || r.report_type === 'ops_morning')
+    const latest = opsR[0]
+    if (!latest) return
+    // stage2_notes: caseId 또는 업체명으로 매칭
+    const newStage2: Record<string, { fund: string; note: string }> = {}
+    for (const c of stage2Cases) {
+      const name = getCaseName(c)
+      const past = (latest.data?.stage2_notes || []).find(
+        (p: any) => p.caseId === c.id || p.company === name
+      )
+      if (past && (past.fund || past.note)) {
+        newStage2[c.id] = { fund: past.fund || '', note: past.note || '' }
+      }
+    }
+    // active_case_notes: caseId 또는 업체명으로 매칭
+    const newCaseNotes: Record<string, string> = {}
+    for (const c of processingCases) {
+      const name = getCaseName(c)
+      const past = (latest.data?.active_case_notes || latest.data?.processed || []).find(
+        (p: any) => p.caseId === c.id || p.company === name
+      )
+      if (past && past.note) {
+        newCaseNotes[c.id] = past.note
+      }
+    }
+    setStage2Notes(newStage2)
+    setCaseNotes(newCaseNotes)
+    setSpecialNotes(latest.data?.special_notes || '')
+  }
 
   async function handleSubmit() {
     setSubmitting(true)
@@ -4343,10 +4377,13 @@ function OpsReportTab({ userId, userName, activeCases }: { userId: string; userN
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div className="bg-white/10 rounded-lg px-3 py-2 text-center">
-            <p className="text-white/50 text-[10px] mb-0.5">이달 수수료</p>
+            <p className="text-white/50 text-[10px] mb-0.5">이달 매출</p>
             <p className="text-white font-black text-base">
               {monthRevenue === null ? '—' : monthRevenue >= 10000 ? Math.round(monthRevenue / 10000) + '만' : monthRevenue.toLocaleString()}
             </p>
+            {putoCount !== null && putoCount > 0 && (
+              <p className="text-sky-300 text-[9px] mt-0.5">뿌토 {putoCount}건</p>
+            )}
           </div>
           {[
             { label: '실사 전', cases: realInspCases },
@@ -4460,6 +4497,20 @@ function OpsReportTab({ userId, userName, activeCases }: { userId: string; userN
           className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400/50 resize-none"
         />
       </div>
+
+      {/* 어제와 동일 버튼 */}
+      {pastReports.filter(r => r.report_type === 'ops_daily' || r.report_type === 'ops_morning').length > 0 && (
+        <button
+          type="button"
+          onClick={loadYesterdayReport}
+          className="w-full bg-white border border-[#1B2A45]/20 hover:border-[#1B2A45]/50 text-[#1B2A45]/70 hover:text-[#1B2A45] py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2">
+          <span className="text-base">↩</span>
+          어제와 동일 — 이전 보고 내용 불러오기
+          <span className="text-[10px] text-gray-400 font-normal">
+            ({pastReports.filter(r => r.report_type === 'ops_daily' || r.report_type === 'ops_morning')[0]?.report_date})
+          </span>
+        </button>
+      )}
 
       <button onClick={handleSubmit} disabled={submitting}
         className="w-full bg-violet-500 hover:bg-violet-600 disabled:opacity-50 text-white py-3 rounded-xl text-sm font-semibold transition-colors">
