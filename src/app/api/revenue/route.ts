@@ -81,6 +81,12 @@ export async function GET(req: NextRequest) {
   // ── 관리팀 수수료 리스트 변환 ────────────────────────────────────────
   // fee_amount(1차) + payment_entries[*].fee_amount(추가)
   // creator_role: owner_id의 role — 'ops' 계정만 급여 귀속, 대표(ceo/admin)는 회사 매출만
+  // 이름 → id 역방향 맵 (revenue_owner 이름으로 user_id 조회용)
+  const userNameToId: Record<string, string> = {}
+  for (const u of (usersRaw || [])) {
+    userNameToId[(u.name || '').trim()] = String(u.id)
+  }
+
   const todayStr = new Date().toISOString().slice(0, 10)
   const opsEntries: OpsEntry[] = (opsCases || [])
     .flatMap((c: any) => {
@@ -91,14 +97,19 @@ export async function GET(req: NextRequest) {
       const creatorRole = ownerIdStr ? (userRoleMap[ownerIdStr] || 'unknown') : ''
       const fee1 = parseMoney(d.fee_amount)
       if (fee1 > 0) {
-        // deposit_date 우선 → updated_at → created_at → 오늘 (반드시 날짜 있어야 월별 집계 가능)
+        // revenue_owner 설정 시 해당 이름으로 매출 귀속 (ops_user_id는 이름으로 역조회)
+        const revenueOwnerName = d.revenue_owner || ''
+        const resolvedName = revenueOwnerName || c.ops_user_name || d.ops_user_name || ''
+        const resolvedId   = revenueOwnerName
+          ? (userNameToId[revenueOwnerName] || revenueOwnerName)
+          : String(c.owner_id || '')
         const entryDate = d.deposit_date || c.created_at?.slice(0, 10) || todayStr
         entries.push({
           id: `${c.id}_1`,
           amount: fee1,
           date: entryDate,
-          ops_user_id: String(c.owner_id || ''),
-          ops_user_name: c.ops_user_name || d.ops_user_name || '',
+          ops_user_id: resolvedId,
+          ops_user_name: resolvedName,
           company: d.sales_customer_info?.company || d.company || c.customer_name || '',
           creator_role: creatorRole,
         })
@@ -106,12 +117,17 @@ export async function GET(req: NextRequest) {
       for (const pe of (d.payment_entries || [])) {
         const feeN = parseMoney(pe.fee_amount)
         if (feeN > 0) {
+          const peOwnerName = pe.revenue_owner || d.revenue_owner || ''
+          const peResolvedName = peOwnerName || c.ops_user_name || d.ops_user_name || ''
+          const peResolvedId   = peOwnerName
+            ? (userNameToId[peOwnerName] || peOwnerName)
+            : String(c.owner_id || '')
           entries.push({
             id: `${c.id}_${pe.id || entries.length}`,
             amount: feeN,
             date: pe.date || c.created_at?.slice(0, 10) || todayStr,
-            ops_user_id: String(c.owner_id || ''),
-            ops_user_name: c.ops_user_name || d.ops_user_name || '',
+            ops_user_id: peResolvedId,
+            ops_user_name: peResolvedName,
             company: d.sales_customer_info?.company || d.company || c.customer_name || '',
             creator_role: creatorRole,
           })
