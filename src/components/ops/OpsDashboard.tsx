@@ -3952,9 +3952,9 @@ interface OpsDailyReport {
 // ──────────────────────────────────────────────────────────────────────
 function OpsMiniRevenue({ userName }: { userName: string }) {
   const [rev, setRev] = useState<any>(null)
-  const [monthlySubCount, setMonthlySubCount] = useState<number | null>(null)
+  const [monthlySubCount, setMonthlySubCount] = useState<number>(0)
 
-  useEffect(() => {
+  function load() {
     fetch('/api/revenue')
       .then(r => r.json())
       .then(d => setRev(d))
@@ -3974,7 +3974,9 @@ function OpsMiniRevenue({ userName }: { userName: string }) {
         setMonthlySubCount(count)
       })
       .catch(() => {})
-  }, [])
+  }
+
+  useEffect(() => { load() }, [])
 
   function fmtMoney(n: number) {
     if (n >= 100_000_000) return (n / 100_000_000).toFixed(1) + '억'
@@ -3982,42 +3984,75 @@ function OpsMiniRevenue({ userName }: { userName: string }) {
     return n.toLocaleString() + '원'
   }
 
-  // 대표(ceo/unknown) 직접 처리 케이스 제외 — 본인 귀속 매출만 표시
-  const myOps = (rev?.thisMonthOps || []).filter((e: any) => e.creator_role === 'ops' || e.creator_role === '')
-  const feeTotal = myOps.reduce((s: number, e: any) => s + (e.amount || 0), 0)
-  const contractTotal = (rev?.thisMonthOpsContracts || []).reduce((s: number, e: any) => s + (e.amount || 0), 0)
+  // API 레벨에서 이미 본인 케이스만 필터링됨 (revenue_owner 포함)
+  const feeTotal = (rev?.thisMonthOps || []).reduce((s: number, e: any) => s + (e.amount || 0), 0)
+  const feeCount = (rev?.thisMonthOps || []).length
+  const contractEntries = rev?.thisMonthOpsContracts || []
+  const putoEntries = contractEntries.filter((e: any) => e.type === 'puto')
+  const directEntries = contractEntries.filter((e: any) => e.type !== 'puto')
+  const putoTotal = putoEntries.reduce((s: number, e: any) => s + (e.amount || 0), 0)
+  const contractTotal = contractEntries.reduce((s: number, e: any) => s + (e.amount || 0), 0)
   const total = feeTotal + contractTotal
   const monthLabel = new Date().getMonth() + 1
+  const achievePct = feeTotal > 0 ? Math.min(100, Math.round(feeTotal / (feeTotal + 10) * 100)) : 0
 
   return (
-    <div className="bg-gradient-to-r from-[#1B2A45] to-[#2d4a7a] rounded-xl px-5 py-4 text-white mt-4">
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-white/70 text-xs font-semibold">{monthLabel}월 내 매출</p>
-        <button onClick={() => fetch('/api/revenue').then(r=>r.json()).then(d=>setRev(d))}
-          className="text-white/40 hover:text-white/70 text-[10px]">↺</button>
-      </div>
-      <p className="text-2xl font-black tracking-tight">{rev ? fmtMoney(total) : '—'}</p>
-      <div className="flex gap-3 mt-3">
-        <div className="flex-1 bg-white/10 rounded-lg px-3 py-2 text-center">
-          <p className="text-white/50 text-[9px] mb-0.5">수수료 매출</p>
-          <p className="text-emerald-300 font-black text-sm">{rev ? fmtMoney(feeTotal) : '—'}</p>
-          <p className="text-white/30 text-[9px] mt-0.5">{rev ? myOps.length + '건' : ''}</p>
-        </div>
-        <div className="flex-1 bg-white/10 rounded-lg px-3 py-2 text-center">
-          <p className="text-white/50 text-[9px] mb-0.5">계약 매출</p>
-          <p className="text-sky-300 font-black text-sm">{rev ? fmtMoney(contractTotal) : '—'}</p>
-          <p className="text-white/30 text-[9px] mt-0.5">{rev ? (rev.thisMonthOpsContracts?.length || 0) + '건' : ''}</p>
-        </div>
-      </div>
-      {monthlySubCount !== null && monthlySubCount > 0 && (
-        <div className="mt-2 bg-purple-600/40 rounded-lg px-3 py-2 flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-purple-200 font-bold">월정기권</span>
-            <span className="text-[9px] text-purple-300">이달 진행중</span>
+    <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+      {/* 헤더 */}
+      <div className="bg-gradient-to-r from-[#1B2A45] to-[#2d4a7a] px-5 py-4 flex items-center justify-between">
+        <div>
+          <p className="text-[11px] text-white/50 font-medium uppercase tracking-widest mb-0.5">{monthLabel}월 내 매출</p>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-black text-white">{rev ? fmtMoney(total) : '—'}</span>
           </div>
-          <span className="text-white font-black text-sm">{monthlySubCount}건</span>
         </div>
-      )}
+        <div className="text-right">
+          <button onClick={load} className="text-white/30 hover:text-white/60 text-[10px] mb-1 block ml-auto">↺</button>
+          <div className="flex flex-col gap-0.5 items-end">
+            <span className="text-[10px] text-emerald-300 font-semibold">수수료 {rev ? fmtMoney(feeTotal) : '—'}</span>
+            <span className="text-[10px] text-sky-300 font-semibold">계약 {rev ? fmtMoney(contractTotal) : '—'}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 매출 세부 지표 */}
+      <div className="p-4 space-y-3">
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-xl bg-emerald-50 p-3 text-center">
+            <p className="text-[9px] text-emerald-500 font-semibold mb-1">수수료 매출</p>
+            <p className="text-xl font-black text-emerald-700 leading-none">{rev ? fmtMoney(feeTotal) : '—'}</p>
+            <p className="text-[8px] text-emerald-400 mt-1">{feeCount}건</p>
+          </div>
+          <div className="rounded-xl bg-sky-50 p-3 text-center">
+            <p className="text-[9px] text-sky-500 font-semibold mb-1">뿌토 계약</p>
+            <p className="text-xl font-black text-sky-700 leading-none">{rev ? fmtMoney(putoTotal) : '—'}</p>
+            <p className="text-[8px] text-sky-400 mt-1">{putoEntries.length}건</p>
+          </div>
+          <div className="rounded-xl bg-violet-50 p-3 text-center">
+            <p className="text-[9px] text-violet-500 font-semibold mb-1">직접 계약</p>
+            <p className="text-xl font-black text-violet-700 leading-none">{rev ? fmtMoney(directEntries.reduce((s: number, e: any) => s + (e.amount || 0), 0)) : '—'}</p>
+            <p className="text-[8px] text-violet-400 mt-1">{directEntries.length}건</p>
+          </div>
+        </div>
+
+        {/* 월정기권 + 뿌토 활동 */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-purple-50 border border-purple-100 rounded-xl px-3 py-2.5 flex items-center justify-between">
+            <div>
+              <p className="text-[9px] text-purple-400 font-semibold">월정기권</p>
+              <p className="text-[8px] text-purple-300 mt-0.5">이달 진행중</p>
+            </div>
+            <span className="text-xl font-black text-purple-700">{monthlySubCount}</span>
+          </div>
+          <div className="bg-sky-50 border border-sky-100 rounded-xl px-3 py-2.5 flex items-center justify-between">
+            <div>
+              <p className="text-[9px] text-sky-500 font-semibold">이달 뿌토</p>
+              <p className="text-[8px] text-sky-400 mt-0.5">계약 건수</p>
+            </div>
+            <span className="text-xl font-black text-sky-700">{rev ? putoEntries.length : '—'}</span>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -4048,10 +4083,9 @@ function OpsRevenueTab({ userName }: { userName: string }) {
   const now = new Date()
   const monthLabel = now.getMonth() + 1
 
-  // 수수료 매출 — 대표(ceo/unknown) 직접 처리 케이스 제외, 본인 귀속 매출만 표시
+  // 수수료 매출 — API 레벨에서 이미 본인 귀속 매출만 필터링됨 (revenue_owner 포함)
   const feeEntries: { company: string; amount: number; date: string }[] =
     (data?.thisMonthOps || [])
-      .filter((e: any) => e.creator_role === 'ops' || e.creator_role === '')
       .map((e: any) => ({
         company: e.company || '—', amount: e.amount, date: e.date || '',
       }))
@@ -4951,19 +4985,22 @@ export default function OpsDashboard({ userId, userName }: Props) {
                 </button>
               </div>
 
+              {/* 이달 매출 — 메인보드 (제일 위) */}
+              <OpsMiniRevenue userName={userName} />
+
               {/* 주요 케이스 현황 */}
               <div className="grid grid-cols-2 gap-3">
                 <button onClick={() => setActiveTab('active')}
-                  className="bg-gradient-to-br from-[#1B2A45] to-[#2d4270] rounded-2xl p-4 text-white text-left shadow active:scale-[0.98] transition-transform">
-                  <p className="text-4xl font-black">{activeCases.length}</p>
-                  <p className="text-sm font-bold mt-1 opacity-90">진행중업체</p>
-                  <p className="text-[10px] opacity-50 mt-0.5">탭하여 상세보기 →</p>
+                  className="bg-white border border-[#1B2A45]/10 rounded-2xl p-4 text-left shadow-sm active:scale-[0.98] transition-transform hover:border-[#1B2A45]/30">
+                  <p className="text-4xl font-black text-[#1B2A45]">{activeCases.length}</p>
+                  <p className="text-sm font-bold mt-1 text-[#1B2A45]/80">진행중업체</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">탭하여 상세보기 →</p>
                 </button>
                 <button onClick={() => setActiveTab('newdb')}
-                  className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-4 text-white text-left shadow active:scale-[0.98] transition-transform">
-                  <p className="text-4xl font-black">{newdbCases.length}</p>
-                  <p className="text-sm font-bold mt-1 opacity-90">신규DB</p>
-                  <p className="text-[10px] opacity-50 mt-0.5">흡수 대기 중 →</p>
+                  className="bg-white border border-emerald-200 rounded-2xl p-4 text-left shadow-sm active:scale-[0.98] transition-transform hover:border-emerald-400">
+                  <p className="text-4xl font-black text-emerald-600">{newdbCases.length}</p>
+                  <p className="text-sm font-bold mt-1 text-emerald-700">신규DB (뿌토)</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">흡수 대기 중 →</p>
                 </button>
               </div>
 
@@ -4984,9 +5021,6 @@ export default function OpsDashboard({ userId, userName }: Props) {
                   <p className="text-[10px] text-gray-500 mt-0.5 font-medium">종료</p>
                 </button>
               </div>
-
-              {/* 이달 매출 */}
-              <OpsMiniRevenue userName={userName} />
 
               {/* 기관별 현황 */}
               <DashboardOverview cases={cases} />

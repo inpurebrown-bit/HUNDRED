@@ -47,10 +47,16 @@ export async function GET(req: NextRequest) {
     const isLeader = myName.includes('팀장')
     if (!isLeader) {
       opsCases = opsCases.filter((c: any) => {
-        const ownerMatch   = c.owner_id != null && String(c.owner_id).trim() === myId
-        const nameMatch    = c.ops_user_name && c.ops_user_name.trim() === myName
-        const detailsMatch = c.details?.ops_user_name && String(c.details.ops_user_name).trim() === myName
-        return ownerMatch || nameMatch || detailsMatch
+        const ownerMatch        = c.owner_id != null && String(c.owner_id).trim() === myId
+        const nameMatch         = c.ops_user_name && c.ops_user_name.trim() === myName
+        const detailsMatch      = c.details?.ops_user_name && String(c.details.ops_user_name).trim() === myName
+        // revenue_owner 설정된 경우 — CEO가 대신 입금해도 귀속 담당자에게 매출 표시
+        const revenueOwnerMatch = c.details?.revenue_owner && String(c.details.revenue_owner).trim() === myName
+        // payment_entries 중 revenue_owner가 나인 것도 포함
+        const peOwnerMatch = (c.details?.payment_entries || []).some(
+          (pe: any) => pe.revenue_owner && String(pe.revenue_owner).trim() === myName
+        )
+        return ownerMatch || nameMatch || detailsMatch || revenueOwnerMatch || peOwnerMatch
       })
     }
   }
@@ -369,6 +375,10 @@ export async function GET(req: NextRequest) {
   const putoContractCount = (opsCases || []).filter((c: any) =>
     parseMoney(c.details?.puto_contract_amount) > 0
   ).length
+  // 이달 뿌토 계약 건수
+  const thisMonthPutoCount = opsContractEntries.filter(
+    e => e.type === 'puto' && e.date?.startsWith(thisMonthKey)
+  ).length
 
   return NextResponse.json({
     monthly,
@@ -378,6 +388,7 @@ export async function GET(req: NextRequest) {
     totalOps,
     total: totalSales + totalOps,
     putoContractCount,
+    thisMonthPutoCount,
     thisMonthSales,
     thisMonthOps,
     thisMonthOpsContracts,
