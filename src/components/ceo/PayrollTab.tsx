@@ -16,6 +16,7 @@ interface OpsEmployee {
   performance_bonus: number
   monthly_sub_bonus: number  // 월정기권 5% 보너스 (관리팀장)
   fee_details?: OpsFeeDetail[]
+  awards: AwardItem[]
 }
 
 interface AwardItem { reason: string; amount: number }
@@ -33,6 +34,7 @@ interface DigEmployee {
   approved_count: number  // 해당 월 승인 건수 (자동)
   join_date?: string      // 입사일 (일할계산용)
   resign_date?: string    // 퇴사일 (일할계산용)
+  awards: AwardItem[]
 }
 
 interface OtherCostItem { label: string; amount: number }
@@ -51,12 +53,13 @@ interface OtherCosts {
 // ─── 계산 ─────────────────────────────────────────────────
 
 function calcOps(e: OpsEmployee) {
-  const feeInc  = Math.round(Number(e.fee_revenue)  * OPS_FEE_RATE)
-  const putoInc = Math.round(Number(e.puto_revenue) * OPS_PUTO_RATE)
+  const feeInc   = Math.round(Number(e.fee_revenue)  * OPS_FEE_RATE)
+  const putoInc  = Math.round(Number(e.puto_revenue) * OPS_PUTO_RATE)
   const subBonus = Number(e.monthly_sub_bonus || 0)
-  const before  = Number(e.base_salary) + feeInc + putoInc + Number(e.performance_bonus) + subBonus
-  const after   = Math.round(before * NET_RATE)
-  return { feeInc, putoInc, subBonus, before, after }
+  const awardsSum = (e.awards || []).reduce((s, a) => s + Number(a.amount || 0), 0)
+  const before   = Number(e.base_salary) + feeInc + putoInc + Number(e.performance_bonus) + subBonus + awardsSum
+  const after    = Math.round(before * NET_RATE)
+  return { feeInc, putoInc, subBonus, awardsSum, before, after }
 }
 
 function calcSales(e: SalesEmployee) {
@@ -87,7 +90,11 @@ function calcDig(e: DigEmployee, yearMonth: string) {
     workedDays = resignDay
     totalDays  = daysInMonth
   }
-  return calcDigSalary(e.approved_count, workedDays, totalDays)
+  const base = calcDigSalary(e.approved_count, workedDays, totalDays)
+  const awardsSum = (e.awards || []).reduce((s, a) => s + Number(a.amount || 0), 0)
+  const before = base.before + awardsSum
+  const after  = Math.round(before * NET_RATE)
+  return { ...base, awardsSum, before, after }
 }
 
 // ─── 유틸 ─────────────────────────────────────────────────
@@ -114,13 +121,13 @@ function nowTimestamp() {
 }
 
 function defaultOps(): OpsEmployee {
-  return { name: '', base_salary: 0, fee_revenue: 0, puto_revenue: 0, performance_bonus: 0, monthly_sub_bonus: 0 }
+  return { name: '', base_salary: 0, fee_revenue: 0, puto_revenue: 0, performance_bonus: 0, monthly_sub_bonus: 0, awards: [] }
 }
 function defaultSales(): SalesEmployee {
   return { name: '', contract_revenue: 0, contract_count: 0, performance_bonus: 0, awards: [] }
 }
 function defaultDig(): DigEmployee {
-  return { name: '', approved_count: 0 }
+  return { name: '', approved_count: 0, awards: [] }
 }
 function defaultCosts(): OtherCosts {
   return { db_count: 0, db_unit_price: 40000, rent: 650000, mgmt: 400000, sales_fixed: 820000, sales_other_items: [],
@@ -168,11 +175,14 @@ function PayRow({
 // ─── 관리팀 직원 카드 ─────────────────────────────────────
 
 function OpsCard({
-  emp, idx, onChange, onRemove,
+  emp, idx, onChange, onRemove, onAddAward, onUpdateAward, onRemoveAward,
 }: {
   emp: OpsEmployee; idx: number
   onChange: (i: number, f: keyof OpsEmployee, v: string) => void
   onRemove: (i: number) => void
+  onAddAward: (i: number) => void
+  onUpdateAward: (ei: number, ai: number, f: keyof AwardItem, v: string) => void
+  onRemoveAward: (ei: number, ai: number) => void
 }) {
   const c = calcOps(emp)
   return (
@@ -206,6 +216,32 @@ function OpsCard({
         {c.subBonus > 0 && (
           <PayRow label="월정기권보너스(5%)" value={c.subBonus} autoTag colorClass="text-violet-600" />
         )}
+        {/* 시상금 */}
+        <div className="py-1.5 border-b border-gray-50">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-400">시상금</span>
+            <div className="flex items-center gap-2">
+              <button onClick={() => onAddAward(idx)}
+                className="text-[10px] text-[#1B2A45] border border-[#1B2A45]/30 rounded px-1.5 py-0.5 hover:bg-[#1B2A45]/10">
+                + 추가
+              </button>
+              <span className="text-xs font-semibold text-gray-700">
+                {c.awardsSum > 0 ? c.awardsSum.toLocaleString('ko-KR') + '원' : '-'}
+              </span>
+            </div>
+          </div>
+          {(emp.awards || []).map((aw, ai) => (
+            <div key={ai} className="flex items-center gap-1.5 mt-1.5">
+              <input type="text" value={aw.reason} placeholder="사유"
+                onChange={e => onUpdateAward(idx, ai, 'reason', e.target.value)}
+                className="flex-1 min-w-0 text-[11px] border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-300 text-gray-600" />
+              <input type="text" inputMode="numeric" value={fmtInput(aw.amount)} placeholder="금액"
+                onChange={e => onUpdateAward(idx, ai, 'amount', e.target.value)}
+                className="w-24 text-right text-[11px] border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-300 text-gray-600" />
+              <button onClick={() => onRemoveAward(idx, ai)} className="text-red-300 hover:text-red-500 text-xs">✕</button>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -299,11 +335,14 @@ function SalesCard({
 // ─── 발굴팀 직원 카드 ─────────────────────────────────────
 
 function DigCard({
-  emp, idx, yearMonth, onChange, onRemove,
+  emp, idx, yearMonth, onChange, onRemove, onAddAward, onUpdateAward, onRemoveAward,
 }: {
   emp: DigEmployee; idx: number; yearMonth: string
   onChange: (i: number, f: keyof DigEmployee, v: string) => void
   onRemove: (i: number) => void
+  onAddAward: (i: number) => void
+  onUpdateAward: (ei: number, ai: number, f: keyof AwardItem, v: string) => void
+  onRemoveAward: (ei: number, ai: number) => void
 }) {
   const c = calcDig(emp, yearMonth)
   return (
@@ -340,6 +379,32 @@ function DigCard({
           value={c.incentive}
           colorClass={c.incentive > 0 ? 'text-orange-600' : undefined}
         />
+        {/* 시상금 */}
+        <div className="py-1.5 border-b border-gray-50">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-400">시상금</span>
+            <div className="flex items-center gap-2">
+              <button onClick={() => onAddAward(idx)}
+                className="text-[10px] text-orange-600 border border-orange-300/50 rounded px-1.5 py-0.5 hover:bg-orange-50">
+                + 추가
+              </button>
+              <span className="text-xs font-semibold text-gray-700">
+                {c.awardsSum > 0 ? c.awardsSum.toLocaleString('ko-KR') + '원' : '-'}
+              </span>
+            </div>
+          </div>
+          {(emp.awards || []).map((aw, ai) => (
+            <div key={ai} className="flex items-center gap-1.5 mt-1.5">
+              <input type="text" value={aw.reason} placeholder="사유"
+                onChange={e => onUpdateAward(idx, ai, 'reason', e.target.value)}
+                className="flex-1 min-w-0 text-[11px] border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-300 text-gray-600" />
+              <input type="text" inputMode="numeric" value={fmtInput(aw.amount)} placeholder="금액"
+                onChange={e => onUpdateAward(idx, ai, 'amount', e.target.value)}
+                className="w-24 text-right text-[11px] border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-300 text-gray-600" />
+              <button onClick={() => onRemoveAward(idx, ai)} className="text-red-300 hover:text-red-500 text-xs">✕</button>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -904,10 +969,37 @@ export default function PayrollTab() {
     setSalesEmps(prev => { const n = [...prev]; n[ei] = { ...n[ei], awards: n[ei].awards.filter((_, j) => j !== ai) }; return n })
   }
 
+  function addOpsAward(ei: number) {
+    setOpsEmps(prev => { const n = [...prev]; n[ei] = { ...n[ei], awards: [...(n[ei].awards || []), { reason: '', amount: 0 }] }; return n })
+  }
+  function updateOpsAward(ei: number, ai: number, f: keyof AwardItem, v: string) {
+    setOpsEmps(prev => {
+      const n = [...prev]; const aw = [...(n[ei].awards || [])]
+      aw[ai] = { ...aw[ai], [f]: f === 'amount' ? parseInput(v) : v }
+      n[ei] = { ...n[ei], awards: aw }; return n
+    })
+  }
+  function removeOpsAward(ei: number, ai: number) {
+    setOpsEmps(prev => { const n = [...prev]; n[ei] = { ...n[ei], awards: n[ei].awards.filter((_, j) => j !== ai) }; return n })
+  }
+
   function updateDig(i: number, f: keyof DigEmployee, v: string) {
     setDigEmps(prev => { const n = [...prev]; n[i] = { ...n[i], [f]: f === 'name' ? v : (f === 'approved_count' ? (parseInt(v.replace(/[^0-9]/g, ''), 10) || 0) : v) }; return n })
   }
   function removeDig(i: number) { setDigEmps(prev => prev.filter((_, j) => j !== i)) }
+  function addDigAward(ei: number) {
+    setDigEmps(prev => { const n = [...prev]; n[ei] = { ...n[ei], awards: [...(n[ei].awards || []), { reason: '', amount: 0 }] }; return n })
+  }
+  function updateDigAward(ei: number, ai: number, f: keyof AwardItem, v: string) {
+    setDigEmps(prev => {
+      const n = [...prev]; const aw = [...(n[ei].awards || [])]
+      aw[ai] = { ...aw[ai], [f]: f === 'amount' ? parseInput(v) : v }
+      n[ei] = { ...n[ei], awards: aw }; return n
+    })
+  }
+  function removeDigAward(ei: number, ai: number) {
+    setDigEmps(prev => { const n = [...prev]; n[ei] = { ...n[ei], awards: n[ei].awards.filter((_, j) => j !== ai) }; return n })
+  }
 
   // ── 손익 집계 ─────────────────────────────────────────────
   const opsCalcs   = opsEmps.map(calcOps)
@@ -1059,7 +1151,8 @@ export default function PayrollTab() {
           </div>
 
           {opsEmps.map((emp, i) => (
-            <OpsCard key={i} emp={emp} idx={i} onChange={updateOps} onRemove={removeOps} />
+            <OpsCard key={i} emp={emp} idx={i} onChange={updateOps} onRemove={removeOps}
+              onAddAward={addOpsAward} onUpdateAward={updateOpsAward} onRemoveAward={removeOpsAward} />
           ))}
 
           {/* 수수료 입금 내역 — 직원별 아코디언 */}
@@ -1122,7 +1215,8 @@ export default function PayrollTab() {
           </div>
 
           {digEmps.map((emp, i) => (
-            <DigCard key={i} emp={emp} idx={i} yearMonth={yearMonth} onChange={updateDig} onRemove={removeDig} />
+            <DigCard key={i} emp={emp} idx={i} yearMonth={yearMonth} onChange={updateDig} onRemove={removeDig}
+              onAddAward={addDigAward} onUpdateAward={updateDigAward} onRemoveAward={removeDigAward} />
           ))}
 
           <button onClick={() => setDigEmps(prev => [...prev, defaultDig()])}
