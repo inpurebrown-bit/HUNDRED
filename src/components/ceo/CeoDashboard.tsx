@@ -6,6 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } fro
 import Image from 'next/image'
 import Link from 'next/link'
 import MinutesTab from './MinutesTab'
+import OpsMinutesTab from './OpsMinutesTab'
 import CalendarTab from './CalendarTab'
 import { PnlSubView } from './PayRateTab'
 import PayrollTab from './PayrollTab'
@@ -73,18 +74,20 @@ function AnalyticsTab() {
 
 // 회의록·보고함 통합 탭
 function MinutesReportsTab() {
-  const [sub, setSub] = useState<'minutes' | 'reports'>('reports')
+  const [sub, setSub] = useState<'minutes' | 'ops_minutes' | 'reports'>('reports')
   return (
     <div>
       <SubTabBar
         tabs={[
           { key: 'reports' as const, label: '보고함' },
-          { key: 'minutes' as const, label: '회의록' },
+          { key: 'minutes' as const, label: '영업팀 회의' },
+          { key: 'ops_minutes' as const, label: '관리팀 회의' },
         ]}
         active={sub} onChange={setSub}
       />
       {sub === 'reports' && <ReportsTab isCeo={true} />}
       {sub === 'minutes' && <MinutesTab />}
+      {sub === 'ops_minutes' && <OpsMinutesTab />}
     </div>
   )
 }
