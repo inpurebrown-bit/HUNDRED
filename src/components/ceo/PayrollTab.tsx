@@ -522,8 +522,9 @@ export default function PayrollTab() {
         if (!name) return
         const w = parseFloat(String(c.details?.refund_deduction_weight || 0)) || 0
         if (w <= 0) return
+        const deductAmt = parseFloat(String(c.details?.refund_deduction_amount || 0)) || Math.round(w * 500_000)
         if (!details[name]) details[name] = []
-        details[name].push({ company: `[환불차감] ${c.details?.refund_company || c.details?.company || c.name || ''}`, amount: 0, weight: -w, date: dedMonth, refund: true })
+        details[name].push({ company: `[환불차감] ${c.details?.refund_company || c.details?.company || c.name || ''}`, amount: -deductAmt, weight: -w, date: dedMonth, refund: true })
       })
       setSalesContractMap(details)
     } catch { /* 목록 로드 실패해도 계속 */ }
@@ -715,7 +716,7 @@ export default function PayrollTab() {
         })
       }
 
-      // 전월 계약 → 이번달 환불 차감 (개수만, 금액 건드리지 않음)
+      // 전월 계약 → 이번달 환불 차감 (개수 + 금액 모두 차감)
       try {
         const custRes2 = await fetch('/api/customers')
         const custJson2 = await custRes2.json()
@@ -726,12 +727,14 @@ export default function PayrollTab() {
           if (!name) return
           const w = parseFloat(String(c.details?.refund_deduction_weight || 0)) || 0
           if (w <= 0) return
+          const deductAmt = parseFloat(String(c.details?.refund_deduction_amount || 0)) || Math.round(w * 500_000)
           if (!salesByName[name]) salesByName[name] = { amount: 0, count: 0 }
-          salesByName[name].count = Math.max(0, salesByName[name].count - w)
+          salesByName[name].count  = Math.max(0, salesByName[name].count - w)
+          salesByName[name].amount = Math.max(0, salesByName[name].amount - deductAmt)
           if (!contractDetails[name]) contractDetails[name] = []
           contractDetails[name].push({
             company: `[환불차감] ${c.details?.refund_company || c.details?.company || c.name || ''}`,
-            amount: 0,
+            amount: -deductAmt,
             weight: -w,
             date: dedMonth,
             refund: true,
@@ -1117,7 +1120,10 @@ export default function PayrollTab() {
                           <div className="flex items-center gap-3 text-gray-400">
                             <span>{c.date.slice(0, 10)}</span>
                             <span className={`font-semibold ${(c as any).refund ? 'text-rose-600' : 'text-amber-600'}`}>{parseFloat(Number(c.weight).toFixed(2))}개</span>
-                            {!(c as any).refund && <span>{c.amount > 0 ? c.amount.toLocaleString('ko-KR') + '원' : '—'}</span>}
+                            {(c as any).refund
+                              ? <span className="text-rose-600 font-semibold">{c.amount !== 0 ? c.amount.toLocaleString('ko-KR') + '원' : '—'}</span>
+                              : <span>{c.amount > 0 ? c.amount.toLocaleString('ko-KR') + '원' : '—'}</span>
+                            }
                           </div>
                         </div>
                       ))}
