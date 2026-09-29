@@ -7,7 +7,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 export const maxDuration = 120
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
-const MODEL = process.env.GEMINI_REPORT_MODEL || 'gemini-2.5-flash'
+const MODELS = [process.env.GEMINI_REPORT_MODEL, 'gemini-3.8-flash', 'gemini-3.1-flash-lite-preview'].filter(Boolean) as string[]
 
 const SYSTEM = `당신은 중소기업·소상공인 경영 컨설턴트입니다. 고객에게 "앞으로 어떻게 진행할 계획인지"를 소개하는 컨설팅 제안 보고서를 작성합니다.
 
@@ -88,13 +88,25 @@ export async function POST(req: NextRequest) {
     }
     parts.push({ text: `[미제출/미확인 서류] ${missing.length ? missing.join(', ') : '없음'}\n[작성일] ${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}\n위 자료로 보고서 JSON을 작성하세요.` })
 
-    const model = genAI.getGenerativeModel({
-      model: MODEL,
-      systemInstruction: SYSTEM,
-      generationConfig: { responseMimeType: 'application/json', temperature: 0.3 },
-    })
-    const result = await model.generateContent(parts)
-    const report = JSON.parse(result.response.text())
+    let text = ''
+    let lastErr: any = null
+    for (const name of MODELS) {
+      try {
+        const model = genAI.getGenerativeModel({
+          model: name,
+          systemInstruction: SYSTEM,
+          generationConfig: { responseMimeType: 'application/json', temperature: 0.3 },
+        })
+        const result = await model.generateContent(parts)
+        text = result.response.text()
+        break
+      } catch (e: any) {
+        lastErr = e
+        if (!/404|not found|no longer available/i.test(String(e?.message))) throw e
+      }
+    }
+    if (!text) throw lastErr || new Error('사용 가능한 모델 없음')
+    const report = JSON.parse(text)
     return NextResponse.json({
       report: { ...report, generatedAt: new Date().toISOString(), missingDocs: missing },
     })
