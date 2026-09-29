@@ -1,7 +1,9 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import ReportDoc, { type ConsultingReport, type Item } from './ConsultingReportDoc'
+export type { ConsultingReport }
 
 type DocKind = 'file' | 'amount' | 'vehicle'
 const DOC_TYPES: { key: string; label: string; hint?: string; kind: DocKind; amountLabel?: string }[] = [
@@ -30,29 +32,6 @@ function normalizeDocs(raw: Record<string, any> | null): Record<string, DocState
   }
   return out
 }
-interface Item { heading: string; text: string }
-interface Section { key: string; title: string; items: Item[] }
-export interface ConsultingReport {
-  headline: string
-  riskLevel: string
-  riskScore: number
-  metrics: { label: string; value: string }[]
-  crossCheck: { item: string; incall: string; document: string; status: string }[]
-  sections: Section[]
-  roadmap: { period: string; title: string; detail: string }[]
-  generatedAt: string
-  missingDocs?: string[]
-}
-
-const RISK_COLOR: Record<string, string> = {
-  '낮음': '#059669', '보통': '#d97706', '높음': '#dc2626',
-}
-const STATUS_STYLE: Record<string, string> = {
-  '일치': 'background:#ecfdf5;color:#047857',
-  '불일치': 'background:#fef2f2;color:#b91c1c',
-  '확인필요': 'background:#fffbeb;color:#b45309',
-}
-
 export default function ConsultingReportTab({ caseId, companyName, incall, credit, savedDocs, savedReport, onSave }: {
   caseId: string
   companyName: string
@@ -64,6 +43,9 @@ export default function ConsultingReportTab({ caseId, companyName, incall, credi
 }) {
   const [docs, setDocs] = useState<Record<string, DocState>>(() => normalizeDocs(savedDocs))
   const [dragKey, setDragKey] = useState('')
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const pagesRef = useRef<HTMLDivElement>(null)
+  const [scale, setScale] = useState(0.6)
   const [report, setReport] = useState<ConsultingReport | null>(savedReport)
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState<string>('')
@@ -128,9 +110,19 @@ export default function ConsultingReportTab({ caseId, companyName, incall, credi
         if (d.kind === 'vehicle') return [{ label: d.label, value: s.owned ? `보유, 대략 가격: ${s.price || '미입력'}` : '미보유' }]
         return []
       })
+      setBusy('research')
+      let research: any = null
+      try {
+        const rr = await fetch('/api/consulting-report', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'research', incall }),
+        })
+        if (rr.ok) research = (await rr.json()).research
+      } catch {}
+      setBusy('generate')
       const res = await fetch('/api/consulting-report', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ incall, credit, docs: payload, extras, absent }),
+        body: JSON.stringify({ mode: 'generate', incall, credit, docs: payload, extras, absent, research }),
       })
       const j = await res.json()
       if (!res.ok) throw new Error(j.error || '생성 실패')
@@ -163,21 +155,36 @@ export default function ConsultingReportTab({ caseId, companyName, incall, credi
     setReport({ ...report, sections: report.sections.map((s, a) => a !== si ? s : { ...s, items: s.items.filter((_, b) => b !== ii) }) })
   }
 
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const calc = () => setScale(Math.min(1, Math.max(0.3, (el.clientWidth - 16) / 794)))
+    calc()
+    const ro = new ResizeObserver(calc); ro.observe(el)
+    return () => ro.disconnect()
+  }, [view, editing, report])
+
+  function printReport() {
+    const host = pagesRef.current
+    if (!host) return
+    const safe = (companyName || '업체').replace(/[\/:*?"<>|]/g, '').trim()
+    const title = '헌드레드컨설팅_' + safe + ' 보고서'
+    const w = window.open('', '_blank')
+    if (!w) { setErr('팝업이 차단되었습니다. 팝업 허용 후 다시 눌러주세요.'); return }
+    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>' + title + '</title><style>' +
+      '@page{size:A4;margin:0}html,body{margin:0;padding:0;background:#fff}' +
+      '*{-webkit-print-color-adjust:exact;print-color-adjust:exact;box-sizing:border-box}' +
+      '.crd-page{width:794px!important;height:1122px!important;overflow:hidden;page-break-after:always;break-after:page;position:relative}.crd-page:last-child{page-break-after:auto;break-after:auto}' +
+      '</style></head><body>' + host.innerHTML + '</body></html>')
+    w.document.close()
+    setTimeout(() => { w.focus(); w.print() }, 600)
+  }
+
   const uploaded = DOC_TYPES.filter(d => (docs[d.key]?.files || []).length > 0).length
   const dateStr = report ? new Date(report.generatedAt).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric' }) : ''
 
   return (
     <div className="space-y-4">
-      <style>{`
-        @media print {
-          body * { visibility: hidden !important; }
-          #consulting-report-print, #consulting-report-print * { visibility: visible !important; }
-          #consulting-report-print { position: absolute; left: 0; top: 0; width: 100%; }
-          .crp-noprint { display: none !important; }
-          .crp-section { break-inside: avoid; }
-          @page { size: A4; margin: 12mm; }
-        }
-      `}</style>
 
       {/* 서류 체크리스트 */}
       {!view && (
@@ -267,7 +274,7 @@ export default function ConsultingReportTab({ caseId, companyName, incall, credi
       <div className="flex flex-wrap items-center gap-2 crp-noprint">
         <button type="button" disabled={!!busy} onClick={generate}
           className="px-4 py-2 rounded-lg bg-[#1B2A45] text-white text-xs font-bold disabled:opacity-50 hover:bg-[#25395f]">
-          {busy === 'generate' ? '분석·작성 중… (30초~1분)' : report ? '보고서 다시 생성' : 'AI 보고서 생성'}
+          {busy === 'research' ? '웹 조사 중… (1/2)' : busy === 'generate' ? '보고서 작성 중… (2/2, 1분 내외)' : report ? '보고서 다시 생성' : 'AI 보고서 생성'}
         </button>
         {report && (
           <>
@@ -278,7 +285,7 @@ export default function ConsultingReportTab({ caseId, companyName, incall, credi
             ) : (
               <button type="button" onClick={() => setEditing(true)} className="px-3 py-2 rounded-lg bg-violet-100 text-violet-700 text-xs font-semibold">편집</button>
             ))}
-            {view && <button type="button" onClick={() => window.print()} className="ml-auto px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold">PDF 출력</button>}
+            {view && <button type="button" onClick={printReport} className="ml-auto px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold">PDF 출력</button>}
           </>
         )}
         {err && <span className="text-xs text-red-500">{err}</span>}
@@ -286,128 +293,51 @@ export default function ConsultingReportTab({ caseId, companyName, incall, credi
       {report?.generatedAt && !view && <p className="text-[10px] text-gray-400">최근 생성: {dateStr}</p>}
 
       {/* 보고서 본문 */}
-      {report && view && (
-        <div id="consulting-report-print" className="bg-white border border-gray-200 rounded-xl overflow-hidden text-gray-800" style={{ fontFamily: 'Pretendard, "Malgun Gothic", sans-serif' }}>
-          {/* 표지 */}
-          <div style={{ background: 'linear-gradient(135deg,#1B2A45 0%,#2c4370 100%)', color: '#fff', padding: '28px 28px 24px' }}>
-            <p style={{ fontSize: 10, letterSpacing: 3, opacity: .7 }}>BUSINESS CONSULTING PROPOSAL</p>
-            <h1 style={{ fontSize: 22, fontWeight: 800, margin: '6px 0 2px' }}>기업 컨설팅 제안 보고서</h1>
-            <p style={{ fontSize: 13, opacity: .9 }}>{companyName}{incall.representative ? ` · 대표 ${incall.representative}` : ''}</p>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16, fontSize: 10, opacity: .75 }}>
-              <span>작성일 {dateStr}</span><span>본 문서는 분석 시점 기준의 제안·계획이며 승인·선정을 보장하지 않습니다</span>
+      {report && view && !editing && (
+        <div ref={wrapRef} className="rounded-xl border border-gray-200 bg-slate-200 p-2 overflow-hidden">
+          <div style={{ zoom: scale } as React.CSSProperties}>
+            <div ref={pagesRef} style={{ display: 'grid', gap: 14, justifyContent: 'center' }}>
+              <ReportDoc report={report} companyName={companyName} representative={incall.representative} />
             </div>
           </div>
+        </div>
+      )}
 
-          <div style={{ padding: 22 }} className="space-y-5">
-            {/* 요약 */}
-            <div className="crp-section" style={{ display: 'flex', gap: 12, alignItems: 'stretch', flexWrap: 'wrap' }}>
-              <div style={{ flex: '1 1 220px', border: '1px solid #e5e7eb', borderRadius: 12, padding: 14 }}>
-                <p style={{ fontSize: 10, color: '#6b7280' }}>종합 진단</p>
-                {editing
-                  ? <textarea value={report.headline} onChange={e => setReport({ ...report, headline: e.target.value })} className="w-full text-sm border rounded p-1 mt-1" rows={3} />
-                  : <p style={{ fontSize: 14, fontWeight: 700, marginTop: 4, lineHeight: 1.5 }}>{report.headline}</p>}
-              </div>
-              <div style={{ width: 130, border: '1px solid #e5e7eb', borderRadius: 12, padding: 14, textAlign: 'center' }}>
-                <p style={{ fontSize: 10, color: '#6b7280' }}>재무 위험도</p>
-                <p style={{ fontSize: 26, fontWeight: 800, color: RISK_COLOR[report.riskLevel] || '#374151' }}>{report.riskLevel}</p>
-                <div style={{ display: 'flex', gap: 3, justifyContent: 'center', marginTop: 4 }}>
-                  {[1, 2, 3, 4, 5].map(n => (
-                    <span key={n} style={{ width: 14, height: 6, borderRadius: 3, background: n <= report.riskScore ? (RISK_COLOR[report.riskLevel] || '#374151') : '#e5e7eb' }} />
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="crp-section" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: 10 }}>
-              {report.metrics.map((m, i) => (
-                <div key={i} style={{ background: '#f8fafc', borderRadius: 10, padding: '10px 12px' }}>
-                  <p style={{ fontSize: 10, color: '#6b7280' }}>{m.label}</p>
-                  <p style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>{m.value}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* 대조 */}
-            {report.crossCheck?.length > 0 && (
-              <div className="crp-section">
-                <h2 style={{ fontSize: 14, fontWeight: 800, color: '#1B2A45', borderLeft: '4px solid #1B2A45', paddingLeft: 8, marginBottom: 8 }}>인콜카드 · 제출서류 대조</h2>
-                <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
-                  <thead><tr style={{ background: '#f1f5f9' }}>
-                    {['항목', '인콜카드', '서류', '결과'].map(h => <th key={h} style={{ padding: '6px 8px', textAlign: 'left', border: '1px solid #e5e7eb' }}>{h}</th>)}
-                  </tr></thead>
-                  <tbody>{report.crossCheck.map((r, i) => (
-                    <tr key={i}>
-                      <td style={{ padding: '6px 8px', border: '1px solid #e5e7eb', fontWeight: 600 }}>{r.item}</td>
-                      <td style={{ padding: '6px 8px', border: '1px solid #e5e7eb' }}>{r.incall}</td>
-                      <td style={{ padding: '6px 8px', border: '1px solid #e5e7eb' }}>{r.document}</td>
-                      <td style={{ padding: '6px 8px', border: '1px solid #e5e7eb' }}>
-                        <span style={{ ...Object.fromEntries((STATUS_STYLE[r.status] || '').split(';').filter(Boolean).map(s => s.split(':'))), padding: '2px 8px', borderRadius: 10, fontWeight: 700, fontSize: 10 }}>{r.status}</span>
-                      </td>
-                    </tr>
-                  ))}</tbody>
-                </table>
-                {!!report.missingDocs?.length && <p style={{ fontSize: 10, color: '#b45309', marginTop: 6 }}>미제출/미확인 서류: {report.missingDocs.join(', ')}</p>}
-              </div>
-            )}
-
-            {/* 섹션 */}
-            {report.sections.map((s, si) => (
-              <div key={s.key} className="crp-section">
-                <h2 style={{ fontSize: 14, fontWeight: 800, color: '#1B2A45', borderLeft: '4px solid #1B2A45', paddingLeft: 8, marginBottom: 8 }}>{s.title}</h2>
-                <div className="space-y-2.5">
-                  {s.items.map((it, ii) => (
-                    <div key={ii} style={{ background: '#f8fafc', borderRadius: 10, padding: '10px 12px' }}>
-                      {editing ? (
-                        <>
-                          <div className="flex gap-1">
-                            <input value={it.heading} onChange={e => patchItem(si, ii, { heading: e.target.value })} className="flex-1 text-xs font-bold border rounded px-1.5 py-1" />
-                            <button type="button" onClick={() => delItem(si, ii)} className="text-[10px] text-red-500 px-1.5">삭제</button>
-                          </div>
-                          <textarea value={it.text} onChange={e => patchItem(si, ii, { text: e.target.value })} rows={4} className="w-full text-xs border rounded p-1.5 mt-1" />
-                        </>
-                      ) : (
-                        <>
-                          <p style={{ fontSize: 12, fontWeight: 700, color: '#1B2A45' }}>{it.heading}</p>
-                          <p style={{ fontSize: 11.5, lineHeight: 1.7, marginTop: 3, whiteSpace: 'pre-wrap' }}>{it.text}</p>
-                        </>
-                      )}
+      {/* 편집 패널 */}
+      {report && view && editing && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4 text-xs">
+          <p className="text-[11px] text-gray-500">본문 텍스트를 수정한 뒤 &quot;수정 저장&quot;을 누르면 보고서에 반영됩니다. (그래프 수치는 &quot;보고서 다시 생성&quot;으로 갱신)</p>
+          <div>
+            <p className="font-bold text-gray-700 mb-1">종합진단 한 줄</p>
+            <textarea value={report.headline} onChange={e => setReport({ ...report, headline: e.target.value })} rows={2} className="w-full border rounded p-1.5" />
+            <p className="font-bold text-gray-700 mt-2 mb-1">종합 분석</p>
+            <textarea value={report.summary || ''} onChange={e => setReport({ ...report, summary: e.target.value })} rows={6} className="w-full border rounded p-1.5" />
+          </div>
+          {report.sections.map((s, si) => (
+            <div key={s.key}>
+              <p className="font-bold text-[#1B2A45] mb-1">{s.title}</p>
+              <div className="space-y-2">
+                {s.items.map((it, ii) => (
+                  <div key={ii} className="bg-gray-50 rounded-lg p-2">
+                    <div className="flex gap-1">
+                      <input value={it.heading} onChange={e => patchItem(si, ii, { heading: e.target.value })} className="flex-1 font-bold border rounded px-1.5 py-1" />
+                      <button type="button" onClick={() => delItem(si, ii)} className="text-[10px] text-red-500 px-1.5">삭제</button>
                     </div>
-                  ))}
-                  {editing && <button type="button" onClick={() => addItem(si)} className="text-[11px] text-indigo-600 font-semibold crp-noprint">+ 항목 추가</button>}
-                </div>
+                    <textarea value={it.text} onChange={e => patchItem(si, ii, { text: e.target.value })} rows={4} className="w-full border rounded p-1.5 mt-1" />
+                  </div>
+                ))}
+                <button type="button" onClick={() => addItem(si)} className="text-[11px] text-indigo-600 font-semibold">+ 항목 추가</button>
+              </div>
+            </div>
+          ))}
+          <div>
+            <p className="font-bold text-[#1B2A45] mb-1">로드맵 상세</p>
+            {report.roadmap.map((rm, i) => (
+              <div key={i} className="bg-gray-50 rounded-lg p-2 mb-1.5 space-y-1">
+                <input value={rm.title} onChange={e => setReport({ ...report, roadmap: report.roadmap.map((x, k) => k === i ? { ...x, title: e.target.value } : x) })} className="w-full font-bold border rounded px-1.5 py-1" />
+                <textarea value={rm.detail} onChange={e => setReport({ ...report, roadmap: report.roadmap.map((x, k) => k === i ? { ...x, detail: e.target.value } : x) })} rows={2} className="w-full border rounded p-1.5" />
               </div>
             ))}
-
-            {/* 로드맵 */}
-            {report.roadmap?.length > 0 && (
-              <div className="crp-section">
-                <h2 style={{ fontSize: 14, fontWeight: 800, color: '#1B2A45', borderLeft: '4px solid #1B2A45', paddingLeft: 8, marginBottom: 10 }}>12개월 진행 로드맵 (제안)</h2>
-                <div style={{ position: 'relative', paddingLeft: 18, borderLeft: '2px solid #cbd5e1', marginLeft: 6 }}>
-                  {report.roadmap.map((r, i) => (
-                    <div key={i} style={{ position: 'relative', marginBottom: 12 }}>
-                      <span style={{ position: 'absolute', left: -25, top: 3, width: 12, height: 12, borderRadius: 6, background: '#1B2A45' }} />
-                      {editing ? (
-                        <div className="space-y-1">
-                          <input value={r.period} onChange={e => setReport({ ...report, roadmap: report.roadmap.map((x, k) => k === i ? { ...x, period: e.target.value } : x) })} className="text-[10px] border rounded px-1 py-0.5 w-32" />
-                          <input value={r.title} onChange={e => setReport({ ...report, roadmap: report.roadmap.map((x, k) => k === i ? { ...x, title: e.target.value } : x) })} className="text-xs font-bold border rounded px-1.5 py-0.5 w-full" />
-                          <textarea value={r.detail} onChange={e => setReport({ ...report, roadmap: report.roadmap.map((x, k) => k === i ? { ...x, detail: e.target.value } : x) })} rows={2} className="text-xs border rounded p-1 w-full" />
-                        </div>
-                      ) : (
-                        <>
-                          <p style={{ fontSize: 10, color: '#6366f1', fontWeight: 700 }}>{r.period}</p>
-                          <p style={{ fontSize: 12, fontWeight: 700 }}>{r.title}</p>
-                          <p style={{ fontSize: 11, color: '#475569', lineHeight: 1.6 }}>{r.detail}</p>
-                        </>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <p style={{ fontSize: 9, color: '#9ca3af', borderTop: '1px solid #e5e7eb', paddingTop: 8 }}>
-              ※ 본 보고서는 고객이 제공한 자료와 작성일 시점의 정보를 바탕으로 한 분석 및 진행 제안이며, 정책자금 승인·인증 선정 등 결과를 보장하지 않습니다. 각 기관의 최신 공고 및 심사 결과에 따라 달라질 수 있습니다.
-            </p>
           </div>
         </div>
       )}
