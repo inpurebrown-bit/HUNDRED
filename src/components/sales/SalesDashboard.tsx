@@ -1866,13 +1866,24 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   { label: '계약 갯수', value: thisMonthContractCount % 1 === 0 ? `${thisMonthContractCount}개` : `${thisMonthContractCount.toFixed(1)}개`, color: 'text-[#C5A258]' },
                   { label: '본인 매출', value: fmtWon(thisMonthTotalRevenueNet), color: 'text-emerald-600' },
                   { label: '입금액(VAT포함)', value: fmtWon(thisMonthTotalPaid), color: 'text-sky-600' },
-                  { label: '취소건수', value: `${cancelledCount}건`, color: 'text-red-500' },
                 ].map(s => (
                   <div key={s.label} className="bg-gray-50 rounded-lg px-3 py-2 text-center">
                     <p className="text-[9px] text-gray-400 mb-0.5">{s.label}</p>
                     <p className={`text-sm font-bold ${s.color}`}>{s.value}</p>
                   </div>
                 ))}
+                {/* 환불차감 카드 */}
+                <div className={`rounded-lg px-3 py-2 text-center ${thisMonthRefunds.length > 0 ? 'bg-red-50 border border-red-100' : 'bg-gray-50'}`}>
+                  <p className="text-[9px] text-gray-400 mb-0.5">환불차감</p>
+                  {thisMonthRefunds.length > 0 ? (
+                    <>
+                      <p className="text-sm font-bold text-red-500">-{thisMonthRefundWeight}개 / -{fmtWon(thisMonthRefundAmount)}</p>
+                      <p className="text-[9px] text-red-400 mt-0.5 truncate">{thisMonthRefunds.map(d => d.company).join(', ')}</p>
+                    </>
+                  ) : (
+                    <p className="text-sm font-bold text-gray-300">없음</p>
+                  )}
+                </div>
               </div>
             </div>
 
