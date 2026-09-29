@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, FormEvent, ReactNode } from 'react'
+import { calcRefundDeductions } from '@/lib/payrollCalc'
 
 // ── 타입 ────────────────────────────────────────────────
 interface MorningData {
@@ -223,9 +224,13 @@ export default function ReportTab({ userId, userName }: Props) {
   const autoTodayContracts = myContracts
     .filter((c: any) => (c.details?.contract_date || '').startsWith(todayStr))
     .reduce((sum: number, c: any) => sum + contractWeight(c.details?.payment_amount, c.details?.vat_included), 0)
-  const autoMonthContracts = myContracts
+  const autoMonthContractsRaw = myContracts
     .filter((c: any) => (c.details?.contract_date || '').startsWith(monthStr))
     .reduce((sum: number, c: any) => sum + contractWeight(c.details?.payment_amount, c.details?.vat_included), 0)
+  const myRefundWeight = calcRefundDeductions(allCustomers, monthStr)
+    .filter(d => d.name === userName || userName.includes(d.name) || d.name.includes(userName))
+    .reduce((s, d) => s + d.weight, 0)
+  const autoMonthContracts = Math.max(0, autoMonthContractsRaw - myRefundWeight)
 
   // 이번달 직가DB 등록 수 (현재 status 무관 — db010_month 기준)
   const autoMonthDirectDb = allCustomers.filter((c: any) => {

@@ -1677,7 +1677,12 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-center">
                     <p className="text-[10px] text-gray-400 mb-0.5">이번달 계약</p>
-                    <p className="text-2xl font-black text-emerald-700">{monthContractCount}건</p>
+                    <p className="text-2xl font-black text-emerald-700">
+                      {(() => { const n = Math.max(0, monthContractCount - thisMonthRefundWeight); return n % 1 === 0 ? n : n.toFixed(1) })()}건
+                    </p>
+                    {thisMonthRefundWeight > 0 && (
+                      <p className="text-[9px] text-red-400 mt-0.5">환불차감 -{thisMonthRefundWeight}개</p>
+                    )}
                   </div>
                   <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 text-center">
                     <p className="text-[10px] text-gray-400 mb-0.5">전체 계약</p>

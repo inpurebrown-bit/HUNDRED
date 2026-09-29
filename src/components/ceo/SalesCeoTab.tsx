@@ -715,6 +715,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
   const [supplyEditMode, setSupplyEditMode] = useState(false)
   const [supplyDraft, setSupplyDraft] = useState<Record<string, { supplied: string; goal: string; base: string }>>({})
   const [supplySaving, setSupplySaving] = useState(false)
+  const [payRateEmps, setPayRateEmps] = useState<any[]>([])
   // 실제 영업팀 사용자 목록 (DB의 users 테이블 기준)
   const [officialSalesUsers, setOfficialSalesUsers] = useState<string[]>([])
   // 대표 직가업체 추가 폼
@@ -727,13 +728,16 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
     async function load(silent = false) {
       if (!silent) setLoading(true)
       try {
-        const [cRes, oRes, scRes, uRes] = await Promise.all([
+        const thisMonthYm = new Date().toISOString().slice(0, 7)
+        const [cRes, oRes, scRes, uRes, prRes] = await Promise.all([
           fetch('/api/customers'),
           fetch('/api/ops-cases'),
           fetch('/api/supply-config'),
           fetch('/api/users?role=sales'),
+          fetch(`/api/payrate?year_month=${thisMonthYm}`).catch(() => null),
         ])
-        const [cData, oData, scData, uData] = await Promise.all([cRes.json(), oRes.json(), scRes.json(), uRes.json()])
+        const [cData, oData, scData, uData, prData] = await Promise.all([cRes.json(), oRes.json(), scRes.json(), uRes.json(), prRes ? prRes.json().catch(() => ({})) : Promise.resolve({})])
+        setPayRateEmps(prData.record?.employee_details || [])
         setCustomers(cData.customers || [])
         // 실제 영업팀 사용자 이름 목록 저장
         const salesUserNames = (uData.users || []).map((u: any) => u.name).filter(Boolean) as string[]
@@ -966,9 +970,22 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
   const bizElapsed = getElapsedBusinessDays(now.getFullYear(), now.getMonth(), now.getDate())
 
   const supplyStats = useMemo(() => {
+    const getPayrateSupply = (name: string, cfgSupplied: number): number => {
+      const entry = payRateEmps.find((e: any) => {
+        const en = (e.name || '').trim()
+        return en === name || name.includes(en) || en.includes(name)
+      })
+      if (!entry) return cfgSupplied
+      const fromDaily = entry.daily_supplies
+        ? Object.values(entry.daily_supplies as Record<string, any>).reduce((s: number, v: any) => s + Number(v || 0), 0)
+        : 0
+      return fromDaily > 0 ? fromDaily : Number(entry.supply_count || 0) || cfgSupplied
+    }
+
     return salesPeople.map(name => {
       const cfg = supplyConfig[name] || { supplied: 0, goal: 30, base: 0 }
       const selfSupplied: number = (cfg as any).self_supplied || 0
+      const supplied = getPayrateSupply(name, cfg.supplied)
 
       // 모든 계약된 고객 (해당 영업사원)
       const myContracted = customers.filter(c =>
@@ -985,13 +1002,13 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
         .reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0)
       const totalContracted = cfg.base + dbContracted + selfContracted
       // floor(소수점 2자리 버림) — 반올림 시 12.999...→13.00이 되어 공급 오계산 방지
-      const rate = cfg.supplied > 0 ? Math.floor((cfg.base + dbContracted) / cfg.supplied * 10000) / 100 : 0
+      const rate = supplied > 0 ? Math.floor((cfg.base + dbContracted) / supplied * 10000) / 100 : 0
       const selfRate = selfSupplied > 0 ? Math.floor(selfContracted / selfSupplied * 10000) / 100 : 0
       const recommended = calcRecommendedSupply(rate, bizElapsed)
       const achievePct = cfg.goal > 0 ? Math.floor(totalContracted / cfg.goal * 10000) / 100 : 0
-      return { name, cfg, selfSupplied, dbContracted, selfContracted, totalContracted, rate, selfRate, recommended, achievePct }
+      return { name, cfg, supplied, selfSupplied, dbContracted, selfContracted, totalContracted, rate, selfRate, recommended, achievePct }
     })
-  }, [salesPeople, supplyConfig, customers, thisMonthStr, bizElapsed])
+  }, [salesPeople, supplyConfig, payRateEmps, customers, thisMonthStr, bizElapsed])
 
   const counts = useMemo(() => ({
     all:        personCustomers.length,
@@ -1629,11 +1646,11 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
                       </div>
                     </td>
                     <td className="px-3 py-2.5 text-center">
-                      <span className="font-black text-sky-700 text-sm">{s.cfg.supplied}</span>
+                      <span className="font-black text-sky-700 text-sm">{s.supplied}</span>
                     </td>
                     <td className="px-3 py-2.5 text-center">
-                      <span className={`font-bold text-sm ${s.rate >= 17 ? 'text-emerald-600' : s.rate >= 13 ? 'text-amber-500' : s.cfg.supplied > 0 ? 'text-red-500' : 'text-gray-300'}`}>
-                        {s.cfg.supplied > 0 ? s.rate.toFixed(1) + '%' : '—'}
+                      <span className={`font-bold text-sm ${s.rate >= 17 ? 'text-emerald-600' : s.rate >= 13 ? 'text-amber-500' : s.supplied > 0 ? 'text-red-500' : 'text-gray-300'}`}>
+                        {s.supplied > 0 ? s.rate.toFixed(1) + '%' : '—'}
                       </span>
                     </td>
                     <td className="px-3 py-2.5 text-center">
