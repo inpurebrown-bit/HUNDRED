@@ -21,10 +21,10 @@ export interface ConsultingReport {
   }
   crossCheck: { item: string; incall: string; document: string; status: string }[]
   sections: Section[]
-  policyFunds?: { org: string; product: string; limit: string; fitScore: number; timing: string; prerequisites: string }[]
+  policyFunds?: { org: string; product: string; limit: string; rate?: string; fitScore: number; timing: string; matchReason?: string; prerequisites: string; verified?: boolean; source?: string }[]
   roadmap: { startMonth?: number; endMonth?: number; track?: string; period?: string; title: string; detail: string }[]
   certifications?: { name: string; requirement: string; benefit: string; timing: string; fit: string }[]
-  corpTransition?: { threshold: string; currentStatus: string; reasons: string[]; benefits: string[] }
+  corpTransition?: { threshold: string; currentStatus: string; reasons: string[]; benefits: string[]; triggers?: { label: string; met: boolean | null; note: string }[] }
   marketing?: { budgetSplit?: { channel: string; pct: number; monthlyWan: number; strategy: string; kpi: string }[]; note?: string }
   swot?: { strengths: string[]; weaknesses: string[]; opportunities: string[]; threats: string[] }
   outlook?: { label: string; value: string }[]
@@ -183,6 +183,58 @@ function CompareBars({ rows }: { rows: { label: string; company: number | null; 
           ))}
         </div>
       ))}
+    </div>
+  )
+}
+
+// 개인사업자(종합소득세) vs 법인(법인세) — 소득금액(과세표준) 구간별 세부담 비교. 지방소득세 10% 포함.
+// 세율 기준: 소득세법 종합소득세율(6~45%), 법인세법 2026년 사업연도 이후 10/20/22/25% (국세청 안내 기준)
+function personalTax(inc: number) {
+  const b: [number, number, number][] = [[14e6, .06, 0], [50e6, .15, 1.26e6], [88e6, .24, 5.76e6], [150e6, .35, 15.44e6], [300e6, .38, 19.94e6], [500e6, .40, 25.94e6], [1e9, .42, 35.94e6], [Infinity, .45, 65.94e6]]
+  const r = b.find(x => inc <= x[0])!
+  return Math.max(0, inc * r[1] - r[2]) * 1.1
+}
+function corpTax(inc: number) {
+  const t = inc <= 2e8 ? inc * .10 : 2e7 + (inc - 2e8) * .20
+  return t * 1.1
+}
+function TaxCompare() {
+  const levels = [3000, 5000, 8000, 10000, 15000, 20000, 30000, 50000]
+  const rows = levels.map(l => { const inc = l * 1e4; const p = personalTax(inc), c = corpTax(inc); return { l, p, c, save: p - c, pr: p / inc * 100, cr: c / inc * 100 } })
+  const W = 330, Hh = 170, pad = 28
+  const mx = Math.max(...rows.map(r => Math.max(r.pr, r.cr)))
+  const gw = (W - pad) / rows.length
+  return (
+    <div>
+      <svg width={W} height={Hh} viewBox={`0 0 ${W} ${Hh}`}>
+        {[0, .5, 1].map(t => <line key={t} x1={pad} x2={W} y1={Hh - 26 - (Hh - 50) * t} y2={Hh - 26 - (Hh - 50) * t} stroke={K.line} />)}
+        {rows.map((r, i) => {
+          const x = pad + i * gw + gw * .12, bw = gw * .34
+          const ph = r.pr / mx * (Hh - 50), ch = r.cr / mx * (Hh - 50)
+          return (
+            <g key={i}>
+              <rect x={x} y={Hh - 26 - ph} width={bw} height={ph} rx={2} fill={K.rose} />
+              <rect x={x + bw + 3} y={Hh - 26 - ch} width={bw} height={ch} rx={2} fill={K.teal} />
+              <text x={x + bw / 2} y={Hh - 29 - ph} fontSize={7.5} textAnchor="middle" fill={K.rose} fontWeight={700}>{r.pr.toFixed(0)}</text>
+              <text x={x + bw * 1.5 + 3} y={Hh - 29 - ch} fontSize={7.5} textAnchor="middle" fill={K.teal} fontWeight={700}>{r.cr.toFixed(0)}</text>
+              <text x={x + bw + 1.5} y={Hh - 12} fontSize={8.5} textAnchor="middle" fill={K.gray}>{r.l >= 10000 ? (r.l / 10000) + '억' : (r.l / 1000) + '천'}</text>
+            </g>
+          )
+        })}
+        <rect x={pad} y={0} width={8} height={8} fill={K.rose} rx={2} /><text x={pad + 11} y={8} fontSize={8.5} fill={K.gray}>개인 실효세율(%)</text>
+        <rect x={pad + 92} y={0} width={8} height={8} fill={K.teal} rx={2} /><text x={pad + 103} y={8} fontSize={8.5} fill={K.gray}>법인 실효세율(%)</text>
+      </svg>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 9.5, marginTop: 4 }}>
+        <thead><tr style={{ background: K.bg }}>{['연 소득금액', '개인 세부담', '법인 세부담', '연 절세 효과'].map(h => <th key={h} style={{ padding: '3px 5px', textAlign: 'right', fontWeight: 700 }}>{h}</th>)}</tr></thead>
+        <tbody>{rows.map(r => (
+          <tr key={r.l}>
+            <td style={{ padding: '2px 5px', textAlign: 'right' }}>{fmtWan(r.l)}</td>
+            <td style={{ padding: '2px 5px', textAlign: 'right' }}>{fmtWan(Math.round(r.p / 1e4))}</td>
+            <td style={{ padding: '2px 5px', textAlign: 'right' }}>{fmtWan(Math.round(r.c / 1e4))}</td>
+            <td style={{ padding: '2px 5px', textAlign: 'right', fontWeight: 800, color: r.save > 0 ? K.green : K.rose }}>{r.save > 0 ? '+' : ''}{fmtWan(Math.round(r.save / 1e4))}</td>
+          </tr>
+        ))}</tbody>
+      </table>
     </div>
   )
 }
@@ -389,9 +441,16 @@ export default function ReportDoc({ report: r, companyName, representative }: { 
       <Page n={6} title="2. 정책자금 진행 전략" company={companyName} color={K.blue}>
         <H color={K.blue}>매칭 가능 정책자금 (검토 대상)</H>
         {pf.length ? (
-          <Table head={['기관', '상품', '예상 한도', '권장 시기', '준비사항']} widths={['12%', '22%', '18%', '14%', '34%']}
-            rows={pf.map(p => [<b key="o">{p.org}</b>, p.product, p.limit, p.timing, p.prerequisites])} />
+          <Table head={['기관 / 상품', '한도 · 금리', '적합 근거', '확인·준비 사항', '기준']} widths={['19%', '19%', '27%', '23%', '12%']}
+            rows={pf.slice(0, 5).map(p => [
+              <span key="o"><b>{p.org}</b><br />{p.product}<br /><span style={{ color: K.gray, fontSize: 9 }}>{p.timing}</span></span>,
+              <span key="l"><b style={{ color: K.navy }}>{p.limit}</b>{p.rate ? <><br /><span style={{ color: K.gray }}>{p.rate}</span></> : null}</span>,
+              p.matchReason, p.prerequisites,
+              p.verified
+                ? <span key="v" style={{ background: '#dcfce7', color: '#166534', padding: '2px 6px', borderRadius: 8, fontWeight: 800, fontSize: 9 }}>공문 기준{p.source ? <><br />{p.source.slice(0, 22)}</> : null}</span>
+                : <span key="v" style={{ background: '#fef3c7', color: '#92400e', padding: '2px 6px', borderRadius: 8, fontWeight: 800, fontSize: 9 }}>공고 재확인 필요</span>])} />
         ) : <Empty />}
+        <div style={{ fontSize: 9, color: K.gray, marginTop: 6 }}>※ 한도·요건은 2026년 기관 공고문(소진공 제2026-478호, 중진공 제2026-464호 등) 기준이며, 실제 승인 여부와 한도는 기관 심사 결과에 따라 결정됩니다. 접수 시점의 최신 공고를 반드시 재확인하시기 바랍니다.</div>
         <H color={K.teal}>적합도 분석</H>
         <Card>
           <div style={{ display: 'grid', gap: 7 }}>
@@ -454,28 +513,40 @@ export default function ReportDoc({ report: r, companyName, representative }: { 
             rows={r.certifications.map(c => [<b key="n">{c.name}</b>, c.requirement, c.benefit, c.timing,
               <span key="f" style={{ fontWeight: 800, color: c.fit === '높음' ? K.green : c.fit === '낮음' ? K.rose : K.amber }}>{c.fit}</span>])} />
         ) : <Empty />}
-        <H color={K.teal}>사업자 → 기업 전환</H>
-        {corp ? (
-          <div style={{ display: 'grid', gap: 10 }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
-              <Card style={{ flex: 1, background: K.bg }}><div style={{ fontSize: 9.5, color: K.gray }}>현재 진단</div><div style={{ fontSize: 11, fontWeight: 700, marginTop: 3, lineHeight: 1.5 }}>{corp.currentStatus}</div></Card>
-              <div style={{ alignSelf: 'center', color: K.violet, fontSize: 20, fontWeight: 900 }}>▶</div>
-              <Card style={{ flex: 1, background: `${K.violet}12` }}><div style={{ fontSize: 9.5, color: K.violet }}>전환 권장 기준</div><div style={{ fontSize: 11, fontWeight: 700, marginTop: 3, lineHeight: 1.5 }}>{corp.threshold}</div></Card>
+        <H color={K.teal}>사업자 → 법인 전환 검토</H>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, marginBottom: 8 }}>
+          {(corp?.triggers?.length ? corp.triggers : [
+            { label: '매출 성장', met: null, note: '' }, { label: '인력 채용', met: null, note: '' },
+            { label: '투자 계획', met: null, note: '' }, { label: '대외 신뢰도', met: null, note: '' },
+          ]).map((t, i) => (
+            <div key={i} style={{ borderRadius: 8, padding: '7px 8px', background: t.met ? '#dcfce7' : t.met === false ? '#f1f5f9' : '#fef3c7', borderTop: `3px solid ${t.met ? K.green : t.met === false ? '#94a3b8' : K.amber}` }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: K.navy }}>{t.met ? '✔ ' : t.met === false ? '– ' : '? '}{t.label}</div>
+              <div style={{ fontSize: 8.8, lineHeight: 1.45, marginTop: 2, color: '#475569' }}>{t.note || '자료 미확인'}</div>
             </div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <Card style={{ flex: 1 }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: K.teal, marginBottom: 5 }}>전환이 필요한 이유</div>
-                {corp.reasons.map((x, i) => <div key={i} style={{ fontSize: 10.5, lineHeight: 1.6, marginBottom: 3 }}>• {x}</div>)}
+          ))}
+        </div>
+        <div style={{ fontSize: 9, color: K.gray, marginBottom: 6 }}>매출이 성장하고, 인력을 채용하며, 투자 계획이 있고, 대외 신뢰도가 필요한 사업자는 법인 설립을 권장합니다.</div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Card style={{ width: 350, padding: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: K.navy, marginBottom: 2 }}>법인 전환 시 이득 구간 (개인 vs 법인 세부담)</div>
+            <TaxCompare />
+          </Card>
+          <div style={{ flex: 1, display: 'grid', gap: 6, alignContent: 'start' }}>
+            {corp && <>
+              <Card style={{ padding: 8, background: K.bg }}><div style={{ fontSize: 9, color: K.gray }}>현재 진단</div><div style={{ fontSize: 10, fontWeight: 700, lineHeight: 1.5 }}>{corp.currentStatus}</div></Card>
+              <Card style={{ padding: 8, background: `${K.violet}12` }}><div style={{ fontSize: 9, color: K.violet }}>전환 권장 기준</div><div style={{ fontSize: 10, fontWeight: 700, lineHeight: 1.5 }}>{corp.threshold}</div></Card>
+              <Card style={{ padding: 8 }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: K.violet, marginBottom: 3 }}>전환·인증 후 이점</div>
+                {corp.benefits.slice(0, 3).map((x, i) => <div key={i} style={{ fontSize: 9.5, lineHeight: 1.5, marginBottom: 2 }}>• {x}</div>)}
               </Card>
-              <Card style={{ flex: 1 }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: K.violet, marginBottom: 5 }}>전환·인증 후 이점</div>
-                {corp.benefits.map((x, i) => <div key={i} style={{ fontSize: 10.5, lineHeight: 1.6, marginBottom: 3 }}>• {x}</div>)}
-              </Card>
-            </div>
+            </>}
           </div>
-        ) : <Empty />}
+        </div>
+        <div style={{ fontSize: 8.3, color: '#94a3b8', marginTop: 4, lineHeight: 1.5 }}>
+          ※ 소득세법 종합소득세율(6~45%)과 법인세법 2026년 사업연도 이후 세율(10/20/22/25%)에 지방소득세 10%를 더한 단순 비교이며, 소득금액=과세표준으로 가정했습니다. 법인은 대표 급여·배당 시 개인 소득세가 추가되고 법인 유지비용(기장·4대보험 등)이 발생하므로 실제 절세액은 세무사 검토가 필요합니다.
+        </div>
         <H color={K.violet}>세부 전략</H>
-        <ItemList items={s3?.items || []} color={K.violet} />
+        <ItemList items={(s3?.items || []).slice(0, 2)} color={K.violet} />
       </Page>
 
       {/* 9. 마케팅 */}

@@ -111,14 +111,24 @@ export default function ConsultingReportTab({ caseId, companyName, incall, credi
         return []
       })
       setBusy('research')
-      let research: any = null
-      try {
-        const rr = await fetch('/api/consulting-report', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode: 'research', incall }),
-        })
-        if (rr.ok) research = (await rr.json()).research
-      } catch {}
+      const callResearch = async (mode: string) => {
+        try {
+          const rr = await fetch('/api/consulting-report', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode, incall }),
+          })
+          return rr.ok ? (await rr.json()).research : null
+        } catch { return null }
+      }
+      const [mk, pa, pb] = await Promise.all([callResearch('research_market'), callResearch('policy_a'), callResearch('policy_b')])
+      const parts = [
+        mk?.text && '### 시장·업황 (참고용)\n' + mk.text,
+        pa?.text && '### 정책자금 공식 검증 A (소진공·중진공)\n' + pa.text,
+        pb?.text && '### 정책자금·인증 공식 검증 B (신보·기보·재단·인증)\n' + pb.text,
+      ].filter(Boolean)
+      const seenUri = new Set<string>()
+      const sources = [pa, pb, mk].flatMap(x => x?.sources || []).filter((x: any) => x.uri && !seenUri.has(x.uri) && seenUri.add(x.uri)).slice(0, 12)
+      const research = { text: parts.join('\n\n'), sources }
       setBusy('generate')
       const res = await fetch('/api/consulting-report', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -274,7 +284,7 @@ export default function ConsultingReportTab({ caseId, companyName, incall, credi
       <div className="flex flex-wrap items-center gap-2 crp-noprint">
         <button type="button" disabled={!!busy} onClick={generate}
           className="px-4 py-2 rounded-lg bg-[#1B2A45] text-white text-xs font-bold disabled:opacity-50 hover:bg-[#25395f]">
-          {busy === 'research' ? '웹 조사 중… (1/2)' : busy === 'generate' ? '보고서 작성 중… (2/2, 1분 내외)' : report ? '보고서 다시 생성' : 'AI 보고서 생성'}
+          {busy === 'research' ? '웹 조사·공식 공고 교차검증 중… (1/2)' : busy === 'generate' ? '보고서 작성 중… (2/2, 1분 내외)' : report ? '보고서 다시 생성' : 'AI 보고서 생성'}
         </button>
         {report && (
           <>
