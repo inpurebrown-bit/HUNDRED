@@ -90,19 +90,25 @@ export async function POST(req: NextRequest) {
 
     let text = ''
     let lastErr: any = null
-    for (const name of MODELS) {
-      try {
-        const model = genAI.getGenerativeModel({
-          model: name,
-          systemInstruction: SYSTEM,
-          generationConfig: { responseMimeType: 'application/json', temperature: 0.3 },
-        })
-        const result = await model.generateContent(parts)
-        text = result.response.text()
-        break
-      } catch (e: any) {
-        lastErr = e
-        if (!/404|not found|no longer available/i.test(String(e?.message))) throw e
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+    outer: for (const name of MODELS) {
+      const model = genAI.getGenerativeModel({
+        model: name,
+        systemInstruction: SYSTEM,
+        generationConfig: { responseMimeType: 'application/json', temperature: 0.3 },
+      })
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const result = await model.generateContent(parts)
+          text = result.response.text()
+          break outer
+        } catch (e: any) {
+          lastErr = e
+          const m = String(e?.message)
+          if (/503|429|overloaded|high demand|unavailable/i.test(m)) { await sleep(3000 * (attempt + 1)); continue }
+          if (/404|not found|no longer available/i.test(m)) break
+          throw e
+        }
       }
     }
     if (!text) throw lastErr || new Error('사용 가능한 모델 없음')

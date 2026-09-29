@@ -203,7 +203,7 @@ export default function ConsultingReportTab({ caseId, companyName, incall, credi
                     <div className="flex-1 min-w-0">
                       <span className="font-medium text-gray-700">{d.label}</span>
                       {d.hint && <span className="text-[10px] text-gray-400 ml-1.5">{d.hint}</span>}
-                      {st.none && <span className="text-[10px] text-gray-400 ml-1.5">없음 — 없는 대로 진행</span>}
+                      {st.none && !hasData && <span className="text-[10px] text-gray-400 ml-1.5">없음 — 없는 대로 진행</span>}
                     </div>
                     <input type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp" className="hidden"
                       ref={el => { fileRefs.current[d.key] = el }}
