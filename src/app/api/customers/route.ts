@@ -14,20 +14,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
 
-  const query = supabaseAdmin
-    .from('customers')
-    .select('*')
-    .order('created_at', { ascending: false })
+  // Supabase 기본 응답 제한(1,000행)을 넘는 고객도 모두 가져오도록 페이지 단위로 반복 조회
+  const PAGE = 1000
+  const rows: any[] = []
+  for (let from = 0; ; from += PAGE) {
+    let q = supabaseAdmin
+      .from('customers')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(from, from + PAGE - 1)
+    // 영업팀은 본인 고객만 (DB 실제 컬럼: owner_id)
+    if (user.role === 'sales') q = q.eq('owner_id', user.id)
+    const { data, error } = await q
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    rows.push(...(data || []))
+    if (!data || data.length < PAGE) break
+  }
 
-  // 영업팀은 본인 고객만 (DB 실제 컬럼: owner_id)
-  const finalQuery = user.role === 'sales'
-    ? query.eq('owner_id', user.id)
-    : query
-
-  const { data, error } = await finalQuery
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ customers: normalizeCustomers(data) })
+  return NextResponse.json({ customers: normalizeCustomers(rows) })
 }
 
 // POST: 신규 고객 등록

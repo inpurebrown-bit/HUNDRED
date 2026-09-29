@@ -1,16 +1,16 @@
 'use client'
 
-import { useState, useEffect, useRef, FormEvent, ChangeEvent, ReactNode } from 'react'
+import { useState, useEffect, useRef, ReactNode } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { useSession, signOut } from 'next-auth/react'
+import FloatingAiWidget from '@/components/home/FloatingAiWidget'
+import LeadForm, { LegalModal } from '@/components/home/LeadForm'
+import { COMPANY } from '@/lib/companyInfo'
+import type { LegalKey } from '@/lib/legalTexts'
 
-// ─── 스크롤 인트로 컴포넌트 ──────────────────────────────
+// ─── 스크롤 등장 효과 ───────────────────────────────────
 function Reveal({ children, from = 'bottom', delay = 0, className = '' }: {
-  children: ReactNode
-  from?: 'left' | 'right' | 'bottom'
-  delay?: number
-  className?: string
+  children: ReactNode; from?: 'left' | 'right' | 'bottom'; delay?: number; className?: string
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [visible, setVisible] = useState(false)
@@ -21,1359 +21,356 @@ function Reveal({ children, from = 'bottom', delay = 0, className = '' }: {
     obs.observe(el)
     return () => obs.disconnect()
   }, [])
-  const t = from === 'left' ? (visible ? 'translate-x-0 opacity-100' : '-translate-x-16 opacity-0')
-           : from === 'right' ? (visible ? 'translate-x-0 opacity-100' : 'translate-x-16 opacity-0')
-           : (visible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0')
+  const t = from === 'left' ? (visible ? 'translate-x-0 opacity-100' : '-translate-x-12 opacity-0')
+    : from === 'right' ? (visible ? 'translate-x-0 opacity-100' : 'translate-x-12 opacity-0')
+    : (visible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0')
   return (
-    <div ref={ref} className={`transition-all duration-700 ease-out ${t} ${className}`}
-      style={{ transitionDelay: `${delay}ms` }}>
+    <div ref={ref} className={`transition-all duration-700 ease-out ${t} ${className}`} style={{ transitionDelay: `${delay}ms` }}>
       {children}
     </div>
   )
 }
 
-// ─── 숫자 카운트업 컴포넌트 ─────────────────────────────
-function CountUp({ target, suffix = '' }: { target: number; suffix?: string }) {
-  const ref = useRef<HTMLSpanElement>(null)
-  const [count, setCount] = useState(0)
-  const [started, setStarted] = useState(false)
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting && !started) setStarted(true) }, { threshold: 0.5 })
-    obs.observe(el)
-    return () => obs.disconnect()
-  }, [started])
-  useEffect(() => {
-    if (!started) return
-    let frame: number
-    const duration = 1600
-    const start = performance.now()
-    const step = (now: number) => {
-      const p = Math.min((now - start) / duration, 1)
-      // ease-out cubic
-      const eased = 1 - Math.pow(1 - p, 3)
-      setCount(Math.round(eased * target))
-      if (p < 1) frame = requestAnimationFrame(step)
-    }
-    frame = requestAnimationFrame(step)
-    return () => cancelAnimationFrame(frame)
-  }, [started, target])
-  return <span ref={ref}>{count}{suffix}</span>
-}
-
-// ─── 데이터 ──────────────────────────────────────────────
-const successCases = [
+// ─── 콘텐츠 ─────────────────────────────────────────────
+const CORE_SERVICES = [
   {
-    id: 1, contact: '대표 박*호', institution: '기보 1억 승인 🎉',
-    messages: [
-      { type: 'sent', text: '선생님!! 기보 1억 승인 났습니다 🎉🎉🎉!!!! 정말 감사합니다요!!! 덕분에 올해 투자 다 진행할 수 있겠어요 진짜로요ㅠㅠ' },
-      { type: 'sent', text: '화환 보내드리고 싶은데 주소 알려주세요 ㅋㅋ 정말 감사합니다요!!' },
-      { type: 'recv', text: '대표님 축하드립니다!! 잘 됐네요 😊 화환은 마음만 받겠습니다~ 앞으로도 잘 부탁드려요!' },
-    ],
-    date: '2025.03.14', color: 'bg-[#4A9B6F]',
+    icon: '🏦', title: '정책자금 컨설팅', tag: 'POLICY FUNDING',
+    lead: '재무·기술성 진단을 바탕으로 기업에 맞는 자금 전략을 설계합니다.',
+    points: ['소진공·중진공·신보·기보·지역신용보증재단 요건 검토', '업력·업종·매출·기대출 기준의 자금 적합도 분석', '신청 서류 준비 및 절차 자문'],
   },
   {
-    id: 2, contact: '대표 이*진', institution: '중진공 1억 5천 승인 🥹',
-    messages: [
-      { type: 'sent', text: '중진공 1억 5천 승인됐어요!!!! 진짜 안될줄 알았는데 🥹🥹' },
-      { type: 'sent', text: '다른데서 두번 거절당하고 포기할뻔 했는데 헌드레드 믿기 잘한것 같아요' },
-      { type: 'recv', text: '정말 수고 많으셨습니다 대표님!! 이번에 서류 꼼꼼히 잘 챙겨주셔서 가능했어요 🙏' },
-    ],
-    date: '2025.02.28', color: 'bg-[#3B7AB5]',
+    icon: '🧭', title: '정부지원사업', tag: 'GOVERNMENT PROGRAMS',
+    lead: '성장 단계에 맞는 지원사업을 찾고 준비 방향을 함께 정리합니다.',
+    points: ['창업·R&D·수출·고용 등 지원사업 탐색', '사업계획서 작성 방향 자문', '공고 일정에 맞춘 준비 로드맵'],
   },
   {
-    id: 3, contact: '대표 최*민', institution: '소진공 1억 승인 💰',
-    messages: [
-      { type: 'sent', text: '소진공 1억 나왔습니다!!! 💰💰' },
-      { type: 'sent', text: '준비하던 2호점 오픈 이제 할 수 있을 것 같아요ㅠ 진짜 감사해요' },
-      { type: 'recv', text: '대표님 2호점 개업 진심으로 응원합니다!! 🎊 항상 잘 되실 거예요!' },
-    ],
-    date: '2025.01.22', color: 'bg-[#7B5EA7]',
-  },
-  {
-    id: 4, contact: '대표 김*수', institution: '신보 3억 승인 😭',
-    messages: [
-      { type: 'sent', text: '신보 3억 승인!!! 와 이건 정말 꿈에도 생각 못했는데' },
-      { type: 'sent', text: '직원들한테 성과급도 드릴 수 있겠네요 😭😭 너무 감사합니다' },
-      { type: 'recv', text: '대표님 사업 규모에 딱 맞게 됐네요!! 앞으로도 잘 부탁드립니다 😊' },
-    ],
-    date: '2024.12.11', color: 'bg-[#D4872F]',
-  },
-  {
-    id: 5, contact: '대표 정*훈', institution: '기보 5억 승인 🔥',
-    messages: [
-      { type: 'sent', text: '기보 5억 ㅋㅋㅋㅋ 이게 실화냐고요' },
-      { type: 'sent', text: '다른 컨설팅 3군데서 안된다고 했는데 헌드레드가 해냈네요 진짜' },
-      { type: 'sent', text: '다음에 또 부탁드립니다 ㅎㅎ 주변에도 많이 소개해드릴게요!' },
-    ],
-    date: '2024.11.05', color: 'bg-[#4A9B6F]',
-  },
-  {
-    id: 6, contact: '대표 오*영', institution: '재단 1억 승인 🙏',
-    messages: [
-      { type: 'sent', text: '재단 1억 나왔어요~ 생각보다 빨리 됐네요! 감사합니다 🙏' },
-      { type: 'recv', text: '대표님 서류 빠르게 잘 보내주셔서 처리가 빨랐어요! 축하드립니다 🎉' },
-    ],
-    date: '2024.10.18', color: 'bg-[#3B7AB5]',
-  },
-  {
-    id: 7, contact: '대표 윤*현', institution: '이노비즈 인증 완료 ✅',
-    messages: [
-      { type: 'sent', text: '이노비즈 인증 드디어 됐습니다!! 이게 이렇게 어려운거였는지 몰랐는데' },
-      { type: 'sent', text: '덕분에 다음 대출 금리도 확 낮아졌어요 ㅎㅎ 최고십니다' },
-    ],
-    date: '2024.09.30', color: 'bg-[#7B5EA7]',
-  },
-  {
-    id: 8, contact: '대표 한*준', institution: '벤처인증 + 정책자금 동시 승인 🎊',
-    messages: [
-      { type: 'sent', text: '벤처인증이랑 정책자금이랑 같이 다 됐어요!!! 🎊🎊🎊' },
-      { type: 'sent', text: '작년에 포기하려다가 선생님 만나서 진짜 잘된것 같아요 눈물이..' },
-      { type: 'recv', text: '대표님 고생 많으셨어요!! 앞으로 더 크게 성장하실 거예요 화이팅!! 💪' },
-    ],
-    date: '2024.09.07', color: 'bg-[#D4872F]',
+    icon: '🏅', title: '기업인증', tag: 'CERTIFICATION',
+    lead: '인증 취득으로 금융·세제·거래 신뢰도를 높이는 방법을 안내합니다.',
+    points: ['벤처기업확인 · 이노비즈 · 메인비즈', '기업부설연구소 · 특허 등 기술 자산 정리', '인증 요건 사전 진단'],
   },
 ]
 
-const reviews = [
-  { name: '대표 김*훈', industry: '제조업', text: '다른 곳에서 두 번 거절당한 후 헌드레드를 찾았는데, 한 번에 기보 2억 승인을 받았습니다. 서류 하나하나 꼼꼼하게 봐주시는 전문성이 달랐어요.' },
-  { name: '대표 이*아', industry: 'IT 스타트업', text: '벤처인증부터 정책자금까지 원스톱으로 해결했습니다. 혼자였으면 몇 달은 걸렸을 텐데 한 달 만에 끝났어요. 강력 추천!' },
-  { name: '대표 박*성', industry: '요식업', text: '자영업자도 받을 수 있는 소진공 지원금이 이렇게 많은 줄 몰랐어요. 헌드레드 덕분에 처음 알고 받게 됐습니다.' },
-  { name: '대표 최*준', industry: '무역업', text: '메인비즈 인증에 이어 중진공까지 한 번에 처리해주셨어요. 바쁜 대표님들은 이런 전문가에게 맡기는 게 맞는 것 같아요.' },
-  { name: '대표 강*민', industry: '건설업', text: '처음엔 반신반의했는데 신보 2억 승인 이후로 완전 신뢰가 생겼습니다. 투명하고 정직하게 진행해주셔서 더 좋았어요.' },
-  { name: '대표 윤*서', industry: '뷰티', text: '특허 출원과 법인 설립까지 함께 처리해주셨는데 정말 편했어요. 뭐든 물어보면 친절하게 답해주시는 것도 큰 장점이에요.' },
+const EXTRA_SERVICES = [
+  { icon: '🏛', title: '법인 설립·전환', desc: '매출·이익 규모와 성장 계획에 맞춘 개인사업자 ↔ 법인 구조 검토' },
+  { icon: '📣', title: '광고·마케팅', desc: '메타·네이버·유튜브 등 채널별 마케팅 전략 수립' },
+  { icon: '🏪', title: '자영업 컨설팅', desc: '매출·비용 구조 점검과 경영 개선 방향 제안' },
 ]
 
-const services = [
-  { icon: '🏆', title: '정책자금 컨설팅', desc: '기보·신보·중진공·소진공·재단 등 기업 맞춤형 정책자금 최적화 솔루션', flagship: true },
-  { icon: '🔬', title: '이노비즈 인증', desc: '혁신형 중소기업 인증으로 가점 및 금리 혜택 확보' },
-  { icon: '📊', title: '메인비즈 인증', desc: '경영혁신형 중소기업 인증으로 정부 지원 우대' },
-  { icon: '💰', title: '무상지원금', desc: '상환 없이 받는 정부 무상 지원금 발굴 및 신청 대행' },
-  { icon: '🚀', title: '벤처기업 인증', desc: '벤처 인증으로 세제 혜택 및 투자 유치 유리한 위치 확보' },
-  { icon: '🧪', title: '연구개발전담부서 및 연구소 설립', desc: '기업 부설 연구소·R&D 전담부서 설립으로 세제 혜택 및 정책자금 우대 확보' },
-  { icon: '🏛', title: '법인설립', desc: '사업 확장과 절세를 위한 최적의 법인 구조 설계' },
-  { icon: '📝', title: '특허·가출원', desc: '핵심 기술 보호와 경쟁력 확보를 위한 지식재산권 전략' },
-  { icon: '📣', title: '광고·마케팅', desc: '온·오프라인 전반의 마케팅 전략 수립 및 실행' },
-  { icon: '🏪', title: '자영업 컨설팅', desc: '자영업에 이루어지는 모든 경영 문제 원스톱 해결' },
+const STAGES = [
+  { n: '01', title: '예비 · 창업 초기', color: '#4A9B6F', items: ['사업계획 정리와 창업 지원사업 탐색', '초기 자금·보증 상품 검토', '사업자 구조(개인/법인) 설계'] },
+  { n: '02', title: '초기 창업기업', color: '#3B82C4', items: ['운전·시설자금 전략', '기술개발(R&D) 연계 및 인증 준비', '재무제표·신용 관리 점검'] },
+  { n: '03', title: '도약기업', color: '#C5A258', items: ['스케일업 자금 및 투자 연계 검토', '수출·해외 진출 지원사업 탐색', '법인 전환·조직 체계 고도화'] },
+  { n: '04', title: '재창업 · 특수', color: '#7B5EA7', items: ['재도전 프로그램과 채무조정 이후 자금 재설계', '신용 회복 단계별 전략', '사업 재편·전환 방향 자문'] },
 ]
 
-// 수상/표창 — 실제 소유한 증서 형태로 스타일링
-const awards = [
-  { title: '업무추진 표창', body: '정책자금 컨설팅 분야에서\n탁월한 업무 성과와 기여를 인정하여\n이 표창장을 수여합니다.', year: '2022년', seal: '관' },
-  { title: '우수 컨설턴트 상', body: '중소기업 경영 지원 및 자금조달 분야\n전문성과 헌신적 서비스로\n우수한 성과를 달성하였기에 이를 표창합니다.', year: '2023년', seal: '협' },
-  { title: '수료증', body: '창업 및 기업경영 전문과정을\n성실히 이수하여 소정의 교육과정을\n완료하였음을 증명합니다.', year: '2021년', seal: '원' },
-  { title: '임명장', body: '오랜 경험과 전문성을 바탕으로\n본 기관 전문의원으로 임명하며\n소임을 다할 것을 기대합니다.', year: '2024년', seal: '장' },
+const PROCESS = [
+  { n: '1', t: '상담 접수', d: '온라인 신청 또는 전화로 사업 현황과 필요 사항을 확인합니다.' },
+  { n: '2', t: '기업 진단', d: '업력·업종·매출·기대출·신용·세금 상태를 종합해 진단합니다.' },
+  { n: '3', t: '맞춤 컨설팅 보고서', d: '재무 분석, 자금·인증 전략, 12개월 진행 계획을 보고서로 안내합니다.' },
+  { n: '4', t: '요건 검토·서류 준비', d: '각 기관 최신 공고 기준으로 요건과 제출 서류를 점검합니다.' },
+  { n: '5', t: '신청 지원', d: '고객 본인 명의의 정확한 자료로 신청 절차를 자문합니다.' },
+  { n: '6', t: '후속 컨설팅 제안', d: '인증·법인 전환·마케팅 등 다음 단계를 협의 후 제안합니다.' },
 ]
 
-// ─── 플로팅 AI 위젯 ──────────────────────────────────────
-function FloatingAiWidget() {
-  const [open, setOpen] = useState(false)
-  const [messages, setMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([])
-  const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
-  const bottomRef = useRef<HTMLDivElement>(null)
+const CEO_BIO = [
+  { p: '學', t: '자산경영학 전공' },
+  { p: '前', t: '법무법인 혜안 소속' },
+  { p: '前', t: 'PUREBROWN 대표이사' },
+  { p: '前', t: '㈜나라감정평가법인 소속' },
+  { p: '前', t: 'GIGGLY 대표이사' },
+  { p: '現', t: '세계탐정연맹본부(WDF) 전문위원' },
+  { p: '現', t: 'HUNDRED consulting 대표' },
+]
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, open])
-
-  async function send(e: FormEvent) {
-    e.preventDefault()
-    const q = input.trim()
-    if (!q || loading) return
-    setInput('')
-    setMessages(prev => [...prev, { role: 'user', text: q }])
-    setLoading(true)
-    try {
-      const res = await fetch('/api/public-ai', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: q }),
-      })
-      const data = await res.json()
-      setMessages(prev => [...prev, { role: 'ai', text: data.reply || '답변을 가져올 수 없습니다.' }])
-    } catch {
-      setMessages(prev => [...prev, { role: 'ai', text: '서버 연결 오류가 발생했습니다.' }])
-    }
-    setLoading(false)
-  }
-
-  return (
-    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col items-end gap-3">
-      {/* 채팅 패널 */}
-      {open && (
-        <div className="w-[340px] sm:w-[380px] bg-white rounded-2xl shadow-2xl border border-[#E8E2D4] flex flex-col overflow-hidden"
-          style={{ height: 460 }}>
-          {/* 헤더 */}
-          <div className="bg-[#1B2A45] px-4 py-3 flex items-center gap-2.5 shrink-0">
-            <div className="w-7 h-7 rounded-full bg-[#C5A258] flex items-center justify-center shrink-0">
-              <span className="text-white text-[11px] font-black">AI</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-white text-xs font-bold">헌드레드 AI 상담</p>
-              <p className="text-white/40 text-[10px]">정책자금·경영 전문</p>
-            </div>
-            <button onClick={() => setOpen(false)} className="text-white/50 hover:text-white text-lg leading-none">✕</button>
-          </div>
-
-          {/* 메시지 영역 */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-[#FAF8F3]">
-            {messages.length === 0 && (
-              <div className="space-y-2 pt-2">
-                <p className="text-[11px] text-[#1B2A45]/40 text-center">궁금한 것을 물어보세요</p>
-                {['정책자금 받을 수 있나요?', '기보 vs 신보 차이는?', '무상지원금도 있나요?'].map(q => (
-                  <button key={q} onClick={() => { setInput(q); setTimeout(() => document.getElementById('ai-input')?.focus(), 50) }}
-                    className="w-full text-left text-xs text-[#C5A258] border border-[#C5A258]/20 bg-white rounded-xl px-3 py-2 hover:bg-[#C5A258]/5 transition-colors">
-                    {q}
-                  </button>
-                ))}
-              </div>
-            )}
-            {messages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                {msg.role === 'ai' && (
-                  <div className="w-5 h-5 rounded-full bg-[#C5A258] flex items-center justify-center mr-2 shrink-0 mt-0.5">
-                    <span className="text-white text-[8px] font-black">AI</span>
-                  </div>
-                )}
-                <div className={`max-w-[82%] text-[12px] leading-relaxed px-3 py-2 rounded-2xl shadow-sm whitespace-pre-wrap
-                  ${msg.role === 'user'
-                    ? 'bg-[#1B2A45] text-white rounded-br-sm'
-                    : 'bg-white text-[#1B2A45]/80 rounded-bl-sm border border-[#E8E2D4]'
-                  }`}>
-                  {msg.text}
-                </div>
-              </div>
-            ))}
-            {loading && (
-              <div className="flex justify-start">
-                <div className="w-5 h-5 rounded-full bg-[#C5A258] flex items-center justify-center mr-2 shrink-0">
-                  <span className="text-white text-[8px] font-black">AI</span>
-                </div>
-                <div className="bg-white border border-[#E8E2D4] px-3 py-2 rounded-2xl rounded-bl-sm flex gap-1">
-                  {[0, 150, 300].map(d => (
-                    <span key={d} className="w-1.5 h-1.5 bg-[#C5A258] rounded-full animate-bounce" style={{ animationDelay: `${d}ms` }} />
-                  ))}
-                </div>
-              </div>
-            )}
-            <div ref={bottomRef} />
-          </div>
-
-          {/* 입력창 */}
-          <form onSubmit={send} className="px-3 py-3 border-t border-[#E8E2D4] flex gap-2 shrink-0 bg-white">
-            <input
-              id="ai-input"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              placeholder="질문을 입력하세요..."
-              disabled={loading}
-              className="flex-1 bg-[#FAF8F3] border border-[#E8E2D4] focus:border-[#C5A258]/60 rounded-xl px-3 py-2 text-xs text-[#1B2A45] placeholder-[#1B2A45]/30 outline-none transition-colors"
-            />
-            <button type="submit" disabled={loading || !input.trim()}
-              className="bg-[#C5A258] hover:bg-[#D4B568] disabled:opacity-40 text-white px-3 py-2 rounded-xl text-xs font-bold transition-colors shrink-0">
-              전송
-            </button>
-          </form>
-        </div>
-      )}
-
-      {/* 토글 버튼 */}
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="w-14 h-14 rounded-full bg-[#1B2A45] hover:bg-[#2A3D5E] shadow-2xl flex items-center justify-center transition-all hover:scale-105 group"
-        style={{ boxShadow: '0 4px 24px rgba(27,42,69,0.35)' }}
-      >
-        {open ? (
-          <span className="text-white/80 text-lg">✕</span>
-        ) : (
-          <div className="text-center">
-            <span className="text-[#C5A258] text-[11px] font-black block leading-none">AI</span>
-            <span className="text-white/50 text-[8px] block leading-none mt-0.5">상담</span>
-          </div>
-        )}
-        {!open && (
-          <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#C5A258] rounded-full border-2 border-white animate-pulse" />
-        )}
-      </button>
-    </div>
-  )
-}
+const NAV = [
+  { label: '서비스', href: '#서비스' },
+  { label: '성장단계', href: '#성장단계' },
+  { label: '진행절차', href: '#진행절차' },
+  { label: '대표소개', href: '#대표소개' },
+  { label: '문의하기', href: '#문의하기' },
+]
 
 export default function HomePage() {
-  const { data: session } = useSession()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [formData, setFormData] = useState({ name: '', region: '', phone: '', company: '', message: '', taxStatus: '없음' })
-  const [inquiryTypes, setInquiryTypes] = useState<string[]>([])
-  const [submitted, setSubmitted] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [caseIdx, setCaseIdx] = useState(0)
-  const [reviewIdx, setReviewIdx] = useState(0)
-  const [installPrompt, setInstallPrompt] = useState<any>(null)
-  const [installable, setInstallable] = useState(false)
+  const [legal, setLegal] = useState<LegalKey | null>(null)
 
-  useEffect(() => {
-    const handler = (e: any) => {
-      e.preventDefault()
-      setInstallPrompt(e)
-      setInstallable(true)
-    }
-    window.addEventListener('beforeinstallprompt', handler)
-    return () => window.removeEventListener('beforeinstallprompt', handler)
-  }, [])
-
-  async function handleInstall() {
-    if (!installPrompt) return
-    installPrompt.prompt()
-    const { outcome } = await installPrompt.userChoice
-    if (outcome === 'accepted') {
-      setInstallable(false)
-      setInstallPrompt(null)
-    }
-  }
-
-  // 성공사례 자동 슬라이드 (4초)
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCaseIdx(i => (i + 1) % successCases.length)
-    }, 4000)
-    return () => clearInterval(timer)
-  }, [])
-
-  // 후기 자동 슬라이드 (5초, 엇갈리게)
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setReviewIdx(i => (i + 1) % reviews.length)
-    }, 5000)
-    return () => clearInterval(timer)
-  }, [])
-
-  function toggleInquiry(type: string) {
-    setInquiryTypes(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type])
-  }
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    setSubmitting(true)
-    try {
-      const res = await fetch('/api/leads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, inquiryTypes }),
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || `서버 오류 (${res.status})`)
-      }
-      setSubmitted(true)
-    } catch (err: any) {
-      alert(`전송 중 오류가 발생했습니다. 전화로 문의해주세요.\n(${err.message})`)
-    }
-    setSubmitting(false)
-  }
+  const infoRows: [string, string][] = ([
+    ['상호', COMPANY.legalName || COMPANY.brandKo],
+    ['대표자', COMPANY.ceo],
+    ['사업자등록번호', COMPANY.bizNo],
+    ['전화권유판매업 신고번호', COMPANY.telemarketingNo],
+    ['통신판매업 신고번호', COMPANY.commerceNo],
+    ['주소', COMPANY.address],
+    ['대표전화', COMPANY.phone],
+    ['이메일', COMPANY.email],
+    ['개인정보 보호책임자', COMPANY.privacyOfficer],
+  ] as [string, string][]).filter(([, v]) => !!v)
 
   return (
     <div className="min-h-screen bg-[#FAF8F3] text-[#1B2A45] overflow-x-hidden">
-
-      {/* ── 플로팅 AI 위젯 ── */}
       <FloatingAiWidget />
 
       {/* ── 네비게이션 ── */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-[#E8E2D4] shadow-sm">
         <div className="max-w-6xl mx-auto px-4 md:px-8 py-3 flex items-center justify-between">
-          {/* 로고만 표시 */}
-          <div className="relative h-14 w-40 shrink-0">
-            <Image src="/images/logo.png" alt="HUNDRED Consultancy" fill className="object-contain object-left" unoptimized />
+          <div className="relative h-12 w-36 shrink-0">
+            <Image src="/images/logo.png" alt="HUNDRED Consulting" fill className="object-contain object-left" unoptimized />
           </div>
-
           <div className="hidden md:flex items-center gap-7">
-            {['서비스', '성공사례', '대표소개', '문의하기'].map((label) => (
-              <a key={label} href={`#${label}`}
-                className="text-xs text-[#1B2A45]/60 hover:text-[#C5A258] transition-colors tracking-wide font-medium">
-                {label}
-              </a>
+            {NAV.map(n => (
+              <a key={n.label} href={n.href} className="text-xs text-[#1B2A45]/60 hover:text-[#C5A258] transition-colors tracking-wide font-medium">{n.label}</a>
             ))}
-            <a href="tel:18442599" className="text-xs text-[#C5A258] font-bold tracking-wide">📞 1844-2599</a>
+            <a href={COMPANY.phoneHref} className="text-xs text-[#C5A258] font-bold tracking-wide">📞 {COMPANY.phone}</a>
           </div>
-
           <div className="flex items-center gap-2">
-            <a href="#문의하기" className="hidden md:inline-flex text-xs bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-4 py-2 rounded-lg transition-colors">
-              무료 상담
-            </a>
-            <Link href="/login" className="hidden md:block text-xs font-semibold text-[#1B2A45]/40 hover:text-[#C5A258] transition-colors px-2 py-2 tracking-widest">
-              Login
-            </Link>
-            <button onClick={() => setMenuOpen(!menuOpen)} className="md:hidden p-2 text-[#1B2A45]/70 flex flex-col gap-1.5 justify-center">
+            <a href="#문의하기" className="hidden md:inline-flex text-xs bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-4 py-2 rounded-lg transition-colors">무료 상담</a>
+            <Link href="/login" className="hidden md:block text-xs font-semibold text-[#1B2A45]/40 hover:text-[#C5A258] transition-colors px-2 py-2 tracking-widest">Login</Link>
+            <button onClick={() => setMenuOpen(!menuOpen)} className="md:hidden p-2 text-[#1B2A45]/70 flex flex-col gap-1.5 justify-center" aria-label="메뉴">
               <span className={`block w-5 h-0.5 bg-current transition-all origin-center ${menuOpen ? 'rotate-45 translate-y-2' : ''}`} />
               <span className={`block w-5 h-0.5 bg-current transition-all ${menuOpen ? 'opacity-0' : ''}`} />
               <span className={`block w-5 h-0.5 bg-current transition-all origin-center ${menuOpen ? '-rotate-45 -translate-y-2' : ''}`} />
             </button>
           </div>
         </div>
-
         {menuOpen && (
           <div className="md:hidden bg-white border-t border-[#E8E2D4] px-4 py-4 space-y-3">
-            {['서비스', '성공사례', '대표소개', '문의하기'].map((label) => (
-              <a key={label} href={`#${label}`} onClick={() => setMenuOpen(false)}
-                className="block text-sm text-[#1B2A45]/70 hover:text-[#C5A258] py-1.5 border-b border-[#E8E2D4]">
-                {label}
-              </a>
+            {NAV.map(n => (
+              <a key={n.label} href={n.href} onClick={() => setMenuOpen(false)} className="block text-sm text-[#1B2A45]/70 py-1.5 border-b border-[#E8E2D4]">{n.label}</a>
             ))}
-            <a href="tel:18442599" className="block text-sm text-[#C5A258] font-bold py-1.5 border-b border-[#E8E2D4]">📞 1844-2599</a>
-            <Link href="/login" onClick={() => setMenuOpen(false)}
-              className="block text-sm text-[#1B2A45]/60 hover:text-[#C5A258] py-1.5 font-semibold tracking-widest">
-              Login
-            </Link>
+            <a href={COMPANY.phoneHref} className="block text-sm text-[#C5A258] font-bold py-1.5 border-b border-[#E8E2D4]">📞 {COMPANY.phone}</a>
+            <Link href="/login" onClick={() => setMenuOpen(false)} className="block text-sm text-[#1B2A45]/60 py-1.5 font-semibold tracking-widest">Login</Link>
           </div>
         )}
       </nav>
 
-      {/* ── 히어로 섹션 ── */}
-      <section className="relative min-h-screen flex items-center pt-16 overflow-hidden bg-[#FAF8F3]">
-        {/* 빌딩숲 배경 이미지 */}
-        <div className="absolute inset-0 z-0" style={{
-          backgroundImage: 'url(https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1920&q=80)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center top',
-          opacity: 0.28,
-        }} />
-        {/* ivory 오버레이 */}
-        <div className="absolute inset-0 z-0 bg-[#FAF8F3]/82" />
-        {/* 금색 점 패턴 */}
-        <div className="absolute inset-0 z-0 opacity-[0.05]"
-          style={{ backgroundImage: 'radial-gradient(#C5A258 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
-        {/* 우측 골드 그라데이션 */}
-        <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-[#C5A258]/6 to-transparent pointer-events-none z-0" />
-
-        <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-8 w-full grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-0 items-center min-h-[calc(100vh-64px)]">
-
-          {/* 왼쪽 텍스트 */}
-          <div className="space-y-7 order-1 md:order-1 py-12">
-            <Reveal from="left" className="flex justify-center">
-              <div className="inline-flex items-center gap-2 border border-[#C5A258]/40 bg-[#C5A258]/8 rounded-full px-4 py-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#C5A258] animate-pulse" />
-                <span className="text-xs text-[#C5A258] tracking-widest font-semibold">The complete solution for business success</span>
+      {/* ── 히어로 ── */}
+      <section className="relative pt-28 pb-20 md:pt-40 md:pb-28 px-4 overflow-hidden bg-gradient-to-br from-[#1B2A45] via-[#223257] to-[#1B3A2F] text-white">
+        <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-[#C5A258]/10 blur-3xl" />
+        <div className="absolute -bottom-32 -left-16 w-96 h-96 rounded-full bg-[#4A9B6F]/10 blur-3xl" />
+        <div className="relative max-w-6xl mx-auto grid md:grid-cols-[1.3fr_1fr] gap-10 items-center">
+          <Reveal from="left" className="space-y-6">
+            <p className="text-xs text-[#C5A258] font-bold tracking-[0.35em]">HUNDRED CONSULTING</p>
+            <h1 className="text-3xl md:text-5xl font-black leading-tight">
+              성장 단계에 맞는<br />자금 · 인증 · 마케팅,<br />
+              <span className="text-[#C5A258]">한 곳에서 설계합니다</span>
+            </h1>
+            <p className="text-sm md:text-base text-white/70 leading-relaxed max-w-xl">
+              재무 진단부터 정책자금 전략, 기업인증, 법인 전환, 마케팅까지.
+              헌드레드컨설팅이 사업의 다음 단계를 함께 그립니다.
+            </p>
+            <div className="flex flex-wrap gap-3 pt-2">
+              <a href="#문의하기" className="bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors">무료 상담 신청</a>
+              <a href={COMPANY.phoneHref} className="border border-white/30 hover:bg-white/10 text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors">📞 {COMPANY.phone}</a>
+            </div>
+          </Reveal>
+          <Reveal from="right" className="grid grid-cols-2 gap-3">
+            {[
+              ['🔍', '정밀 진단', '재무·기술성 기반 분석'],
+              ['📑', '맞춤 보고서', '10페이지 컨설팅 보고서'],
+              ['🧑‍💼', '전담 컨설턴트', '1:1 상담 진행'],
+              ['🗓', '12개월 로드맵', '단계별 진행 계획 제안'],
+            ].map(([i, t, d]) => (
+              <div key={t} className="bg-white/8 border border-white/10 rounded-2xl p-4 backdrop-blur">
+                <div className="text-2xl mb-2">{i}</div>
+                <p className="text-sm font-bold">{t}</p>
+                <p className="text-[11px] text-white/55 mt-0.5 leading-snug">{d}</p>
               </div>
-            </Reveal>
-
-            <Reveal from="left" delay={100}>
-              <h1 className="tracking-tight text-center"
-                style={{ fontFamily: 'var(--font-noto-serif-kr), Georgia, serif' }}>
-
-                {/* 1단 */}
-                <div className="text-[1.5rem] font-bold text-[#3A4A5C] leading-snug">부자들만 오가던</div>
-                <div className="text-[1.5rem] font-bold text-[#3A4A5C] leading-snug">추월차선이</div>
-                <div className="text-[0.85rem] font-normal text-[#1B2A45]/30 tracking-[0.12em] mt-1 mb-6">따로 있었다면..</div>
-
-                {/* 2단 */}
-                <div className="text-[1.5rem] font-bold text-[#3A4A5C] leading-snug">나만 안되던 이유가</div>
-                <div className="text-[0.85rem] font-normal text-[#1B2A45]/30 tracking-[0.12em] mt-1 mb-6">따로 있었다면</div>
-
-                {/* 3단 — 필기체 금색 */}
-                <div className="text-[2.2rem] text-[#C5A258] leading-snug"
-                  style={{
-                    fontFamily: 'var(--font-nanum-brush), cursive',
-                    textDecoration: 'underline',
-                    textDecorationColor: 'rgba(197,162,88,0.25)',
-                    textUnderlineOffset: '6px',
-                  }}>
-                  이번에도 부정하시겠습니까&nbsp;?
-                </div>
-              </h1>
-            </Reveal>
-
-            <Reveal from="left" delay={200}>
-              <ul className="space-y-2 flex flex-col items-center">
-                {[
-                  { p: '學', t: '자산경영학 전공' },
-                  { p: '前', t: '법무법인 혜안 소속' },
-                  { p: '前', t: 'PUREBROWN 대표이사' },
-                  { p: '前', t: '㈜나라감정평가법인 소속' },
-                  { p: '前', t: 'GIGGLY 대표이사' },
-                  { p: '現', t: '세계탐정연맹본부(WDF) 전문위원' },
-                  { p: '現', t: 'HUNDRED consulting 대표' },
-                ].map((item) => (
-                  <li key={item.t} className="flex items-center gap-2.5 text-sm text-[#1B2A45]/55">
-                    <span className={`text-[11px] font-bold w-5 shrink-0 ${item.p === '現' ? 'text-[#C5A258]' : item.p === '學' ? 'text-[#7B5EA7]' : 'text-[#1B2A45]/35'}`}>{item.p}</span>
-                    {item.t}
-                  </li>
-                ))}
-              </ul>
-            </Reveal>
-
-            <Reveal from="left" delay={300}>
-              <div className="flex flex-wrap justify-center gap-3 pt-1">
-                <a href="#문의하기"
-                  className="inline-flex items-center gap-2 bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-7 py-3.5 rounded-xl text-sm transition-all shadow-lg shadow-[#C5A258]/25 hover:scale-[1.02]">
-                  무료 상담 신청 →
-                </a>
-                <a href="#서비스"
-                  className="inline-flex items-center gap-2 border-2 border-[#1B2A45]/15 hover:border-[#C5A258]/50 text-[#1B2A45]/60 hover:text-[#C5A258] px-6 py-3.5 rounded-xl text-sm transition-all font-medium">
-                  서비스 보기
-                </a>
-              </div>
-            </Reveal>
-          </div>
-
-          {/* 오른쪽 CEO 사진 */}
-          <Reveal from="right" className="order-2 md:order-2 flex flex-col items-center md:items-end gap-3 relative pt-28">
-
-            {/* CEO 사진 — 배경제거본이라 자연스럽게 블렌딩 */}
-            <div className="relative w-full max-w-[280px] md:max-w-[340px]" style={{ aspectRatio: '3/4' }}>
-              {/* 대표 이름 — 사진 바로 위에 절대 위치 */}
-              <div className="absolute -top-[5.5rem] left-0 z-10 text-center md:text-left w-full">
-                <p className="text-xs tracking-[0.25em] text-[#C5A258] font-bold mb-0.5">헌드레드 지원센터 대표</p>
-                <p className="text-[2.6rem] text-[#1B2A45] leading-none"
-                  style={{ fontFamily: 'var(--font-nanum-brush), cursive' }}>백승협</p>
-              </div>
-              <Image
-                src="/images/ceo-main.png"
-                alt="백승협 대표"
-                fill
-                className="object-contain object-bottom"
-                style={{ filter: 'drop-shadow(0 20px 50px rgba(27,42,69,0.18)) drop-shadow(0 8px 20px rgba(197,162,88,0.12))' }}
-                unoptimized
-              />
-            </div>
-
-            {/* 인용구 박스 */}
-            <div className="bg-white border-l-4 border-[#C5A258] rounded-r-2xl rounded-bl-2xl px-5 py-4 w-full shadow-md">
-              <p className="text-[13px] text-[#1B2A45]/75 leading-[2.0] font-medium">
-                뭐든 필요할 때 찾으면 늦습니다.<br />
-                잘될 때 그 기반으로 만들어 놔야,<br />
-                힘들 때 움직일 수 있는 원동력이 됩니다.<br />
-                <br />
-                <span className="text-[#1B2A45]/75">옆 가게가 어려운 상황에도 사업에 투자할 수 있는 건,</span><br />
-                <span className="text-[#C5A258] font-bold">시장이 어려운 지금을 기회로 바꿀 준비를 미리 해뒀기 때문입니다.</span>
-              </p>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── 통계 바 ── */}
-      <div className="bg-[#1B2A45]">
-        <div className="max-w-5xl mx-auto px-4 py-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[
-            { value: '500억+', label: '누적 승인금액' },
-            { value: '1,200+', label: '계약 고객 수' },
-            { value: '94%', label: '성공 승인율' },
-            { value: '10년+', label: '전문 경력' },
-          ].map((s, i) => (
-            <div key={s.label} className={`text-center py-2 ${i < 3 ? 'md:border-r border-[#C5A258]/15' : ''}`}>
-              <p className="text-2xl md:text-3xl font-black text-[#C5A258]">{s.value}</p>
-              <p className="text-xs text-white/40 mt-1">{s.label}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── 3단계 간편 프로세스 ── */}
-      <section className="py-16 px-4 bg-white border-b border-[#E8E2D4] overflow-hidden">
-        <div className="max-w-4xl mx-auto">
-          <Reveal>
-            <p className="text-center text-xs text-[#C5A258] font-bold tracking-[0.3em] uppercase mb-2">HOW IT WORKS</p>
-            <h2 className="text-center text-xl md:text-2xl font-black text-[#1B2A45] mb-12">상담부터 승인까지, 딱 3단계</h2>
-          </Reveal>
-
-          {/* 데스크톱: 가로 3단 / 모바일: 세로 스텝퍼 */}
-          <div className="hidden md:flex items-start justify-center gap-0 relative">
-            {/* 배경 연결 트랙 */}
-            <div className="absolute top-[38px] left-[22%] right-[22%] h-[3px] bg-gradient-to-r from-[#C5A258] via-[#E8D080] to-[#4A9B6F] rounded-full z-0 opacity-30" />
-
-            {([
-              { step: '01', icon: '📞', title: '무료 상담 신청', desc: '이름과 연락처만 남겨주세요.\n담당자가 당일 연락드립니다.', accent: '#C5A258', bg: 'from-[#FEF9EE] to-[#FDF5E0]', ring: 'ring-[#C5A258]/30' },
-              { step: '02', icon: '🔍', title: '사업체 분석',     desc: '업종·매출·신용·대출현황을\n종합분석해 최적 자금을 찾아드립니다.', accent: '#1B2A45', bg: 'from-[#EEF1F7] to-[#E5EAF4]', ring: 'ring-[#1B2A45]/20' },
-              { step: '03', icon: '🎉', title: '자금 승인',       desc: '서류 준비부터 기관 제출까지\n전담 처리. 승인까지 함께합니다.', accent: '#4A9B6F', bg: 'from-[#EEF7F2] to-[#E5F4EB]', ring: 'ring-[#4A9B6F]/30' },
-            ] as const).map((s, i) => (
-              <Reveal key={s.step} from="bottom" delay={i * 150} className="relative z-10 flex-1 flex flex-col items-center text-center px-5">
-                {/* 아이콘 원 */}
-                <div className="relative mb-5 group cursor-default">
-                  <div
-                    className="w-[76px] h-[76px] rounded-full flex items-center justify-center shadow-xl transition-all duration-300 hover:scale-110 hover:shadow-2xl"
-                    style={{ background: `linear-gradient(135deg, ${s.accent}ee, ${s.accent}99)` }}
-                  >
-                    <span className="text-3xl select-none">{s.icon}</span>
-                  </div>
-                  {/* 맥동 링 */}
-                  <div
-                    className="absolute inset-0 rounded-full animate-ping opacity-20"
-                    style={{ background: s.accent, animationDuration: `${2.2 + i * 0.4}s` }}
-                  />
-                  {/* 스텝 번호 배지 */}
-                  <div
-                    className="absolute -bottom-2 -right-2 w-6 h-6 rounded-full text-white text-[10px] font-black flex items-center justify-center shadow-md border-2 border-white"
-                    style={{ background: s.accent }}
-                  >
-                    {s.step}
-                  </div>
-                </div>
-
-                {/* 카드 */}
-                <div className={`w-full bg-gradient-to-b ${s.bg} border border-white/80 rounded-2xl px-5 py-5 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 ring-1 ${s.ring}`}>
-                  <span className="text-[10px] font-black tracking-widest mb-1 block" style={{ color: s.accent }}>STEP {s.step}</span>
-                  <h3 className="text-sm font-black text-[#1B2A45] mb-2">{s.title}</h3>
-                  <p className="text-xs text-[#1B2A45]/50 leading-relaxed whitespace-pre-line">{s.desc}</p>
-                </div>
-              </Reveal>
             ))}
-          </div>
-
-          {/* 모바일: 세로 스텝퍼 */}
-          <div className="flex md:hidden flex-col gap-0">
-            {([
-              { step: '01', icon: '📞', title: '무료 상담 신청', desc: '이름과 연락처만 남겨주세요. 담당자가 당일 연락드립니다.', accent: '#C5A258' },
-              { step: '02', icon: '🔍', title: '사업체 분석',     desc: '업종·매출·신용·대출현황을 종합분석해 최적 자금을 찾아드립니다.', accent: '#1B2A45' },
-              { step: '03', icon: '🎉', title: '자금 승인',       desc: '서류 준비부터 기관 제출까지 전담 처리. 승인까지 함께합니다.', accent: '#4A9B6F' },
-            ] as const).map((s, i) => (
-              <Reveal key={s.step} from="left" delay={i * 120} className="flex items-start gap-4 pb-8 relative">
-                {/* 수직선 */}
-                {i < 2 && (
-                  <div className="absolute left-[27px] top-[56px] bottom-0 w-0.5 bg-gradient-to-b" style={{ background: `linear-gradient(to bottom, ${s.accent}60, transparent)` }} />
-                )}
-                {/* 아이콘 */}
-                <div className="relative shrink-0">
-                  <div className="w-14 h-14 rounded-full flex items-center justify-center shadow-lg"
-                    style={{ background: `linear-gradient(135deg, ${s.accent}ee, ${s.accent}99)` }}>
-                    <span className="text-2xl">{s.icon}</span>
-                  </div>
-                  <div className="absolute -bottom-1.5 -right-1.5 w-5 h-5 rounded-full text-white text-[9px] font-black flex items-center justify-center shadow border-2 border-white"
-                    style={{ background: s.accent }}>
-                    {s.step}
-                  </div>
-                </div>
-                {/* 텍스트 */}
-                <div className="pt-1 flex-1">
-                  <span className="text-[10px] font-black tracking-widest" style={{ color: s.accent }}>STEP {s.step}</span>
-                  <h3 className="text-sm font-black text-[#1B2A45] mb-1 mt-0.5">{s.title}</h3>
-                  <p className="text-xs text-[#1B2A45]/50 leading-relaxed">{s.desc}</p>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-
-          <Reveal>
-            <div className="mt-10 text-center">
-              <a href="#문의하기"
-                className="inline-flex items-center gap-2 bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-8 py-3.5 rounded-xl text-sm transition-all shadow-lg shadow-[#C5A258]/25 hover:scale-[1.02] active:scale-95">
-                지금 무료 상담 신청하기 →
-              </a>
-              <p className="text-[11px] text-[#1B2A45]/30 mt-3">신청 후 평균 2시간 내 연락 · 상담비용 0원</p>
-            </div>
           </Reveal>
         </div>
       </section>
 
-      {/* ── 자격 확인 배너 ── */}
-      <section className="py-14 px-4 bg-gradient-to-br from-[#1B2A45] via-[#223257] to-[#1B3A2F] relative overflow-hidden">
-        {/* 배경 점 패턴 */}
-        <div className="absolute inset-0 opacity-[0.04]"
-          style={{ backgroundImage: 'radial-gradient(#C5A258 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
-        {/* 우상단 글로우 */}
-        <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-[#C5A258]/10 blur-3xl pointer-events-none" />
-
-        <div className="relative max-w-4xl mx-auto flex flex-col md:flex-row items-center gap-8 md:gap-14">
-          {/* 왼쪽: 체크리스트 */}
-          <Reveal from="left" className="flex-1 text-white">
-            <p className="text-xs text-[#C5A258] font-bold tracking-[0.25em] uppercase mb-3">내 사업, 정책자금 받을 수 있을까?</p>
-            <h3 className="text-2xl md:text-3xl font-black leading-tight mb-5">
-              아래 하나라도 해당되면<br />
-              <span className="text-[#C5A258]">받을 수 있습니다</span>
-            </h3>
-            <ul className="space-y-3">
-              {[
-                { icon: '👤', text: '직원이 없어도' },
-                { icon: '📉', text: '매출이 적어도' },
-                { icon: '💳', text: '기존 대출이 많아도' },
-                { icon: '🔧', text: '기술이 없어도' },
-                { icon: '📋', text: '사업자등록을 방금 했어도' },
-              ].map((item, i) => (
-                <Reveal key={item.text} from="left" delay={i * 80}>
-                  <li className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-full bg-[#C5A258]/20 border border-[#C5A258]/40 flex items-center justify-center shrink-0 text-sm">
-                      {item.icon}
-                    </div>
-                    <span className="text-sm md:text-base text-white/85 font-medium">{item.text}</span>
-                    <span className="ml-auto text-[#C5A258] font-black text-base shrink-0">✓</span>
-                  </li>
-                </Reveal>
-              ))}
-            </ul>
-          </Reveal>
-
-          {/* 오른쪽: 승인율 + CTA */}
-          <Reveal from="right" className="shrink-0 flex flex-col items-center gap-5 w-full md:w-auto">
-            {/* 승인율 카드 */}
-            <div className="relative bg-white/10 backdrop-blur-sm border border-white/20 rounded-3xl px-10 py-8 text-center shadow-2xl overflow-hidden">
-              {/* 안쪽 글로우 */}
-              <div className="absolute inset-0 bg-gradient-to-br from-[#C5A258]/10 to-transparent pointer-events-none rounded-3xl" />
-              <p className="text-[10px] text-white/40 tracking-widest uppercase mb-2">헌드레드 고객</p>
-              <p className="text-6xl font-black text-[#C5A258] leading-none mb-1">
-                <CountUp target={94} />
-                <span className="text-3xl">%</span>
-              </p>
-              <div className="w-12 h-0.5 bg-[#C5A258]/40 mx-auto my-2 rounded-full" />
-              <p className="text-xs text-white/60 font-medium">정책자금 승인율</p>
-            </div>
-
-            <a href="#문의하기"
-              className="inline-flex items-center gap-2 bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-8 py-4 rounded-2xl text-sm transition-all hover:scale-[1.03] active:scale-95 shadow-xl shadow-[#C5A258]/30 w-full justify-center">
-              3분 자격 확인하기 →
-            </a>
-            <p className="text-[10px] text-white/30 text-center">무료 · 비밀보장 · 부담 없음</p>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── 수상 / 표창 섹션 (실제 증서 스타일) ── */}
-      <section className="py-16 md:py-20 px-4 bg-[#FAF8F3]">
-        <div className="max-w-5xl mx-auto">
-          <Reveal>
-            <div className="text-center mb-10">
-              <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] uppercase mb-2">AWARDS & CREDENTIALS</p>
-              <h2 className="text-2xl md:text-3xl font-black text-[#1B2A45]">수상 및 표창 내역</h2>
-            </div>
-          </Reveal>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
-            {awards.map((a, i) => (
-              <Reveal key={a.title} from="bottom" delay={i * 80} className="h-full">
-                {/* 증서 프레임 스타일 */}
-                <div className="relative bg-[#FEFCF5] border border-[#D4B968]/50 rounded-lg overflow-hidden hover:shadow-lg transition-shadow h-full flex flex-col"
-                  style={{ boxShadow: '0 2px 8px rgba(197,162,88,0.12), inset 0 0 0 6px rgba(197,162,88,0.06)' }}>
-                  {/* 상단 금색 띠 */}
-                  <div className="h-2 bg-gradient-to-r from-[#C5A258] via-[#E8D080] to-[#C5A258] shrink-0" />
-                  <div className="px-4 py-5 text-center flex flex-col flex-1">
-                    {/* 태극/봉황 장식 */}
-                    <div className="w-10 h-10 mx-auto mb-3 rounded-full border-2 border-[#C5A258]/40 flex items-center justify-center bg-[#C5A258]/5 shrink-0">
-                      <span className="text-lg font-black text-[#C5A258]">{a.seal}</span>
-                    </div>
-                    <h3 className="text-sm font-black text-[#1B2A45] mb-2 tracking-wide shrink-0"
-                      style={{ fontFamily: 'var(--font-noto-serif-kr), Georgia, serif' }}>
-                      {a.title}
-                    </h3>
-                    <p className="text-[10px] text-[#1B2A45]/50 leading-relaxed whitespace-pre-line flex-1 mb-3">{a.body}</p>
-                    <div className="border-t border-[#C5A258]/20 pt-2 shrink-0">
-                      <span className="text-[10px] text-[#C5A258] font-bold tracking-widest">{a.year}</span>
-                    </div>
-                  </div>
-                  {/* 하단 금색 띠 */}
-                  <div className="h-1 bg-gradient-to-r from-[#C5A258] via-[#E8D080] to-[#C5A258] shrink-0" />
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── 서비스 섹션 ── */}
+      {/* ── 핵심 서비스 ── */}
       <section id="서비스" className="py-20 md:py-28 px-4 md:px-8 bg-white">
         <div className="max-w-6xl mx-auto">
-          <Reveal>
-            <div className="text-center mb-14">
-              <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] uppercase mb-3">SERVICES</p>
-              <h2 className="text-2xl md:text-4xl font-black text-[#1B2A45] mb-3">비즈니스의 모든 것을 함께합니다</h2>
-              <p className="text-sm text-[#1B2A45]/40">정책자금은 그 중 우리가 가장 잘하는 것일 뿐</p>
-            </div>
+          <Reveal className="text-center mb-12">
+            <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] mb-3">SERVICES</p>
+            <h2 className="text-2xl md:text-4xl font-black">세 가지 핵심 서비스</h2>
+            <p className="text-sm text-[#1B2A45]/45 mt-3">기업의 현재 위치를 정확히 진단하고, 필요한 순서대로 준비합니다.</p>
           </Reveal>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {services.map((s, i) => (
-              <Reveal key={s.title} from="bottom" delay={i * 50}>
-                <div className={`relative group rounded-2xl p-6 border h-full transition-all cursor-default hover:scale-[1.01]
-                  ${s.flagship
-                    ? 'bg-gradient-to-br from-[#C5A258]/12 to-[#FAF8F3] border-[#C5A258]/50 shadow-md shadow-[#C5A258]/10'
-                    : 'bg-[#FAF8F3] border-[#E8E2D4] hover:border-[#C5A258]/30 hover:shadow-sm'
-                  }`}>
-                  {s.flagship && (
-                    <div className="absolute top-4 right-4 bg-[#C5A258] text-white text-[9px] font-black tracking-widest px-2 py-0.5 rounded-full">
-                      FLAGSHIP
-                    </div>
-                  )}
+          <div className="grid md:grid-cols-3 gap-5">
+            {CORE_SERVICES.map((s, i) => (
+              <Reveal key={s.title} delay={i * 100}>
+                <div className="h-full bg-[#FAF8F3] border border-[#E8E2D4] rounded-2xl p-6 hover:border-[#C5A258]/50 hover:shadow-lg transition-all">
                   <div className="text-3xl mb-3">{s.icon}</div>
-                  <h3 className={`font-bold mb-2 text-sm ${s.flagship ? 'text-[#C5A258]' : 'text-[#1B2A45]'}`}>{s.title}</h3>
-                  <p className="text-xs text-[#1B2A45]/40 leading-relaxed">{s.desc}</p>
+                  <p className="text-[10px] tracking-[0.25em] text-[#C5A258] font-bold">{s.tag}</p>
+                  <h3 className="text-lg font-black mt-1 mb-2">{s.title}</h3>
+                  <p className="text-sm text-[#1B2A45]/60 leading-relaxed mb-4">{s.lead}</p>
+                  <ul className="space-y-1.5">
+                    {s.points.map(p => (
+                      <li key={p} className="flex gap-2 text-xs text-[#1B2A45]/70 leading-relaxed">
+                        <span className="text-[#C5A258] font-bold">✓</span>{p}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+          <div className="grid sm:grid-cols-3 gap-4 mt-6">
+            {EXTRA_SERVICES.map(s => (
+              <div key={s.title} className="flex gap-3 items-start bg-white border border-[#E8E2D4] rounded-xl p-4">
+                <span className="text-2xl">{s.icon}</span>
+                <div>
+                  <p className="text-sm font-bold">{s.title}</p>
+                  <p className="text-xs text-[#1B2A45]/55 leading-relaxed mt-0.5">{s.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── 성장 단계별 ── */}
+      <section id="성장단계" className="py-20 md:py-28 px-4 md:px-8 bg-[#F2EFE8]">
+        <div className="max-w-6xl mx-auto">
+          <Reveal className="text-center mb-12">
+            <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] mb-3">GROWTH STAGES</p>
+            <h2 className="text-2xl md:text-4xl font-black">기업 성장 단계별 프로그램</h2>
+            <p className="text-sm text-[#1B2A45]/45 mt-3">지금 어느 단계에 계신지에 따라 우선순위가 달라집니다.</p>
+          </Reveal>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {STAGES.map((s, i) => (
+              <Reveal key={s.n} delay={i * 90}>
+                <div className="h-full bg-white rounded-2xl p-5 border border-[#E8E2D4] relative overflow-hidden">
+                  <div className="absolute top-0 left-0 right-0 h-1" style={{ background: s.color }} />
+                  <p className="text-3xl font-black opacity-20" style={{ color: s.color }}>{s.n}</p>
+                  <h3 className="text-base font-black mb-3 -mt-1">{s.title}</h3>
+                  <ul className="space-y-2">
+                    {s.items.map(t => (
+                      <li key={t} className="text-xs text-[#1B2A45]/65 leading-relaxed flex gap-2"><span style={{ color: s.color }}>●</span>{t}</li>
+                    ))}
+                  </ul>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── 진행 절차 ── */}
+      <section id="진행절차" className="py-20 md:py-28 px-4 md:px-8 bg-white">
+        <div className="max-w-5xl mx-auto">
+          <Reveal className="text-center mb-12">
+            <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] mb-3">PROCESS</p>
+            <h2 className="text-2xl md:text-4xl font-black">이렇게 진행됩니다</h2>
+          </Reveal>
+          <div className="grid md:grid-cols-2 gap-4">
+            {PROCESS.map((p, i) => (
+              <Reveal key={p.n} delay={i * 70}>
+                <div className="flex gap-4 items-start bg-[#FAF8F3] border border-[#E8E2D4] rounded-xl p-4">
+                  <span className="w-9 h-9 shrink-0 rounded-full bg-[#1B2A45] text-[#C5A258] font-black flex items-center justify-center text-sm">{p.n}</span>
+                  <div>
+                    <p className="text-sm font-bold">{p.t}</p>
+                    <p className="text-xs text-[#1B2A45]/60 leading-relaxed mt-0.5">{p.d}</p>
+                  </div>
                 </div>
               </Reveal>
             ))}
           </div>
 
-          {/* 서비스 하단 CTA */}
-          <Reveal>
-            <div className="mt-14 text-center">
-              <p className="text-sm text-[#1B2A45]/50 mb-5">어떤 서비스가 내 사업에 맞는지 모르겠다면, 전문가가 직접 분석해드립니다</p>
-              <a href="#문의하기"
-                className="inline-flex items-center gap-2 bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-9 py-4 rounded-xl text-sm transition-all shadow-lg shadow-[#C5A258]/25 hover:scale-[1.02]">
-                무료 상담 신청 →
-              </a>
+          {/* 이용 안내 */}
+          <Reveal className="mt-10">
+            <div className="bg-[#1B2A45] text-white rounded-2xl p-6 md:p-7">
+              <p className="text-sm font-bold text-[#C5A258] mb-3">서비스 이용 전 꼭 확인해 주세요</p>
+              <ul className="space-y-2 text-xs text-white/75 leading-relaxed">
+                <li>• 정책자금·지원사업·인증의 승인 여부와 금액, 금리는 각 기관의 심사와 공고에 따라 결정되며 당사가 보장하지 않습니다.</li>
+                <li>• 당사는 정부·공공기관이 아닌 민간 경영컨설팅 업체입니다. 기관을 사칭하거나 승인을 보장한다는 연락에 주의하세요.</li>
+                <li>• 서비스 범위와 비용은 상담 후 계약서에 명시하며, 계약 전 충분히 설명드립니다.</li>
+                <li>• 신청은 고객 본인의 정확한 자료로 진행되며, 허위 자료 제출 시 지원 제한 등 불이익이 있을 수 있습니다.</li>
+              </ul>
             </div>
           </Reveal>
         </div>
       </section>
 
-      {/* ── 성공사례 캐러셀 ── */}
-      <section id="성공사례" className="py-20 px-4 bg-[#F2EFE8]">
-        <div className="max-w-5xl mx-auto">
-          <Reveal>
-            <div className="text-center mb-12">
-              <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] uppercase mb-3">SUCCESS CASES</p>
-              <h2 className="text-2xl md:text-4xl font-black text-[#1B2A45] mb-3">실제 승인 성공 사례</h2>
-              <p className="text-sm text-[#1B2A45]/40 mb-5">고객의 진심 어린 감사 메시지</p>
-              <div className="flex flex-wrap justify-center gap-2">
-                {['💐 화환을 보내주셨습니다', '🎊 승인을 축하드립니다', '🌸 함께해서 영광입니다'].map(t => (
-                  <span key={t} className="text-xs text-[#C5A258]/70 border border-[#C5A258]/20 rounded-full px-3 py-1 bg-white">{t}</span>
-                ))}
-              </div>
-            </div>
-          </Reveal>
-
-          <div className="relative">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {[0, 1].map(offset => {
-                const c = successCases[(caseIdx + offset) % successCases.length]
-                // 메시지별 가짜 시각 (연속된 분단위)
-                const baseMin = 17 + (caseIdx * 7)
-                const msgTimes = c.messages.map((_, mi) => {
-                  const totalMin = baseMin + mi * 3
-                  const h = Math.floor(totalMin / 60) % 12 || 12
-                  const m = String(totalMin % 60).padStart(2, '0')
-                  const ampm = totalMin < 60 || (totalMin >= 720 && totalMin < 780) ? '오전' : '오후'
-                  return `${ampm} ${h}:${m}`
-                })
-                // 프로필 색상 (bg- 클래스에서 hex 추출)
-                const profileBg: Record<string, string> = {
-                  'bg-[#4A9B6F]': '#4A9B6F', 'bg-[#3B7AB5]': '#3B7AB5',
-                  'bg-[#7B5EA7]': '#7B5EA7', 'bg-[#D4872F]': '#D4872F',
-                }
-                const pfColor = profileBg[c.color] ?? '#4A9B6F'
-
-                return (
-                  <div key={`${caseIdx}-${offset}`}
-                    className="rounded-2xl overflow-hidden shadow-xl transition-all duration-500 border border-black/8"
-                    style={{ fontFamily: "'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif" }}>
-
-                    {/* ── 카카오톡 헤더 ── */}
-                    <div className="flex items-center gap-2.5 px-4 py-3 border-b border-[#D8D8D8]"
-                      style={{ background: '#F5F5F5' }}>
-                      {/* 프로필 사각형 (카톡 스타일 rounded-square) */}
-                      <div className="w-10 h-10 shrink-0 flex items-center justify-center shadow-sm"
-                        style={{ background: pfColor, borderRadius: 10 }}>
-                        <span className="text-[13px] font-black text-white leading-none">
-                          {c.contact.replace('대표 ', '').charAt(0)}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-[13.5px] font-bold text-[#111] truncate leading-tight">
-                            {c.contact}
-                          </p>
-                          {/* 1:1 채팅 인원 표시 */}
-                          <span className="text-[11px] text-[#999] shrink-0 leading-tight">1</span>
-                        </div>
-                        <p className="text-[10.5px] text-[#999] leading-tight truncate">{c.institution}</p>
-                      </div>
-                      {/* 우측 아이콘 (SVG) */}
-                      <div className="flex items-center gap-3.5 shrink-0 text-[#666]">
-                        {/* 검색 */}
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                          <circle cx="11" cy="11" r="7.5"/><line x1="20" y1="20" x2="15.5" y2="15.5"/>
-                        </svg>
-                        {/* 전화 */}
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M22 16.92v3a2 2 0 01-2.18 2 19.8 19.8 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.8 19.8 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.36 1.9.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0122 16.92z"/>
-                        </svg>
-                        {/* 점 3개 메뉴 */}
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
-                          <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
-                        </svg>
-                      </div>
-                    </div>
-
-                    {/* ── 채팅 배경 ── */}
-                    <div className="px-3 py-4 space-y-2.5" style={{ background: '#B2C7D9', minHeight: 190 }}>
-                      {c.messages.map((msg, mi) => {
-                        const prevSameType = mi > 0 && c.messages[mi - 1].type === msg.type
-                        const t = msgTimes[mi]
-
-                        /* ── 고객 메시지: sent = 고객이 우리한테 보낸 것 → 왼쪽 흰색 ── */
-                        if (msg.type === 'sent') {
-                          return (
-                            <div key={mi} className="flex items-start gap-1.5">
-                              {/* 고객 프로필 */}
-                              <div className="shrink-0 mt-0.5">
-                                {!prevSameType ? (
-                                  <div className="w-9 h-9 flex items-center justify-center shadow-sm"
-                                    style={{ background: pfColor, borderRadius: 9 }}>
-                                    <span className="text-[11px] font-black text-white leading-none">
-                                      {c.contact.replace('대표 ', '').charAt(0)}
-                                    </span>
-                                  </div>
-                                ) : <div className="w-9" />}
-                              </div>
-                              <div className="flex flex-col gap-0.5 max-w-[78%]">
-                                {!prevSameType && (
-                                  <p className="text-[11.5px] font-semibold text-[#333] leading-none mb-0.5 ml-0.5">
-                                    {c.contact}
-                                  </p>
-                                )}
-                                <div className="flex items-end gap-1.5">
-                                  {/* 흰색 말풍선 — 좌상단 꺾임 */}
-                                  <div className="px-3 py-2 text-[12px] leading-relaxed text-[#111] bg-white shadow-sm"
-                                    style={{ borderRadius: '2px 13px 13px 13px', wordBreak: 'break-word', maxWidth: '100%' }}>
-                                    {msg.text}
-                                  </div>
-                                  <span className="text-[10px] text-[#5A5A5A]/75 shrink-0 pb-0.5 whitespace-nowrap">{t}</span>
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        }
-
-                        /* ── 우리(헌드레드) 메시지: recv = 우리가 보낸 것 → 오른쪽 노란색 ── */
-                        return (
-                          <div key={mi} className="flex justify-end items-end gap-1.5">
-                            <span className="text-[10px] text-[#5A5A5A]/75 shrink-0 pb-0.5 whitespace-nowrap">{t}</span>
-                            {/* 노란 말풍선 — 우상단 꺾임 */}
-                            <div className="max-w-[78%] px-3 py-2 text-[12px] leading-relaxed text-[#111] shadow-sm"
-                              style={{ background: '#FAE300', borderRadius: '13px 2px 13px 13px', wordBreak: 'break-word' }}>
-                              {msg.text}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-
-                    {/* ── 입력창 (장식용) ── */}
-                    <div className="flex items-center gap-2 px-3 py-2.5 border-t border-[#D8D8D8]"
-                      style={{ background: '#F5F5F5' }}>
-                      <span className="text-[22px] text-[#777] leading-none select-none">+</span>
-                      <div className="flex-1 bg-white border border-[#E0E0E0] rounded-full px-4 py-1.5 text-[12px] text-[#BDBDBD] select-none">
-                        메시지 입력
-                      </div>
-                      <span className="text-[20px] select-none">😊</span>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#777" strokeWidth="2" strokeLinecap="round">
-                        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
-                        <polyline points="21 15 16 10 5 21"/>
-                      </svg>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-            <div className="flex items-center justify-center gap-3 mt-6">
-              <button onClick={() => setCaseIdx(i => (i - 1 + successCases.length) % successCases.length)}
-                className="w-9 h-9 rounded-full bg-white border border-[#E8E2D4] text-[#1B2A45] flex items-center justify-center hover:border-[#C5A258] hover:text-[#C5A258] transition-all text-sm font-bold">←</button>
-              <div className="flex gap-1.5">
-                {successCases.map((_, i) => (
-                  <button key={i} onClick={() => setCaseIdx(i)}
-                    className={`h-1.5 rounded-full transition-all ${i === caseIdx % successCases.length ? 'bg-[#C5A258] w-5' : 'bg-[#1B2A45]/20 w-1.5'}`} />
-                ))}
-              </div>
-              <button onClick={() => setCaseIdx(i => (i + 1) % successCases.length)}
-                className="w-9 h-9 rounded-full bg-white border border-[#E8E2D4] text-[#1B2A45] flex items-center justify-center hover:border-[#C5A258] hover:text-[#C5A258] transition-all text-sm font-bold">→</button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 후기 캐러셀 ── */}
-      <section className="py-20 md:py-28 px-4 md:px-8 bg-white">
-        <div className="max-w-6xl mx-auto">
-          <Reveal>
-            <div className="text-center mb-12">
-              <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] uppercase mb-3">REVIEWS</p>
-              <h2 className="text-2xl md:text-4xl font-black text-[#1B2A45]">고객 후기</h2>
-            </div>
-          </Reveal>
-          <div className="relative">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[0, 1, 2].map(offset => {
-                const r = reviews[(reviewIdx + offset) % reviews.length]
-                return (
-                  <div key={`${reviewIdx}-${offset}`} className="bg-[#FAF8F3] border border-[#E8E2D4] hover:border-[#C5A258]/40 rounded-2xl p-5 transition-all">
-                    <div className="flex mb-3 gap-0.5">
-                      {[...Array(5)].map((_, i) => <span key={i} className="text-[#C5A258] text-base">★</span>)}
-                    </div>
-                    <p className="text-[13px] text-[#1B2A45]/65 leading-relaxed mb-4">&ldquo;{r.text}&rdquo;</p>
-                    <div className="flex items-center gap-2 border-t border-[#E8E2D4] pt-3">
-                      <div className="w-8 h-8 rounded-full bg-[#C5A258]/15 flex items-center justify-center shrink-0">
-                        <span className="text-xs text-[#C5A258] font-bold">{r.name.charAt(3)}</span>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-[#1B2A45]">{r.name}</p>
-                        <p className="text-[10px] text-[#1B2A45]/30">{r.industry}</p>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-            <div className="flex items-center justify-center gap-3 mt-6">
-              <button onClick={() => setReviewIdx(i => (i - 1 + reviews.length) % reviews.length)}
-                className="w-9 h-9 rounded-full bg-white border border-[#E8E2D4] text-[#1B2A45] flex items-center justify-center hover:border-[#C5A258] hover:text-[#C5A258] transition-all text-sm font-bold">←</button>
-              <div className="flex gap-1.5">
-                {reviews.map((_, i) => (
-                  <button key={i} onClick={() => setReviewIdx(i)}
-                    className={`h-1.5 rounded-full transition-all ${i === reviewIdx % reviews.length ? 'bg-[#C5A258] w-5' : 'bg-[#1B2A45]/20 w-1.5'}`} />
-                ))}
-              </div>
-              <button onClick={() => setReviewIdx(i => (i + 1) % reviews.length)}
-                className="w-9 h-9 rounded-full bg-white border border-[#E8E2D4] text-[#1B2A45] flex items-center justify-center hover:border-[#C5A258] hover:text-[#C5A258] transition-all text-sm font-bold">→</button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── CEO 소개 — 사진 자연스럽게 ── */}
+      {/* ── 대표 소개 ── */}
       <section id="대표소개" className="relative overflow-hidden bg-[#FAF8F3]">
-        {/* 빌딩숲 배경 이미지 */}
-        <div className="absolute inset-0 z-0" style={{
-          backgroundImage: 'url(https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1920&q=80)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center top',
-          opacity: 0.28,
-        }} />
-        <div className="absolute inset-0 z-0 bg-[#FAF8F3]/82" />
-        {/* 섹션을 좌/우 분할: 좌(텍스트) ivory, 우(사진) dark */}
         <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-[#1B2A45]/90 hidden md:block z-0" />
-
-        <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-8 grid grid-cols-1 md:grid-cols-2 gap-0 min-h-[600px] items-stretch">
-
-          {/* 왼쪽 텍스트 */}
+        <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-8 grid grid-cols-1 md:grid-cols-2 gap-0 min-h-[560px] items-stretch">
           <Reveal from="left" className="py-20 pr-0 md:pr-12 flex flex-col justify-center space-y-5">
-            <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] uppercase">ABOUT CEO</p>
-            <h2 className="text-3xl md:text-5xl font-black text-[#1B2A45] leading-tight">대표 백승협</h2>
+            <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em]">ABOUT CEO</p>
+            <h2 className="text-3xl md:text-5xl font-black leading-tight">대표 {COMPANY.ceo}</h2>
             <p className="text-base text-[#C5A258] font-semibold">&ldquo;당신의 성공이 우리의 성공입니다&rdquo;</p>
-            <p className="text-sm text-[#1B2A45]/55 leading-relaxed">
-              10년이 넘는 법률·금융·경영 분야 경력을 바탕으로, 단순한 자금 알선이 아닌 기업의 근본적인 성장을 함께 설계합니다. 법무법인부터 세계 기관까지 다양한 현장에서 쌓은 실전 경험이 고객의 성공을 만듭니다.
+            <p className="text-sm text-[#1B2A45]/60 leading-relaxed">
+              법률·금융·경영 분야의 현장 경험을 바탕으로, 기업의 현재를 정확히 진단하고 근본적인 성장 방향을 함께 설계합니다.
             </p>
             <div className="space-y-2.5">
-              {[
-                { p: '學', t: '자산경영학 전공' },
-                { p: '前', t: '법무법인 혜안 소속' },
-                { p: '前', t: 'PUREBROWN 대표이사' },
-                { p: '前', t: '㈜나라감정평가법인 소속' },
-                { p: '前', t: 'GIGGLY 대표이사' },
-                { p: '現', t: '세계탐정연맹본부(WDF) 전문위원' },
-                { p: '現', t: 'HUNDRED consulting 대표' },
-              ].map(item => (
+              {CEO_BIO.map(item => (
                 <div key={item.t} className="flex items-center gap-3">
-                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0
-                    ${item.p === '現' ? 'bg-[#C5A258] text-white' : item.p === '學' ? 'bg-[#7B5EA7]/20 text-[#7B5EA7]' : 'bg-[#1B2A45]/10 text-[#1B2A45]/40'}`}>
-                    {item.p}
-                  </span>
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${item.p === '現' ? 'bg-[#C5A258] text-white' : item.p === '學' ? 'bg-[#7B5EA7]/20 text-[#7B5EA7]' : 'bg-[#1B2A45]/10 text-[#1B2A45]/40'}`}>{item.p}</span>
                   <span className="text-sm text-[#1B2A45]/65">{item.t}</span>
                 </div>
               ))}
             </div>
           </Reveal>
-
-          {/* 오른쪽 사진 — 다크 배경에 자연스럽게 */}
           <Reveal from="right" className="relative flex items-end justify-center md:justify-start py-8 md:py-0">
-            <div className="relative w-full max-w-[340px] h-[480px] md:h-full">
-              <Image
-                src="/images/ceo-stand.png"
-                alt="백승협 대표"
-                fill
-                className="object-contain object-bottom"
-                style={{ filter: 'drop-shadow(0 0 30px rgba(197,162,88,0.15))' }}
-                unoptimized
-              />
+            <div className="relative w-full max-w-[340px] h-[460px] md:h-full">
+              <Image src="/images/ceo-stand.png" alt={`${COMPANY.ceo} 대표`} fill className="object-contain object-bottom" style={{ filter: 'drop-shadow(0 0 30px rgba(197,162,88,0.15))' }} unoptimized />
             </div>
           </Reveal>
         </div>
       </section>
 
-      {/* ── 강의·강연 섹션 ── */}
-      <section className="py-20 md:py-28 px-4 md:px-8 bg-[#1B2A45] overflow-hidden">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-
-          <Reveal from="left" className="relative">
-            <div className="absolute -inset-3 bg-[#C5A258]/5 rounded-3xl" />
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-[#C5A258]/20">
-              <Image src="/images/lecture.png" alt="백승협 대표 강의 현장"
-                width={700} height={500} className="w-full object-cover" unoptimized />
-              <div className="absolute bottom-4 left-4 right-4 flex flex-wrap gap-2">
-                <span className="bg-[#C5A258] text-white text-xs font-black px-3 py-1.5 rounded-full shadow-lg">📍 소상공인 정책자금 실전 강의</span>
-                <span className="bg-[#1B2A45]/90 text-white text-xs font-semibold px-3 py-1.5 rounded-full border border-white/10">수강생 200명+ 직강 완료</span>
-              </div>
-            </div>
-          </Reveal>
-
-          <Reveal from="right" className="space-y-6 text-white">
-            <div>
-              <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] uppercase mb-3">LECTURE & SEMINAR</p>
-              <h2 className="text-3xl md:text-4xl font-black leading-tight mb-4">
-                전국에서<br /><span className="text-[#C5A258]">검증된 전문가</span>
-              </h2>
-              <p className="text-sm text-white/60 leading-relaxed">
-                정책자금, 법인설립, 경영전략 등 기업 성장에 필요한 모든 분야를 전국 각지에서 직접 강의하며 수천 명의 대표님들과 함께했습니다. 책에서 배운 지식이 아닌, 현장에서 쌓은 실전 노하우를 나눕니다.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { num: '50+', label: '누적 강의 횟수' },
-                { num: '3,000+', label: '수강 대표님' },
-                { num: '15개', label: '강의 지역' },
-                { num: '98%', label: '수강생 만족도' },
-              ].map(s => (
-                <div key={s.label} className="bg-white/5 border border-white/10 rounded-xl p-4">
-                  <p className="text-2xl font-black text-[#C5A258]">{s.num}</p>
-                  <p className="text-xs text-white/40 mt-1">{s.label}</p>
-                </div>
-              ))}
-            </div>
-            <div>
-              <p className="text-xs text-white/40 mb-3">주요 강의 주제</p>
-              <div className="flex flex-wrap gap-2">
-                {['정책자금 실전 활용', '소상공인 자금조달', '법인전환 전략', '정부지원사업 공략법', '사업계획서 작성법', '기업 신용관리'].map(tag => (
-                  <span key={tag} className="text-xs border border-[#C5A258]/30 text-[#C5A258]/80 px-3 py-1 rounded-full">{tag}</span>
-                ))}
-              </div>
-            </div>
-            <a href="#문의하기"
-              className="inline-flex items-center gap-2 bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-lg shadow-[#C5A258]/20">
-              강의 문의하기 →
-            </a>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── 현장 컨설팅 섹션 ── */}
-      <section className="py-20 px-4 bg-[#F2EFE8]">
-        <div className="max-w-6xl mx-auto">
-          <Reveal>
-            <div className="text-center mb-12">
-              <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] uppercase mb-2">FIELD CONSULTING</p>
-              <h2 className="text-2xl md:text-4xl font-black text-[#1B2A45] mb-2">현장에서 함께합니다</h2>
-              <p className="text-sm text-[#1B2A45]/50">직접 찾아가는 1:1 밀착 컨설팅</p>
-            </div>
-          </Reveal>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-            {[
-              { photo: '/images/consulting/construction.png', caption: '건설업 대표님과 현장 미팅',    badge: '정책자금 3억 승인',    pos: 'center',     size: 'cover' },
-              { photo: '/images/consulting/restaurant.jpg',   caption: '요식업 대표님 매장 방문 상담', badge: '소진공 1억 승인',    pos: 'center',     size: 'cover' },
-              { photo: '/images/consulting/interior.jpg',     caption: '인테리어 업체 사무실 방문',    badge: '기보 2억 승인',    pos: 'center 58%', size: 'cover' },
-              { photo: '/images/consulting/factory.jpg',      caption: '제조업 공장 현장 방문 상담',   badge: '신보 5억 승인',    pos: 'center',     size: 'cover' },
-              { photo: '/images/consulting/retail.jpg',       caption: '소매업 대표님 직접 방문',      badge: '무상지원금 5천만원', pos: 'center',    size: 'cover' },
-              { photo: '/images/consulting/startup.jpg',      caption: '스타트업 대표님 사무실 미팅',  badge: '벤처인증 + 정책자금', pos: 'center 38%', size: '100% auto' },
-            ].map((s, i) => (
-              <Reveal key={i} from="bottom" delay={i * 70}>
-                <div className="relative rounded-2xl overflow-hidden aspect-[4/3] shadow-lg cursor-default group">
-                  {/* 실제 사진 — 호버 시 살짝 확대 */}
-                  <div
-                    className="absolute inset-0 transition-transform duration-500 ease-out group-hover:scale-105"
-                    style={{
-                      backgroundImage: `url(${s.photo})`,
-                      backgroundSize: s.size,
-                      backgroundPosition: s.pos,
-                    }}
-                  />
-                  {/* 그라데이션 오버레이 — 평상시 진하게, 호버 시 살짝 밝아짐 */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/5 transition-opacity duration-300 group-hover:opacity-80" />
-                  {/* 호버 시 골드 테두리 효과 */}
-                  <div className="absolute inset-0 rounded-2xl ring-2 ring-[#C5A258]/0 group-hover:ring-[#C5A258]/60 transition-all duration-300" />
-                  {/* 텍스트 */}
-                  <div className="absolute bottom-0 left-0 right-0 p-3 md:p-4 translate-y-0.5 group-hover:translate-y-0 transition-transform duration-300">
-                    <p className="text-white text-[11px] md:text-xs font-semibold leading-snug mb-2 drop-shadow-sm">{s.caption}</p>
-                    <span className="text-[9px] md:text-[10px] bg-[#C5A258] text-white font-bold px-2.5 py-1 rounded-full shadow-md">{s.badge}</span>
-                  </div>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── 문의 섹션 ── */}
+      {/* ── 문의하기 ── */}
       <section id="문의하기" className="py-20 md:py-28 px-4 md:px-8 bg-white">
         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12">
-
           <Reveal from="left" className="space-y-6">
             <div>
-              <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] uppercase mb-3">CONTACT</p>
-              <h2 className="text-2xl md:text-4xl font-black text-[#1B2A45] mb-2">무료 상담 신청</h2>
-              <p className="text-sm text-[#1B2A45]/40">남겨주신 정보로 담당자가 빠르게 연락드립니다.</p>
+              <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] mb-3">CONTACT</p>
+              <h2 className="text-2xl md:text-4xl font-black mb-2">무료 상담 신청</h2>
+              <p className="text-sm text-[#1B2A45]/45">남겨주신 정보로 담당 컨설턴트가 순차적으로 연락드립니다.</p>
             </div>
             <div className="space-y-4">
               {[
-                { icon: '📍', label: '주소', value: '서울특별시 구로구 디지털로 243 지하이시티 911호' },
-                { icon: '📞', label: '전화', value: '1844-2599' },
-                { icon: '✉️', label: '이메일', value: '100-house@naver.com' },
-                { icon: '🕐', label: '운영시간', value: '평일 09:00 – 18:00 (토/일 휴무)' },
+                { icon: '📍', label: '주소', value: COMPANY.address },
+                { icon: '📞', label: '전화', value: COMPANY.phone },
+                { icon: '✉️', label: '이메일', value: COMPANY.email },
+                { icon: '🕐', label: '운영시간', value: COMPANY.hours },
               ].map(item => (
                 <div key={item.label} className="flex items-start gap-3">
                   <span className="text-lg mt-0.5 shrink-0">{item.icon}</span>
                   <div>
-                    <p className="text-[10px] text-[#1B2A45]/30 mb-0.5">{item.label}</p>
-                    <p className="text-sm text-[#1B2A45]/70">{item.value}</p>
+                    <p className="text-[10px] text-[#1B2A45]/35 mb-0.5">{item.label}</p>
+                    <p className="text-sm text-[#1B2A45]/75">{item.value}</p>
                   </div>
                 </div>
               ))}
             </div>
-
-            {/* SNS 링크 — 추후 추가 예정 */}
           </Reveal>
-
-          <Reveal from="right">
-            {submitted ? (
-              <div className="bg-[#FAF8F3] border border-[#C5A258]/30 rounded-2xl p-8 text-center space-y-5">
-                {/* 아이콘 */}
-                <div className="w-16 h-16 rounded-full bg-[#C5A258]/10 flex items-center justify-center mx-auto text-3xl">🤝</div>
-
-                {/* 메인 타이틀 */}
-                <div>
-                  <p className="text-xs font-bold text-[#C5A258] tracking-widest uppercase mb-2">신청 접수 완료</p>
-                  <h3 className="text-xl font-black text-[#1B2A45] leading-snug">
-                    고민 잘 남겨주셨습니다.
-                  </h3>
-                </div>
-
-                {/* 본문 */}
-                <div className="bg-white rounded-xl px-5 py-4 text-left space-y-3 border border-[#E8E2D4]">
-                  <p className="text-sm text-[#1B2A45]/75 leading-relaxed">
-                    무한경쟁 속 버텨내고 있는 대표님의 고민,<br />
-                    가볍게 여기지 않겠습니다.
-                  </p>
-                  <p className="text-sm text-[#1B2A45]/75 leading-relaxed">
-                    현재 문의가 많아 검증된 전담 컨설턴트가<br />
-                    <span className="font-bold text-[#1B2A45]">익일 영업일 내로 직접 연락드립니다.</span>
-                  </p>
-                </div>
-
-                {/* 사칭 주의 경고 */}
-                <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 flex items-start gap-2.5 text-left">
-                  <span className="text-base mt-0.5 shrink-0">⚠️</span>
-                  <p className="text-xs text-red-600 leading-relaxed font-medium">
-                    <span className="font-black">헌드레드 사칭에 주의하세요.</span>
-                  </p>
-                </div>
-
-                {/* 전화 */}
-                <p className="text-xs text-[#1B2A45]/40">
-                  급하신 분은 직접 연락주세요&nbsp;
-                  <a href="tel:18442599" className="font-bold text-[#C5A258] hover:underline">📞 1844-2599</a>
-                </p>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="bg-[#FAF8F3] border border-[#E8E2D4] rounded-2xl p-6 space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-[#1B2A45]/50 mb-1.5 font-medium">이름 *</label>
-                    <input type="text" required value={formData.name}
-                      onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData(p => ({ ...p, name: e.target.value }))}
-                      className="w-full bg-white border border-[#E8E2D4] focus:border-[#C5A258]/60 rounded-xl px-3 py-2.5 text-sm text-[#1B2A45] placeholder-[#1B2A45]/20 outline-none transition-colors"
-                      placeholder="홍길동" />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-[#1B2A45]/50 mb-1.5 font-medium">지역</label>
-                    <select value={formData.region}
-                      onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData(p => ({ ...p, region: e.target.value }))}
-                      className="w-full bg-white border border-[#E8E2D4] focus:border-[#C5A258]/60 rounded-xl px-3 py-2.5 text-sm text-[#1B2A45] outline-none transition-colors">
-                      <option value="">선택</option>
-                      {['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'].map(r => (
-                        <option key={r} value={r}>{r}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-[#1B2A45]/50 mb-1.5 font-medium">연락처 *</label>
-                    <input type="tel" required value={formData.phone}
-                      onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData(p => ({ ...p, phone: e.target.value }))}
-                      className="w-full bg-white border border-[#E8E2D4] focus:border-[#C5A258]/60 rounded-xl px-3 py-2.5 text-sm text-[#1B2A45] placeholder-[#1B2A45]/20 outline-none transition-colors"
-                      placeholder="010-0000-0000" />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-[#1B2A45]/50 mb-1.5 font-medium">회사명</label>
-                    <input type="text" value={formData.company}
-                      onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData(p => ({ ...p, company: e.target.value }))}
-                      className="w-full bg-white border border-[#E8E2D4] focus:border-[#C5A258]/60 rounded-xl px-3 py-2.5 text-sm text-[#1B2A45] placeholder-[#1B2A45]/20 outline-none transition-colors"
-                      placeholder="(주)홍길동상사" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs text-[#1B2A45]/50 mb-2 font-medium">문의 유형 (복수 선택 가능)</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {['정책자금','이노비즈/메인비즈 인증','무상지원금','벤처기업 인증','법인설립','특허/가출원','광고·마케팅','자영업 컨설팅','기타'].map(type => (
-                      <label key={type} className={`flex items-center gap-2 border rounded-lg px-2.5 py-2 cursor-pointer transition-all text-xs
-                        ${inquiryTypes.includes(type) ? 'border-[#C5A258] bg-[#C5A258]/10 text-[#C5A258] font-semibold' : 'border-[#E8E2D4] text-[#1B2A45]/60 hover:border-[#C5A258]/40 bg-white'}`}>
-                        <input type="checkbox" checked={inquiryTypes.includes(type)} onChange={() => toggleInquiry(type)} className="hidden" />
-                        <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${inquiryTypes.includes(type) ? 'border-[#C5A258] bg-[#C5A258]' : 'border-current'}`}>
-                          {inquiryTypes.includes(type) && <span className="text-white text-[8px]">✓</span>}
-                        </span>
-                        {type}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs text-[#1B2A45]/50 mb-2 font-medium">세금체납 여부</label>
-                  <div className="flex flex-wrap gap-4">
-                    {['없음', '있음(납부예정)', '있음(현재체납)'].map(opt => (
-                      <label key={opt} className={`flex items-center gap-2 cursor-pointer text-sm ${formData.taxStatus === opt ? 'text-[#C5A258] font-semibold' : 'text-[#1B2A45]/60'}`}>
-                        <input type="radio" name="taxStatus" value={opt} checked={formData.taxStatus === opt}
-                          onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData(p => ({ ...p, taxStatus: e.target.value }))}
-                          className="accent-[#C5A258]" />
-                        {opt}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs text-[#1B2A45]/50 mb-1.5 font-medium">문의 내용</label>
-                  <textarea rows={3} value={formData.message}
-                    onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setFormData(p => ({ ...p, message: e.target.value }))}
-                    className="w-full bg-white border border-[#E8E2D4] focus:border-[#C5A258]/60 rounded-xl px-3 py-2.5 text-sm text-[#1B2A45] placeholder-[#1B2A45]/20 outline-none transition-colors resize-none"
-                    placeholder="필요한 자금 규모나 현재 상황을 간단히 적어주세요." />
-                </div>
-                <button type="submit" disabled={submitting}
-                  className="w-full bg-[#C5A258] hover:bg-[#D4B568] disabled:opacity-50 text-white font-bold py-3.5 rounded-xl text-sm transition-all hover:scale-[1.01]">
-                  {submitting ? '전송 중...' : '상담 신청하기 →'}
-                </button>
-              </form>
-            )}
-          </Reveal>
+          <Reveal from="right"><LeadForm /></Reveal>
         </div>
       </section>
 
       {/* ── 푸터 ── */}
-      <footer className="bg-[#1B2A45] border-t border-[#C5A258]/10 py-4 px-4 md:px-8">
+      <footer className="bg-[#1B2A45] text-white/60 px-4 md:px-8 pt-10 pb-8">
         <div className="max-w-6xl mx-auto">
-
-          {/* 메인 행: 로고 | contact | 퀵메뉴 */}
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-
-            {/* 로고 */}
-            <div className="relative h-7 w-20 shrink-0">
-              <Image src="/images/logo.png" alt="HUNDRED" fill className="object-contain object-left" unoptimized />
+          <div className="flex flex-wrap items-start justify-between gap-6 pb-6 border-b border-white/10">
+            <div>
+              <div className="relative h-8 w-28 mb-3">
+                <Image src="/images/logo.png" alt="HUNDRED" fill className="object-contain object-left" unoptimized />
+              </div>
+              <p className="text-xs text-white/50">{COMPANY.brand}</p>
             </div>
-
-            {/* Contact — 모바일에서도 한 줄 */}
-            <div className="flex items-center gap-3 text-[11px] text-white/35 flex-wrap">
-              <span>📞 1844-2599</span>
-              <span className="hidden sm:inline">✉️ 100-house@naver.com</span>
-              <span className="hidden lg:inline">📍 서울 구로구 디지털로 243 지하이시티 911호</span>
-              <span className="hidden md:inline">🕐 평일 09:00–18:00</span>
-            </div>
-
-            {/* 퀵메뉴 */}
-            <div className="flex items-center gap-3">
-              {['서비스', '성공사례', '대표소개', '문의하기'].map(label => (
-                <a key={label} href={`#${label}`}
-                  className="text-[11px] text-white/35 hover:text-[#C5A258] transition-colors whitespace-nowrap">
-                  {label}
-                </a>
-              ))}
+            <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs">
+              <button onClick={() => setLegal('terms')} className="hover:text-[#C5A258] transition-colors">이용약관</button>
+              <button onClick={() => setLegal('privacy')} className="font-bold text-white/80 hover:text-[#C5A258] transition-colors">개인정보처리방침</button>
+              {NAV.slice(0, 4).map(n => <a key={n.label} href={n.href} className="hover:text-[#C5A258] transition-colors">{n.label}</a>)}
             </div>
           </div>
-
-          {/* 카피라이트 */}
-          <p className="text-[10px] text-white/15 text-center mt-3 pt-3 border-t border-white/5">
-            © 2025 HUNDRED Consultancy. All rights reserved.
+          <dl className="grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-[11px] leading-relaxed py-5">
+            {infoRows.map(([k, v]) => (
+              <div key={k} className="flex gap-2"><dt className="text-white/35 shrink-0">{k}</dt><dd className="text-white/65 break-all">{v}</dd></div>
+            ))}
+          </dl>
+          <p className="text-[10px] leading-relaxed text-white/30 pt-4 border-t border-white/10">
+            당사는 정부·공공기관이 아닌 민간 경영컨설팅 업체이며, 정책자금·지원사업·인증의 승인 및 선정을 보장하지 않습니다. 각 기관의 심사 및 공고에 따라 결과가 달라질 수 있습니다.
           </p>
+          <p className="text-[10px] text-white/25 mt-3">© {new Date().getFullYear()} {COMPANY.brand}. All rights reserved.</p>
         </div>
       </footer>
+
+      <LegalModal kind={legal} onClose={() => setLegal(null)} />
     </div>
   )
 }
