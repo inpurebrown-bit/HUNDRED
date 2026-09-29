@@ -695,7 +695,6 @@ export default function PayrollTab() {
         ops:         opsEntries.reduce((s: number, e: any) => s + (e.amount || 0), 0),
         opsContract: contractEntries.reduce((s: number, e: any) => s + (e.amount || 0), 0),
       }
-      setRevTotals(newRevTotals)
 
       // 영업팀
       const salesByName: Record<string, { amount: number; count: number }> = {}
@@ -717,6 +716,7 @@ export default function PayrollTab() {
       }
 
       // 전월 계약 → 이번달 환불 차감 (개수 + 금액 모두 차감)
+      let salesDeductionTotal = 0
       try {
         const custRes2 = await fetch('/api/customers')
         const custJson2 = await custRes2.json()
@@ -727,10 +727,20 @@ export default function PayrollTab() {
           if (!name) return
           const w = parseFloat(String(c.details?.refund_deduction_weight || 0)) || 0
           if (w <= 0) return
-          const deductAmt = parseFloat(String(c.details?.refund_deduction_amount || 0)) || Math.round(w * 500_000)
+          // refund_deduction_amount 우선, 없으면 net_paid(실수익) × weight, 최후 fallback: w × 50만
+          const netPaid = parseFloat(String(c.details?.net_paid || '').replace(/[^0-9]/g, '')) || 0
+          const myRevRaw = parseFloat(String(c.details?.my_revenue || '').replace(/[^0-9]/g, '')) || 0
+          const payAmt   = parseFloat(String(c.details?.payment_amount || '').replace(/[^0-9]/g, '')) || 0
+          const vatIncl  = !!c.details?.vat_included
+          const baseRevenue = netPaid || (vatIncl ? Math.round(payAmt / 1.1) : myRevRaw) || Math.round(payAmt / 1.1)
+          const baseAmt = parseFloat(String(c.details?.refund_deduction_amount || 0))
+            || Math.round(baseRevenue * w)
+            || Math.round(w * 500_000)
+          const deductAmt = baseAmt
           if (!salesByName[name]) salesByName[name] = { amount: 0, count: 0 }
           salesByName[name].count  = Math.max(0, salesByName[name].count - w)
-          salesByName[name].amount = Math.max(0, salesByName[name].amount - deductAmt)
+          salesByName[name].amount -= deductAmt   // 음수 허용 (표시용)
+          salesDeductionTotal += deductAmt
           if (!contractDetails[name]) contractDetails[name] = []
           contractDetails[name].push({
             company: `[환불차감] ${c.details?.refund_company || c.details?.company || c.name || ''}`,
@@ -741,6 +751,10 @@ export default function PayrollTab() {
           })
         })
       } catch { /* 환불차감 로드 실패해도 계속 */ }
+
+      // 환불 차감을 반영한 총 매출 업데이트
+      newRevTotals.sales = Math.max(0, newRevTotals.sales - salesDeductionTotal)
+      setRevTotals(newRevTotals)
 
       setSalesContractMap(contractDetails)
       const newSalesEmps = currentSales.map(emp => {
