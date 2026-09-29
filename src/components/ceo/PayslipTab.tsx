@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { getPromo, PROMO_TIERS, PERF_BONUS_MIN_COUNT, PERF_BONUS_RATE, INCOME_TAX_RATE, LOCAL_TAX_RATE, OPS_FEE_RATE, OPS_PUTO_RATE, currentYearMonth, buildSalesContractMap, DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
+import { getPromo, PROMO_TIERS, PERF_BONUS_MIN_COUNT, PERF_BONUS_RATE, INCOME_TAX_RATE, LOCAL_TAX_RATE, OPS_FEE_RATE, OPS_PUTO_RATE, currentYearMonth, buildSalesContractMap, calcRefundDeductions, DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
 
 // ─── 타입 ─────────────────────────────────────────────────
 
@@ -551,8 +551,15 @@ export default function PayslipTab() {
 
       // ── 해당 월 계약 실시간 집계 (buildSalesContractMap — payrollCalc.ts 단일 구현) ──
       const liveMap    = buildSalesContractMap(custJson.customers || [], yearMonth)
+      // customers 테이블 기반 weight 차감 (refund_deduction_weight 있는 active 케이스 포함)
+      const custDeductions = calcRefundDeductions(custJson.customers || [], yearMonth)
       const liveByName = Object.fromEntries(
-        Object.entries(liveMap).map(([k, v]) => [k, { revenue: v.revenue, count: v.count }])
+        Object.entries(liveMap).map(([k, v]) => {
+          const myDeds = custDeductions.filter(d => d.name === k || k.includes(d.name) || d.name.includes(k))
+          const dedAmt = myDeds.reduce((s, d) => s + d.amount, 0)
+          const dedCnt = myDeds.reduce((s, d) => s + d.weight, 0)
+          return [k, { revenue: Math.max(0, v.revenue - dedAmt), count: Math.max(0, v.count - dedCnt) }]
+        })
       )
 
       const isCurrentMon = yearMonth === thisMonth()

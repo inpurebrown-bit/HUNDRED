@@ -6,6 +6,7 @@ import type { Customer } from '@/components/sales/InCallTableView'
 import InCallForm, { emptyInCallData, InCallData } from '@/components/sales/InCallForm'
 import { SUPPLY_RATE_TABLE, calcRecommendedSupply, isActiveRow, contractWeight } from '@/lib/supplyRules'
 import { getElapsedBusinessDays } from '@/lib/businessDays'
+import { calcRefundDeductions } from '@/lib/payrollCalc'
 
 // ── DB 이동 모드 컴포넌트 ─────────────────────────────────
 type TransferDir = 'sales_to_sales' | 'sales_to_ops' | 'ops_to_sales' | 'ops_to_ops'
@@ -919,9 +920,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
   [customers, lastMonthStr])
 
   const thisMonthRefundDeductAmt = useMemo(() =>
-    customers
-      .filter((c: any) => c.status === 'refunded' && c.details?.refund_deduction_month === thisMonthStr)
-      .reduce((s: number, c: any) => s + (parseFloat(String(c.details?.refund_deduction_amount || 0)) || 0), 0),
+    calcRefundDeductions(customers, thisMonthStr).reduce((s, d) => s + d.amount, 0),
   [customers, thisMonthStr])
 
   const thisMonthRevenue = useMemo(() =>
@@ -952,20 +951,10 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
       const m = c.details?.db010_month || (c.details?.is_direct ? (c.created_at || '').slice(0, 7) : null)
       return m === thisMonthStr
     }).length
-    const refundAmt = customers
-      .filter((c: any) =>
-        c.status === 'refunded' &&
-        c.details?.refund_deduction_month === thisMonthStr &&
-        (c.details?.refund_deduction_sales || '').trim() === name
-      )
-      .reduce((s: number, c: any) => s + (parseFloat(String(c.details?.refund_deduction_amount || 0)) || 0), 0)
-    const refundCount = customers
-      .filter((c: any) =>
-        c.status === 'refunded' &&
-        c.details?.refund_deduction_month === thisMonthStr &&
-        (c.details?.refund_deduction_sales || '').trim() === name
-      )
-      .reduce((s: number, c: any) => s + (parseFloat(String(c.details?.refund_deduction_weight || 0)) || 0), 0)
+    const myDeductions = calcRefundDeductions(customers, thisMonthStr)
+      .filter(d => d.name === name || name.includes(d.name) || d.name.includes(name))
+    const refundAmt   = myDeductions.reduce((s, d) => s + d.amount, 0)
+    const refundCount = myDeductions.reduce((s, d) => s + d.weight, 0)
     return {
       name,
       revenue: Math.max(0, mine.reduce((s, c) => s + parseNum((c as any).details?.my_revenue), 0) - refundAmt),

@@ -73,6 +73,7 @@ export interface RefundDeduction {
 }
 
 export function calcRefundDeductions(customers: any[], yearMonth: string): RefundDeduction[] {
+  const parseMoney = (v: any) => parseInt(String(v || '0').replace(/[^0-9]/g, ''), 10) || 0
   const result: RefundDeduction[] = []
   for (const c of customers) {
     const dedMonth = (c.details?.refund_deduction_month || '').trim()
@@ -81,8 +82,15 @@ export function calcRefundDeductions(customers: any[], yearMonth: string): Refun
     if (!name) continue
     const w = parseFloat(String(c.details?.refund_deduction_weight || 0)) || 0
     if (w <= 0) continue
-    const stored = parseFloat(String(c.details?.refund_deduction_amount || 0)) || 0
-    const amount = stored > 0 ? stored : Math.round(w * 500_000)
+    const stored  = parseMoney(c.details?.refund_deduction_amount)
+    const netPaid = parseMoney(c.details?.net_paid)
+    const payAmt  = parseMoney(c.details?.payment_amount)
+    const vatIncl = !!c.details?.vat_included
+    const baseRev = vatIncl ? Math.round(payAmt / 1.1) : payAmt
+    const amount  = stored > 0 ? stored
+      : netPaid > 0 ? Math.round(netPaid * w)
+      : baseRev > 0 ? Math.round(baseRev * w)
+      : Math.round(w * 500_000)
     result.push({
       name,
       weight: w,
