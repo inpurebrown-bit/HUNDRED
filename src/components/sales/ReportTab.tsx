@@ -215,11 +215,10 @@ export default function ReportTab({ userId, userName }: Props) {
   const todayStr   = today()
   const monthStr   = todayStr.slice(0, 7)
   const myContracts = allCustomers.filter((c: any) => {
+    if (c.status !== 'contracted') return false
     const owner = (c.details?.sales_user_name || c.sales_user_name || '').trim()
-    return c.status === 'contracted' && (
-      owner === userName ||
-      cleanNameLocal(owner) === cleanNameLocal(userName)
-    )
+    if (!owner) return true  // sales_user_name 없으면 직원 아이디 기준 본인 계약
+    return owner === userName || cleanNameLocal(owner) === cleanNameLocal(userName)
   })
   const autoTodayContracts = myContracts
     .filter((c: any) => (c.details?.contract_date || '').startsWith(todayStr))
@@ -228,7 +227,6 @@ export default function ReportTab({ userId, userName }: Props) {
     .filter((c: any) => (c.details?.contract_date || '').startsWith(monthStr))
     .reduce((sum: number, c: any) => sum + contractWeight(c.details?.payment_amount, c.details?.vat_included), 0)
   const myRefundWeight = calcRefundDeductions(allCustomers, monthStr)
-    .filter(d => d.name === userName || userName.includes(d.name) || d.name.includes(userName))
     .reduce((s, d) => s + d.weight, 0)
   const autoMonthContracts = Math.max(0, autoMonthContractsRaw - myRefundWeight)
 
