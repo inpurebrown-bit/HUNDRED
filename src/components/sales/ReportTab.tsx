@@ -347,8 +347,7 @@ export default function ReportTab({ userId, userName }: Props) {
   }
   const dailyStats = {
     today_contracts: dailyReports.reduce((s, r) => s + Number(r.data?.today_contracts || 0), 0),
-    month_contracts: dailyReports.filter(r => r.report_date?.slice(0, 7) === todayStr.slice(0, 7))
-      .reduce((s, r) => s + Number(r.data?.today_contracts || 0), 0),
+    month_contracts: autoMonthContracts,
     supply_decided: dailyReports.reduce((s, r) => s + (r.data?.supply_db || []).filter((i: any) => i.is_decided || ['결정업체','계약대기','계약서대기','입금대기'].includes(i.status)).length, 0),
     outbound_decided: dailyReports.reduce((s, r) => s + (r.data?.outbound || []).filter((i: any) => i.is_decided || ['결정업체','계약대기','계약서대기','입금대기'].includes(i.status)).length, 0),
   }
