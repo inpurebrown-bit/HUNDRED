@@ -3,19 +3,33 @@
 import { useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 
-const DOC_TYPES: { key: string; label: string; hint?: string }[] = [
-  { key: 'biz_reg',      label: '사업자등록증' },
-  { key: 'id_card',      label: '신분증' },
-  { key: 'biz_lease',    label: '사업장 임대차계약서', hint: '자가면 시세자료' },
-  { key: 'home_lease',   label: '자택 임대차계약서',   hint: '자가면 시세자료' },
-  { key: 'vehicle',      label: '차량보유현황' },
-  { key: 'tax_paid',     label: '국세·지방세 완납증명서' },
-  { key: 'sales_data',   label: '매출자료', hint: '부가세과세표준증명 또는 표준재무제표 3개년' },
-  { key: 'insurance',    label: '4대보험 가입자명부' },
-  { key: 'shareholders', label: '법인주주명부' },
+type DocKind = 'file' | 'amount' | 'vehicle'
+const DOC_TYPES: { key: string; label: string; hint?: string; kind: DocKind; amountLabel?: string }[] = [
+  { key: 'biz_reg',      label: '사업자등록증', kind: 'file' },
+  { key: 'id_card',      label: '신분증', kind: 'file' },
+  { key: 'biz_lease',    label: '사업장 임대차계약서', kind: 'amount', amountLabel: '자가 시세 / 보증금·월세' },
+  { key: 'home_lease',   label: '자택 임대차계약서',   kind: 'amount', amountLabel: '자가 시세 / 보증금·월세' },
+  { key: 'vehicle',      label: '차량보유현황', kind: 'vehicle' },
+  { key: 'tax_paid',     label: '국세·지방세 완납증명서', kind: 'file' },
+  { key: 'sales_data',   label: '매출자료', hint: '부가세과세표준증명·재무제표 등 여러 파일 가능', kind: 'file' },
+  { key: 'insurance',    label: '4대보험 가입자명부', kind: 'file' },
+  { key: 'corp_reg',     label: '법인등기부등본', hint: '법인인 경우', kind: 'file' },
+  { key: 'shareholders', label: '법인주주명부', hint: '법인인 경우', kind: 'file' },
+  { key: 'etc',          label: '기타자료', hint: '추가로 참고할 자료', kind: 'file' },
 ]
 
-interface DocState { path?: string; fileName?: string; none?: boolean }
+interface DocFile { path: string; fileName: string }
+interface DocState { files?: DocFile[]; none?: boolean; amount?: string; owned?: boolean; price?: string }
+
+// 이전 단일파일 형식 호환
+function normalizeDocs(raw: Record<string, any> | null): Record<string, DocState> {
+  const out: Record<string, DocState> = {}
+  for (const [k, v] of Object.entries(raw || {})) {
+    const files: DocFile[] = Array.isArray(v?.files) ? v.files : (v?.path ? [{ path: v.path, fileName: v.fileName || '' }] : [])
+    out[k] = { ...v, files }
+  }
+  return out
+}
 interface Item { heading: string; text: string }
 interface Section { key: string; title: string; items: Item[] }
 export interface ConsultingReport {
@@ -48,7 +62,8 @@ export default function ConsultingReportTab({ caseId, companyName, incall, credi
   savedReport: ConsultingReport | null
   onSave: (patch: Record<string, any>) => void
 }) {
-  const [docs, setDocs] = useState<Record<string, DocState>>(savedDocs || {})
+  const [docs, setDocs] = useState<Record<string, DocState>>(() => normalizeDocs(savedDocs))
+  const [dragKey, setDragKey] = useState('')
   const [report, setReport] = useState<ConsultingReport | null>(savedReport)
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState<string>('')
@@ -61,46 +76,61 @@ export default function ConsultingReportTab({ caseId, companyName, incall, credi
     onSave({ consulting_docs: next })
   }
 
-  async function upload(type: string, file: File) {
-    setBusy(type); setErr('')
+  async function uploadMany(type: string, list: File[]) {
+    const ok = list.filter(f => /\.(pdf|png|jpe?g|webp)$/i.test(f.name))
+    if (ok.length < list.length) setErr('PDF·JPG·PNG 파일만 가능합니다 (그 외 파일은 제외됨)')
+    else setErr('')
+    if (!ok.length) return
+    setBusy(type)
     try {
-      const res = await fetch('/api/consulting-docs-upload', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: file.name, caseId, docType: type }),
-      })
-      const j = await res.json()
-      if (!res.ok) throw new Error(j.error || '업로드 준비 실패')
-      const up = await supabase.storage.from('consulting-docs').uploadToSignedUrl(j.path, j.token, file)
-      if (up.error) throw new Error(up.error.message)
-      if (docs[type]?.path) {
-        fetch('/api/consulting-docs-upload', {
-          method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: docs[type].path }),
-        }).catch(() => {})
+      const added: DocFile[] = []
+      for (const file of ok) {
+        const res = await fetch('/api/consulting-docs-upload', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: file.name, caseId, docType: type }),
+        })
+        const j = await res.json()
+        if (!res.ok) throw new Error(j.error || '업로드 준비 실패')
+        const up = await supabase.storage.from('consulting-docs').uploadToSignedUrl(j.path, j.token, file)
+        if (up.error) throw new Error(up.error.message)
+        added.push({ path: j.path, fileName: file.name })
       }
-      persistDocs({ ...docs, [type]: { path: j.path, fileName: file.name } })
+      const cur = docs[type] || {}
+      persistDocs({ ...docs, [type]: { ...cur, none: false, files: [...(cur.files || []), ...added] } })
     } catch (e: any) {
       setErr('업로드 실패: ' + (e?.message || ''))
     } finally { setBusy('') }
   }
 
-  async function removeDoc(type: string) {
-    const p = docs[type]?.path
-    if (p) fetch('/api/consulting-docs-upload', {
-      method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: p }),
+  function removeFile(type: string, idx: number) {
+    const cur = docs[type]
+    const f = cur?.files?.[idx]
+    if (!cur || !f) return
+    fetch('/api/consulting-docs-upload', {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: f.path }),
     }).catch(() => {})
-    const next = { ...docs }; delete next[type]
-    persistDocs(next)
+    persistDocs({ ...docs, [type]: { ...cur, files: (cur.files || []).filter((_, i) => i !== idx) } })
+  }
+
+  function patchDoc(type: string, patch: Partial<DocState>) {
+    persistDocs({ ...docs, [type]: { ...(docs[type] || {}), ...patch } })
   }
 
   async function generate() {
     setBusy('generate'); setErr('')
     try {
-      const payload = DOC_TYPES.map(d => ({ type: d.key, label: d.label, path: docs[d.key]?.path || '' }))
-        .filter(d => !docs[d.type]?.none)
+      const payload = DOC_TYPES.flatMap(d =>
+        docs[d.key]?.none ? [] : (docs[d.key]?.files || []).map(f => ({ type: d.key, label: d.label, path: f.path })))
+      const absent = DOC_TYPES.filter(d => d.kind === 'file' && (docs[d.key]?.none || !(docs[d.key]?.files || []).length) && d.key !== 'etc').map(d => d.label)
+      const extras = DOC_TYPES.flatMap(d => {
+        const s = docs[d.key] || {}
+        if (d.kind === 'amount' && s.amount) return [{ label: d.label, value: `${d.amountLabel}: ${s.amount}` }]
+        if (d.kind === 'vehicle') return [{ label: d.label, value: s.owned ? `보유, 대략 가격: ${s.price || '미입력'}` : '미보유' }]
+        return []
+      })
       const res = await fetch('/api/consulting-report', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ incall, credit, docs: payload }),
+        body: JSON.stringify({ incall, credit, docs: payload, extras, absent }),
       })
       const j = await res.json()
       if (!res.ok) throw new Error(j.error || '생성 실패')
@@ -133,7 +163,7 @@ export default function ConsultingReportTab({ caseId, companyName, incall, credi
     setReport({ ...report, sections: report.sections.map((s, a) => a !== si ? s : { ...s, items: s.items.filter((_, b) => b !== ii) }) })
   }
 
-  const uploaded = DOC_TYPES.filter(d => docs[d.key]?.path).length
+  const uploaded = DOC_TYPES.filter(d => (docs[d.key]?.files || []).length > 0).length
   const dateStr = report ? new Date(report.generatedAt).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric' }) : ''
 
   return (
@@ -154,35 +184,76 @@ export default function ConsultingReportTab({ caseId, companyName, incall, credi
         <div className="bg-white border border-gray-200 rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-bold text-gray-800">제출 서류 <span className="text-xs font-normal text-gray-400">({uploaded}/{DOC_TYPES.length} 업로드)</span></p>
-            <p className="text-[10px] text-gray-400">PDF · JPG · PNG / 없는 서류는 &quot;없음&quot; 처리</p>
+            <p className="text-[10px] text-gray-400">파일을 각 항목에 끌어다 놓기 · PDF/JPG/PNG · 여러 개 가능</p>
           </div>
           <div className="space-y-1.5">
             {DOC_TYPES.map(d => {
-              const st = docs[d.key]
+              const st = docs[d.key] || {}
+              const files = st.files || []
+              const hasData = files.length > 0 || !!st.amount || (d.kind === 'vehicle' && st.owned !== undefined)
+              const dropHere = dragKey === d.key
               return (
-                <div key={d.key} className="flex items-center gap-2 text-xs border border-gray-100 rounded-lg px-3 py-2">
-                  <span className={`w-2 h-2 rounded-full ${st?.path ? 'bg-emerald-500' : st?.none ? 'bg-gray-300' : 'bg-amber-400'}`} />
-                  <div className="flex-1 min-w-0">
-                    <span className="font-medium text-gray-700">{d.label}</span>
-                    {d.hint && <span className="text-[10px] text-gray-400 ml-1.5">{d.hint}</span>}
-                    {st?.fileName && <p className="text-[10px] text-emerald-600 truncate">{st.fileName}</p>}
-                    {st?.none && <p className="text-[10px] text-gray-400">서류 없음 — 없는 대로 진행</p>}
+                <div key={d.key}
+                  onDragOver={e => { e.preventDefault(); setDragKey(d.key) }}
+                  onDragLeave={() => setDragKey('')}
+                  onDrop={e => { e.preventDefault(); setDragKey(''); uploadMany(d.key, Array.from(e.dataTransfer.files || [])) }}
+                  className={`text-xs border rounded-lg px-3 py-2 transition-colors ${dropHere ? 'border-indigo-400 bg-indigo-50' : 'border-gray-100'}`}>
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${hasData ? 'bg-emerald-500' : st.none ? 'bg-gray-300' : 'bg-amber-400'}`} />
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium text-gray-700">{d.label}</span>
+                      {d.hint && <span className="text-[10px] text-gray-400 ml-1.5">{d.hint}</span>}
+                      {st.none && <span className="text-[10px] text-gray-400 ml-1.5">없음 — 없는 대로 진행</span>}
+                    </div>
+                    <input type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp" className="hidden"
+                      ref={el => { fileRefs.current[d.key] = el }}
+                      onChange={e => { uploadMany(d.key, Array.from(e.target.files || [])); e.target.value = '' }} />
+                    {busy === d.key ? <span className="text-[10px] text-indigo-500">업로드 중…</span> : (
+                      <>
+                        <button type="button" onClick={() => fileRefs.current[d.key]?.click()}
+                          className="px-2 py-1 rounded bg-indigo-50 text-indigo-600 font-semibold hover:bg-indigo-100">
+                          {files.length ? '+ 추가' : '업로드'}
+                        </button>
+                        {d.kind === 'file' && d.key !== 'etc' && !files.length && (
+                          <button type="button" onClick={() => patchDoc(d.key, { none: !st.none })}
+                            className="px-2 py-1 rounded bg-gray-50 text-gray-500 hover:bg-gray-100">{st.none ? '없음 해제' : '없음'}</button>
+                        )}
+                      </>
+                    )}
                   </div>
-                  <input type="file" accept="application/pdf,image/png,image/jpeg,image/webp" className="hidden"
-                    ref={el => { fileRefs.current[d.key] = el }}
-                    onChange={e => { const f = e.target.files?.[0]; if (f) upload(d.key, f); e.target.value = '' }} />
-                  {busy === d.key ? <span className="text-[10px] text-indigo-500">업로드 중…</span> : (
-                    <>
-                      <button type="button" onClick={() => fileRefs.current[d.key]?.click()}
-                        className="px-2 py-1 rounded bg-indigo-50 text-indigo-600 font-semibold hover:bg-indigo-100">
-                        {st?.path ? '교체' : '업로드'}
-                      </button>
-                      {st?.path && <button type="button" onClick={() => removeDoc(d.key)} className="px-2 py-1 rounded bg-gray-50 text-gray-500 hover:bg-gray-100">삭제</button>}
-                      {!st?.path && (
-                        <button type="button" onClick={() => persistDocs({ ...docs, [d.key]: st?.none ? {} : { none: true } })}
-                          className="px-2 py-1 rounded bg-gray-50 text-gray-500 hover:bg-gray-100">{st?.none ? '없음 해제' : '없음'}</button>
+
+                  {d.kind === 'amount' && (
+                    <div className="flex items-center gap-2 mt-1.5 pl-4">
+                      <span className="text-[10px] text-gray-500 whitespace-nowrap">{d.amountLabel}</span>
+                      <input value={st.amount || ''} onChange={e => patchDoc(d.key, { amount: e.target.value })}
+                        placeholder="예) 자가 시세 5억 / 보증금 3천 월 100"
+                        className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs" />
+                    </div>
+                  )}
+
+                  {d.kind === 'vehicle' && (
+                    <div className="flex items-center gap-2 mt-1.5 pl-4">
+                      <label className="flex items-center gap-1 text-[11px] text-gray-600 cursor-pointer">
+                        <input type="checkbox" checked={!!st.owned} onChange={e => patchDoc(d.key, { owned: e.target.checked })} />
+                        차량 보유
+                      </label>
+                      {st.owned && (
+                        <input value={st.price || ''} onChange={e => patchDoc(d.key, { price: e.target.value })}
+                          placeholder="대략 가격 (예: 3,000만원)"
+                          className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs" />
                       )}
-                    </>
+                    </div>
+                  )}
+
+                  {files.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-1.5 pl-4">
+                      {files.map((f, i) => (
+                        <span key={f.path} className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 rounded px-2 py-0.5 text-[10px] max-w-[220px]">
+                          <span className="truncate">{f.fileName}</span>
+                          <button type="button" onClick={() => removeFile(d.key, i)} className="text-emerald-500 hover:text-red-500 font-bold">×</button>
+                        </span>
+                      ))}
+                    </div>
                   )}
                 </div>
               )

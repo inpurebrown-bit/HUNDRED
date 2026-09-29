@@ -61,10 +61,12 @@ export async function POST(req: NextRequest) {
   const user = session.user as any
   if (!['ops', 'ceo'].includes(user.role)) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
-  const { incall, credit, docs } = await req.json() as {
+  const { incall, credit, docs, extras, absent } = await req.json() as {
     incall: Record<string, any>
     credit: any
     docs: { type: string; label: string; path: string }[]
+    extras?: { label: string; value: string }[]
+    absent?: string[]
   }
 
   try {
@@ -72,9 +74,13 @@ export async function POST(req: NextRequest) {
     parts.push({ text: `[인콜카드 기재 내용]\n${JSON.stringify(incall || {}, null, 1)}` })
     parts.push({ text: `[여신구분(기대출) 분석 데이터]\n${credit ? JSON.stringify(credit) : '없음'}` })
 
-    const missing: string[] = []
+    if (extras?.length) {
+      parts.push({ text: `[담당자가 직접 입력한 정보]\n${extras.map(e => `- ${e.label}: ${e.value}`).join('\n')}\n(금액은 담당자 입력 그대로이며 별도 증빙 없음)` })
+    }
+
+    const missing: string[] = [...(absent || [])]
     for (const d of docs || []) {
-      if (!d.path) { missing.push(d.label); continue }
+      if (!d.path) continue
       const f = await fetchDoc(d.path)
       if (!f) { missing.push(`${d.label}(읽기 실패/미지원 형식)`); continue }
       parts.push({ text: `[첨부 서류: ${d.label}]` })
