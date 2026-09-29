@@ -8,6 +8,21 @@ function parseMoney(v: any): number {
   return parseInt(String(v).replace(/[^0-9]/g, ''), 10) || 0
 }
 
+// weight 기반 차감액 계산: net_paid × w → payment/1.1 × w → w × 50만
+function calcWeightDeductAmt(c: any): number {
+  const w = parseFloat(String(c.details?.refund_deduction_weight || 0)) || 0
+  if (w <= 0) return 0
+  const explicit = parseFloat(String(c.details?.refund_deduction_amount || 0))
+  if (explicit > 0) return explicit
+  const netPaid = parseMoney(c.details?.net_paid)
+  if (netPaid > 0) return Math.round(netPaid * w)
+  const payAmt = parseMoney(c.details?.payment_amount)
+  const vatIncl = !!c.details?.vat_included
+  const baseRev = vatIncl ? Math.round(payAmt / 1.1) : payAmt
+  if (baseRev > 0) return Math.round(baseRev * w)
+  return Math.round(w * 500_000)
+}
+
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
@@ -28,9 +43,11 @@ export async function GET(req: NextRequest) {
     .from('ops_cases')
     .select('id, details, created_at, owner_id, ops_user_name, customer_name, phone')
 
-  const [{ data: custContracted }, { data: custRefunded }, { data: opsCasesRaw }, { data: usersRaw }] = await Promise.all([
+  const [{ data: custContracted }, { data: custRefunded }, { data: custWeightDeduct }, { data: opsCasesRaw }, { data: usersRaw }] = await Promise.all([
     custQuery,
     supabaseAdmin.from('customers').select('id, owner_id, name, details').eq('status', 'refunded'),
+    // weight 기반 차감: status 무관하게 refund_deduction_weight가 있는 고객 (반품이 아닌 부분차감)
+    supabaseAdmin.from('customers').select('id, owner_id, name, details').not('details->>refund_deduction_weight', 'is', null),
     opsQuery,
     supabaseAdmin.from('users').select('id, role, name'),
   ])
@@ -216,6 +233,33 @@ export async function GET(req: NextRequest) {
     }
   })
 
+  // ── weight 기반 차감 엔트리 (status 무관, refund_deduction_weight 있는 고객) ───
+  const weightDeductEntries = (custWeightDeduct || [])
+    .map((c: any) => {
+      const dedMonth = c.details?.refund_deduction_month
+      if (!dedMonth) return null
+      const deductAmt = calcWeightDeductAmt(c)
+      if (deductAmt <= 0) return null
+      return {
+        id: `wdeduct_${c.id}`,
+        amount: -deductAmt,
+        date: dedMonth + '-01',
+        sales_user_id: String(c.owner_id || ''),
+        sales_user_name: (c.details?.refund_deduction_sales || '').trim(),
+        company: c.details?.refund_company || c.details?.company || c.name || '',
+        isRefund: true,
+      }
+    })
+    .filter(Boolean) as any[]
+
+  // weight 차감 → monthlyMap
+  weightDeductEntries.forEach((e: any) => {
+    const key = e.date?.slice(0, 7)
+    if (key && monthlyMap[key]) {
+      monthlyMap[key].sales = Math.max(0, monthlyMap[key].sales - Math.abs(e.amount))
+    }
+  })
+
   const monthly = Object.entries(monthlyMap).map(([month, v]) => ({
     month: month.slice(5) + '월',
     fullMonth: month,
@@ -235,6 +279,13 @@ export async function GET(req: NextRequest) {
   salesEntries.forEach(e => {
     const year = e.date?.slice(0, 4)
     if (year && annualRevenue[year]) { annualRevenue[year].sales += e.amount; annualRevenue[year].total += e.amount }
+  })
+  weightDeductEntries.forEach((e: any) => {
+    const year = e.date?.slice(0, 4)
+    if (year && annualRevenue[year]) {
+      annualRevenue[year].sales = Math.max(0, annualRevenue[year].sales - Math.abs(e.amount))
+      annualRevenue[year].total = Math.max(0, annualRevenue[year].total - Math.abs(e.amount))
+    }
   })
   opsEntries.forEach(e => {
     const year = e.date?.slice(0, 4)
@@ -309,6 +360,15 @@ export async function GET(req: NextRequest) {
     }
   })
 
+  // weight 기반 차감 → salesByUser
+  weightDeductEntries.forEach((e: any) => {
+    const uid = e.sales_user_id
+    if (!uid) return
+    if (salesByUser[uid]) {
+      salesByUser[uid].amount = Math.max(0, salesByUser[uid].amount - Math.abs(e.amount))
+    }
+  })
+
   const opsByUser: Record<string, { name: string; amount: number; count: number }> = {}
   opsEntries.forEach(e => {
     const id = e.ops_user_id || e.ops_user_name
@@ -344,6 +404,7 @@ export async function GET(req: NextRequest) {
     const targetSales    = [
       ...salesEntries.filter(e => e.date?.startsWith(targetMonth)),
       ...refundSalesEntries.filter((e: any) => e.date?.startsWith(targetMonth)),
+      ...weightDeductEntries.filter((e: any) => e.date?.startsWith(targetMonth)),
     ]
     return NextResponse.json({
       thisMonthOps:          targetOps,
@@ -360,6 +421,7 @@ export async function GET(req: NextRequest) {
   const thisMonthSales = [
     ...salesEntries.filter(e => e.date?.startsWith(thisMonthKey)),
     ...refundSalesEntries.filter((e: any) => e.date?.startsWith(thisMonthKey)),
+    ...weightDeductEntries.filter((e: any) => e.date?.startsWith(thisMonthKey)),
   ]
   const thisMonthOps           = opsEntries.filter(e => e.date?.startsWith(thisMonthKey))
   const thisMonthOpsContracts  = opsContractEntries.filter(e => e.date?.startsWith(thisMonthKey))
@@ -370,7 +432,8 @@ export async function GET(req: NextRequest) {
   const twoAgoOps          = opsEntries.filter(e => e.date?.startsWith(twoAgoKey))
   const twoAgoOpsContracts = opsContractEntries.filter(e => e.date?.startsWith(twoAgoKey))
 
-  const totalSales = salesEntries.reduce((s, e) => s + e.amount, 0)
+  const weightDeductTotal = weightDeductEntries.reduce((s: number, e: any) => s + Math.abs(e.amount), 0)
+  const totalSales = Math.max(0, salesEntries.reduce((s, e) => s + e.amount, 0) - weightDeductTotal)
   const totalOps   = opsEntries.reduce((s, e) => s + e.amount, 0)
 
   // 뿌토 계약 건수 (puto_contract_amount 있는 ops_cases)
