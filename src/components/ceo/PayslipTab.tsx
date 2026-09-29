@@ -685,7 +685,7 @@ export default function PayslipTab() {
               const cur = updates[emp.id] || {}
               updates[emp.id] = {
                 ...cur,
-                contract_count:   Math.max(0, (Number(cur.contract_count)   || 0) - r.totalCount),
+                // contract_count는 liveByName에서 custDeductions로 이미 차감됨 — ops-cases 중복 차감 금지
                 contract_revenue: Math.max(0, (Number(cur.contract_revenue) || 0) - r.totalRevenue),
                 deduction:        r.totalRevenue,
                 refund_companies: r.companies.join(' | '),
