@@ -9,6 +9,7 @@ import PullToRefresh from '@/components/ui/PullToRefresh'
 import SplitView from '@/components/shared/SplitView'
 import { contractWeight } from '@/lib/supplyRules'
 import { printIncall, buildCustomerSections } from '@/lib/printIncall'
+import ConsultingReportTab from './ConsultingReportTab'
 // ── KST Utils ──────────────────────────────────────────────────────────
 function nowKST() {
   return new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(' ', 'T') + '+09:00'
@@ -279,7 +280,7 @@ const opsTabs: { key: OpsTab; label: string }[] = [
 ]
 
 // ── Detail Tab Types: 진행현황 우선, 타임라인 진행현황 하단에 통합 ──────────
-const DETAIL_TABS = ['진행현황', '인콜일지', '기관ID/PW', '입금/계약', '여신구분'] as const
+const DETAIL_TABS = ['진행현황', '인콜일지', '기관ID/PW', '입금/계약', '여신구분', '컨설팅보고서'] as const
 type DetailTab = typeof DETAIL_TABS[number]
 
 // ──────────────────────────────────────────────────────────────────────
@@ -2404,6 +2405,23 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
           onSaveReport={(report) => {
             const merged = { ...(local.details || {}), credit_report: report }
             setLocal({ ...local, details: merged })
+            onSave(c.id, { details: merged })
+          }}
+        />
+      )}
+
+      {/* ── 컨설팅보고서 ── */}
+      {activeDetailTab === '컨설팅보고서' && (
+        <ConsultingReportTab
+          caseId={c.id}
+          companyName={local.customers?.details?.company || local.customers?.name || ''}
+          incall={{ ...(local.customers?.details || {}), ...(d.incall_journal || {}), representative: d.incall_journal?.representative || local.customers?.name || '' }}
+          credit={d.credit_report || null}
+          savedDocs={d.consulting_docs || null}
+          savedReport={d.consulting_report || null}
+          onSave={(patch) => {
+            const merged = { ...(local.details || {}), ...patch }
+            setLocal(prev => ({ ...prev, details: { ...(prev.details || {}), ...patch } }))
             onSave(c.id, { details: merged })
           }}
         />
