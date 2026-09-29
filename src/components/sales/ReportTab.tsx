@@ -2,6 +2,7 @@
 
 import { useState, useEffect, FormEvent, ReactNode } from 'react'
 import { calcRefundDeductions } from '@/lib/payrollCalc'
+import { contractWeight as contractWeightLib } from '@/lib/supplyRules'
 
 // ── 타입 ────────────────────────────────────────────────
 interface MorningData {
@@ -199,14 +200,7 @@ export default function ReportTab({ userId, userName }: Props) {
   }, [userName])
 
   // ── 이번달/오늘 계약 자동집계 ───────────────────────────
-  function contractWeight(paymentAmount: string | number | undefined, vatIncluded?: boolean): number {
-    const amt = parseInt(String(paymentAmount || '0').replace(/[^0-9]/g, ''), 10) || 0
-    if (amt <= 0) return 0
-    const vatExcl = vatIncluded === false ? amt : Math.round(amt / 1.1)
-    if (vatExcl <= 300000) return 0.5
-    if (vatExcl < 1000000) return 1
-    return Math.floor((vatExcl - 1000000) / 500000) + 2
-  }
+  const contractWeight = contractWeightLib
 
   function cleanNameLocal(s: string): string {
     return s.replace(/\s*(수석팀장|팀장|팀원|대리|과장|부장|차장|이사|수석|매니저|주임|사원).*/g, '').trim()
