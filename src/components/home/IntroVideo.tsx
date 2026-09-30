@@ -14,9 +14,9 @@ export default function IntroVideo() {
       <video ref={ref} src={HOME_VIDEO.src} poster={HOME_VIDEO.poster || undefined}
         autoPlay muted loop playsInline preload="metadata"
         className="w-full h-[56vh] md:h-[82vh] object-cover" />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-black/30 pointer-events-none" />
-      <div className="absolute left-0 right-0 bottom-0 p-5 md:p-10 flex items-end justify-between gap-4">
-        <div className="text-white">
+      <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/5 to-black/10 pointer-events-none" />
+      <div className="absolute left-0 right-0 top-0 p-5 md:p-10 pt-20 md:pt-24 flex items-start justify-between gap-4">
+        <div className="text-white drop-shadow">
           <p className="text-[11px] md:text-xs tracking-[0.35em] text-[#C5A258] font-bold mb-2">{HOME_VIDEO.label}</p>
           <p className="text-lg md:text-3xl font-black leading-snug">{HOME_VIDEO.title}</p>
         </div>

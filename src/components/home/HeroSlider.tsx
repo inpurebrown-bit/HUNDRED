@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react'
 
 const SLIDES = [
   {
-    tab: '자금 전략',
-    en: 'Funding Strategy',
-    title: '기업의 성장 단계에 맞는\n자금 전략을 설계합니다',
-    desc: '정밀한 재무·기술성 진단을 바탕으로 기관별 요건을 꼼꼼히 검토하고,\n성장 단계에 맞는 정책자금 전략을 제안합니다.',
+    tab: '성장 단계',
+    en: 'Life-cycle Solution',
+    title: '창업에서 스케일업까지,\n성장 단계에 맞는 솔루션',
+    desc: '예비 창업부터 중소기업까지 생애주기 진단으로\n지금 필요한 지원과 준비 과제를 찾아드립니다.',
     img: 'https://images.unsplash.com/photo-1486325212027-8081e485255e?w=2000&q=75',
   },
   {

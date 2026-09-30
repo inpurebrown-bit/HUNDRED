@@ -6,6 +6,7 @@ import Image from 'next/image'
 import FloatingInquiry from '@/components/home/FloatingInquiry'
 import HeroSlider from '@/components/home/HeroSlider'
 import IntroVideo from '@/components/home/IntroVideo'
+import GrowthStages from '@/components/home/GrowthStages'
 import LeadForm, { LegalModal } from '@/components/home/LeadForm'
 import { COMPANY } from '@/lib/companyInfo'
 import type { LegalKey } from '@/lib/legalTexts'
@@ -36,9 +37,9 @@ function Reveal({ children, from = 'bottom', delay = 0, className = '' }: {
 // ─── 콘텐츠 ─────────────────────────────────────────────
 const CORE_SERVICES = [
   {
-    icon: '01', title: '정책자금 컨설팅', tag: 'POLICY FUNDING',
-    lead: '재무·기술성 진단을 바탕으로 기업에 맞는 자금 전략을 설계합니다.',
-    points: ['소진공·중진공·신보·기보·지역신용보증재단 요건 검토', '업력·업종·매출·기대출 기준의 자금 적합도 분석', '신청 서류 준비 및 절차 자문'],
+    icon: '01', title: '성장 지원 솔루션', tag: 'GROWTH SUPPORT',
+    lead: '재무·기술성 진단을 바탕으로 기업에 맞는 지원 제도와 준비 순서를 설계합니다.',
+    points: ['업력·업종·매출·기대출 기준의 지원 제도 적합도 분석', '기관별 최신 공고 기준 요건 검토', '신청 서류 준비 및 절차 자문'],
   },
   {
     icon: '02', title: '정부지원사업', tag: 'GOVERNMENT PROGRAMS',
@@ -144,7 +145,6 @@ export default function HomePage() {
             {NAV.map(n => (
               <a key={n.label} href={n.href} className={`text-xs hover:text-[#C5A258] transition-colors tracking-wide font-medium ${scrolled ? 'text-[#1B2A45]/60' : 'text-white/85'}`}>{n.label}</a>
             ))}
-            <a href={COMPANY.phoneHref} className="text-xs text-[#C5A258] font-bold tracking-wide">📞 {COMPANY.phone}</a>
           </div>
           <div className="flex items-center gap-2">
             <a href="#문의하기" className="hidden md:inline-flex text-xs bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-4 py-2 rounded-lg transition-colors">무료 상담</a>
@@ -195,7 +195,7 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto">
           <Reveal className="text-center mb-12">
             <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] mb-3">SERVICES</p>
-            <h2 className="text-2xl md:text-4xl font-black">세 가지 핵심 서비스</h2>
+            <h2 className="text-2xl md:text-4xl font-black">핵심 서비스</h2>
             <p className="text-sm text-[#1B2A45]/45 mt-3">기업의 현재 위치를 정확히 진단하고, 필요한 순서대로 준비합니다.</p>
           </Reveal>
           <div className="grid md:grid-cols-3 gap-5">
@@ -231,32 +231,20 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── 성장 단계별 ── */}
+      {/* ── 성장 단계별 (마우스를 올리면 펼쳐지는 패널) ── */}
       <section id="성장단계" className="py-20 md:py-28 px-4 md:px-8 bg-[#F2EFE8]">
         <div className="max-w-6xl mx-auto">
-          <Reveal className="text-center mb-12">
+          <Reveal className="text-center mb-10">
             <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] mb-3">GROWTH STAGES</p>
-            <h2 className="text-2xl md:text-4xl font-black">기업 성장 단계별 프로그램</h2>
-            <p className="text-sm text-[#1B2A45]/45 mt-3">지금 어느 단계에 계신지에 따라 우선순위가 달라집니다.</p>
+            <h2 className="text-xl md:text-3xl font-medium text-[#1B2A45]/80">예비 창업부터 중견·중소기업까지</h2>
+            <p className="text-xl md:text-3xl font-black mt-1">생애주기 진단으로 필요한 지원을 찾아드립니다</p>
           </Reveal>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {STAGES.map((s, i) => (
-              <Reveal key={s.n} delay={i * 90}>
-                <div className="h-full bg-white rounded-2xl p-5 border border-[#E8E2D4] relative overflow-hidden">
-                  <div className="absolute top-0 left-0 right-0 h-1" style={{ background: s.color }} />
-                  <p className="text-3xl font-black opacity-20" style={{ color: s.color }}>{s.n}</p>
-                  <h3 className="text-base font-black mb-3 -mt-1">{s.title}</h3>
-                  <ul className="space-y-2">
-                    {s.items.map(t => (
-                      <li key={t} className="text-xs text-[#1B2A45]/65 leading-relaxed flex gap-2"><span style={{ color: s.color }}>●</span>{t}</li>
-                    ))}
-                  </ul>
-                </div>
-              </Reveal>
-            ))}
-          </div>
+          <Reveal><GrowthStages /></Reveal>
         </div>
       </section>
+
+      {/* ── 대표 영상 (HOME_VIDEO.src 설정 시 표시) ── */}
+      <IntroVideo />
 
       {/* ── 업종별 현장 사례 (옆으로 흐르는 슬라이드) ── */}
       <section id="업종사례" className="py-20 md:py-24 bg-[#FAF8F3] overflow-hidden">
@@ -379,9 +367,6 @@ export default function HomePage() {
           </Reveal>
         </div>
       </section>
-
-      {/* ── 대표 인사 영상 (HOME_VIDEO.src 설정 시 표시) ── */}
-      <IntroVideo />
 
       {/* ── 강의·강연 ── */}
       <section id="강의" className="py-20 md:py-28 px-4 md:px-8 bg-[#1B2A45] overflow-hidden">

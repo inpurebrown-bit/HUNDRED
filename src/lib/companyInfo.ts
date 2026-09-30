@@ -23,8 +23,8 @@ export const RETENTION_MONTHS = 12
 
 // 대표 인사 영상. public/videos/ 에 mp4를 넣고 src에 '/videos/파일명.mp4' 를 적으면 홈페이지에 꽉 찬 영상 섹션이 나타납니다.
 export const HOME_VIDEO = {
-  src: '',            // 예: '/videos/ceo-intro.mp4'
-  poster: '',         // 예: '/videos/ceo-intro.jpg' (선택)
+  src: '/videos/ceo-intro.mp4',
+  poster: '/videos/ceo-intro.jpg',
   label: 'CEO MESSAGE',
   title: '대표가 직접 전하는 헌드레드컨설팅 이야기',
 }
