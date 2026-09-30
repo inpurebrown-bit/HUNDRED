@@ -36,26 +36,26 @@ function Reveal({ children, from = 'bottom', delay = 0, className = '' }: {
 // ─── 콘텐츠 ─────────────────────────────────────────────
 const CORE_SERVICES = [
   {
-    icon: '🏦', title: '정책자금 컨설팅', tag: 'POLICY FUNDING',
+    icon: '01', title: '정책자금 컨설팅', tag: 'POLICY FUNDING',
     lead: '재무·기술성 진단을 바탕으로 기업에 맞는 자금 전략을 설계합니다.',
     points: ['소진공·중진공·신보·기보·지역신용보증재단 요건 검토', '업력·업종·매출·기대출 기준의 자금 적합도 분석', '신청 서류 준비 및 절차 자문'],
   },
   {
-    icon: '🧭', title: '정부지원사업', tag: 'GOVERNMENT PROGRAMS',
+    icon: '02', title: '정부지원사업', tag: 'GOVERNMENT PROGRAMS',
     lead: '성장 단계에 맞는 지원사업을 찾고 준비 방향을 함께 정리합니다.',
     points: ['창업·R&D·수출·고용 등 지원사업 탐색', '사업계획서 작성 방향 자문', '공고 일정에 맞춘 준비 로드맵'],
   },
   {
-    icon: '🏅', title: '기업인증', tag: 'CERTIFICATION',
+    icon: '03', title: '기업인증', tag: 'CERTIFICATION',
     lead: '인증 취득으로 금융·세제·거래 신뢰도를 높이는 방법을 안내합니다.',
     points: ['벤처기업확인 · 이노비즈 · 메인비즈', '기업부설연구소 · 특허 등 기술 자산 정리', '인증 요건 사전 진단'],
   },
 ]
 
 const EXTRA_SERVICES = [
-  { icon: '🏛', title: '법인 설립·전환', desc: '매출·이익 규모와 성장 계획에 맞춘 개인사업자 ↔ 법인 구조 검토' },
-  { icon: '📣', title: '광고·마케팅', desc: '메타·네이버·유튜브 등 채널별 마케팅 전략 수립' },
-  { icon: '🏪', title: '자영업 컨설팅', desc: '매출·비용 구조 점검과 경영 개선 방향 제안' },
+  { icon: '+', title: '법인 설립·전환', desc: '매출·이익 규모와 성장 계획에 맞춘 개인사업자 ↔ 법인 구조 검토' },
+  { icon: '+', title: '광고·마케팅', desc: '메타·네이버·유튜브 등 채널별 마케팅 전략 수립' },
+  { icon: '+', title: '자영업 컨설팅', desc: '매출·비용 구조 점검과 경영 개선 방향 제안' },
 ]
 
 const STAGES = [
@@ -170,22 +170,22 @@ export default function HomePage() {
       {/* ── 히어로 슬라이드 ── */}
       <HeroSlider />
 
-      {/* ── 핵심 강점 띠 ── */}
-      <section className="bg-[#0b1220] text-white border-t border-white/10">
-        <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 divide-x divide-white/10">
+      {/* ── 핵심 강점 (버튼형) ── */}
+      <section className="bg-[#0b1220] text-white">
+        <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 border-x border-white/10">
           {[
-            ['🔍', '정밀 진단', '재무·기술성 기반 분석'],
-            ['📑', '맞춤 보고서', '10페이지 컨설팅 보고서'],
-            ['🧑‍💼', '전담 컨설턴트', '1:1 상담 진행'],
-            ['🗓', '12개월 로드맵', '단계별 진행 계획 제안'],
-          ].map(([i, t, d]) => (
-            <div key={t} className="flex items-center gap-3 px-4 py-5 md:px-6">
-              <span className="text-2xl">{i}</span>
-              <div>
-                <p className="text-sm font-bold">{t}</p>
-                <p className="text-[11px] text-white/50 leading-snug">{d}</p>
-              </div>
-            </div>
+            ['01', '정밀 진단', '재무·기술성 기반 분석', '#진행절차'],
+            ['02', '맞춤 보고서', '10페이지 컨설팅 보고서', '#진행절차'],
+            ['03', '전담 컨설턴트', '1:1 상담 진행', '#대표소개'],
+            ['04', '12개월 로드맵', '단계별 진행 계획 제안', '#성장단계'],
+          ].map(([n, t, d, href]) => (
+            <a key={n} href={href}
+              className="group relative px-5 py-6 md:px-7 md:py-8 border-b md:border-b-0 border-r border-white/10 last:border-r-0 hover:bg-[#C5A258] transition-colors duration-300">
+              <span className="block text-[11px] tabular-nums text-[#C5A258] group-hover:text-[#0b1220]/70 font-bold transition-colors">{n}</span>
+              <span className="block text-sm md:text-base font-bold mt-1.5 group-hover:text-[#0b1220] transition-colors">{t}</span>
+              <span className="block text-[11px] text-white/45 mt-1 leading-snug group-hover:text-[#0b1220]/70 transition-colors">{d}</span>
+              <span className="absolute right-5 top-1/2 -translate-y-1/2 text-white/25 group-hover:text-[#0b1220] group-hover:translate-x-1 transition-all hidden sm:block">→</span>
+            </a>
           ))}
         </div>
       </section>
@@ -202,7 +202,7 @@ export default function HomePage() {
             {CORE_SERVICES.map((s, i) => (
               <Reveal key={s.title} delay={i * 100}>
                 <div className="h-full bg-[#FAF8F3] border border-[#E8E2D4] rounded-2xl p-6 hover:border-[#C5A258]/50 hover:shadow-lg transition-all">
-                  <div className="text-3xl mb-3">{s.icon}</div>
+                  <div className="w-10 h-10 rounded-lg bg-[#1B2A45] text-[#C5A258] text-sm font-black flex items-center justify-center mb-4">{s.icon}</div>
                   <p className="text-[10px] tracking-[0.25em] text-[#C5A258] font-bold">{s.tag}</p>
                   <h3 className="text-lg font-black mt-1 mb-2">{s.title}</h3>
                   <p className="text-sm text-[#1B2A45]/60 leading-relaxed mb-4">{s.lead}</p>
@@ -220,7 +220,7 @@ export default function HomePage() {
           <div className="grid sm:grid-cols-3 gap-4 mt-6">
             {EXTRA_SERVICES.map(s => (
               <div key={s.title} className="flex gap-3 items-start bg-white border border-[#E8E2D4] rounded-xl p-4">
-                <span className="text-2xl">{s.icon}</span>
+                <span className="w-8 h-8 shrink-0 rounded-md border border-[#C5A258]/50 text-[#C5A258] font-black text-sm flex items-center justify-center">{s.icon}</span>
                 <div>
                   <p className="text-sm font-bold">{s.title}</p>
                   <p className="text-xs text-[#1B2A45]/55 leading-relaxed mt-0.5">{s.desc}</p>
@@ -323,16 +323,30 @@ export default function HomePage() {
             ))}
           </div>
 
-          {/* 이용 안내 */}
+          {/* 약속 */}
           <Reveal className="mt-10">
-            <div className="bg-[#1B2A45] text-white rounded-2xl p-6 md:p-7">
-              <p className="text-sm font-bold text-[#C5A258] mb-3">서비스 이용 전 꼭 확인해 주세요</p>
-              <ul className="space-y-2 text-xs text-white/75 leading-relaxed">
-                <li>• 정책자금·지원사업·인증의 승인 여부와 금액, 금리는 각 기관의 심사와 공고에 따라 결정되며 당사가 보장하지 않습니다.</li>
-                <li>• 당사는 정부·공공기관이 아닌 민간 경영컨설팅 업체입니다. 기관을 사칭하거나 승인을 보장한다는 연락에 주의하세요.</li>
-                <li>• 서비스 범위와 비용은 상담 후 계약서에 명시하며, 계약 전 충분히 설명드립니다.</li>
-                <li>• 신청은 고객 본인의 정확한 자료로 진행되며, 허위 자료 제출 시 지원 제한 등 불이익이 있을 수 있습니다.</li>
-              </ul>
+            <div className="bg-[#0f1a2e] text-white rounded-2xl p-6 md:p-9 relative overflow-hidden">
+              <div className="absolute -top-16 -right-16 w-56 h-56 rounded-full bg-[#C5A258]/10 blur-3xl" />
+              <div className="relative">
+                <p className="text-[11px] text-[#C5A258] font-bold tracking-[0.3em] mb-2">OUR PROMISE</p>
+                <h3 className="text-xl md:text-2xl font-black leading-snug">헌드레드컨설팅이 약속드립니다</h3>
+                <p className="text-sm text-white/60 mt-2 leading-relaxed">정확한 진단과 성실한 준비로, 대표님의 다음 단계를 자신 있게 돕겠습니다.</p>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+                  {[
+                    ['솔직한 진단', '가능한 것과 어려운 것을 구분해 있는 그대로 말씀드립니다.'],
+                    ['기준에 맞춘 검토', '각 기관의 최신 공고 기준으로 요건을 하나씩 대조합니다.'],
+                    ['투명한 계약', '서비스 범위와 비용은 계약서에 명시하고, 계약 전에 충분히 설명합니다.'],
+                    ['끝까지 소통', '진행 상황을 단계별로 공유하고, 다음 성장 과제까지 함께 제안합니다.'],
+                  ].map(([t, d], i) => (
+                    <div key={t} className="border-t border-[#C5A258]/40 pt-4">
+                      <p className="text-xs text-[#C5A258] font-bold tabular-nums">{String(i + 1).padStart(2, '0')}</p>
+                      <p className="text-sm font-bold mt-1">{t}</p>
+                      <p className="text-xs text-white/55 leading-relaxed mt-1.5">{d}</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-white/30 mt-6">※ 승인 여부와 금액은 각 기관의 심사 결과에 따라 결정됩니다.</p>
+              </div>
             </div>
           </Reveal>
         </div>
