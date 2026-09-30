@@ -3,7 +3,9 @@
 import { useState, useEffect, useRef, ReactNode } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import FloatingAiWidget from '@/components/home/FloatingAiWidget'
+import FloatingInquiry from '@/components/home/FloatingInquiry'
+import HeroSlider from '@/components/home/HeroSlider'
+import IntroVideo from '@/components/home/IntroVideo'
 import LeadForm, { LegalModal } from '@/components/home/LeadForm'
 import { COMPANY } from '@/lib/companyInfo'
 import type { LegalKey } from '@/lib/legalTexts'
@@ -82,23 +84,45 @@ const CEO_BIO = [
   { p: '現', t: 'HUNDRED consulting 대표' },
 ]
 
+// 업종별 상담 카드. quote(고객 후기)와 client(고객 표기)는 실제 고객이 공개에 동의한 내용만 채워 주세요.
+// quote가 있으면 카드 하단에 후기가 표시되고, 없으면 주요 상담 분야가 표시됩니다.
+const CASES: { photo: string; industry: string; title: string; desc: string; chips: string[]; pos?: string; quote?: string; client?: string }[] = [
+  { photo: '/images/consulting/construction.png', industry: '건설업', title: '건설업 컨설팅', desc: '공사 대금 회수 주기와 운전자금, 보증서 발급 요건을 함께 점검합니다.', chips: ['운전자금', '보증', '시설자금'] },
+  { photo: '/images/consulting/restaurant.jpg', industry: '요식업', title: '요식업 컨설팅', desc: '매출과 임대료 구조를 살펴 소상공인 자금과 지원 프로그램을 검토합니다.', chips: ['소상공인 자금', '지원사업', '신용관리'] },
+  { photo: '/images/consulting/interior.jpg', industry: '인테리어', title: '인테리어업 컨설팅', desc: '프로젝트 단위 현금흐름에 맞는 운전자금과 보증 상품을 검토합니다.', chips: ['운전자금', '보증', '법인전환'], pos: 'center 58%' },
+  { photo: '/images/consulting/factory.jpg', industry: '제조업', title: '제조업 컨설팅', desc: '설비 투자 계획에 맞는 시설·운전자금과 기술 인증 방향을 상담합니다.', chips: ['시설자금', '기술인증', '연구소'] },
+  { photo: '/images/consulting/retail.jpg', industry: '소매업', title: '소매·유통업 컨설팅', desc: '재고와 매출 흐름을 기준으로 자금 운용과 지원사업을 안내합니다.', chips: ['운전자금', '지원사업', '마케팅'] },
+  { photo: '/images/consulting/startup.jpg', industry: '스타트업', title: '스타트업 컨설팅', desc: '업력과 기술성에 맞춰 벤처·이노비즈 인증과 자금 연계를 검토합니다.', chips: ['벤처인증', '이노비즈', 'R&D'], pos: 'center 38%' },
+]
+
+const LECTURE_TOPICS = ['정책자금 실전 활용', '소상공인 자금조달', '법인전환 전략', '정부지원사업 공략법', '사업계획서 작성법', '기업 신용관리']
+
 const NAV = [
   { label: '서비스', href: '#서비스' },
   { label: '성장단계', href: '#성장단계' },
+  { label: '업종사례', href: '#업종사례' },
   { label: '진행절차', href: '#진행절차' },
   { label: '대표소개', href: '#대표소개' },
+  { label: '강의', href: '#강의' },
   { label: '문의하기', href: '#문의하기' },
 ]
 
 export default function HomePage() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [legal, setLegal] = useState<LegalKey | null>(null)
+  const [scrolled, setScrolled] = useState(false)
+  useEffect(() => {
+    const on = () => setScrolled(window.scrollY > 40)
+    on()
+    window.addEventListener('scroll', on, { passive: true })
+    return () => window.removeEventListener('scroll', on)
+  }, [])
 
   const infoRows: [string, string][] = ([
     ['상호', COMPANY.legalName || COMPANY.brandKo],
     ['대표자', COMPANY.ceo],
     ['사업자등록번호', COMPANY.bizNo],
-    ['전화권유판매업 신고번호', COMPANY.telemarketingNo],
+    ['전화권유판매업', COMPANY.telemarketingNo],
     ['통신판매업 신고번호', COMPANY.commerceNo],
     ['주소', COMPANY.address],
     ['대표전화', COMPANY.phone],
@@ -108,24 +132,24 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-[#FAF8F3] text-[#1B2A45] overflow-x-hidden">
-      <FloatingAiWidget />
+      <FloatingInquiry />
 
       {/* ── 네비게이션 ── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-[#E8E2D4] shadow-sm">
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition-colors duration-300 ${scrolled ? 'bg-white/95 backdrop-blur-md border-b border-[#E8E2D4] shadow-sm' : 'bg-transparent border-b border-white/10'}`}>
         <div className="max-w-6xl mx-auto px-4 md:px-8 py-3 flex items-center justify-between">
           <div className="relative h-12 w-36 shrink-0">
             <Image src="/images/logo.png" alt="HUNDRED Consulting" fill className="object-contain object-left" unoptimized />
           </div>
           <div className="hidden md:flex items-center gap-7">
             {NAV.map(n => (
-              <a key={n.label} href={n.href} className="text-xs text-[#1B2A45]/60 hover:text-[#C5A258] transition-colors tracking-wide font-medium">{n.label}</a>
+              <a key={n.label} href={n.href} className={`text-xs hover:text-[#C5A258] transition-colors tracking-wide font-medium ${scrolled ? 'text-[#1B2A45]/60' : 'text-white/85'}`}>{n.label}</a>
             ))}
             <a href={COMPANY.phoneHref} className="text-xs text-[#C5A258] font-bold tracking-wide">📞 {COMPANY.phone}</a>
           </div>
           <div className="flex items-center gap-2">
             <a href="#문의하기" className="hidden md:inline-flex text-xs bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-4 py-2 rounded-lg transition-colors">무료 상담</a>
-            <Link href="/login" className="hidden md:block text-xs font-semibold text-[#1B2A45]/40 hover:text-[#C5A258] transition-colors px-2 py-2 tracking-widest">Login</Link>
-            <button onClick={() => setMenuOpen(!menuOpen)} className="md:hidden p-2 text-[#1B2A45]/70 flex flex-col gap-1.5 justify-center" aria-label="메뉴">
+            <Link href="/login" className={`hidden md:block text-xs font-semibold hover:text-[#C5A258] transition-colors px-2 py-2 tracking-widest ${scrolled ? 'text-[#1B2A45]/40' : 'text-white/60'}`}>Login</Link>
+            <button onClick={() => setMenuOpen(!menuOpen)} className={`md:hidden p-2 flex flex-col gap-1.5 justify-center ${scrolled ? 'text-[#1B2A45]/70' : 'text-white'}`} aria-label="메뉴">
               <span className={`block w-5 h-0.5 bg-current transition-all origin-center ${menuOpen ? 'rotate-45 translate-y-2' : ''}`} />
               <span className={`block w-5 h-0.5 bg-current transition-all ${menuOpen ? 'opacity-0' : ''}`} />
               <span className={`block w-5 h-0.5 bg-current transition-all origin-center ${menuOpen ? '-rotate-45 -translate-y-2' : ''}`} />
@@ -143,40 +167,26 @@ export default function HomePage() {
         )}
       </nav>
 
-      {/* ── 히어로 ── */}
-      <section className="relative pt-28 pb-20 md:pt-40 md:pb-28 px-4 overflow-hidden bg-gradient-to-br from-[#1B2A45] via-[#223257] to-[#1B3A2F] text-white">
-        <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-[#C5A258]/10 blur-3xl" />
-        <div className="absolute -bottom-32 -left-16 w-96 h-96 rounded-full bg-[#4A9B6F]/10 blur-3xl" />
-        <div className="relative max-w-6xl mx-auto grid md:grid-cols-[1.3fr_1fr] gap-10 items-center">
-          <Reveal from="left" className="space-y-6">
-            <p className="text-xs text-[#C5A258] font-bold tracking-[0.35em]">HUNDRED CONSULTING</p>
-            <h1 className="text-3xl md:text-5xl font-black leading-tight">
-              성장 단계에 맞는<br />자금 · 인증 · 마케팅,<br />
-              <span className="text-[#C5A258]">한 곳에서 설계합니다</span>
-            </h1>
-            <p className="text-sm md:text-base text-white/70 leading-relaxed max-w-xl">
-              재무 진단부터 정책자금 전략, 기업인증, 법인 전환, 마케팅까지.
-              헌드레드컨설팅이 사업의 다음 단계를 함께 그립니다.
-            </p>
-            <div className="flex flex-wrap gap-3 pt-2">
-              <a href="#문의하기" className="bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors">무료 상담 신청</a>
-              <a href={COMPANY.phoneHref} className="border border-white/30 hover:bg-white/10 text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors">📞 {COMPANY.phone}</a>
-            </div>
-          </Reveal>
-          <Reveal from="right" className="grid grid-cols-2 gap-3">
-            {[
-              ['🔍', '정밀 진단', '재무·기술성 기반 분석'],
-              ['📑', '맞춤 보고서', '10페이지 컨설팅 보고서'],
-              ['🧑‍💼', '전담 컨설턴트', '1:1 상담 진행'],
-              ['🗓', '12개월 로드맵', '단계별 진행 계획 제안'],
-            ].map(([i, t, d]) => (
-              <div key={t} className="bg-white/8 border border-white/10 rounded-2xl p-4 backdrop-blur">
-                <div className="text-2xl mb-2">{i}</div>
+      {/* ── 히어로 슬라이드 ── */}
+      <HeroSlider />
+
+      {/* ── 핵심 강점 띠 ── */}
+      <section className="bg-[#0b1220] text-white border-t border-white/10">
+        <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 divide-x divide-white/10">
+          {[
+            ['🔍', '정밀 진단', '재무·기술성 기반 분석'],
+            ['📑', '맞춤 보고서', '10페이지 컨설팅 보고서'],
+            ['🧑‍💼', '전담 컨설턴트', '1:1 상담 진행'],
+            ['🗓', '12개월 로드맵', '단계별 진행 계획 제안'],
+          ].map(([i, t, d]) => (
+            <div key={t} className="flex items-center gap-3 px-4 py-5 md:px-6">
+              <span className="text-2xl">{i}</span>
+              <div>
                 <p className="text-sm font-bold">{t}</p>
-                <p className="text-[11px] text-white/55 mt-0.5 leading-snug">{d}</p>
+                <p className="text-[11px] text-white/50 leading-snug">{d}</p>
               </div>
-            ))}
-          </Reveal>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -248,6 +258,50 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ── 업종별 현장 사례 (옆으로 흐르는 슬라이드) ── */}
+      <section id="업종사례" className="py-20 md:py-24 bg-[#FAF8F3] overflow-hidden">
+        <style>{`
+          @keyframes hcMarquee { from { transform: translateX(0) } to { transform: translateX(-50%) } }
+          .hc-track { animation: hcMarquee 45s linear infinite; }
+          .hc-wrap:hover .hc-track { animation-play-state: paused; }
+        `}</style>
+        <Reveal className="text-center mb-10 px-4">
+          <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] mb-3">BY INDUSTRY</p>
+          <h2 className="text-2xl md:text-4xl font-black">업종별 컨설팅</h2>
+          <p className="text-sm text-[#1B2A45]/45 mt-3">업종마다 다른 자금 흐름과 요건에 맞춰 상담합니다.</p>
+        </Reveal>
+        <div className="hc-wrap relative">
+          <div className="hc-track flex gap-4 w-max px-4">
+            {[...CASES, ...CASES].map((c, i) => (
+              <div key={i} className="w-80 shrink-0 rounded-2xl overflow-hidden shadow-md border border-[#E8E2D4] bg-white flex flex-col">
+                <div className="flex gap-3 p-4 items-start">
+                  <div className="relative w-20 h-20 rounded-xl overflow-hidden shrink-0 bg-[#F2EFE8]">
+                    <Image src={c.photo} alt={c.industry} fill className="object-cover" style={{ objectPosition: c.pos || 'center' }} unoptimized />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="inline-block text-[10px] font-black text-[#7B5EA7] bg-[#7B5EA7]/10 px-2 py-0.5 rounded">#{c.industry}</span>
+                    <p className="text-sm font-black mt-1 leading-snug">{c.client || c.title}</p>
+                    <p className="text-[11px] text-[#1B2A45]/55 leading-relaxed mt-1">{c.desc}</p>
+                  </div>
+                </div>
+                <div className="bg-[#1B2A45] px-4 py-3.5 flex-1 min-h-[84px] flex items-center">
+                  {c.quote ? (
+                    <p className="text-xs text-white/85 leading-relaxed">&ldquo;{c.quote}&rdquo;</p>
+                  ) : (
+                    <div>
+                      <p className="text-[10px] text-white/40 mb-1.5">주요 상담 분야</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {c.chips.map(t => <span key={t} className="text-[11px] text-[#E8D080] border border-[#C5A258]/40 rounded-full px-2.5 py-0.5">{t}</span>)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── 진행 절차 ── */}
       <section id="진행절차" className="py-20 md:py-28 px-4 md:px-8 bg-white">
         <div className="max-w-5xl mx-auto">
@@ -312,33 +366,59 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── 문의하기 ── */}
-      <section id="문의하기" className="py-20 md:py-28 px-4 md:px-8 bg-white">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12">
-          <Reveal from="left" className="space-y-6">
-            <div>
-              <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] mb-3">CONTACT</p>
-              <h2 className="text-2xl md:text-4xl font-black mb-2">무료 상담 신청</h2>
-              <p className="text-sm text-[#1B2A45]/45">남겨주신 정보로 담당 컨설턴트가 순차적으로 연락드립니다.</p>
-            </div>
-            <div className="space-y-4">
-              {[
-                { icon: '📍', label: '주소', value: COMPANY.address },
-                { icon: '📞', label: '전화', value: COMPANY.phone },
-                { icon: '✉️', label: '이메일', value: COMPANY.email },
-                { icon: '🕐', label: '운영시간', value: COMPANY.hours },
-              ].map(item => (
-                <div key={item.label} className="flex items-start gap-3">
-                  <span className="text-lg mt-0.5 shrink-0">{item.icon}</span>
-                  <div>
-                    <p className="text-[10px] text-[#1B2A45]/35 mb-0.5">{item.label}</p>
-                    <p className="text-sm text-[#1B2A45]/75">{item.value}</p>
-                  </div>
-                </div>
-              ))}
+      {/* ── 대표 인사 영상 (HOME_VIDEO.src 설정 시 표시) ── */}
+      <IntroVideo />
+
+      {/* ── 강의·강연 ── */}
+      <section id="강의" className="py-20 md:py-28 px-4 md:px-8 bg-[#1B2A45] overflow-hidden">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          <Reveal from="left" className="relative">
+            <div className="absolute -inset-3 bg-[#C5A258]/5 rounded-3xl" />
+            <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-[#C5A258]/20">
+              <Image src="/images/lecture.png" alt={`${COMPANY.ceo} 대표 강의 현장`} width={700} height={500} className="w-full object-cover" unoptimized />
+              <div className="absolute bottom-4 left-4 right-4 flex flex-wrap gap-2">
+                <span className="bg-[#C5A258] text-white text-xs font-black px-3 py-1.5 rounded-full shadow-lg">📍 소상공인 정책자금 실전 강의</span>
+              </div>
             </div>
           </Reveal>
-          <Reveal from="right"><LeadForm /></Reveal>
+          <Reveal from="right" className="space-y-6 text-white">
+            <div>
+              <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] mb-3">LECTURE & SEMINAR</p>
+              <h2 className="text-3xl md:text-4xl font-black leading-tight mb-4">
+                현장에서 쌓은<br /><span className="text-[#C5A258]">실전 노하우를 나눕니다</span>
+              </h2>
+              <p className="text-sm text-white/60 leading-relaxed">
+                정책자금, 법인설립, 경영전략 등 기업 성장에 필요한 주제를 직접 강의합니다. 이론이 아닌, 현장에서 쌓은 경험을 바탕으로 대표님들의 실제 고민에 맞춰 설명드립니다.
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-white/40 mb-3">주요 강의 주제</p>
+              <div className="flex flex-wrap gap-2">
+                {LECTURE_TOPICS.map(tag => (
+                  <span key={tag} className="text-xs border border-[#C5A258]/30 text-[#C5A258]/80 px-3 py-1 rounded-full">{tag}</span>
+                ))}
+              </div>
+            </div>
+            <a href="#문의하기" className="inline-flex items-center gap-2 bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-lg shadow-[#C5A258]/20">
+              강의 문의하기 →
+            </a>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ── 문의하기 ── */}
+      <section id="문의하기" className="py-12 md:py-14 px-4 bg-white">
+        <div className="max-w-xl mx-auto">
+          <Reveal className="text-center mb-5">
+            <p className="text-[11px] text-[#C5A258] font-bold tracking-[0.3em] mb-1.5">CONTACT</p>
+            <h2 className="text-xl md:text-2xl font-black">무료 상담 신청</h2>
+            <p className="text-xs text-[#1B2A45]/45 mt-1.5">남겨주신 연락처로 담당 컨설턴트가 순차적으로 연락드립니다.</p>
+            <p className="text-[11px] text-[#1B2A45]/45 mt-2">
+              📞 <a href={COMPANY.phoneHref} className="font-bold text-[#C5A258]">{COMPANY.phone}</a>
+              <span className="mx-2 text-[#1B2A45]/20">|</span>{COMPANY.hours}
+            </p>
+          </Reveal>
+          <Reveal><LeadForm /></Reveal>
         </div>
       </section>
 
@@ -355,7 +435,7 @@ export default function HomePage() {
             <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs">
               <button onClick={() => setLegal('terms')} className="hover:text-[#C5A258] transition-colors">이용약관</button>
               <button onClick={() => setLegal('privacy')} className="font-bold text-white/80 hover:text-[#C5A258] transition-colors">개인정보처리방침</button>
-              {NAV.slice(0, 4).map(n => <a key={n.label} href={n.href} className="hover:text-[#C5A258] transition-colors">{n.label}</a>)}
+              {NAV.slice(0, 6).map(n => <a key={n.label} href={n.href} className="hover:text-[#C5A258] transition-colors">{n.label}</a>)}
             </div>
           </div>
           <dl className="grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-[11px] leading-relaxed py-5">
@@ -363,10 +443,7 @@ export default function HomePage() {
               <div key={k} className="flex gap-2"><dt className="text-white/35 shrink-0">{k}</dt><dd className="text-white/65 break-all">{v}</dd></div>
             ))}
           </dl>
-          <p className="text-[10px] leading-relaxed text-white/30 pt-4 border-t border-white/10">
-            당사는 정부·공공기관이 아닌 민간 경영컨설팅 업체이며, 정책자금·지원사업·인증의 승인 및 선정을 보장하지 않습니다. 각 기관의 심사 및 공고에 따라 결과가 달라질 수 있습니다.
-          </p>
-          <p className="text-[10px] text-white/25 mt-3">© {new Date().getFullYear()} {COMPANY.brand}. All rights reserved.</p>
+          <p className="text-[10px] text-white/25 pt-4 border-t border-white/10">© {new Date().getFullYear()} {COMPANY.brand}. All rights reserved.</p>
         </div>
       </footer>
 
