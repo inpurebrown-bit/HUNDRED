@@ -48,7 +48,7 @@ function cleanName(s: string): string {
 }
 
 // ── 헬퍼 ──────────────────────────────────────────────────────────────────────
-function todayStr() { return new Date().toISOString().slice(0, 10) }
+function todayStr() { return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10) }
 
 function calcWorkingDays(dateStr: string): { total: number; elapsed: number } {
   const d = new Date(dateStr)

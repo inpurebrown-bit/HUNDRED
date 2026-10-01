@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
       status: autoStatus,
       ceo_comment: autoComment,
       ...(autoStatus === 'approved' ? { approved_at: new Date().toISOString() } : {}),
-      call_date: new Date().toISOString().slice(0, 10),
+      call_date: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10),
     })
     .select()
     .single()

@@ -200,7 +200,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
 
   useEffect(() => { loadProspects() }, [loadProspects])
 
-  const today        = new Date().toISOString().slice(0, 10)
+  const today        = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
   const currentMonth = new Date().toISOString().slice(0, 7)
   const dateLabel    = new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })
 

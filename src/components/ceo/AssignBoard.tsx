@@ -62,7 +62,7 @@ interface Contract {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function today() {
-  return new Date().toISOString().slice(0, 10)
+  return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
 }
 
 function fmtDate(s: string) {

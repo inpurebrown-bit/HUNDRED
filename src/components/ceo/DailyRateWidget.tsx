@@ -12,7 +12,7 @@ import { getElapsedBusinessDays } from '@/lib/businessDays'
 
 const TESTER = 'sales-tester'
 
-function todayStr() { return new Date().toISOString().slice(0, 10) }
+function todayStr() { return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10) }
 
 function calcWorkingDays(dateStr: string) {
   const d = new Date(dateStr)

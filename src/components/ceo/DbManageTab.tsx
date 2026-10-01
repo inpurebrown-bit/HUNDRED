@@ -106,7 +106,7 @@ export default function DbManageTab({ initialView = 'trash' }: { initialView?: '
   // 수락: 삭제DB로 이동
   async function approveDeleteRequest(id: string) {
     setProcessingId(id)
-    const todayIso = new Date().toISOString().slice(0, 10)
+    const todayIso = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
     const customer = deleteReqList.find(c => c.id === id)
     const d = customer?.details || {}
     await fetch(`/api/customers/${id}`, {

@@ -805,7 +805,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
     setFeeSaving(true)
     const nowIso = new Date().toISOString()
-    const todayStr = nowIso.slice(0, 10)
+    const todayStr = nowKST().slice(0, 10)
     // c.details(서버 최신) 위에 local.details(로컬 편집) 병합
     // → stale한 local 초기값이 서버에 저장된 최신값(예: tax_invoice_completed)을 덮어씌우지 않도록
     const localDetails = local.details || {}
@@ -1834,7 +1834,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
               <button type="button"
                 onClick={() => {
                   const entries: any[] = d.payment_entries || []
-                  detailField('payment_entries', [...entries, { id: Date.now().toString(), date: '', approval_amount: '', fee_rate: '', fee_amount: '' }])
+                  detailField('payment_entries', [...entries, { id: Date.now().toString(), date: '', approval_amount: '', fee_rate: '', fee_amount: '', revenue_owner: d.revenue_owner || (userRole === 'ops' ? (userName || '') : '') }])
                 }}
                 className="text-[10px] bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded font-bold transition-colors">
                 + 입금내역 추가
@@ -2075,10 +2075,22 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
 
                 async function saveEntry() {
                   if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
-                  const todayStr2 = new Date().toISOString().slice(0, 10)
+                  const todayStr2 = nowKST().slice(0, 10)
                   const entries: any[] = [...(d.payment_entries || [])]
                   // deposit_date 없으면 오늘로 세팅
                   if (!entries[idx].date) entries[idx] = { ...entries[idx], date: todayStr2 }
+                  // 매출 귀속 담당자가 비어 있으면 입력자 본인으로 (케이스 담당자명으로 넘어가 본인 매출에서 빠지는 문제 방지)
+                  if (!entries[idx].revenue_owner) {
+                    const fallbackOwner = d.revenue_owner || (userRole === 'ops' ? (userName || '') : '')
+                    if (fallbackOwner) entries[idx] = { ...entries[idx], revenue_owner: fallbackOwner }
+                  }
+                  if (!entries[idx].revenue_owner && !window.confirm('매출 귀속 담당자가 선택되지 않았습니다.\n이대로 저장하면 케이스 담당자(' + (c.ops_user_name || '미지정') + ')의 매출로 잡힙니다. 저장할까요?')) return
+                  // 이미 지난 달 입금이면 마감(급여 확정) 이후 변경일 수 있어 확인 + 표시
+                  const entryMonth = String(entries[idx].date || '').slice(0, 7)
+                  if (entryMonth && entryMonth < todayStr2.slice(0, 7)) {
+                    if (!window.confirm(entryMonth + ' 입금입니다. 해당 월이 이미 마감(급여 확정)됐다면 대표님께 반영 요청이 필요합니다.\n그래도 저장할까요?')) return
+                    entries[idx] = { ...entries[idx], late_entry_at: nowKST() }
+                  }
                   if (entries[idx].tax_invoice_requested == null) entries[idx].tax_invoice_requested = false
                   if (entries[idx].tax_invoice_issued == null) entries[idx].tax_invoice_issued = false
                   entries[idx] = { ...entries[idx], fee_locked: true }
@@ -2175,6 +2187,19 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                       entries[idx] = { ...entries[idx], fee_rate: e.target.value, ...(amt > 0 && rate > 0 ? { fee_amount: String(Math.round(amt * rate / 100)) } : {}) }
                       detailField('payment_entries', entries)
                     }} className={entryInp} placeholder="%" /></div>
+                    <div className="col-span-2">
+                      <label className={lbl}>매출 귀속 담당자 <span className="text-amber-600 font-bold">(성공보수 실적 반영)</span></label>
+                      <select value={entry.revenue_owner || ''} disabled={entryLocked} onChange={e => {
+                        const entries: any[] = [...(d.payment_entries || [])]
+                        entries[idx] = { ...entries[idx], revenue_owner: e.target.value }
+                        detailField('payment_entries', entries)
+                      }} className={entryInp}>
+                        <option value="">— 담당자 선택 —</option>
+                        {revenueOwnerOptions.map(name => (
+                          <option key={name} value={name}>{name}</option>
+                        ))}
+                      </select>
+                    </div>
                     <div className="col-span-2">
                       <label className={lbl}>매출액 <span className="text-blue-600 font-bold">(공급가액)</span></label>
                       {entryLocked ? (
@@ -3287,7 +3312,7 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
       details: {
         ...(contractingCase.details || {}),
         puto_contract_amount: form.contract_amount,
-        puto_contract_date: new Date().toISOString().slice(0, 10),
+        puto_contract_date: nowKST().slice(0, 10),
         puto_contract_memo: form.memo,
         ops_user_name: managerName,
       },
@@ -4231,7 +4256,7 @@ function OpsRevenueTab({ userName }: { userName: string }) {
 }
 
 function OpsReportTab({ userId, userName, activeCases }: { userId: string; userName: string; activeCases: OpsCase[] }) {
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = nowKST().slice(0, 10)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [pastReports, setPastReports] = useState<any[]>([])

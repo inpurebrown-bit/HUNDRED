@@ -484,7 +484,7 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
   const [paidAmount,  setPaidAmount]  = useState('')
   const [vatIncluded, setVatIncluded] = useState(false)
   const [myRevenue,   setMyRevenue]   = useState('')
-  const [contractDate, setContractDate] = useState(new Date().toISOString().slice(0, 10))
+  const [contractDate, setContractDate] = useState(new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10))
   const [paymentMethod, setPaymentMethod] = useState<'카드' | '현금' | ''>('')
   const [approvedAmount, setApprovedAmount] = useState('')
   const [commissionRate, setCommissionRate] = useState('')
@@ -967,7 +967,7 @@ function CustomerCard({
     await onUpdate(c.id, {
       details: {
         inspection_status: 'pending',
-        inspection_date: new Date().toISOString().slice(0, 10),
+        inspection_date: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10),
       },
     })
   }
@@ -1478,7 +1478,7 @@ function CustomerCard({
         {c.details?.follow_up_date && (
           <div className="mt-1.5 flex justify-center w-full">
             <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold max-w-full text-center leading-tight ${
-              c.details.follow_up_date === new Date().toISOString().slice(0, 10)
+              c.details.follow_up_date === new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
                 ? 'bg-sky-500 text-white animate-pulse'
                 : 'bg-sky-100 text-sky-700'
             }`}>
@@ -1500,7 +1500,7 @@ function CustomerCard({
             type="button"
             onClick={e => {
               e.stopPropagation()
-              setQtContractDate((c as any).details?.contract_date || new Date().toISOString().slice(0, 10))
+              setQtContractDate((c as any).details?.contract_date || new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10))
               setQtPayMethod(((c as any).details?.payment_method as '카드' | '현금' | '') || '')
               setQuickTransferOpen(true)
             }}
@@ -1598,7 +1598,7 @@ function CustomerCard({
                             onUpdate(c.id, { details: {
                               sales_user_name: u,
                               trade_from: c.sales_user_name || c.details?.sales_user_name || '',
-                              trade_date: new Date().toISOString().slice(0, 10),
+                              trade_date: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10),
                             }})
                             setTradeOpen(false)
                           }}
@@ -2106,7 +2106,7 @@ function CustomerCard({
                       <button type="button"
                         onClick={() => onUpdate(c.id, { details: {
                           as_requested: true,
-                          as_request_date: new Date().toISOString().slice(0, 10),
+                          as_request_date: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10),
                         }})}
                         className="inline-flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors"
                       >

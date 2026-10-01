@@ -39,7 +39,7 @@ export interface InCallData {
 export function emptyInCallData(): InCallData {
   return {
     name: '', phone: '', company: '', corp_type: '', region: '',
-    business_reg_no: '', assignee: '', reception_date: new Date().toISOString().slice(0, 10),
+    business_reg_no: '', assignee: '', reception_date: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10),
     business_type: '', years_in_business: '', employee_count: '',
     loan_policy: '', loan_kibo: '', loan_credit: '',
     revenue_2026: '', revenue_2025: '', revenue_2024: '', revenue_2023: '',

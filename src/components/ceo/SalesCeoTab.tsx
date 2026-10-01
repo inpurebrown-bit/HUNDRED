@@ -164,7 +164,7 @@ function TransferModeView({
                 sales_user_name: dest,
                 transfer_history: [
                   ...((c as any).details?.transfer_history || []),
-                  { from: (c as any).details?.sales_user_name || '—', to: dest, at: new Date().toISOString().slice(0, 10), by: 'CEO' },
+                  { from: (c as any).details?.sales_user_name || '—', to: dest, at: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10), by: 'CEO' },
                 ],
               },
             }),
@@ -202,7 +202,7 @@ function TransferModeView({
               method: 'PATCH', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 status: 'lead',
-                details: { sales_user_name: dest, transfer_history: [{ from: '관리팀', to: dest, at: new Date().toISOString().slice(0, 10), by: 'CEO' }] },
+                details: { sales_user_name: dest, transfer_history: [{ from: '관리팀', to: dest, at: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10), by: 'CEO' }] },
               }),
             }),
           ])
@@ -868,14 +868,14 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
     const ownerName = (c as any)?.details?.sales_user_name || (c as any)?.sales_user_name || ''
     await updateCustomer(id, {
       status: 'trash',
-      details: { as_approved: true, as_resolved: true, as_approve_date: new Date().toISOString().slice(0, 10) },
+      details: { as_approved: true, as_resolved: true, as_approve_date: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10) },
     })
     await decrementSupplyForUser(ownerName)
   }
 
   // A/S 비해당 — 결과 기록 (DB이동 없음)
   async function notApplicableAs(id: string) {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
     await updateCustomer(id, {
       details: {
         as_not_applicable: true,
@@ -1095,7 +1095,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
           sales_user_name: destPerson,
           transfer_history: [
             ...((customers.find(x => x.id === id) as any)?.details?.transfer_history || []),
-            { from: (customers.find(x => x.id === id) as any)?.details?.sales_user_name || '—', to: destPerson, at: new Date().toISOString().slice(0, 10), by: 'CEO' },
+            { from: (customers.find(x => x.id === id) as any)?.details?.sales_user_name || '—', to: destPerson, at: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10), by: 'CEO' },
           ],
         },
       })
@@ -1177,7 +1177,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
     await updateCustomer(id, {
       details: {
         inspection_status: result,
-        inspection_result_date: new Date().toISOString().slice(0, 10),
+        inspection_result_date: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10),
       },
     })
   }
@@ -1213,7 +1213,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
           region:           data.region,
           business_reg_no:  data.business_reg_no,
           assignee:         data.assignee,
-          reception_date:   data.reception_date || now.toISOString().slice(0, 10),
+          reception_date:   data.reception_date || new Date(now.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10),
           business_type:    data.business_type,
           years_in_business: data.years_in_business,
           employee_count:   data.employee_count,

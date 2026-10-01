@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
 
   // date 없으면 최신 레코드 반환 (오늘 or 가장 최근 저장 레코드)
   if (!date) {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
     const { data: todayData } = await supabaseAdmin
       .from('payrate_records')
       .select('*')

@@ -112,7 +112,7 @@ export async function GET(req: NextRequest) {
     userNameToId[(u.name || '').trim()] = String(u.id)
   }
 
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
   const opsEntries: OpsEntry[] = (opsCases || [])
     .flatMap((c: any) => {
       const d = c.details || {}

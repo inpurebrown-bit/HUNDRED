@@ -1704,7 +1704,7 @@ function EmployeeManageSection() {
   }
 
   async function resignEmployee(emp: EmpRow) {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
     const resignDate = prompt(`${emp.name} 퇴사 처리\n퇴사일을 입력하세요 (기본: 오늘)`, today)
     if (resignDate === null) return  // 취소
     const dateToUse = resignDate.trim() || today
@@ -1947,7 +1947,7 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
   const filtered = filter === 'all' ? reports
     : filter === 'ops' ? opsReports
     : reports.filter(r => r.report_type === filter)
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
   const todayMorning = morningReports.filter(r => r.report_date === todayStr)
   const todayDaily   = dailyReports.filter(r => r.report_date === todayStr)
   const todayOps     = opsReports.filter(r => r.report_date === todayStr)
