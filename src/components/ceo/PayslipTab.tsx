@@ -116,13 +116,14 @@ function PayslipDocument({ emp, financial, yearMonth }: {
     const feeInc    = Math.round(Number(financial.fee_revenue) * OPS_FEE_RATE)
     const putoInc   = Math.round(Number(financial.puto_revenue) * OPS_PUTO_RATE)
     const subBonus  = Number(financial.monthly_sub_bonus || 0)
+    const awardsSum = (financial.awards || []).reduce((s, a) => s + Number(a.amount || 0), 0)
     const allowSum  = (financial.allowance_details || []).reduce((s, a) => s + Number(a.amount || 0), 0)
-    const subtotal  = Number(financial.base_salary) + feeInc + putoInc + Number(financial.ops_performance_bonus) + subBonus + allowSum
+    const subtotal  = Number(financial.base_salary) + feeInc + putoInc + Number(financial.ops_performance_bonus) + subBonus + awardsSum + allowSum
     const beforeTax = subtotal - financial.deduction
     const incomeTax = Math.round(beforeTax * INCOME_TAX_RATE)
     const localTax  = Math.round(beforeTax * LOCAL_TAX_RATE)
     const actualPay = beforeTax - incomeTax - localTax
-    return { feeInc, putoInc, subBonus, allowSum, subtotal, beforeTax, incomeTax, localTax, actualPay }
+    return { feeInc, putoInc, subBonus, awardsSum, allowSum, subtotal, beforeTax, incomeTax, localTax, actualPay }
   })()
 
   // ── 발굴팀 계산 ──
@@ -331,9 +332,20 @@ function PayslipDocument({ emp, financial, yearMonth }: {
                 <td className={tdV}></td>
                 <td className={tdN}>{financial.ops_performance_bonus > 0 ? fmt(financial.ops_performance_bonus) : '-'}</td>
               </tr>
+              <tr>
+                <td className={tdL}>⑤ 시상금</td>
+                <td className={tdV}>
+                  {(financial.awards || []).length > 0
+                    ? (financial.awards || []).map(a => a.reason || '-').join(', ')
+                    : '-'}
+                </td>
+                <td className={tdN + (opsCalc.awardsSum > 0 ? ' text-amber-700 font-semibold' : '')}>
+                  {opsCalc.awardsSum > 0 ? fmt(opsCalc.awardsSum) : '-'}
+                </td>
+              </tr>
               {opsCalc.subBonus > 0 && (
                 <tr>
-                  <td className={tdL}>⑤ 월정기권보너스</td>
+                  <td className={tdL}>⑥ 월정기권보너스</td>
                   <td className={tdV}>월정기권 계약금 × 5%</td>
                   <td className={tdN}>{fmt(opsCalc.subBonus)}</td>
                 </tr>
@@ -628,6 +640,7 @@ export default function PayslipTab() {
               puto_revenue:          Number(match.puto_revenue || 0),
               ops_performance_bonus: Number(match.performance_bonus || 0),
               monthly_sub_bonus:     Number(match.monthly_sub_bonus || 0),
+              awards:                match.awards || [],
             }
           }
         }
@@ -1177,6 +1190,30 @@ function OpsFinancialForm({ fin, update }: { fin: EmpFinancial; update: (p: Part
           {fin.puto_revenue > 0 && (
             <p className="text-[10px] text-violet-600 mt-0.5">인센: {Math.round(fin.puto_revenue * 0.40).toLocaleString()}원</p>
           )}
+        </div>
+      </div>
+
+      {/* 시상금 */}
+      <div className="mt-3">
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs font-bold text-gray-600">시상금</label>
+          <button onClick={() => update({ awards: [...(fin.awards || []), { reason: '', amount: 0 }] })}
+            className="text-xs text-blue-600 border border-blue-200 rounded px-2 py-0.5 hover:bg-blue-50">+ 추가</button>
+        </div>
+        <div className="space-y-2">
+          {(fin.awards || []).map((a, i) => (
+            <div key={i} className="flex gap-2 items-center">
+              <input value={a.reason} placeholder="사유"
+                onChange={e => update({ awards: fin.awards.map((x, j) => j === i ? { ...x, reason: e.target.value } : x) })}
+                className="flex-1 border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none" />
+              <input type="number" value={a.amount}
+                onChange={e => update({ awards: fin.awards.map((x, j) => j === i ? { ...x, amount: Number(e.target.value) } : x) })}
+                className="w-32 border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none" />
+              <button onClick={() => update({ awards: fin.awards.filter((_, j) => j !== i) })}
+                className="text-red-400 hover:text-red-600 text-xs">삭제</button>
+            </div>
+          ))}
+          {(fin.awards || []).length === 0 && <p className="text-xs text-gray-400 py-1">시상금 없음</p>}
         </div>
       </div>
     </div>
