@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import { HOME_VIDEO } from '@/lib/companyInfo'
 
+// 영상 위에는 아무것도 얹지 않고(얼굴 가림 방지), 제목과 조작 버튼은 아래 띠에 둡니다.
 export default function IntroVideo() {
   const ref = useRef<HTMLVideoElement>(null)
   const [muted, setMuted] = useState(true)
@@ -10,21 +11,26 @@ export default function IntroVideo() {
   if (!HOME_VIDEO.src) return null
 
   return (
-    <section className="relative bg-black overflow-hidden">
+    <section className="bg-black">
       <video ref={ref} src={HOME_VIDEO.src} poster={HOME_VIDEO.poster || undefined}
-        autoPlay muted loop playsInline preload="metadata"
-        className="w-full h-[56vh] md:h-[82vh] object-cover" />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/5 to-black/10 pointer-events-none" />
-      <div className="absolute left-0 right-0 top-0 p-5 md:p-10 pt-20 md:pt-24 flex items-start justify-between gap-4">
-        <div className="text-white drop-shadow">
-          <p className="text-[11px] md:text-xs tracking-[0.35em] text-[#C5A258] font-bold mb-2">{HOME_VIDEO.label}</p>
-          <p className="text-lg md:text-3xl font-black leading-snug">{HOME_VIDEO.title}</p>
-        </div>
-        <div className="flex gap-2 shrink-0">
-          <button onClick={() => { const v = ref.current; if (!v) return; v.muted = !v.muted; setMuted(v.muted) }}
-            className="w-10 h-10 rounded-full bg-white/90 text-[#0b1220] text-base flex items-center justify-center" aria-label="소리">{muted ? '🔇' : '🔊'}</button>
-          <button onClick={() => { const v = ref.current; if (!v) return; if (v.paused) { v.play(); setPlaying(true) } else { v.pause(); setPlaying(false) } }}
-            className="w-10 h-10 rounded-full bg-white/90 text-[#0b1220] text-xs font-black flex items-center justify-center" aria-label="재생/정지">{playing ? '❚❚' : '▶'}</button>
+        autoPlay muted loop playsInline preload="auto"
+        className="w-full max-h-[86vh] object-cover block" />
+      <div className="bg-[#0b1220] border-t border-white/10">
+        <div className="max-w-6xl mx-auto px-5 md:px-8 py-4 md:py-5 flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[10px] md:text-[11px] tracking-[0.35em] text-[#C5A258] font-bold">{HOME_VIDEO.label}</p>
+            <p className="text-sm md:text-lg font-bold text-white mt-1 truncate">{HOME_VIDEO.title}</p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <button onClick={() => { const v = ref.current; if (!v) return; v.muted = !v.muted; setMuted(v.muted) }}
+              className="h-9 px-4 rounded-full border border-white/30 text-white text-xs font-semibold hover:bg-white/10" aria-label="소리">
+              {muted ? '소리 켜기' : '소리 끄기'}
+            </button>
+            <button onClick={() => { const v = ref.current; if (!v) return; if (v.paused) { v.play(); setPlaying(true) } else { v.pause(); setPlaying(false) } }}
+              className="h-9 px-4 rounded-full bg-white text-[#0b1220] text-xs font-bold" aria-label="재생/정지">
+              {playing ? '일시정지' : '재생'}
+            </button>
+          </div>
         </div>
       </div>
     </section>

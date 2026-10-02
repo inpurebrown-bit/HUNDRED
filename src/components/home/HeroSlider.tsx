@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 const SLIDES = [
   {
@@ -34,19 +34,36 @@ const SLIDES = [
 ]
 const INTERVAL = 6500
 
+const SLIDE_MS = 950
+
 export default function HeroSlider() {
   const [idx, setIdx] = useState(0)
+  const [prev, setPrev] = useState<number | null>(null)
+  const [dir, setDir] = useState<1 | -1>(1)
   const [playing, setPlaying] = useState(true)
   const [tick, setTick] = useState(0)
+  const clearRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // 사진 미리 불러오기 (넘어갈 때 빈 화면이 보이지 않도록)
+  useEffect(() => { SLIDES.forEach(sl => { const im = new Image(); im.src = sl.img }) }, [])
+
+  const go = (n: number, d: 1 | -1 = 1) => {
+    const next = (n + SLIDES.length) % SLIDES.length
+    if (next === idx) return
+    if (clearRef.current) clearTimeout(clearRef.current)
+    setPrev(idx); setDir(d); setIdx(next); setTick(k => k + 1)
+    clearRef.current = setTimeout(() => setPrev(null), SLIDE_MS + 60)
+  }
 
   useEffect(() => {
     if (!playing) return
-    const t = setTimeout(() => { setIdx(i => (i + 1) % SLIDES.length); setTick(k => k + 1) }, INTERVAL)
+    const t = setTimeout(() => go(idx + 1, 1), INTERVAL)
     return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idx, playing, tick])
 
-  const go = (n: number) => { setIdx((n + SLIDES.length) % SLIDES.length); setTick(k => k + 1) }
   const s = SLIDES[idx]
+  const layers = prev === null ? [idx] : [prev, idx]
 
   return (
     <section className="relative h-[100svh] min-h-[600px] max-h-[920px] overflow-hidden bg-[#05080f] text-white">
@@ -54,19 +71,29 @@ export default function HeroSlider() {
         @keyframes hsZoom { from { transform: scale(1.02) } to { transform: scale(1.12) } }
         @keyframes hsBar { from { width: 0 } to { width: 100% } }
         @keyframes hsUp { from { opacity: 0; transform: translateY(18px) } to { opacity: 1; transform: translateY(0) } }
-        .hs-zoom { animation: hsZoom 9s ease-out forwards; }
+        @keyframes hsInR { from { transform: translateX(100%) } to { transform: translateX(0) } }
+        @keyframes hsOutL { from { transform: translateX(0) } to { transform: translateX(-100%) } }
+        @keyframes hsInL { from { transform: translateX(-100%) } to { transform: translateX(0) } }
+        @keyframes hsOutR { from { transform: translateX(0) } to { transform: translateX(100%) } }
+        .hs-zoom { animation: hsZoom 10s ease-out forwards; will-change: transform; }
         .hs-up { opacity: 0; animation: hsUp .9s ease-out forwards; }
       `}</style>
 
-      {SLIDES.map((sl, i) => (
-        <div key={sl.en} className={`absolute inset-0 transition-opacity duration-[1400ms] ${i === idx ? 'opacity-100' : 'opacity-0'}`}>
-          <div className={`absolute inset-0 bg-cover bg-center ${i === idx ? 'hs-zoom' : ''}`}
-            style={{ backgroundImage: `url(${sl.img})`, filter: 'grayscale(35%) contrast(1.05)' }} />
-        </div>
-      ))}
-      <div className="absolute inset-0 bg-gradient-to-r from-[#03060c] via-[#03060c]/85 to-[#03060c]/35" />
-      <div className="absolute inset-0 bg-gradient-to-b from-[#03060c]/70 via-transparent to-[#03060c]/85" />
-      <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: 'radial-gradient(#C5A258 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
+      {layers.map(i => {
+        const isCur = i === idx
+        const anim = prev === null ? undefined
+          : isCur ? `${dir === 1 ? 'hsInR' : 'hsInL'} ${SLIDE_MS}ms cubic-bezier(.65,0,.35,1) forwards`
+                  : `${dir === 1 ? 'hsOutL' : 'hsOutR'} ${SLIDE_MS}ms cubic-bezier(.65,0,.35,1) forwards`
+        return (
+          <div key={SLIDES[i].en} className="absolute inset-0 overflow-hidden" style={{ animation: anim, zIndex: isCur ? 2 : 1 }}>
+            <div className="absolute inset-0 bg-cover bg-center hs-zoom"
+              style={{ backgroundImage: `url(${SLIDES[i].img})`, filter: 'grayscale(35%) contrast(1.05)' }} />
+          </div>
+        )
+      })}
+      <div className="absolute inset-0 z-[3] bg-gradient-to-r from-[#03060c] via-[#03060c]/85 to-[#03060c]/35" />
+      <div className="absolute inset-0 z-[3] bg-gradient-to-b from-[#03060c]/70 via-transparent to-[#03060c]/85" />
+      <div className="absolute inset-0 z-[3] opacity-[0.05]" style={{ backgroundImage: 'radial-gradient(#C5A258 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
 
       {/* 문구: 왼쪽 정렬 */}
       <div className="relative z-10 h-full max-w-6xl mx-auto px-5 md:px-8 flex items-center">
@@ -94,7 +121,7 @@ export default function HeroSlider() {
         <div className="max-w-6xl mx-auto px-5 md:px-8 pb-7 md:pb-9 flex items-end justify-between gap-6">
           <div className="grid grid-cols-4 gap-3 md:gap-5 flex-1 max-w-2xl">
             {SLIDES.map((sl, i) => (
-              <button key={sl.en} onClick={() => go(i)} className="text-left group">
+              <button key={sl.en} onClick={() => go(i, i > idx ? 1 : -1)} className="text-left group">
                 <div className="h-[2px] bg-white/20 overflow-hidden mb-2.5">
                   {i === idx
                     ? <div key={`${tick}-${playing}`} className="h-full bg-[#C5A258]" style={playing ? { animation: `hsBar ${INTERVAL}ms linear forwards` } : { width: '100%' }} />
@@ -107,8 +134,8 @@ export default function HeroSlider() {
           </div>
           <div className="hidden sm:flex items-center gap-1">
             <button onClick={() => setPlaying(p => !p)} className="text-[10px] tracking-[0.2em] text-white/50 hover:text-white px-3 py-2">{playing ? 'PAUSE' : 'PLAY'}</button>
-            <button onClick={() => go(idx - 1)} aria-label="이전" className="w-10 h-10 border border-white/25 hover:bg-white/10 flex items-center justify-center text-sm">←</button>
-            <button onClick={() => go(idx + 1)} aria-label="다음" className="w-10 h-10 border border-white/25 hover:bg-white/10 flex items-center justify-center text-sm">→</button>
+            <button onClick={() => go(idx - 1, -1)} aria-label="이전" className="w-10 h-10 border border-white/25 hover:bg-white/10 flex items-center justify-center text-sm">←</button>
+            <button onClick={() => go(idx + 1, 1)} aria-label="다음" className="w-10 h-10 border border-white/25 hover:bg-white/10 flex items-center justify-center text-sm">→</button>
           </div>
         </div>
       </div>

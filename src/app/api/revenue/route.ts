@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
   }
 
   const todayStr = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
-  const opsEntries: OpsEntry[] = (opsCases || [])
+  let opsEntries: OpsEntry[] = (opsCases || [])
     .flatMap((c: any) => {
       const d = c.details || {}
       const entries: OpsEntry[] = []
@@ -160,6 +160,12 @@ export async function GET(req: NextRequest) {
       }
       return entries
     })
+
+  // 관리팀 개인 계정(팀장 제외)은 같은 케이스 안의 다른 담당자 입금을 제외하고 본인 귀속 입금만 본다
+  if (user.role === 'ops' && !String(user.name || '').includes('팀장')) {
+    const myNm = String(user.name || '').trim()
+    opsEntries = opsEntries.filter(e => (e.ops_user_name || '').includes(myNm))
+  }
 
   // ── 관리팀 계약 매출 (뿌토 계약 + 직접계약) ──────────────────────────
   type OpsContractEntry = OpsEntry & { type: 'puto' | 'direct' }

@@ -465,6 +465,8 @@ export default function PayrollTab() {
   const didInitLoad = useRef(false)
   // handleLoad와 prevMonthLoad 간 race condition 방지 토큰
   const loadToken   = useRef(0)
+  // 사용자가 직접 편집(시상금·직원·비용 등)했는지 — false인 자동저장은 서버가 기존 시상금/직원/기타비용을 보존
+  const editedRef   = useRef(false)
   // 월 전환 자동저장용 — 이전 월과 그 당시 state 기억
   const prevMonthRef = useRef(yearMonth)
   const prevStateRef = useRef<{ ops: OpsEmployee[]; sales: SalesEmployee[]; costs: OtherCosts; rev: typeof revTotals }>({
@@ -487,6 +489,7 @@ export default function PayrollTab() {
         year_month: ym ?? yearMonth,
         employees: { ops_employees: ops, sales_employees: sales, dig_employees: dig ?? digEmps, other_costs: c, revenue_totals: rev },
         memo: '',
+        edited: editedRef.current,
       }),
     })
   }
@@ -528,6 +531,17 @@ export default function PayrollTab() {
       })
       setSalesContractMap(details)
     } catch { /* 목록 로드 실패해도 계속 */ }
+  }
+
+  // ── 과거 월 관리팀 입금 내역(하단 표시용만, 저장값은 건드리지 않음) ──
+  async function loadPastOpsEntries(ym: string) {
+    try {
+      const rv = await (await fetch(`/api/revenue?year_month=${ym}`)).json()
+      setOpsAllFeeEntries((rv.thisMonthOps || []).map((e: any) => ({
+        company: e.company || '', amount: e.amount || 0, date: e.date || '',
+        ops_user_name: (e.ops_user_name || '').trim(),
+      })))
+    } catch { /* 표시용이므로 실패해도 계속 */ }
   }
 
   // ── 전월 불러오기: 고객 DB 실시간 집계 (이달이 아닐 때 사용) ─────────────
@@ -620,8 +634,8 @@ export default function PayrollTab() {
         const dKey = Object.keys(opsFeeDetailsByName).find(k => k === emp.name || k.includes(emp.name) || emp.name.includes(k))
         return {
           ...emp,
-          fee_revenue:       fKey ? opsFeeByName[fKey]  : emp.fee_revenue,
-          puto_revenue:      pKey ? opsPutoByName[pKey] : emp.puto_revenue,
+          fee_revenue:       fKey ? opsFeeByName[fKey]  : 0,
+          puto_revenue:      pKey ? opsPutoByName[pKey] : 0,
           monthly_sub_bonus: emp.name.includes('윤지') ? monthlySubBonusPrev : 0,
           fee_details:       dKey ? opsFeeDetailsByName[dKey] : [],
         }
@@ -780,8 +794,8 @@ export default function PayrollTab() {
         const isYunji = emp.name.includes('윤지')
         return {
           ...emp,
-          fee_revenue:       key  ? opsFeeByName[key]   : emp.fee_revenue,
-          puto_revenue:      pKey ? opsPutoByName[pKey]  : emp.puto_revenue,
+          fee_revenue:       key  ? opsFeeByName[key]   : 0,
+          puto_revenue:      pKey ? opsPutoByName[pKey]  : 0,
           monthly_sub_bonus: isYunji ? monthlySubBonusTotal : 0,
           fee_details:       dKey ? opsFeeDetailsByName[dKey] : [],
         }
@@ -864,6 +878,7 @@ export default function PayrollTab() {
     setLoading(true)
     setMsg('')
     didInitLoad.current = false
+    editedRef.current = false
     const [res, prRes] = await Promise.all([
       fetch(`/api/payroll?year_month=${yearMonth}`),
       fetch(`/api/payrate?year_month=${yearMonth}`),
@@ -916,12 +931,19 @@ export default function PayrollTab() {
       } else {
         setMsg('불러오기 완료')
         await loadPastContractMap(yearMonth)
+        await loadPastOpsEntries(yearMonth)
       }
     } else {
-      if (yearMonth === thisMonth()) await autoLoad()
+      // 새 달: 직원 명단·기본급만 이어받고 매출·시상금·성과급은 비운 상태로 시작
+      const rOps   = opsEmps.map(e => ({ ...e, fee_revenue: 0, puto_revenue: 0, performance_bonus: 0, monthly_sub_bonus: 0, awards: [], fee_details: [] }))
+      const rSales = salesEmps.map(e => ({ ...e, contract_revenue: 0, contract_count: 0, performance_bonus: 0, awards: [] }))
+      const rDig   = digEmps.map(e => ({ ...e, approved_count: 0, awards: [] }))
+      setOpsEmps(rOps); setSalesEmps(rSales); setDigEmps(rDig)
+      if (yearMonth === thisMonth()) await autoLoad(rOps, rSales, costs)
       else {
         setMsg('저장된 데이터 없음')
         await loadPastContractMap(yearMonth)
+        await loadPastOpsEntries(yearMonth)
       }
     }
     didInitLoad.current = true
@@ -1027,7 +1049,9 @@ export default function PayrollTab() {
   const namedDig   = digEmps.filter(e => e.name.trim())
 
   return (
-    <div className="space-y-6 pb-10 max-w-4xl mx-auto">
+    <div className="space-y-6 pb-10 max-w-4xl mx-auto"
+      onChangeCapture={() => { editedRef.current = true }}
+      onClickCapture={e => { const t = (e.target as HTMLElement).closest('button'); if (t && /추가|✕|×|삭제/.test(t.textContent || '')) editedRef.current = true }}>
 
       {/* ── 헤더 바 ── */}
       <div className="flex items-center gap-3 flex-wrap">
@@ -1045,6 +1069,7 @@ export default function PayrollTab() {
           onClick={async () => {
             setSaving(true)
             setMsg('')
+            editedRef.current = true   // 직접 누른 저장은 화면 값 그대로 확정
             try {
               await doSave(opsEmps, salesEmps, costs, revTotals)
               setMsg('저장 완료')

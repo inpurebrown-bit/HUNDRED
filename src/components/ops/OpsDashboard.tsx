@@ -4107,6 +4107,7 @@ function OpsRevenueTab({ userName }: { userName: string }) {
   const [data, setData]     = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [revenueTab, setRevenueTab] = useState<'fee' | 'contract'>('fee')
+  const [sel, setSel] = useState(0)   // 0=이번 달, 1=지난달, 2=2개월 전
 
   function load() {
     setLoading(true)
@@ -4124,21 +4125,30 @@ function OpsRevenueTab({ userName }: { userName: string }) {
   }
 
   const now = new Date()
-  const monthLabel = now.getMonth() + 1
+  // 본인 귀속 매출 최근 3개월 (API가 본인 매출만 내려줌)
+  const baseKey: string = data?.thisMonthKey || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const baseY = Number(baseKey.slice(0, 4)), baseM = Number(baseKey.slice(5, 7))
+  const monthSets = [
+    { ops: data?.thisMonthOps, con: data?.thisMonthOpsContracts, off: 0 },
+    { ops: data?.lastMonthOps, con: data?.lastMonthOpsContracts, off: 1 },
+    { ops: data?.twoAgoOps,   con: data?.twoAgoOpsContracts,   off: 2 },
+  ].map(m => {
+    const d = new Date(baseY, baseM - 1 - m.off, 1)
+    const fee = (m.ops || []) as any[]
+    const con = (m.con || []) as any[]
+    const feeSum = fee.reduce((x, e) => x + (e.amount || 0), 0)
+    const conSum = con.reduce((x, e) => x + (e.amount || 0), 0)
+    return { year: d.getFullYear(), month: d.getMonth() + 1, fee, con, feeSum, conSum, total: feeSum + conSum }
+  })
+  const cur = monthSets[sel]
+  const monthLabel = cur.month
 
-  // 수수료 매출 — API 레벨에서 이미 본인 귀속 매출만 필터링됨 (revenue_owner 포함)
   const feeEntries: { company: string; amount: number; date: string }[] =
-    (data?.thisMonthOps || [])
-      .map((e: any) => ({
-        company: e.company || '—', amount: e.amount, date: e.date || '',
-      }))
+    cur.fee.map((e: any) => ({ company: e.company || '—', amount: e.amount, date: e.date || '' }))
   const feeTotal = feeEntries.reduce((s, e) => s + e.amount, 0)
 
-  // 계약 매출
   const contractEntries: { company: string; amount: number; date: string; type: string }[] =
-    (data?.thisMonthOpsContracts || []).map((e: any) => ({
-      company: e.company || '—', amount: e.amount, date: e.date || '', type: e.type || '',
-    }))
+    cur.con.map((e: any) => ({ company: e.company || '—', amount: e.amount, date: e.date || '', type: e.type || '' }))
   const contractTotal = contractEntries.reduce((s, e) => s + e.amount, 0)
 
   const totalAll = feeTotal + contractTotal
@@ -4160,7 +4170,7 @@ function OpsRevenueTab({ userName }: { userName: string }) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-black text-[#1B2A45] text-lg">{userName || '—'} 매출 현황</h2>
-          <p className="text-xs text-gray-400 mt-0.5">{now.getFullYear()}년 {monthLabel}월</p>
+          <p className="text-xs text-gray-400 mt-0.5">{cur.year}년 {monthLabel}월 · 최근 3개월 내 매출</p>
         </div>
         <button onClick={load}
           className="flex items-center gap-1.5 text-xs bg-white border border-[#E8E2D4] text-[#1B2A45]/60 px-3 py-1.5 rounded-lg hover:border-[#1B2A45]/30 transition-colors">
@@ -4168,7 +4178,19 @@ function OpsRevenueTab({ userName }: { userName: string }) {
         </button>
       </div>
 
-      {/* 이달 합계 카드 */}
+      {/* 최근 3개월 매출 (눌러서 월 선택) */}
+      <div className="grid grid-cols-3 gap-2">
+        {monthSets.map((m, i) => (
+          <button key={i} onClick={() => setSel(i)}
+            className={`rounded-xl border px-3 py-2.5 text-left transition-all ${sel === i ? 'bg-[#1B2A45] border-[#1B2A45] text-white shadow' : 'bg-white border-[#E8E2D4] text-[#1B2A45] hover:border-[#1B2A45]/40'}`}>
+            <p className={`text-[10px] font-semibold ${sel === i ? 'text-white/60' : 'text-gray-400'}`}>{m.month}월{i === 0 ? ' (이번 달)' : ''}</p>
+            <p className="text-base font-black mt-0.5">{fmtMoney(m.total)}</p>
+            <p className={`text-[9px] mt-0.5 ${sel === i ? 'text-white/50' : 'text-gray-400'}`}>수수료 {m.fee.length}건 · 계약 {m.con.length}건</p>
+          </button>
+        ))}
+      </div>
+
+      {/* 선택한 달 합계 카드 */}
       <div className="bg-gradient-to-br from-[#1B2A45] to-[#2d4a7a] rounded-2xl p-5 text-white">
         <p className="text-white/50 text-xs font-semibold mb-1">{monthLabel}월 총 매출</p>
         <p className="text-4xl font-black tracking-tight">{fmtMoney(totalAll)}</p>
@@ -4200,11 +4222,11 @@ function OpsRevenueTab({ userName }: { userName: string }) {
       {revenueTab === 'fee' && (
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-            <p className="text-xs font-bold text-gray-500">이달 수수료 매출 내역</p>
+            <p className="text-xs font-bold text-gray-500">{monthLabel}월 수수료 매출 내역</p>
             <span className="text-xs font-black text-emerald-600">{fmtMoney(feeTotal)}</span>
           </div>
           {feeEntries.length === 0 ? (
-            <div className="p-8 text-center text-gray-300 text-sm">이달 수수료 내역이 없습니다</div>
+            <div className="p-8 text-center text-gray-300 text-sm">{monthLabel}월 수수료 내역이 없습니다</div>
           ) : (
             <div className="divide-y divide-gray-50">
               {feeEntries.map((e, i) => (
@@ -4225,11 +4247,11 @@ function OpsRevenueTab({ userName }: { userName: string }) {
       {revenueTab === 'contract' && (
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-            <p className="text-xs font-bold text-gray-500">이달 계약 매출 내역</p>
+            <p className="text-xs font-bold text-gray-500">{monthLabel}월 계약 매출 내역</p>
             <span className="text-xs font-black text-sky-600">{fmtMoney(contractTotal)}</span>
           </div>
           {contractEntries.length === 0 ? (
-            <div className="p-8 text-center text-gray-300 text-sm">이달 계약 내역이 없습니다</div>
+            <div className="p-8 text-center text-gray-300 text-sm">{monthLabel}월 계약 내역이 없습니다</div>
           ) : (
             <div className="divide-y divide-gray-50">
               {contractEntries.map((e, i) => (
