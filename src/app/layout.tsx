@@ -62,8 +62,8 @@ export const metadata: Metadata = {
     'apple-mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-status-bar-style': 'default',
     'apple-mobile-web-app-title': 'Hundred Consulting',
-    'msapplication-TileColor': '#FAF8F3',
-    'theme-color': '#FAF8F3',
+    'msapplication-TileColor': '#ece8dc',
+    'theme-color': '#ece8dc',
   },
 }
 
@@ -75,10 +75,12 @@ export default function RootLayout({
   return (
     <html lang="ko" data-color-scheme="light" className={`${geist.variable} ${notoSerifKR.variable} ${nanumBrush.variable} h-full antialiased`} style={{ colorScheme: 'light' }}>
       <head>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
         <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
       </head>
       <body className="min-h-full">
+        <div className="hc-wm" aria-hidden />
         <Providers>
           <PushNotificationManager />
           {children}

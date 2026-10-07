@@ -24,6 +24,7 @@ import PullToRefresh from '@/components/ui/PullToRefresh'
 import SplitView from '@/components/shared/SplitView'
 import TabErrorBoundary from '@/components/shared/TabErrorBoundary'
 import DigManageTab from './DigManageTab'
+import AuthCodeTab from './AuthCodeTab'
 
 // ── 공통 서브탭 바 컴포넌트 ────────────────────────────────────
 function SubTabBar<T extends string>({ tabs, active, onChange }: {
@@ -136,7 +137,7 @@ export default function CeoDashboard() {
   const { data: session } = useSession()
   const ceoName = session?.user?.name ?? '대표'
   const ceoId = (session?.user as any)?.id ?? ''
-  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'staffmanage' | 'minutesreports' | 'calendar' | 'ailogs' | 'trash' | 'dbmanage' | 'profile' | 'dig'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'staffmanage' | 'minutesreports' | 'calendar' | 'ailogs' | 'trash' | 'dbmanage' | 'profile' | 'dig' | 'authcode'>('overview')
   const [menuOpen, setMenuOpen] = useState(false)
   const [salesInitialView, setSalesInitialView] = useState<'customers' | 'inspection' | 'as' | 'transfer' | 'diary' | undefined>(undefined)
   const [salesInitialStatusTab, setSalesInitialStatusTab] = useState<'all' | 'lead' | 'db010' | 'contracted' | 'emotional' | 'trash' | undefined>(undefined)
@@ -148,6 +149,7 @@ export default function CeoDashboard() {
   const [installable, setInstallable] = useState(false)
   // 검색 결과 클릭 시 빠른 조회 드로어
   const [quickViewCustomer, setQuickViewCustomer] = useState<any | null>(null)
+  const [salesSearchSeed, setSalesSearchSeed] = useState<{ q: string; n: number }>({ q: '', n: 0 })
   // ── 메모장 ──────────────────────────────────────────────
   const [notepadOpen, setNotepadOpen] = useState(false)
   const [notepadOpacity, setNotepadOpacity] = useState(90)
@@ -238,6 +240,16 @@ export default function CeoDashboard() {
     )
   }
 
+  // 아직 처리 안 된 코드 요청 수 (탭 배지)
+  const [authCodeCount, setAuthCodeCount] = useState(0)
+  useEffect(() => {
+    const f = () => fetch('/api/auth-help', { cache: 'no-store' }).then(r => r.json())
+      .then(j => setAuthCodeCount((j.items || []).filter((i: any) => !i.used && !i.expired && i.tries < 5).length)).catch(() => {})
+    f()
+    const t = setInterval(f, 30000)
+    return () => clearInterval(t)
+  }, [])
+
   const tabs = [
     { key: 'overview',       label: '전체 현황' },
     { key: 'dig',            label: '발굴팀' },
@@ -249,6 +261,7 @@ export default function CeoDashboard() {
     { key: 'minutesreports', label: '회의록·보고' },
     { key: 'calendar',       label: '일정관리' },
     { key: 'ailogs',         label: 'AI 로그' },
+    { key: 'authcode',       label: authCodeCount > 0 ? `코드 요청 (${authCodeCount})` : '코드 요청' },
     { key: 'trash',          label: deleteReqCount > 0 ? `DB 쓰레기통 (${deleteReqCount})` : 'DB 쓰레기통' },
   ]
 
@@ -287,7 +300,9 @@ export default function CeoDashboard() {
                   return (
                     <button key={c.id}
                       onClick={() => {
-                        setQuickViewCustomer(c)
+                        // 약식 보기 대신 영업팀 탭으로 이동해 그 업체만 표시 → 카드를 눌러 인콜일지 전체 확인
+                        setSalesSearchSeed(p => ({ q: c.details?.company || c.company || c.name || '', n: p.n + 1 }))
+                        setActiveTab('sales')
                         setSearchQuery(''); setSearchResults([])
                       }}
                       className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors flex items-center justify-between gap-2 border-t border-gray-50">
@@ -414,13 +429,14 @@ export default function CeoDashboard() {
         }} />}
         {activeTab === 'dig'            && <DigManageTab />}
         {activeTab === 'assign'         && <AssignBoard />}
-        {activeTab === 'sales'          && <TabErrorBoundary tabName="영업팀"><SalesCeoTab initialView={salesInitialView} initialStatusTab={salesInitialStatusTab} /></TabErrorBoundary>}
+        {activeTab === 'sales'          && <TabErrorBoundary tabName="영업팀"><SalesCeoTab key={salesSearchSeed.n} initialView={salesSearchSeed.q ? 'customers' : salesInitialView} initialStatusTab={salesInitialStatusTab} initialSearch={salesSearchSeed.q} /></TabErrorBoundary>}
         {activeTab === 'ops'            && <TabErrorBoundary tabName="관리팀"><OpsCeoTab /></TabErrorBoundary>}
         {activeTab === 'analytics'      && <AnalyticsTab />}
         {activeTab === 'staffmanage'    && <StaffManageTab />}
         {activeTab === 'minutesreports' && <MinutesReportsTab />}
         {activeTab === 'calendar'       && <CalendarTab />}
         {activeTab === 'ailogs'         && <AiLogsTab />}
+        {activeTab === 'authcode'       && <AuthCodeTab />}
         {activeTab === 'trash'          && <TrashOnlyTab />}
         {activeTab === 'dbmanage'       && <DuplicateOnlyTab />}
       </div>

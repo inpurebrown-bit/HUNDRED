@@ -15,6 +15,8 @@ export async function GET(req: NextRequest) {
   }
 
   // Supabase 기본 응답 제한(1,000행)을 넘는 고객도 모두 가져오도록 페이지 단위로 반복 조회
+  // scope=payroll: 급여·정산에 쓰이는 고객만 (계약/환불 + 환수차감·잔금 추가입금 보유)
+  const payrollOnly = req.nextUrl.searchParams.get('scope') === 'payroll'
   const PAGE = 1000
   const rows: any[] = []
   for (let from = 0; ; from += PAGE) {
@@ -26,6 +28,7 @@ export async function GET(req: NextRequest) {
       .range(from, from + PAGE - 1)
     // 영업팀은 본인 고객만 (DB 실제 컬럼: owner_id)
     if (user.role === 'sales') q = q.eq('owner_id', user.id)
+    if (payrollOnly) q = q.or('status.in.(contracted,refunded),details->>refund_deduction_weight.not.is.null,details->extra_counts.not.is.null')
     const { data, error } = await q
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     rows.push(...(data || []))

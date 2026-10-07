@@ -599,7 +599,7 @@ export default function PayslipTab() {
     try {
       const [payRes, custRes, refundRes] = await Promise.all([
         fetch(`/api/payroll?year_month=${yearMonth}`),
-        fetch('/api/customers'),
+        fetch('/api/customers?scope=payroll'),
         fetch(`/api/ops-cases?refund_month=${yearMonth}`),
       ])
       const [json, custJson, refundJson] = await Promise.all([payRes.json(), custRes.json(), refundRes.json()])

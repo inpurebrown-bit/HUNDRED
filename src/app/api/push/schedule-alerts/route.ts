@@ -80,9 +80,19 @@ async function runAlerts(opts: {
   const doRecall  = (mode === 'recall'  || mode === 'all')
 
   // ── 고객 조회 ──────────────────────────────────────────
-  const { data: customers, error: custErr } = await supabaseAdmin
-    .from('customers')
-    .select('id, name, sales_user_name, details')
+  // Supabase 기본 조회 한도(1000건)를 넘으므로 페이지 단위로 전체를 읽는다
+  const customers: any[] = []
+  let custErr: { message: string } | null = null
+  for (let from = 0; ; from += 1000) {
+    const { data: page, error: pageErr } = await supabaseAdmin
+      .from('customers')
+      .select('id, name, details')
+      .order('id')
+      .range(from, from + 999)
+    if (pageErr) { custErr = pageErr; break }
+    customers.push(...(page || []))
+    if (!page || page.length < 1000) break
+  }
 
   if (custErr) {
     return NextResponse.json({ error: `고객 조회 실패: ${custErr.message}` }, { status: 500 })
@@ -114,7 +124,7 @@ async function runAlerts(opts: {
   for (const c of (customers || [])) {
     const d = (c.details as any) || {}
     const company   = d.company || c.name || '—'
-    const salesUser: string = d.sales_user_name || (c as any).sales_user_name || ''
+    const salesUser: string = d.sales_user_name || ''
     if (!salesUser) continue
 
     if (doRecall) {

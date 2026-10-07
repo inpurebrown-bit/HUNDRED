@@ -97,6 +97,12 @@ function abbrevInst(inst: string): string {
   return MAP[inst] || inst
 }
 
+// 환불/종료 계열 상태 표기 통일 (영문 키·한글 키 혼용 방지)
+const STAGE_FIX: Record<string, { label: string; color: string }> = {
+  refunded: { label: '환불', color: 'bg-rose-500' }, '환불': { label: '환불', color: 'bg-rose-500' },
+  '종료': { label: '종료', color: 'bg-slate-500' }, '완료': { label: '완료', color: 'bg-emerald-600' }, completed: { label: '완료', color: 'bg-emerald-600' },
+}
+
 // ─── Case Card (grid) ─────────────────────────────────────
 function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
   c: OpsCase; isOpen: boolean
@@ -108,7 +114,7 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
   const companyName   = c.customers?.details?.company || c.customers?.name || '—'
   const repName       = c.customers?.representative || c.customers?.details?.representative || ''
   const phone         = c.customers?.phone || ''
-  const overallStage  = allStages.find(s => s.key === c.progress_stage)
+  const overallStage  = STAGE_FIX[c.progress_stage] || allStages.find(s => s.key === c.progress_stage)
   const directStage   = c.details?.direct_stage  || ''
   const indirectStage = c.details?.indirect_stage || ''
   const directInfo    = allStages.find(s => s.key === directStage)
@@ -160,7 +166,6 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
       )}
       {/* ① 담당자명 + 뱃지 — 고정 높이 1줄 */}
       <div className="h-[14px] flex items-center gap-1 mb-0.5 overflow-hidden">
-        <span className="text-[8px] text-gray-400 font-medium truncate shrink-0 max-w-[40%]">{opsUser || '—'}</span>
         {needsAbsorb && (
           <span className="text-[7px] font-bold bg-indigo-500 text-white px-1 rounded leading-tight shrink-0">흡수</span>
         )}
@@ -173,16 +178,12 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
       </div>
 
       {/* ② 업체명 — 네모 박스 */}
-      <div className={`h-[34px] flex items-center justify-center border rounded-lg px-1.5 mt-0.5 ${isMonthly ? 'border-purple-300 bg-purple-100' : 'border-gray-300 bg-gray-50'}`}>
+      <div className={`h-[50px] flex flex-col items-center justify-center border rounded-lg px-1.5 mt-0.5 ${isMonthly ? 'border-purple-300 bg-purple-100' : 'border-gray-300 bg-gray-50'}`}>
         <p className="font-bold text-[#1B2A45] text-[11px] leading-tight text-center break-all line-clamp-2 w-full"
           style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
           {companyName}
         </p>
-      </div>
-
-      {/* ③ 대표명 */}
-      <div className="h-[16px] flex items-center justify-center mt-0.5">
-        <p className="text-[10px] text-gray-400 truncate">{repName || <span className="text-gray-200">—</span>}</p>
+        {repName && <p className="text-[9px] text-gray-400 truncate w-full text-center leading-tight mt-0.5">{repName}</p>}
       </div>
 
       {/* ④ 전화번호 */}
@@ -199,32 +200,6 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
         ) : (
           <span className="text-[9px] text-gray-200">—</span>
         )}
-      </div>
-
-      {/* ⑥ 직접대출 기관 : 현황 */}
-      <div className="h-[18px] flex items-center justify-center gap-1 mt-1">
-        <span className="text-[8px] font-bold text-blue-400 shrink-0">직</span>
-        {directInsts.length > 0
-          ? <span className="text-[8px] text-blue-700 font-medium truncate">{directInsts.map(abbrevInst).join('·')}</span>
-          : <span className="text-[8px] text-gray-200">—</span>
-        }
-        {directStage
-          ? <span className={`shrink-0 text-[8px] font-bold text-white px-1 py-0.5 rounded ${directInfo?.color || 'bg-blue-400'}`}>{directStage}</span>
-          : <span className="text-[8px] text-gray-200"></span>
-        }
-      </div>
-
-      {/* ⑦ 간접대출 기관 : 현황 */}
-      <div className="h-[18px] flex items-center justify-center gap-1 mt-0.5">
-        <span className="text-[8px] font-bold text-violet-400 shrink-0">간</span>
-        {indirectInsts.length > 0
-          ? <span className="text-[8px] text-violet-700 font-medium truncate">{indirectInsts.map(abbrevInst).join('·')}</span>
-          : <span className="text-[8px] text-gray-200">—</span>
-        }
-        {indirectStage
-          ? <span className={`shrink-0 text-[8px] font-bold text-white px-1 py-0.5 rounded ${indirectInfo?.color || 'bg-violet-400'}`}>{indirectStage}</span>
-          : <span className="text-[8px] text-gray-200"></span>
-        }
       </div>
 
       {/* 인증사업 */}
@@ -259,17 +234,6 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
           </button>
         </div>
       )}
-
-      {/* ⑧ 스크립트 발송 */}
-      <div className="mt-auto pt-1.5 flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
-        <input type="checkbox" id={`ceo-script-${c.id}`} checked={scriptSent}
-          onChange={e => onScriptToggle(c.id, e.target.checked)}
-          className="w-3 h-3 accent-violet-500 cursor-pointer" />
-        <label htmlFor={`ceo-script-${c.id}`}
-          className={`text-[9px] cursor-pointer select-none ${scriptSent ? 'text-violet-600 font-semibold line-through' : 'text-gray-400'}`}>
-          스크립트 발송
-        </label>
-      </div>
     </div>
   )
 }
@@ -422,7 +386,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
                     {(() => {
                       const s1 = items.filter(c => (c.details?.absorption_stage ?? 1) !== 2)
                       return s1.length > 0 ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                        <div className="hc-cardgrid">
                           {s1.map(c => (
                             <div key={`신규-1-${c.id}`} className="relative group">
                               <CeoCaseCard c={c} isOpen={openPanelIds.includes(c.id)} onToggle={onToggle} onScriptToggle={onScriptToggle} />
@@ -444,7 +408,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
                     {(() => {
                       const s2 = items.filter(c => (c.details?.absorption_stage ?? 1) === 2)
                       return s2.length > 0 ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                        <div className="hc-cardgrid">
                           {s2.map(c => (
                             <div key={`신규-2-${c.id}`} className="relative group">
                               <CeoCaseCard c={c} isOpen={openPanelIds.includes(c.id)} onToggle={onToggle} onScriptToggle={onScriptToggle} />
@@ -464,7 +428,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
                 </div>
               ) : isSpecial ? (
                 // 기타 특수 그룹: 단순 그리드
-                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                <div className="hc-cardgrid">
                   {items.map(c => (
                     <CeoCaseCard key={`${inst}-${c.id}`} c={c} isOpen={openPanelIds.includes(c.id)} onToggle={onToggle} onScriptToggle={onScriptToggle} onApprove={isPending ? onApprove : undefined} />
                   ))}
@@ -472,9 +436,9 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
               ) : (
                 // 기관 그룹: 진행 / 대기 좌우 분리
                 <div className="flex gap-0 items-start">
-                  <div className="w-1/2 min-w-0 pr-3">
+                  <div className="w-[30%] min-w-0 pr-3">
                     {activeItems.length > 0 ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                      <div className="hc-cardgrid">
                         {activeItems.map(c => (
                           <CeoCaseCard key={`${inst}-${c.id}`} c={c} isOpen={openPanelIds.includes(c.id)} onToggle={onToggle} onScriptToggle={onScriptToggle} />
                         ))}
@@ -483,10 +447,10 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
                       <div className="h-full min-h-[40px]" />
                     )}
                   </div>
-                  <div className="w-1/2 min-w-0 border-l-2 border-dashed border-gray-200 pl-3">
+                  <div className="w-[70%] min-w-0 border-l-2 border-dashed border-gray-200 pl-3">
                     <p className="text-[9px] font-bold text-gray-400 mb-1.5 uppercase tracking-wide">다음 자금 대기</p>
                     {upcomingItems.length > 0 ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                      <div className="hc-cardgrid">
                         {upcomingItems.map(c => (
                           <CeoCaseCard key={`${inst}-upcoming-${c.id}`} c={c} isOpen={openPanelIds.includes(c.id)} onToggle={onToggle} onScriptToggle={onScriptToggle} />
                         ))}
@@ -695,7 +659,7 @@ function CeoPutoContractView({ cases, openPanelIds, onToggle, onScriptToggle }: 
       )}
 
       {/* 카드 그리드 */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+      <div className="hc-cardgrid">
         {contracted.map(c => (
           <CeoCaseCard
             key={c.id}
@@ -1175,7 +1139,7 @@ export default function OpsCeoTab() {
             {view === 'refund' ? '환불 업체가 없습니다' : '종료 업체가 없습니다'}
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+          <div className="hc-cardgrid">
             {viewCases.map(c => (
               <CeoCaseCard
                 key={c.id}

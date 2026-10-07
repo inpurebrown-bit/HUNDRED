@@ -569,7 +569,7 @@ export default function PayrollTab() {
   // 저장된 contract_count(이미 환수 반영된 값)는 그대로 두고 지급명세 목록만 채움
   async function loadPastContractMap(ym: string) {
     try {
-      const custRes = await fetch('/api/customers')
+      const custRes = await fetch('/api/customers?scope=payroll')
       const custJson = await custRes.json()
       const liveMap = buildSalesContractMap(custJson.customers || [], ym)
       const details: Record<string, Array<{ company: string; amount: number; weight: number; date: string; refund?: boolean }>> = {}
@@ -610,7 +610,7 @@ export default function PayrollTab() {
     setMsg('')
     try {
       const [custRes, prRes, revRes] = await Promise.all([
-        fetch('/api/customers'),
+        fetch('/api/customers?scope=payroll'),
         fetch(`/api/payrate?year_month=${yearMonth}`),
         fetch(`/api/revenue?year_month=${yearMonth}`),   // 해당 월 ops 수수료 복구용
       ])
@@ -851,7 +851,7 @@ export default function PayrollTab() {
       // 월정기권 보너스 — 고객 DB에서 이번달 월정기권 계약 집계
       let monthlySubBonusTotal = 0
       try {
-        const custRes2 = await fetch('/api/customers')
+        const custRes2 = await fetch('/api/customers?scope=payroll')
         const custJson2 = await custRes2.json()
         monthlySubBonusTotal = calcMonthlySubBonus(custJson2.customers || [], yearMonth)
       } catch { /* 계속 */ }

@@ -477,7 +477,7 @@ interface ContractModalProps {
   onConfirm: (data: Record<string, any>) => Promise<void>
 }
 
-const INP = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/50'
+const INP = 'w-full border-[1.5px] border-[#e4e7ee] rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-[#b8995a] focus:ring-4 focus:ring-[#b8995a]/15 transition-all'
 
 function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRefund = false, onClose, onConfirm }: ContractModalProps) {
   const [contractFee, setContractFee] = useState('')
@@ -511,6 +511,7 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
   const cumulative = cumulativeBase + myRevNum
 
   async function handleConfirm() {
+    if (!paymentMethod) { alert('결제방식(카드/현금)을 선택해야 자금팀으로 전송할 수 있습니다.'); return }
     setSaving(true)
     const commRateNum = parseFloat(commissionRate) || 0
     // 성공보수 = 승인예상금액 × 성공보수율% (입금액 기준 아님)
@@ -542,21 +543,22 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/60 z-[300] flex items-center justify-center p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-y-auto max-h-[90vh]">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-y-auto max-h-[92vh] hc-in border border-[#e4e7ee]">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div className="px-6 py-5 flex items-center justify-between bg-gradient-to-br from-[#0e2446] to-[#0a1b36] rounded-t-3xl sticky top-0 z-10">
           <div>
-            <h2 className="font-bold text-[#1B2A45] text-sm">계약완료 처리</h2>
-            <p className="text-[11px] text-gray-400 mt-0.5">{company}</p>
+            <p className="text-[10px] tracking-[0.25em] text-[#C5A258] font-semibold mb-1">CONTRACT</p>
+            <h2 className="font-bold text-white text-base">계약완료 · 자금팀 전송</h2>
+            <p className="text-[11px] text-white/60 mt-0.5">{company}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
+          <button onClick={onClose} className="text-white/60 hover:text-white text-lg leading-none">✕</button>
         </div>
 
         {/* Body */}
-        <div className="px-5 py-4 space-y-3">
+        <div className="px-6 py-5 space-y-4">
 
           {/* ① 계약 타입 */}
           <div>
@@ -706,7 +708,7 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
             </label>
             <textarea value={opsMemo} onChange={e => setOpsMemo(e.target.value)}
               rows={4}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/50 resize-none"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#b8995a]/20 resize-none"
               placeholder="통화내용, 특이사항, 자금팀 전달 내용..." />
           </div>
 
@@ -723,14 +725,14 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
         </div>
 
         {/* Footer */}
-        <div className="px-5 pb-5 flex gap-2.5">
+        <div className="px-6 pb-6 flex gap-2.5">
           <button onClick={onClose}
-            className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors">
+            className="flex-1 border border-[#e4e7ee] text-gray-600 py-3 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors">
             취소
           </button>
           <button onClick={handleConfirm} disabled={saving}
-            className="flex-1 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
-            {saving ? '처리중...' : '계약완료 확정'}
+            className="flex-[1.6] bg-gradient-to-r from-[#0b2140] to-[#4a5a9a] hover:-translate-y-0.5 disabled:opacity-60 text-white py-3 rounded-xl text-sm font-bold transition-all shadow-[0_10px_22px_-10px_rgba(11,33,64,.7)]">
+            {saving ? '전송중...' : '입력 완료 · 자금팀으로 보내기'}
           </button>
         </div>
       </div>
@@ -805,6 +807,7 @@ function CustomerCard({
     await onUpdate(c.id, {
       details: {
         is_direct: true,
+        lead_type: '직가',
         db010_month: (c.details as any)?.db010_month || thisMonth,
       },
     })
@@ -813,9 +816,22 @@ function CustomerCard({
   // 공가DB로 되돌릴 때 직가 플래그 해제
   async function setToSupplyDb(targetStatus: 'lead' | 'db010' = 'lead') {
     if (targetStatus === 'lead') {
-      await onUpdate(c.id, { details: { is_direct: false } })
+      await onUpdate(c.id, { details: { is_direct: false, lead_type: '공가', db010_month: '' } })
     }
     await onStatusChange(c.id, targetStatus)
+  }
+  // 인콜일지 상단 직가/공가 선택 — 표시·통계·DB 탭이 항상 같은 값을 보도록 함께 갱신
+  async function selectLeadType(opt: '직가' | '공가') {
+    const st = (c as any).status
+    if (opt === '직가') {
+      if (st === 'db010') return
+      if (st === 'lead') { await setToDirectDb(); onExpand(null); return }
+      await onUpdate(c.id, { details: { lead_type: '직가', is_direct: true, db010_month: (c.details as any)?.db010_month || new Date().toISOString().slice(0, 7) } })
+    } else {
+      if (st === 'lead') return
+      if (st === 'db010') { await setToSupplyDb('lead'); onExpand(null); return }
+      await onUpdate(c.id, { details: { lead_type: '공가', is_direct: false, db010_month: '' } })
+    }
   }
   const [contractModalOpen, setContractModalOpen] = useState(false)
   const [quickTransferOpen, setQuickTransferOpen] = useState(false)
@@ -952,7 +968,12 @@ function CustomerCard({
     }
   }, [expanded])
 
-  const leadType = c.details?.lead_type
+  // 직가/공가 판정을 한 곳으로 통일: DB 탭 상태 → 직가 플래그 → 선택값 (표시·통계 불일치 방지)
+  const leadType: '' | '직가' | '공가' =
+    (c as any).status === 'db010' ? '직가'
+    : (c as any).status === 'lead' ? '공가'
+    : ((c.details as any)?.is_direct || (c.details as any)?.db010_month) ? '직가'
+    : (((c.details as any)?.lead_type as '직가' | '공가' | undefined) || '')
   const ownerName = c.sales_user_name || c.details?.sales_user_name || userName
   const inspectionStatus = c.details?.inspection_status
 
@@ -961,6 +982,10 @@ function CustomerCard({
     await onStatusChange(c.id, 'contracted')
     setContractModalOpen(false)
     onExpand(null)
+    // 입력 완료 = 바로 자금팀 전송 (계약업체 탭에서 다시 누를 필요 없음)
+    if (onTransferToOps) {
+      await onTransferToOps({ ...c, details: { ...(c.details || {}), ...data } } as Customer)
+    }
   }
 
   async function handleInspectionRequest() {
@@ -1055,7 +1080,7 @@ function CustomerCard({
 
       {/* 관리팀 빠른 전송 모달 */}
       {quickTransferOpen && (
-        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-black/60 z-[300] flex items-center justify-center p-4"
           onClick={e => { if (e.target === e.currentTarget) setQuickTransferOpen(false) }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -1126,7 +1151,7 @@ function CustomerCard({
 
       {/* 감성톡(거절업체) 감도 선택 모달 */}
       {emotionalOpen && (
-        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-black/60 z-[300] flex items-center justify-center p-4"
           onClick={e => { if (e.target === e.currentTarget) setEmotionalOpen(false) }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -1171,7 +1196,7 @@ function CustomerCard({
 
       {/* 자체거절 사유 입력 모달 */}
       {trashOpen && (
-        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-black/60 z-[300] flex items-center justify-center p-4"
           onClick={e => { if (e.target === e.currentTarget) setTrashOpen(false) }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -1531,87 +1556,47 @@ function CustomerCard({
           {/* 배경 오버레이 */}
           <div className="fixed inset-0 bg-black/40 z-[199]" onClick={() => onExpand(null)} />
           {/* 우측 슬라이딩 패널 */}
-          <div ref={expandedRef} className="fixed top-0 right-0 bottom-0 w-full md:w-[680px] bg-[#FAFAF8] z-[200] overflow-y-auto shadow-2xl">
+          <div ref={expandedRef} className="fixed top-0 right-0 bottom-0 w-full md:w-[680px] bg-[#FAFAF8] z-[200] flex flex-col overflow-y-auto md:overflow-hidden shadow-2xl">
 
           {/* 상단 액션 바 */}
-          <div className="sticky top-0 flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b border-gray-100 bg-white z-10">
+          <div className="sticky md:static top-0 shrink-0 flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b border-gray-100 bg-white z-10">
             <span className="text-xs font-bold text-[#1B2A45] mr-2">
               {c.details?.company || c.company || c.name}
             </span>
             {/* 자금팀 전송 후: 액션 버튼 모두 숨김 */}
             {!isTransferred && (
               <>
-                {tabType !== 'contracted' && (
-                  <button type="button" onClick={() => setContractModalOpen(true)}
-                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-emerald-500 text-white hover:bg-emerald-600">
-                    계약완료
+                {/* 이동 버튼 — 공가/직가DB → 감성톡 → 자체거절 → 계약완료 순 */}
+                {tabType !== 'lead' && (
+                  <button type="button" onClick={async () => { tabType === 'db010' ? onStatusChange(c.id, 'lead') : await setToSupplyDb('lead'); onExpand(null) }}
+                    className="px-3 py-1 rounded-full text-[11px] font-semibold border border-[#e4e7ee] bg-white text-[#0b2140] hover:border-[#b8995a] hover:bg-[#fbf8f0] hover:-translate-y-px transition-all">
+                    공가DB로 이전
+                  </button>
+                )}
+                {tabType !== 'db010' && (
+                  <button type="button" onClick={async () => { await setToDirectDb(); onExpand(null) }}
+                    className="px-3 py-1 rounded-full text-[11px] font-semibold border border-[#e4e7ee] bg-white text-[#0b2140] hover:border-[#b8995a] hover:bg-[#fbf8f0] hover:-translate-y-px transition-all">
+                    직가DB로 이전
                   </button>
                 )}
                 {tabType !== 'emotional' && (
                   <button type="button" onClick={() => { setEmotionalMood(''); setEmotionalOpen(true) }}
-                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-violet-500 text-white">
-                    감성톡(거절업체)
+                    className="px-3 py-1 rounded-full text-[11px] font-semibold border border-[#e4e7ee] bg-white text-[#0b2140] hover:border-[#b8995a] hover:bg-[#fbf8f0] hover:-translate-y-px transition-all">
+                    감성톡관리업체로 이전
                   </button>
                 )}
                 {tabType !== 'trash' && (
                   <button type="button" onClick={() => { setTrashReason(''); setTrashOpen(true) }}
-                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-gray-400 text-white">
-                    자체거절
+                    className="px-3 py-1 rounded-full text-[11px] font-semibold border border-[#e4e7ee] bg-white text-[#0b2140] hover:border-[#b8995a] hover:bg-[#fbf8f0] hover:-translate-y-px transition-all">
+                    자체거절로 이전
                   </button>
                 )}
-                {tabType === 'db010' && (
-                  <button type="button" onClick={() => { onStatusChange(c.id, 'lead'); onExpand(null) }}
-                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-blue-600 text-white hover:bg-blue-700">
-                    공가DB로 전송
+                {tabType !== 'contracted' && (
+                  <button type="button" onClick={() => setContractModalOpen(true)}
+                    className="px-3 py-1 rounded-full text-[11px] font-bold text-[#0b2140] bg-gradient-to-r from-[#b8995a] to-[#e6d4a3] shadow-[0_6px_14px_-6px_rgba(168,135,63,.8)] hover:-translate-y-px transition-all">
+                    계약완료로 이전
                   </button>
                 )}
-                {tabType === 'lead' && (
-                  <button type="button" onClick={async () => { await setToDirectDb(); onExpand(null) }}
-                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-indigo-600 text-white hover:bg-indigo-700">
-                    직가DB로 전송
-                  </button>
-                )}
-                {tabType !== 'lead' && tabType !== 'db010' && (
-                  <>
-                    <button type="button" onClick={async () => { await setToSupplyDb('lead'); onExpand(null) }}
-                      className="px-2.5 py-1 rounded text-[11px] font-semibold bg-blue-500 text-white hover:bg-blue-600">
-                      ↩ 공급
-                    </button>
-                    <button type="button" onClick={async () => { await setToDirectDb(); onExpand(null) }}
-                      className="px-2.5 py-1 rounded text-[11px] font-semibold bg-indigo-500 text-white hover:bg-indigo-600">
-                      ↩ 직접
-                    </button>
-                  </>
-                )}
-                {/* DB 트레이드 */}
-                <div className="relative" ref={tradeRef}>
-                  <button type="button" onClick={() => setTradeOpen(v => !v)}
-                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-sky-500 hover:bg-sky-600 text-white">
-                    DB 트레이드
-                  </button>
-                  {tradeOpen && (
-                    <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 py-1 z-50 min-w-[160px]">
-                      <p className="text-[10px] text-gray-400 px-3 py-1.5 font-semibold border-b border-gray-50">담당자 변경</p>
-                      {salesUsers.filter(u => u !== (c.sales_user_name || c.details?.sales_user_name)).map(u => (
-                        <button key={u} type="button"
-                          onClick={() => {
-                            onUpdate(c.id, { details: {
-                              sales_user_name: u,
-                              trade_from: c.sales_user_name || c.details?.sales_user_name || '',
-                              trade_date: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10),
-                            }})
-                            setTradeOpen(false)
-                          }}
-                          className="w-full text-left px-3 py-2.5 text-xs hover:bg-sky-50 text-sky-700 font-semibold flex items-center gap-2">
-                          <span className="text-gray-300 text-[10px]">→</span> {u}
-                        </button>
-                      ))}
-                      {salesUsers.filter(u => u !== (c.sales_user_name || c.details?.sales_user_name)).length === 0 && (
-                        <p className="text-[11px] text-gray-400 px-3 py-2 italic">다른 영업사원 없음</p>
-                      )}
-                    </div>
-                  )}
-                </div>
               </>
             )}
             {/* 자금팀 전송됨 알림 */}
@@ -1665,11 +1650,32 @@ function CustomerCard({
               className="text-gray-400 hover:text-gray-600 text-sm font-bold px-1">✕</button>
           </div>
 
+          <div className="shrink-0 px-4 pt-3 pb-2 bg-white/70 border-b border-[#e4e7ee]">
+          {/* 직가/공가 — 패널 최상단 (먼저 선택해야 아래 기입 가능) */}
+          <div className={`flex items-center gap-2 border rounded-xl px-4 py-2.5 shadow-sm transition-colors ${leadType ? 'bg-gradient-to-r from-[#0e2446] to-[#0a1b36] border-transparent' : 'bg-red-50 border-red-300'}`}>
+            <div className="w-36 shrink-0">
+              <p className={`text-[11px] font-bold ${leadType ? 'text-white' : 'text-red-700'}`}>직가 / 공가 <span className="text-red-400">*</span></p>
+              {!leadType && <p className="text-[9px] text-red-500 font-semibold">먼저 선택해야 아래 기입 가능</p>}
+            </div>
+            <div className="flex gap-1.5">
+              {(['직가', '공가'] as const).map(opt => (
+                <button key={opt} type="button"
+                  onClick={() => selectLeadType(opt)}
+                  className={`px-3.5 py-1.5 rounded-full text-[11px] font-bold border transition-all ${
+                    leadType === opt
+                      ? opt === '직가' ? 'bg-sky-400 text-white border-sky-400 shadow' : 'bg-amber-400 text-white border-amber-400 shadow'
+                      : leadType ? 'bg-white/10 text-white/60 border-white/20 hover:bg-white/20' : 'bg-white text-gray-600 border-red-200 hover:border-red-400'
+                  }`}>{opt}</button>
+              ))}
+            </div>
+          </div>
+          </div>
+
           {/* 좌/우 2단 패널 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-0 divide-y md:divide-y-0 md:divide-x divide-gray-200">
+          <div className={`grid grid-cols-1 md:grid-cols-2 md:grid-rows-1 md:flex-1 md:min-h-0 gap-0 divide-y md:divide-y-0 md:divide-x divide-gray-200 transition-opacity duration-300 ${!leadType && !isTransferred ? 'opacity-40 pointer-events-none select-none' : ''}`}>
 
             {/* ── 좌측: 인콜일지 ── */}
-            <div className="p-4 flex flex-col">
+            <div className="p-4 flex flex-col md:h-full md:min-h-0">
               {/* 헤더 + 수정 버튼 (자금팀 전송 전만) */}
               <div className="flex items-center justify-between mb-2 shrink-0">
                 <p className="text-[10px] font-bold text-[#1B2A45] uppercase tracking-wide">인콜일지</p>
@@ -1689,22 +1695,6 @@ function CustomerCard({
               </div>
               {/* 스크롤 영역 */}
               <div className="flex-1 overflow-y-auto min-h-0">
-
-              {/* ① 직가/공가 — 최상단 (항상 표시) */}
-              <div className="flex items-center gap-2 bg-gradient-to-r from-[#1B2A45] to-sky-800 border border-transparent rounded-lg px-2.5 py-2 mb-2 shadow-sm">
-                <span className="w-20 shrink-0 text-[10px] text-white font-bold">직가/공가</span>
-                <div className="flex gap-1.5">
-                  {['직가', '공가'].map(opt => (
-                    <button key={opt} type="button"
-                      onClick={() => onUpdate(c.id, { details: { lead_type: leadType === opt ? '' : opt } })}
-                      className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border transition-colors ${
-                        leadType === opt
-                          ? opt === '직가' ? 'bg-blue-400 text-white border-blue-400' : 'bg-amber-400 text-white border-amber-400'
-                          : 'bg-white/10 text-white/60 border-white/20 hover:bg-white/20'
-                      }`}>{opt}</button>
-                  ))}
-                </div>
-              </div>
 
               {logEditMode ? (
                 /* ── 편집 모드: 인풋 폼 ── */
@@ -1851,17 +1841,6 @@ function CustomerCard({
                 </div>
               )}
 
-              {/* 통화내용 + 메모 미러링 */}
-              <div className="bg-white border border-gray-100 rounded-lg px-2.5 py-2 mt-1 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                <div className="flex items-center justify-between mb-1.5">
-                  <p className="text-[10px] font-bold text-blue-700">통화내용 / 메모</p>
-                  <span className="text-[9px] text-emerald-600">↔ 자금팀 전달메모와 연동</span>
-                </div>
-                <ResultMemoField
-                  value={c.details?.result_memo || c.notes || c.memo || ''}
-                  onChange={(val) => onUpdate(c.id, { details: { result_memo: val } })}
-                />
-              </div>
               </div>{/* end scroll area */}
               {/* ── 하단 버튼 바: 자금팀 전송 전만 표시 ── */}
               {!isTransferred && (
@@ -1884,7 +1863,7 @@ function CustomerCard({
             </div>
 
             {/* ── 우측: 인콜결과 또는 자금팀 현황 ── */}
-            <div className="p-4 space-y-4">
+            <div className="p-4 space-y-4 md:h-full md:overflow-y-auto md:min-h-0">
               {/* 담당자 (자동 - 읽기 전용) */}
               <div className="flex items-center justify-between">
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">
@@ -1953,6 +1932,18 @@ function CustomerCard({
               {/* 자금팀 전송 전: 기존 인콜결과 섹션 */}
               {!isTransferred && (
                 <>
+              {/* 통화내용 / 메모 — 인콜결과 최상단 */}
+                  <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-[10px] font-bold text-blue-700">통화내용 / 메모</p>
+                      <span className="text-[9px] text-emerald-600">↔ 자금팀 전달메모와 연동</span>
+                    </div>
+                    <ResultMemoField
+                      value={c.details?.result_memo || c.notes || c.memo || ''}
+                      onChange={(val) => onUpdate(c.id, { details: { result_memo: val } })}
+                    />
+                  </div>
+
                   {/* 결정전 결과 */}
                   <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                     <label className="text-[10px] text-blue-700 mb-1.5 block font-bold">결정전 결과</label>
@@ -2055,6 +2046,7 @@ function CustomerCard({
                         className="w-28 border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50 text-gray-800"
                       />
                     </div>
+                    <p className="text-[9px] text-gray-400 mt-1.5 leading-snug">🔔 날짜와 시간을 모두 입력하면 설정한 시각 5분 전에 알림이 옵니다.</p>
                   </div>
 
                   {/* 미팅 일정 */}
@@ -2081,6 +2073,7 @@ function CustomerCard({
                       placeholder="메모 (장소, 내용 등)"
                       className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400/50 text-gray-800"
                     />
+                    <p className="text-[9px] text-gray-400 mt-1.5 leading-snug">🔔 미팅 하루 전 오전 9시에 알림이 옵니다. (예: 내일 미팅이면 오늘 오전 9시)</p>
                     {c.details?.meeting_date && (
                       <button type="button"
                         onClick={() => onUpdate(c.id, { details: { meeting_date: '', meeting_time: '', meeting_memo: '' } })}

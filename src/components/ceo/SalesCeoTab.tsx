@@ -708,13 +708,15 @@ function SalesDiaryView({ customers }: { customers: Customer[] }) {
   )
 }
 
-export default function SalesCeoTab({ initialView, initialStatusTab }: { initialView?: CeoView; initialStatusTab?: StatusKey }) {
+export default function SalesCeoTab({ initialView, initialStatusTab, initialSearch }: { initialView?: CeoView; initialStatusTab?: StatusKey; initialSearch?: string }) {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [ceoView, setCeoView] = useState<CeoView>(initialView ?? 'customers')
   const [supplyBannerDismissed, setSupplyBannerDismissed] = useState(false)
   const [personTab, setPersonTab] = useState<string>('all')
   const [statusTab, setStatusTab] = useState<StatusKey>(initialStatusTab ?? 'all')
+  // 업체명·대표자·연락처 검색 — 입력하면 해당 업체만 표시 (전체 담당자·전체 상태에서 검색)
+  const [custSearch, setCustSearch] = useState(initialSearch ?? '')
   const [inspDetail, setInspDetail] = useState<Customer | null>(null)
   const [opsUsers, setOpsUsers] = useState<string[]>([])
   const [supplyConfig, setSupplyConfig] = useState<SupplyConfig>({})
@@ -824,6 +826,15 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
 
   const statusCustomers = useMemo(() => {
     let list: Customer[]
+    const q = custSearch.trim().toLowerCase()
+    if (q) {
+      const qd = q.replace(/-/g, '')
+      return customers.filter((c: any) =>
+        (c.details?.company || c.company || '').toLowerCase().includes(q) ||
+        (c.name || '').toLowerCase().includes(q) ||
+        (qd.length >= 3 && (c.phone || '').replace(/-/g, '').includes(qd))
+      )
+    }
     if (statusTab === 'all') {
       list = personCustomers
     } else if (statusTab === 'lead') {
@@ -838,7 +849,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
       )
     }
     return list
-  }, [personCustomers, statusTab])
+  }, [customers, personCustomers, statusTab, custSearch])
 
   // 심사요청 대기 중인 업체
   const pendingInspections = useMemo(() =>
@@ -1781,6 +1792,24 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
 
       {/* 등록되지 않은 담당자 배너 제거됨 */}
 
+      {/* ── 업체 검색 ── */}
+      <div className="relative">
+        <input
+          type="text"
+          value={custSearch}
+          onChange={e => setCustSearch(e.target.value)}
+          placeholder="업체명 · 대표자 · 연락처로 검색 (입력한 업체만 표시)"
+          className="w-full bg-white border-[1.5px] border-[#e4e7ee] rounded-2xl px-4 py-2.5 text-sm outline-none focus:border-[#b8995a]"
+        />
+        {custSearch && (
+          <button type="button" onClick={() => setCustSearch('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600">✕ 지우기</button>
+        )}
+      </div>
+      {custSearch.trim() && (
+        <p className="text-[11px] text-[#a8873f] font-semibold -mt-2">검색 결과 {statusCustomers.length}건 · 담당자/상태 구분 없이 전체에서 찾습니다</p>
+      )}
+
       {/* ── 상태 탭 ── */}
       <div className="flex gap-1.5 flex-wrap">
         {STATUS_TABS.map(t => (
@@ -1808,7 +1837,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
         <InCallTableView
           customers={statusCustomers}
           allCustomers={customers}
-          tabType={statusTab === 'all' ? 'lead' : statusTab}
+          tabType={custSearch.trim() ? 'lead' : statusTab === 'all' ? 'lead' : statusTab}
           salesUsers={salesPeople}
           opsUsers={opsUsers}
           userName="ceo"

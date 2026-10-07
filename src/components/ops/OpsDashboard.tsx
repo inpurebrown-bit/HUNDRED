@@ -1255,6 +1255,50 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
             </div>
           </div>
 
+          {/* ── 인증사업 섹션 (간접자금 아래) ── */}
+          <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 space-y-3">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-bold text-teal-700">인증사업</span>
+              <div className="flex-1 h-px bg-teal-200" />
+              <span className="text-[9px] text-teal-600/70">선택하면 '인증사업 진행중'에 표시됩니다</span>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {CERT_PROGRAMS.map(p => {
+                const sel: string[] = certOf(local)
+                const on = sel.includes(p)
+                return (
+                  <button key={p} type="button"
+                    onClick={() => {
+                      const nextSel = on ? sel.filter(x => x !== p) : [...sel, p]
+                      const st = { ...(d.cert_status || {}) }
+                      if (on) delete st[p]; else st[p] = st[p] || '상담중'
+                      immediateDetailFields({ cert_programs: nextSel, cert_status: st })
+                    }}
+                    className={`px-2 py-0.5 rounded text-xs font-medium border transition-colors ${on ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-500 border-gray-300 hover:bg-teal-50'}`}>
+                    {p}
+                  </button>
+                )
+              })}
+            </div>
+            {certOf(local).map(p => (
+              <div key={p}>
+                <label className={lbl}>{p} 진행상태</label>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {CERT_STATUSES.map(st => {
+                    const on = certStatus(local, p) === st
+                    return (
+                      <button key={st} type="button"
+                        onClick={() => immediateDetailFields({ cert_status: { ...(d.cert_status || {}), [p]: st } })}
+                        className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors ${on ? CERT_STATUS_COLOR[st] + ' ring-1 ring-offset-0' : 'bg-white text-gray-400 border-gray-200 hover:border-gray-400'}`}>
+                        {st}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
           {/* ── 확인서 섹션 ── */}
           <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             <div className="flex items-center gap-2 flex-wrap">
@@ -1535,51 +1579,6 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                     </button>
                   </div>
                 </div>
-
-                {/* ── 인증사업 (연구소 / 벤처 / 무상지원금) ── */}
-                <div className="bg-teal-600 px-3 py-1.5 flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-white tracking-wide">인증사업</span>
-                  <span className="text-[9px] text-white/70">선택하면 관리팀 '인증사업 진행중'에 표시됩니다</span>
-                </div>
-                <div className="px-3 py-2.5 flex flex-wrap gap-1.5 border-b border-gray-100">
-                  {CERT_PROGRAMS.map(p => {
-                    const sel: string[] = certOf(local)
-                    const on = sel.includes(p)
-                    return (
-                      <button key={p} type="button"
-                        onClick={() => {
-                          const nextSel = on ? sel.filter(x => x !== p) : [...sel, p]
-                          const st = { ...(d.cert_status || {}) }
-                          if (on) delete st[p]; else st[p] = st[p] || '상담중'
-                          immediateDetailFields({ cert_programs: nextSel, cert_status: st })
-                        }}
-                        className={`text-[11px] px-2.5 py-1 rounded-full border font-semibold transition-colors ${on ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-500 border-gray-200 hover:border-teal-400 hover:text-teal-600'}`}>
-                        {on ? '✓ ' : ''}{p}
-                      </button>
-                    )
-                  })}
-                </div>
-                {certOf(local).length > 0 && (
-                  <div className="px-3 py-2 border-b border-gray-100 space-y-1.5 bg-teal-50/40">
-                    {certOf(local).map(p => (
-                      <div key={p} className="flex items-center gap-2">
-                        <span className="text-[11px] font-semibold text-teal-700 w-[128px] shrink-0 truncate">{p}</span>
-                        <div className="flex flex-wrap gap-1">
-                          {CERT_STATUSES.map(st => {
-                            const on = certStatus(local, p) === st
-                            return (
-                              <button key={st} type="button"
-                                onClick={() => immediateDetailFields({ cert_status: { ...(d.cert_status || {}), [p]: st } })}
-                                className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors ${on ? CERT_STATUS_COLOR[st] + ' ring-1 ring-offset-0' : 'bg-white text-gray-400 border-gray-200 hover:border-gray-400'}`}>
-                                {st}
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
 
                 {/* ── 섹션별 필드 그리드 ── */}
                 {sections.map(sec => (
@@ -2533,13 +2532,19 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
 // ──────────────────────────────────────────────────────────────────────
 // OpsCard (기관별 그룹용, 동시진행 기관 표시)
 // ──────────────────────────────────────────────────────────────────────
+// 환불/종료 계열 상태 표기 통일 (영문 키·한글 키 혼용 방지)
+const STAGE_FIX: Record<string, { label: string; color: string }> = {
+  refunded: { label: '환불', color: 'bg-rose-500' }, '환불': { label: '환불', color: 'bg-rose-500' },
+  '종료': { label: '종료', color: 'bg-slate-500' }, '완료': { label: '완료', color: 'bg-emerald-600' }, completed: { label: '완료', color: 'bg-emerald-600' },
+}
+
 function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
   c: OpsCase; isOpen: boolean
   onToggle: (id: string) => void
   onScriptToggle: (id: string, val: boolean) => void
 }) {
   const allStages     = [...PIPELINE_STAGES, ...OVERALL_STAGES]
-  const overallStage  = allStages.find(s => s.key === c.progress_stage)
+  const overallStage  = STAGE_FIX[c.progress_stage] || allStages.find(s => s.key === c.progress_stage)
   const directStage   = c.details?.direct_stage   || ''
   const indirectStage = c.details?.indirect_stage  || ''
   const directInfo    = allStages.find(s => s.key === directStage)
@@ -2595,7 +2600,6 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
     >
       {/* ① 담당자명 + 뱃지 — 고정 높이 1줄 */}
       <div className="h-[14px] flex items-center gap-1 mb-0.5 overflow-hidden">
-        <span className="text-[8px] text-gray-400 font-medium truncate shrink-0 max-w-[40%]">{opsUser || '—'}</span>
         {isMonthlyCard && (
           <span className="text-[7px] font-bold bg-purple-500 text-white px-1 rounded leading-tight shrink-0">월정기</span>
         )}
@@ -2611,16 +2615,12 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
       </div>
 
       {/* ② 업체명 — 네모 박스 */}
-      <div className="h-[34px] flex items-center justify-center border border-gray-300 rounded-lg bg-gray-50 px-1.5 mt-0.5">
+      <div className="h-[50px] flex flex-col items-center justify-center border border-gray-300 rounded-lg bg-gray-50 px-1.5 mt-0.5">
         <p className="font-bold text-[#1B2A45] text-[11px] leading-tight text-center break-all line-clamp-2 w-full"
           style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
           {companyName}
         </p>
-      </div>
-
-      {/* ③ 대표명 — 1줄 고정 */}
-      <div className="h-[16px] flex items-center justify-center mt-0.5">
-        <p className="text-[10px] text-gray-400 truncate">{repName || <span className="text-gray-200">—</span>}</p>
+        {repName && <p className="text-[9px] text-gray-400 truncate w-full text-center leading-tight mt-0.5">{repName}</p>}
       </div>
 
       {/* ④ 전화번호 — 1줄 고정 */}
@@ -2652,32 +2652,6 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
         )
       })()}
 
-      {/* ⑥ 직접대출 기관 : 현황 — 1줄 고정 */}
-      <div className="h-[18px] flex items-center justify-center gap-1 mt-1">
-        <span className="text-[8px] font-bold text-blue-400 shrink-0">직</span>
-        {directInsts.length > 0
-          ? <span className="text-[8px] text-blue-700 font-medium truncate">{directInsts.map(abbrevInst).join('·')}</span>
-          : <span className="text-[8px] text-gray-200">—</span>
-        }
-        {directStage
-          ? <span className={`shrink-0 text-[8px] font-bold text-white px-1 py-0.5 rounded ${directInfo?.color || 'bg-blue-400'}`}>{directStage}</span>
-          : <span className="text-[8px] text-gray-200"></span>
-        }
-      </div>
-
-      {/* ⑦ 간접대출 기관 : 현황 — 1줄 고정 */}
-      <div className="h-[18px] flex items-center justify-center gap-1 mt-0.5">
-        <span className="text-[8px] font-bold text-violet-400 shrink-0">간</span>
-        {indirectInsts.length > 0
-          ? <span className="text-[8px] text-violet-700 font-medium truncate">{indirectInsts.map(abbrevInst).join('·')}</span>
-          : <span className="text-[8px] text-gray-200">—</span>
-        }
-        {indirectStage
-          ? <span className={`shrink-0 text-[8px] font-bold text-white px-1 py-0.5 rounded ${indirectInfo?.color || 'bg-violet-400'}`}>{indirectStage}</span>
-          : <span className="text-[8px] text-gray-200"></span>
-        }
-      </div>
-
       {/* ⑧ 인증사업 (선택된 경우만) */}
       {certOf(c).length > 0 && (
         <div className="h-[18px] flex items-center justify-center gap-1 mt-0.5">
@@ -2694,17 +2668,6 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
           ))}
         </div>
       )}
-
-      {/* ⑧ 스크립트 발송 — 항상 최하단 */}
-      <div className="mt-auto pt-1.5 flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
-        <input type="checkbox" id={`script-${c.id}`} checked={scriptSent}
-          onChange={e => onScriptToggle(c.id, e.target.checked)}
-          className="w-3 h-3 accent-violet-500 cursor-pointer" />
-        <label htmlFor={`script-${c.id}`}
-          className={`text-[9px] cursor-pointer select-none ${scriptSent ? 'text-violet-600 font-semibold line-through' : 'text-gray-400'}`}>
-          스크립트 발송
-        </label>
-      </div>
     </div>
   )
 }
@@ -3207,7 +3170,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
                     {(() => {
                       const s1 = items.filter(c => (c.details?.absorption_stage ?? 1) !== 2)
                       return s1.length > 0 ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                        <div className="hc-cardgrid">
                           {s1.map(c => (
                             <div key={`신규-1-${c.id}`} className="relative group">
                               <OpsCard c={c} isOpen={openPanelIds.includes(c.id)} onToggle={onToggle} onScriptToggle={onScriptToggle} />
@@ -3229,7 +3192,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
                     {(() => {
                       const s2 = items.filter(c => (c.details?.absorption_stage ?? 1) === 2)
                       return s2.length > 0 ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                        <div className="hc-cardgrid">
                           {s2.map(c => (
                             <div key={`신규-2-${c.id}`} className="relative group">
                               <OpsCard c={c} isOpen={openPanelIds.includes(c.id)} onToggle={onToggle} onScriptToggle={onScriptToggle} />
@@ -3249,7 +3212,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
                 </div>
               ) : isSpecial ? (
                 // 핸들링/홀딩/대표승인대기: 단순 그리드 (다음자금 없음)
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                <div className="hc-cardgrid">
                   {items.map(c => (
                     <OpsCard
                       key={`${inst}-${c.id}`}
@@ -3263,9 +3226,9 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
               ) : (
                 // 기관 그룹: 진행 / 다음자금대기 좌우 분리
                 <div className="flex gap-0 items-start">
-                  <div className="w-1/2 min-w-0 pr-3">
+                  <div className="w-[30%] min-w-0 pr-3">
                     {activeItems.length > 0 ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                      <div className="hc-cardgrid">
                         {activeItems.map(c => (
                           <OpsCard
                             key={`${inst}-${c.id}`}
@@ -3280,10 +3243,10 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
                       <div className="h-full min-h-[40px]" />
                     )}
                   </div>
-                  <div className="w-1/2 min-w-0 border-l-2 border-dashed border-gray-200 pl-3">
+                  <div className="w-[70%] min-w-0 border-l-2 border-dashed border-gray-200 pl-3">
                     <p className="text-[9px] font-bold text-gray-400 mb-1.5 uppercase tracking-wide">다음 자금 대기</p>
                     {upcomingItems.length > 0 ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                      <div className="hc-cardgrid">
                         {upcomingItems.map(c => (
                           <OpsCard
                             key={`${inst}-upcoming-${c.id}`}
@@ -4037,7 +4000,7 @@ function OpsContractTab({ userName, openPanelIds, onToggle, onScriptToggle }: {
           <span className="text-xs text-gray-300 mt-1 block">신규DB 탭에서 계약하기를 눌러 계약을 진행하세요</span>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+        <div className="hc-cardgrid">
           {contracts.map(c => (
             <OpsCard
               key={c.id}
@@ -5177,7 +5140,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
       </div>
 
       {/* 콘텐츠 */}
-      <div className="px-4 md:px-6 py-5 max-w-6xl mx-auto pb-24 md:pb-6">
+      <div className="px-4 md:px-6 py-5 max-w-[1800px] mx-auto pb-24 md:pb-6">
 
         {/* ── 대시보드 ── */}
         {activeTab === 'dashboard' && (
@@ -5272,7 +5235,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
 
         {/* ── 진행중업체 ── */}
         {activeTab === 'active' && (
-          <div className="max-w-6xl space-y-4">
+          <div className="max-w-[1800px] space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="font-bold text-[#1B2A45] text-base">진행중업체</h2>
               <div className="flex items-center gap-2">
@@ -5313,7 +5276,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
                 {refundCases.map(c => (
-                  <CaseCard key={c.id} c={c} onToggle={togglePanel} isOpen={openPanelIds.includes(c.id)} cardType="refund" />
+                  <OpsCard key={c.id} c={c} isOpen={openPanelIds.includes(c.id)} onToggle={togglePanel} onScriptToggle={() => {}} />
                 ))}
               </div>
             )}
@@ -5335,7 +5298,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
                 {completedCases.map(c => (
-                  <CaseCard key={c.id} c={c} onToggle={togglePanel} isOpen={openPanelIds.includes(c.id)} cardType="completed" />
+                  <OpsCard key={c.id} c={c} isOpen={openPanelIds.includes(c.id)} onToggle={togglePanel} onScriptToggle={() => {}} />
                 ))}
               </div>
             )}

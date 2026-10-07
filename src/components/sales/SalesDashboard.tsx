@@ -822,7 +822,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
       {splitActive && <SplitView onClose={() => setSplitActive(false)} />}
       {/* ── 자금팀 전송 담당자 선택 모달 ── */}
       {opsTransferModal.customer && (
-        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-black/60 z-[300] flex items-center justify-center p-4"
           onClick={e => { if (e.target === e.currentTarget) setOpsTransferModal({ customer: null, opsUserId: '', opsUserName: '', contractType: '일반' }) }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -1062,7 +1062,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         ))}
       </div>
 
-      <div className="px-4 md:px-6 py-5 max-w-5xl mx-auto">
+      <div className="px-4 md:px-6 py-5 max-w-[1600px] mx-auto">
 
         {/* ══════════ 메인보드 ══════════ */}
         {activeTab === 'board' && (
@@ -1136,11 +1136,11 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               return (
                 <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
                   {/* 헤더 */}
-                  <div className="bg-gradient-to-r from-[#1B2A45] to-sky-700 px-5 py-4 flex items-center justify-between">
+                  <div className="bg-gradient-to-r from-[#1B2A45] to-sky-700 px-5 py-2.5 flex items-center justify-between">
                     <div>
                       <p className="text-[11px] text-white/50 font-medium uppercase tracking-widest mb-0.5">이번달 공급 현황</p>
                       <div className="flex items-baseline gap-2">
-                        <span className="text-3xl font-black text-white">{fmtV(total)}</span>
+                        <span className="text-2xl font-black text-white">{fmtV(total)}</span>
                         <button
                           onClick={() => { setGoalEditValue(String(target)); setGoalEditOpen(true) }}
                           className="text-sm text-white/50 hover:text-white/80 hover:underline transition-colors"
@@ -1171,10 +1171,10 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                     />
                   </div>
 
-                  <div className="p-4 space-y-3">
+                  <div className="p-3 grid grid-cols-1 lg:grid-cols-3 gap-3 items-start">
                     {/* 환불 차감 알림 — 기본 접힌 상태 */}
                     {thisMonthRefunds.length > 0 && (
-                      <details className="bg-red-50 border border-red-100 rounded-xl overflow-hidden">
+                      <details className="lg:col-span-3 bg-red-50 border border-red-100 rounded-xl overflow-hidden">
                         <summary className="px-3 py-2 cursor-pointer select-none flex items-center justify-between">
                           <span className="text-[9px] font-bold text-red-400 uppercase tracking-widest">이달 환불 차감</span>
                           <span className="text-[9px] font-bold text-red-500">-{thisMonthRefundWeight}개 / -{thisMonthRefundAmount.toLocaleString('ko-KR')}원</span>
@@ -1194,23 +1194,23 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                       <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest px-3 pt-2.5 pb-1.5 bg-sky-50/60">공급 채널</p>
 
                       {/* 한경연 공급 */}
-                      <div className="px-3 pb-2 pt-1.5">
+                      <div className="px-3 pb-1.5 pt-1">
                         <p className="text-[8px] font-semibold text-sky-400 mb-1.5">한경연 공급</p>
                         <div className="grid grid-cols-3 gap-2">
-                          <div className="rounded-xl bg-sky-50 p-3 text-center">
-                            <p className="text-[9px] text-sky-400 font-semibold mb-1">공급수</p>
-                            <p className="text-2xl font-black text-sky-700 leading-none">{supCnt}</p>
-                            <p className="text-[8px] text-sky-400 mt-1">이번달 투입</p>
+                          <div className="rounded-lg bg-sky-50 px-2 py-1.5 text-center">
+                            <p className="text-[9px] text-sky-400 font-semibold mb-0">공급수</p>
+                            <p className="text-xl font-black text-sky-700 leading-none">{supCnt}</p>
+                            <p className="text-[8px] text-sky-400 mt-0 leading-tight">이번달 투입</p>
                           </div>
-                          <div className="rounded-xl bg-emerald-50 p-3 text-center">
-                            <p className="text-[9px] text-emerald-500 font-semibold mb-1">공급결제</p>
-                            <p className="text-2xl font-black text-emerald-700 leading-none">{fmtV(supPay)}</p>
-                            <p className="text-[8px] text-emerald-400 mt-1">공가 계약</p>
+                          <div className="rounded-lg bg-emerald-50 px-2 py-1.5 text-center">
+                            <p className="text-[9px] text-emerald-500 font-semibold mb-0">공급결제</p>
+                            <p className="text-xl font-black text-emerald-700 leading-none">{fmtV(supPay)}</p>
+                            <p className="text-[8px] text-emerald-400 mt-0 leading-tight">공가 계약</p>
                           </div>
-                          <div className="rounded-xl bg-blue-50 p-3 text-center">
-                            <p className="text-[9px] text-blue-400 font-semibold mb-1">공급결제율</p>
-                            <p className={`text-xl font-black leading-none ${rateGrade(supRate, 40).numCls}`}>{fmtP(supRate)}</p>
-                            <p className="text-[8px] mt-1">{rateGrade(supRate, 40).label ?? <span className="text-blue-400">—</span>}</p>
+                          <div className="rounded-lg bg-blue-50 px-2 py-1.5 text-center">
+                            <p className="text-[9px] text-blue-400 font-semibold mb-0">공급결제율</p>
+                            <p className={`text-lg font-black leading-none ${rateGrade(supRate, 40).numCls}`}>{fmtP(supRate)}</p>
+                            <p className="text-[8px] mt-0">{rateGrade(supRate, 40).label ?? <span className="text-blue-400">—</span>}</p>
                           </div>
                         </div>
                       </div>
@@ -1230,23 +1230,23 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                         )
                         const selfRate = selfSupplied > 0 ? (selfPay / selfSupplied * 100) : null
                         return (
-                          <div className="px-3 pb-3 pt-1.5">
+                          <div className="px-3 pb-2 pt-1">
                             <p className="text-[8px] font-semibold text-emerald-500 mb-1.5">자체공급</p>
                             <div className="grid grid-cols-3 gap-2">
-                              <div className="rounded-xl bg-emerald-50 p-3 text-center">
-                                <p className="text-[9px] text-emerald-500 font-semibold mb-1">자체공급수</p>
-                                <p className="text-2xl font-black text-emerald-700 leading-none">{selfSupplied}</p>
-                                <p className="text-[8px] text-emerald-400 mt-1">발굴팀 배정</p>
+                              <div className="rounded-lg bg-emerald-50 px-2 py-1.5 text-center">
+                                <p className="text-[9px] text-emerald-500 font-semibold mb-0">자체공급수</p>
+                                <p className="text-xl font-black text-emerald-700 leading-none">{selfSupplied}</p>
+                                <p className="text-[8px] text-emerald-400 mt-0 leading-tight">발굴팀 배정</p>
                               </div>
-                              <div className="rounded-xl bg-teal-50 p-3 text-center">
-                                <p className="text-[9px] text-teal-500 font-semibold mb-1">자체공급결제</p>
-                                <p className="text-2xl font-black text-teal-700 leading-none">{fmtV(selfPay)}</p>
-                                <p className="text-[8px] text-teal-400 mt-1">자체공급 계약</p>
+                              <div className="rounded-lg bg-teal-50 px-2 py-1.5 text-center">
+                                <p className="text-[9px] text-teal-500 font-semibold mb-0">자체공급결제</p>
+                                <p className="text-xl font-black text-teal-700 leading-none">{fmtV(selfPay)}</p>
+                                <p className="text-[8px] text-teal-400 mt-0 leading-tight">자체공급 계약</p>
                               </div>
-                              <div className="rounded-xl bg-green-50 p-3 text-center">
-                                <p className="text-[9px] text-green-500 font-semibold mb-1">자체공급결제율</p>
-                                <p className={`text-xl font-black leading-none ${rateGrade(selfRate, 40).numCls}`}>{fmtP(selfRate)}</p>
-                                <p className="text-[8px] mt-1">{rateGrade(selfRate, 40).label ?? <span className="text-green-400">—</span>}</p>
+                              <div className="rounded-lg bg-green-50 px-2 py-1.5 text-center">
+                                <p className="text-[9px] text-green-500 font-semibold mb-0">자체공급결제율</p>
+                                <p className={`text-lg font-black leading-none ${rateGrade(selfRate, 40).numCls}`}>{fmtP(selfRate)}</p>
+                                <p className="text-[8px] mt-0">{rateGrade(selfRate, 40).label ?? <span className="text-green-400">—</span>}</p>
                               </div>
                             </div>
                           </div>
@@ -1258,29 +1258,29 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                     <div>
                       <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-2">직접 채널</p>
                       <div className="grid grid-cols-3 gap-2">
-                        <div className="rounded-xl bg-violet-50 p-3 text-center">
-                          <p className="text-[9px] text-violet-400 font-semibold mb-1">직접수</p>
-                          <p className="text-2xl font-black text-violet-700 leading-none">{dirCnt}</p>
-                          <p className="text-[8px] text-violet-400 mt-1">직가 DB 등록</p>
+                        <div className="rounded-lg bg-violet-50 px-2 py-1.5 text-center">
+                          <p className="text-[9px] text-violet-400 font-semibold mb-0">직접수</p>
+                          <p className="text-xl font-black text-violet-700 leading-none">{dirCnt}</p>
+                          <p className="text-[8px] text-violet-400 mt-0 leading-tight">직가 DB 등록</p>
                         </div>
-                        <div className="rounded-xl bg-purple-50 p-3 text-center">
-                          <p className="text-[9px] text-purple-400 font-semibold mb-1">직접결제</p>
-                          <p className="text-2xl font-black text-purple-700 leading-none">{fmtV(dirPay)}</p>
-                          <p className="text-[8px] text-purple-400 mt-1">직가 계약</p>
+                        <div className="rounded-lg bg-purple-50 px-2 py-1.5 text-center">
+                          <p className="text-[9px] text-purple-400 font-semibold mb-0">직접결제</p>
+                          <p className="text-xl font-black text-purple-700 leading-none">{fmtV(dirPay)}</p>
+                          <p className="text-[8px] text-purple-400 mt-0 leading-tight">직가 계약</p>
                         </div>
-                        <div className="rounded-xl bg-pink-50 p-3 text-center">
-                          <p className="text-[9px] text-pink-400 font-semibold mb-1">직접결제율</p>
+                        <div className="rounded-lg bg-pink-50 px-2 py-1.5 text-center">
+                          <p className="text-[9px] text-pink-400 font-semibold mb-0">직접결제율</p>
                           <p className="text-xl font-black text-pink-700 leading-none">{fmtP(dirRate)}</p>
-                          <p className="text-[8px] text-pink-400 mt-1">&nbsp;</p>
+                          <p className="text-[8px] text-pink-400 mt-0 leading-tight">&nbsp;</p>
                         </div>
                       </div>
                     </div>
 
                     {/* 통합 요약 */}
-                    <div className="border border-[#C5A258]/30 bg-gradient-to-r from-[#1B2A45]/5 to-[#C5A258]/5 rounded-xl p-3 grid grid-cols-3 divide-x divide-[#C5A258]/20 text-center">
+                    <div className="border border-[#C5A258]/30 bg-gradient-to-r from-[#1B2A45]/5 to-[#C5A258]/5 rounded-xl px-3 py-2 grid grid-cols-3 divide-x divide-[#C5A258]/20 text-center">
                       <div className="pr-3">
                         <p className="text-[9px] text-[#C5A258] font-bold mb-0.5 tracking-wide">총결제</p>
-                        <p className={`text-2xl font-black ${
+                        <p className={`text-xl font-black ${
                           total >= target ? 'text-emerald-500' :
                           achievePct >= 60 ? 'text-[#C5A258]' : 'text-orange-500'
                         }`}>{fmtV(total)}</p>
