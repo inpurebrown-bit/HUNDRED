@@ -277,7 +277,7 @@ function PayslipDocument({ emp, financial, yearMonth }: {
                     <td className={tdV}>
                       {fmt(salesCalc.basePay)}원{salesCalc.days < SALES_PAY_MONTH_DAYS
                         ? ` ÷ ${SALES_PAY_MONTH_DAYS}일 × ${salesCalc.days}일 근무`
-                        : ' (만근)'}
+                        : ''}
                     </td>
                     <td className={tdN}>{fmt(salesCalc.baseProrated)}</td>
                   </tr>
@@ -1242,7 +1242,7 @@ function SalesFinancialForm({ fin, update }: { fin: EmpFinancial; update: (p: Pa
           <select value={fin.work_days || SALES_PAY_MONTH_DAYS}
             onChange={e => update({ work_days: Number(e.target.value) >= SALES_PAY_MONTH_DAYS ? undefined : Number(e.target.value) })} className={inp}>
             {Array.from({ length: SALES_PAY_MONTH_DAYS }, (_, i) => SALES_PAY_MONTH_DAYS - i).map(d => (
-              <option key={d} value={d}>{d === SALES_PAY_MONTH_DAYS ? '30일 (만근)' : d + '일'}</option>
+              <option key={d} value={d}>{d === SALES_PAY_MONTH_DAYS ? '30일' : d + '일'}</option>
             ))}
           </select>
         </div>

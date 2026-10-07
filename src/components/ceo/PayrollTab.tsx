@@ -29,7 +29,7 @@ interface SalesEmployee {
   awards: AwardItem[]
   pay_mode?: SalesPayMode   // 이번 달 지급 방식: 'base7'(160만+7%) | 'all'(올인센) — 매달 직접 선택
   base_pay?: number         // 기본급(기본 160만원)
-  work_days?: number        // 일할 근무일수(1~30, 비우면 만근)
+  work_days?: number        // 일할 근무일수(1~30, 비우면 30일)
   memo?: string             // 비고(계산 사유)
 }
 
@@ -346,7 +346,7 @@ function SalesCard({
             onChange={e => onPatch(idx, { work_days: Number(e.target.value) >= SALES_PAY_MONTH_DAYS ? undefined : Number(e.target.value) })}
             className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-amber-300 text-gray-700">
             {Array.from({ length: SALES_PAY_MONTH_DAYS }, (_, i) => SALES_PAY_MONTH_DAYS - i).map(d => (
-              <option key={d} value={d}>{d === SALES_PAY_MONTH_DAYS ? '30일 (만근)' : `${d}일`}</option>
+              <option key={d} value={d}>{d === SALES_PAY_MONTH_DAYS ? '30일' : `${d}일`}</option>
             ))}
           </select>
         </div>

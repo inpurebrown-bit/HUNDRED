@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { OpsDetailPanel, OpsCase, CERT_PROGRAMS, CERT_SHORT, CERT_GROUP, certOf } from '@/components/ops/OpsDashboard'
+import { OpsDetailPanel, OpsCase, CERT_PROGRAMS, CERT_SHORT, CERT_GROUP, certOf, certStatus, certLabel } from '@/components/ops/OpsDashboard'
 
 // ─── Constants ─────────────────────────────────────────────
 const PIPELINE_STAGES = [
@@ -231,7 +231,7 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
       {certOf(c).length > 0 && (
         <div className="h-[18px] flex items-center justify-center gap-1 mt-0.5">
           <span className="text-[8px] font-bold text-teal-500 shrink-0">인증</span>
-          <span className="text-[8px] text-teal-700 font-medium truncate">{certOf(c).map(x => CERT_SHORT[x] || x).join('·')}</span>
+          <span className="text-[8px] text-teal-700 font-medium truncate" title={certOf(c).map(x => `${x} · ${certStatus(c, x)}`).join(', ')}>{certOf(c).map(x => certLabel(c, x)).join('·')}</span>
         </div>
       )}
 

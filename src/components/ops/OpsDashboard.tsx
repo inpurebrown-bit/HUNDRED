@@ -285,6 +285,25 @@ export const CERT_SHORT: Record<string, string> = {
   '연구소/연구개발전담부서': '연구소', '벤처(혁신)': '벤처혁신', '벤처(투자)': '벤처투자', '무상지원금': '무상지원',
 }
 export const CERT_GROUP = '인증사업 진행중'
+export const CERT_STATUSES = ['상담중', '진행중', '심사중', '실사완료', '지급 전', '지급완료'] as const
+export const CERT_STATUS_SHORT: Record<string, string> = {
+  '상담중': '상담', '진행중': '진행', '심사중': '심사', '실사완료': '실사', '지급 전': '지급전', '지급완료': '완료',
+}
+export const CERT_STATUS_COLOR: Record<string, string> = {
+  '상담중': 'bg-gray-100 text-gray-600 border-gray-300',
+  '진행중': 'bg-sky-100 text-sky-700 border-sky-300',
+  '심사중': 'bg-violet-100 text-violet-700 border-violet-300',
+  '실사완료': 'bg-amber-100 text-amber-700 border-amber-300',
+  '지급 전': 'bg-orange-100 text-orange-700 border-orange-300',
+  '지급완료': 'bg-emerald-100 text-emerald-700 border-emerald-300',
+}
+// 선택된 인증사업의 진행 상태 (미지정이면 상담중)
+export function certStatus(c: { details?: any }, program: string): string {
+  return c?.details?.cert_status?.[program] || '상담중'
+}
+export function certLabel(c: { details?: any }, program: string): string {
+  return `${CERT_SHORT[program] || program}(${CERT_STATUS_SHORT[certStatus(c, program)] || certStatus(c, program)})`
+}
 export function certOf(c: { details?: any }): string[] {
   const v = c?.details?.cert_programs
   return Array.isArray(v) ? v.filter(Boolean) : []
@@ -1528,13 +1547,39 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                     const on = sel.includes(p)
                     return (
                       <button key={p} type="button"
-                        onClick={() => detailField('cert_programs', on ? sel.filter(x => x !== p) : [...sel, p])}
+                        onClick={() => {
+                          const nextSel = on ? sel.filter(x => x !== p) : [...sel, p]
+                          const st = { ...(d.cert_status || {}) }
+                          if (on) delete st[p]; else st[p] = st[p] || '상담중'
+                          immediateDetailFields({ cert_programs: nextSel, cert_status: st })
+                        }}
                         className={`text-[11px] px-2.5 py-1 rounded-full border font-semibold transition-colors ${on ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-500 border-gray-200 hover:border-teal-400 hover:text-teal-600'}`}>
                         {on ? '✓ ' : ''}{p}
                       </button>
                     )
                   })}
                 </div>
+                {certOf(local).length > 0 && (
+                  <div className="px-3 py-2 border-b border-gray-100 space-y-1.5 bg-teal-50/40">
+                    {certOf(local).map(p => (
+                      <div key={p} className="flex items-center gap-2">
+                        <span className="text-[11px] font-semibold text-teal-700 w-[128px] shrink-0 truncate">{p}</span>
+                        <div className="flex flex-wrap gap-1">
+                          {CERT_STATUSES.map(st => {
+                            const on = certStatus(local, p) === st
+                            return (
+                              <button key={st} type="button"
+                                onClick={() => immediateDetailFields({ cert_status: { ...(d.cert_status || {}), [p]: st } })}
+                                className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors ${on ? CERT_STATUS_COLOR[st] + ' ring-1 ring-offset-0' : 'bg-white text-gray-400 border-gray-200 hover:border-gray-400'}`}>
+                                {st}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* ── 섹션별 필드 그리드 ── */}
                 {sections.map(sec => (
@@ -2637,7 +2682,7 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
       {certOf(c).length > 0 && (
         <div className="h-[18px] flex items-center justify-center gap-1 mt-0.5">
           <span className="text-[8px] font-bold text-teal-500 shrink-0">인증</span>
-          <span className="text-[8px] text-teal-700 font-medium truncate">{certOf(c).map(x => CERT_SHORT[x] || x).join('·')}</span>
+          <span className="text-[8px] text-teal-700 font-medium truncate" title={certOf(c).map(x => `${x} · ${certStatus(c, x)}`).join(', ')}>{certOf(c).map(x => certLabel(c, x)).join('·')}</span>
         </div>
       )}
 
