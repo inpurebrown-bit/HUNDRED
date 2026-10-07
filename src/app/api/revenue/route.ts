@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { calcExtraCounts } from '@/lib/payrollCalc'
 
 function parseMoney(v: any): number {
   if (!v) return 0
@@ -413,6 +414,7 @@ export async function GET(req: NextRequest) {
       ...weightDeductEntries.filter((e: any) => e.date?.startsWith(targetMonth)),
     ]
     return NextResponse.json({
+      extraCounts:           calcExtraCounts(custContracted || [], targetMonth),
       thisMonthOps:          targetOps,
       thisMonthOpsContracts: targetContracts,
       thisMonthSales:        targetSales,
@@ -452,6 +454,7 @@ export async function GET(req: NextRequest) {
   ).length
 
   return NextResponse.json({
+    thisMonthExtraCounts: calcExtraCounts(custContracted || [], thisMonthKey),
     monthly,
     salesByUser: Object.values(salesByUser),
     opsByUser: Object.values(opsByUser),

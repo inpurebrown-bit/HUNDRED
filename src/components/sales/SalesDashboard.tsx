@@ -17,7 +17,7 @@ import {
   getRemainingBusinessDays,
 } from '@/lib/businessDays'
 import { SUPPLY_RATE_TABLE, calcRecommendedSupply, isActiveRow, contractWeight } from '@/lib/supplyRules'
-import { calcRefundDeductions } from '@/lib/payrollCalc'
+import { calcRefundDeductions, calcExtraCounts } from '@/lib/payrollCalc'
 import SalesScheduleTab from './SalesScheduleTab'
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -655,7 +655,9 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const myDbContracted = thisMonthContracted.reduce(
     (sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0
   )
-  const myTotalContracted = mySupplyCfg ? (Number(mySupplyCfg.base) || 0) + myDbContracted : myDbContracted
+  // 잔금 등 추가 입금 갯수 (입금한 달에만 가산, 매출·계약건수는 그대로)
+  const myExtraWeight = calcExtraCounts(customers, thisMonth).reduce((s, x) => s + x.weight, 0)
+  const myTotalContracted = (mySupplyCfg ? (Number(mySupplyCfg.base) || 0) + myDbContracted : myDbContracted) + myExtraWeight
 
   // 월 목표: supply_config.goal 우선, 없으면 MONTHLY_GOALS 폴백
   const monthlyGoal = mySupplyCfg?.goal ?? MONTHLY_GOALS[username] ?? 30
@@ -772,6 +774,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const thisMonthContractCount = Math.max(
     0,
     thisMonthRevenue.reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0)
+    + myExtraWeight
     - thisMonthRefundWeight
   )
   const thisMonthTotalRevenueNet = Math.max(0, thisMonthTotalRevenue - thisMonthRefundAmount)
@@ -1106,7 +1109,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               const dirCnt    = dirCntAuto  // DB 실시간
               const dirPay    = dirPayAuto  // DB 실시간
               const target    = Number(monthlyGoal)
-              const total     = Math.max(0, supPay + dirPay - thisMonthRefundWeight)
+              const total     = Math.max(0, supPay + dirPay + myExtraWeight - thisMonthRefundWeight)
               const supRate   = supCnt > 0 ? (supPay / supCnt * 100) : null
               const dirRate   = dirCnt > 0 ? (dirPay / dirCnt * 100) : null
               // 총결제율 = 총계약수(공가+직가) / 공급갯수 × 100
@@ -1680,6 +1683,9 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                     <p className="text-2xl font-black text-emerald-700">
                       {(() => { const n = Math.max(0, monthContractCount - thisMonthRefundWeight); return n % 1 === 0 ? n : n.toFixed(1) })()}건
                     </p>
+                    {myExtraWeight > 0 && (
+                      <p className="text-[9px] text-emerald-600 mt-0.5">잔금입금 +{parseFloat(myExtraWeight.toFixed(2))}개</p>
+                    )}
                     {thisMonthRefundWeight > 0 && (
                       <p className="text-[9px] text-red-400 mt-0.5">환불차감 -{thisMonthRefundWeight}개</p>
                     )}

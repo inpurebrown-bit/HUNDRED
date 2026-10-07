@@ -6,7 +6,7 @@ import type { Customer } from '@/components/sales/InCallTableView'
 import InCallForm, { emptyInCallData, InCallData } from '@/components/sales/InCallForm'
 import { SUPPLY_RATE_TABLE, calcRecommendedSupply, isActiveRow, contractWeight } from '@/lib/supplyRules'
 import { getElapsedBusinessDays } from '@/lib/businessDays'
-import { calcRefundDeductions } from '@/lib/payrollCalc'
+import { calcRefundDeductions, calcExtraCounts } from '@/lib/payrollCalc'
 
 // ── DB 이동 모드 컴포넌트 ─────────────────────────────────
 type TransferDir = 'sales_to_sales' | 'sales_to_ops' | 'ops_to_sales' | 'ops_to_ops'
@@ -559,6 +559,12 @@ function buildLivePayMap(customers: Customer[], ym: string): Record<string, { su
     if (isDirectType) map[name].direct += w
     else              map[name].supply += w
   }
+  // 잔금 등 추가 입금 갯수
+  for (const ex of calcExtraCounts(customers as any[], ym)) {
+    if (!ex.name || ex.name === DIARY_TESTER) continue
+    if (!map[ex.name]) map[ex.name] = { supply: 0, direct: 0 }
+    map[ex.name].supply += ex.weight
+  }
   return map
 }
 
@@ -936,12 +942,14 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
   [lastMonthContracted])
 
   const thisMonthContractCount = useMemo(() =>
-    thisMonthContracted.reduce((s, c) => s + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0),
-  [thisMonthContracted])
+    thisMonthContracted.reduce((s, c) => s + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0)
+    + calcExtraCounts(customers, thisMonthStr).reduce((s, x) => s + x.weight, 0),
+  [thisMonthContracted, customers, thisMonthStr])
 
   const lastMonthContractCount = useMemo(() =>
-    lastMonthContracted.reduce((s, c) => s + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0),
-  [lastMonthContracted])
+    lastMonthContracted.reduce((s, c) => s + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0)
+    + calcExtraCounts(customers, lastMonthStr).reduce((s, x) => s + x.weight, 0),
+  [lastMonthContracted, customers, lastMonthStr])
 
   // 인별 이번달 매출
   const personThisMonth = useMemo(() => salesPeople.map(name => {
@@ -959,11 +967,14 @@ export default function SalesCeoTab({ initialView, initialStatusTab }: { initial
       .filter(d => d.name === name || name.includes(d.name) || d.name.includes(name))
     const refundAmt   = myDeductions.reduce((s, d) => s + d.amount, 0)
     const refundCount = myDeductions.reduce((s, d) => s + d.weight, 0)
+    const extraCount  = calcExtraCounts(customers, thisMonthStr)
+      .filter(x => x.name === name || name.includes(x.name) || x.name.includes(name))
+      .reduce((s, x) => s + x.weight, 0)
     return {
       name,
       revenue: Math.max(0, mine.reduce((s, c) => s + parseNum((c as any).details?.my_revenue), 0) - refundAmt),
       payment: mine.reduce((s, c) => s + parseNum((c as any).details?.payment_amount), 0),
-      count:   Math.max(0, mine.reduce((s, c) => s + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0) - refundCount),
+      count:   Math.max(0, mine.reduce((s, c) => s + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0) + extraCount - refundCount),
       db010,
     }
   }), [salesPeople, thisMonthContracted, customers, thisMonthStr])

@@ -478,6 +478,17 @@ function PayRateSubView() {
               if (isDirectType) directPayMap[name] = (directPayMap[name] || 0) + w
               else              supplyPayMap[name]  = (supplyPayMap[name] || 0) + w
             }
+            // 잔금 등 추가 입금 갯수 (입금한 달에 가산)
+            if (c.status === 'contracted') {
+              for (const ex of (Array.isArray(c.details?.extra_counts) ? c.details.extra_counts : [])) {
+                if (String(ex?.date || '').slice(0, 7) !== month) continue
+                const w = parseFloat(String(ex?.weight ?? 0)) || 0
+                if (w <= 0) continue
+                byPerson[name] = (byPerson[name] || 0) + w
+                if (isDirectType) directPayMap[name] = (directPayMap[name] || 0) + w
+                else              supplyPayMap[name]  = (supplyPayMap[name] || 0) + w
+              }
+            }
             // 직접수: 거절/삭제 이동해도 카운트 유지 (direct_count_voided=true일 때만 제외)
             // ⚡ reception_date는 통화접수일(지난달 가능)이므로 폴백에서 제외 → created_at 기준으로만 판단
             const isDirectMonth = isDirectType && receptionMonth === month
@@ -803,6 +814,16 @@ function PayRateSubView() {
           byPerson[name] = (byPerson[name] || 0) + w
           if (isDirectType) directPayMap[name] = (directPayMap[name] || 0) + w
           else              supplyPayMap[name]  = (supplyPayMap[name] || 0) + w
+        }
+        if (c.status === 'contracted') {
+          for (const ex of (Array.isArray(c.details?.extra_counts) ? c.details.extra_counts : [])) {
+            if (String(ex?.date || '').slice(0, 7) !== month) continue
+            const w = parseFloat(String(ex?.weight ?? 0)) || 0
+            if (w <= 0) continue
+            byPerson[name] = (byPerson[name] || 0) + w
+            if (isDirectType) directPayMap[name] = (directPayMap[name] || 0) + w
+            else              supplyPayMap[name]  = (supplyPayMap[name] || 0) + w
+          }
         }
         const isDirectMonth = isDirectType && receptionMonth === month
         const isVoided = c.details?.direct_count_voided === true
