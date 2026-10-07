@@ -148,7 +148,7 @@ export default function HomePage() {
           </div>
           <div className="flex items-center gap-2">
             <a href="#문의하기" className="hidden md:inline-flex text-xs bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-4 py-2 rounded-lg transition-colors">무료 상담</a>
-            <Link href="/login" className={`hidden md:block text-xs font-semibold hover:text-[#C5A258] transition-colors px-2 py-2 tracking-widest ${scrolled ? 'text-[#1B2A45]/40' : 'text-white/60'}`}>Login</Link>
+            <Link href="/login" className={`hidden md:block text-xs font-semibold hover:text-[#C5A258] transition-colors px-2 py-2 ${scrolled ? 'text-[#1B2A45]/55' : 'text-white/70'}`}>직원로그인</Link>
             <button onClick={() => setMenuOpen(!menuOpen)} className={`md:hidden p-2 flex flex-col gap-1.5 justify-center ${scrolled ? 'text-[#1B2A45]/70' : 'text-white'}`} aria-label="메뉴">
               <span className={`block w-5 h-0.5 bg-current transition-all origin-center ${menuOpen ? 'rotate-45 translate-y-2' : ''}`} />
               <span className={`block w-5 h-0.5 bg-current transition-all ${menuOpen ? 'opacity-0' : ''}`} />
@@ -162,7 +162,7 @@ export default function HomePage() {
               <a key={n.label} href={n.href} onClick={() => setMenuOpen(false)} className="block text-sm text-[#1B2A45]/70 py-1.5 border-b border-[#E8E2D4]">{n.label}</a>
             ))}
             <a href={COMPANY.phoneHref} className="block text-sm text-[#C5A258] font-bold py-1.5 border-b border-[#E8E2D4]">📞 {COMPANY.phone}</a>
-            <Link href="/login" onClick={() => setMenuOpen(false)} className="block text-sm text-[#1B2A45]/60 py-1.5 font-semibold tracking-widest">Login</Link>
+            <Link href="/login" onClick={() => setMenuOpen(false)} className="block text-sm text-[#1B2A45]/60 py-1.5 font-semibold">직원로그인</Link>
           </div>
         )}
       </nav>
