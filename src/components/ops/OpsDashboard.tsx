@@ -279,6 +279,17 @@ const opsTabs: { key: OpsTab; label: string }[] = [
   { key: 'expired',      label: '계약기간만료' },
 ]
 
+// ── 인증사업 (연구소/벤처/무상지원금) — 정책자금 이후 추가로 진행하는 사업 ───────────
+export const CERT_PROGRAMS = ['연구소/연구개발전담부서', '벤처(혁신)', '벤처(투자)', '무상지원금'] as const
+export const CERT_SHORT: Record<string, string> = {
+  '연구소/연구개발전담부서': '연구소', '벤처(혁신)': '벤처혁신', '벤처(투자)': '벤처투자', '무상지원금': '무상지원',
+}
+export const CERT_GROUP = '인증사업 진행중'
+export function certOf(c: { details?: any }): string[] {
+  const v = c?.details?.cert_programs
+  return Array.isArray(v) ? v.filter(Boolean) : []
+}
+
 // ── Detail Tab Types: 진행현황 우선, 타임라인 진행현황 하단에 통합 ──────────
 const DETAIL_TABS = ['진행현황', '인콜일지', '기관ID/PW', '입금/계약', '여신구분', '컨설팅보고서'] as const
 type DetailTab = typeof DETAIL_TABS[number]
@@ -1506,6 +1517,25 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                   </div>
                 </div>
 
+                {/* ── 인증사업 (연구소 / 벤처 / 무상지원금) ── */}
+                <div className="bg-teal-600 px-3 py-1.5 flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-white tracking-wide">인증사업</span>
+                  <span className="text-[9px] text-white/70">선택하면 관리팀 '인증사업 진행중'에 표시됩니다</span>
+                </div>
+                <div className="px-3 py-2.5 flex flex-wrap gap-1.5 border-b border-gray-100">
+                  {CERT_PROGRAMS.map(p => {
+                    const sel: string[] = certOf(local)
+                    const on = sel.includes(p)
+                    return (
+                      <button key={p} type="button"
+                        onClick={() => detailField('cert_programs', on ? sel.filter(x => x !== p) : [...sel, p])}
+                        className={`text-[11px] px-2.5 py-1 rounded-full border font-semibold transition-colors ${on ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-500 border-gray-200 hover:border-teal-400 hover:text-teal-600'}`}>
+                        {on ? '✓ ' : ''}{p}
+                      </button>
+                    )
+                  })}
+                </div>
+
                 {/* ── 섹션별 필드 그리드 ── */}
                 {sections.map(sec => (
                   <div key={sec.title} className="mb-0">
@@ -2603,6 +2633,14 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
         }
       </div>
 
+      {/* ⑧ 인증사업 (선택된 경우만) */}
+      {certOf(c).length > 0 && (
+        <div className="h-[18px] flex items-center justify-center gap-1 mt-0.5">
+          <span className="text-[8px] font-bold text-teal-500 shrink-0">인증</span>
+          <span className="text-[8px] text-teal-700 font-medium truncate">{certOf(c).map(x => CERT_SHORT[x] || x).join('·')}</span>
+        </div>
+      )}
+
       {/* 경고 뱃지 (있을 때만, 높이 변동 허용) */}
       {warningBadges.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-0.5 justify-center">
@@ -2958,6 +2996,13 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
   // 승인 대기 — 최상단에 배치
   if (pendingCases.length > 0) instGroups.unshift({ inst: '대표 승인 대기', items: pendingCases })
 
+  // 인증사업 진행중 — 중진공(첫 기관 그룹) 바로 위에 표시. 케이스는 기관 그룹에도 그대로 남는다.
+  const certCases = regularCases.filter(c => certOf(c).length > 0)
+  if (certCases.length > 0) {
+    const firstInst = instGroups.findIndex(g => (ALL_INST_ORDER as readonly string[]).includes(g.inst))
+    instGroups.splice(firstInst >= 0 ? firstInst : instGroups.length, 0, { inst: CERT_GROUP, items: certCases })
+  }
+
   if (instGroups.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-[#E8E2D4] p-14 text-center text-[#1B2A45]/40 text-sm">
@@ -3060,7 +3105,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
         if (q && items.length === 0) return null
         const isIndirect = INDIRECT_SET.has(inst)
         const isOpen = !collapsed[inst]
-        const isSpecial = inst === '신규 유입' || inst === '대표 승인 대기' || inst === '핸들링' || inst === '홀딩'
+        const isSpecial = inst === '신규 유입' || inst === '대표 승인 대기' || inst === '핸들링' || inst === '홀딩' || inst === CERT_GROUP
 
         // 기관 그룹만 진행/대기 분리 (특수 그룹 제외)
         // 직접자금 탭 → direct_stage 기준, 간접자금 탭 → indirect_stage 기준
@@ -3077,6 +3122,8 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
                   ? 'bg-violet-600 hover:bg-violet-700'
                   : inst === '신규 유입'
                     ? 'bg-sky-500 hover:bg-sky-600'
+                    : inst === CERT_GROUP
+                      ? 'bg-teal-600 hover:bg-teal-700'
                     : inst === '대표 승인 대기'
                       ? 'bg-rose-500 hover:bg-rose-600'
                       : inst === '핸들링'
@@ -3099,6 +3146,10 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
                   </span>
                 )}
                 {isIndirect && <span className="text-white/60 text-[10px]">간접자금</span>}
+                {inst === CERT_GROUP && CERT_PROGRAMS.map(p => {
+                  const n = items.filter(c => certOf(c).includes(p)).length
+                  return n > 0 ? <span key={p} className="text-[10px] text-white/90 bg-white/15 rounded-full px-2 py-0.5">{CERT_SHORT[p]} {n}</span> : null
+                })}
               </div>
               <span className="text-white/60 text-xs">{isOpen ? '▲' : '▼'}</span>
             </button>

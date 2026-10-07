@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { OpsDetailPanel, OpsCase } from '@/components/ops/OpsDashboard'
+import { OpsDetailPanel, OpsCase, CERT_PROGRAMS, CERT_SHORT, CERT_GROUP, certOf } from '@/components/ops/OpsDashboard'
 
 // ─── Constants ─────────────────────────────────────────────
 const PIPELINE_STAGES = [
@@ -227,6 +227,14 @@ function CeoCaseCard({ c, isOpen, onToggle, onScriptToggle, onApprove }: {
         }
       </div>
 
+      {/* 인증사업 */}
+      {certOf(c).length > 0 && (
+        <div className="h-[18px] flex items-center justify-center gap-1 mt-0.5">
+          <span className="text-[8px] font-bold text-teal-500 shrink-0">인증</span>
+          <span className="text-[8px] text-teal-700 font-medium truncate">{certOf(c).map(x => CERT_SHORT[x] || x).join('·')}</span>
+        </div>
+      )}
+
       {/* 경고 뱃지 */}
       {warningBadges.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-0.5 justify-center">
@@ -351,6 +359,13 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
   if (holdingCases.length > 0)  instGroups.push({ inst: '🔒 홀딩', items: holdingCases })
   if (pendingCases.length > 0)  instGroups.unshift({ inst: '⏳ 대표 승인 대기', items: pendingCases })
 
+  // 인증사업 진행중 — 중진공(첫 기관 그룹) 위에 표시
+  const certCases = regularCases.filter(c => certOf(c).length > 0)
+  if (certCases.length > 0) {
+    const firstInst = instGroups.findIndex(g => (ALL_INST_ORDER as readonly string[]).includes(g.inst))
+    instGroups.splice(firstInst >= 0 ? firstInst : instGroups.length, 0, { inst: CERT_GROUP, items: certCases })
+  }
+
   if (instGroups.length === 0) {
     return <div className="bg-white rounded-xl border border-[#E8E2D4] p-12 text-center text-[#1B2A45]/40 text-sm">진행중인 업체가 없습니다</div>
   }
@@ -361,7 +376,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
         const isIndirect = INDIRECT_SET.has(inst)
         const isPending  = inst === '⏳ 대표 승인 대기'
         const isHoldingG = inst === '🔒 홀딩'
-        const isSpecial  = isPending || isHoldingG || inst === '신규 유입' || inst === '🔧 핸들링'
+        const isSpecial  = isPending || isHoldingG || inst === '신규 유입' || inst === '🔧 핸들링' || inst === CERT_GROUP
         const isOpen = !collapsed[inst]
 
         // 진행/대기 분리 (특수 그룹 제외)
@@ -375,6 +390,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
                 isPending    ? 'bg-rose-500 hover:bg-rose-600'
                 : isHoldingG ? 'bg-indigo-600 hover:bg-indigo-700'
                 : isIndirect ? 'bg-violet-600 hover:bg-violet-700'
+                : inst === CERT_GROUP   ? 'bg-teal-600 hover:bg-teal-700'
                 : inst === '신규 유입'  ? 'bg-sky-500 hover:bg-sky-600'
                 : inst === '🔧 핸들링' ? 'bg-slate-500 hover:bg-slate-600'
                 : 'bg-[#1B2A45] hover:bg-[#1B2A45]/90'
@@ -390,6 +406,10 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
                   </span>
                 )}
                 {isIndirect && <span className="text-white/60 text-[10px]">간접자금</span>}
+                {inst === CERT_GROUP && CERT_PROGRAMS.map(p => {
+                  const n = items.filter(x => certOf(x).includes(p)).length
+                  return n > 0 ? <span key={p} className="text-[10px] text-white/90 bg-white/15 rounded-full px-2 py-0.5">{CERT_SHORT[p]} {n}</span> : null
+                })}
               </div>
               <span className="text-white/60 text-xs">{isOpen ? '▲' : '▼'}</span>
             </button>
