@@ -27,7 +27,7 @@ interface SalesEmployee {
   contract_count: number
   performance_bonus: number
   awards: AwardItem[]
-  pay_mode?: SalesPayMode   // 'auto'(높은 쪽) | 'base7'(160만+7%) | 'all'(올인센)
+  pay_mode?: SalesPayMode   // 이번 달 지급 방식: 'base7'(160만+7%) | 'all'(올인센) — 매달 직접 선택
   base_pay?: number         // 기본급(기본 160만원)
   work_days?: number        // 일할 근무일수(1~30, 비우면 만근)
   memo?: string             // 비고(계산 사유)
@@ -277,7 +277,7 @@ function SalesCard({
 
   const modeBtn = (mode: SalesPayMode, label: string, amount: number, active: boolean) => (
     <button key={mode} onClick={() => onPatch(idx, { pay_mode: mode })}
-      title={mode === 'auto' ? '둘 중 높은 금액을 자동 지급' : label + ' 방식으로 고정'}
+      title={label + ' 방식으로 이번 달 지급'}
       className={`flex-1 rounded-lg px-2 py-1.5 text-left transition-colors border ${active ? 'bg-white text-[#8a6d2b] border-white shadow' : 'bg-white/10 text-white/80 border-white/20 hover:bg-white/20'}`}>
       <span className="block text-[10px] font-semibold leading-tight">{label}{active ? ' ✓' : ''}</span>
       <span className="block text-[11px] font-black leading-tight">{amount > 0 ? man(amount) + '원' : '-'}</span>
@@ -305,9 +305,8 @@ function SalesCard({
         </div>
         {/* 지급 방식: 160+7% / 올인센 / 자동(높은 쪽) — 각각 지급 시 금액 바로 비교 */}
         <div className="flex gap-1.5 mt-2">
-          {modeBtn('base7', '160만+7%', c.baseTotal, c.configured === 'base7')}
-          {modeBtn('all', '올인센', c.allTotal, c.configured === 'all')}
-          {modeBtn('auto', c.configured === 'auto' ? `자동 · ${isBase7 ? '160+7%' : '올인센'} 적용` : '자동(높은 쪽)', Math.max(c.baseTotal, c.allTotal), c.configured === 'auto')}
+          {modeBtn('base7', '160만+7%', c.baseTotal, c.selected && c.chosen === 'base7')}
+          {modeBtn('all', '올인센', c.allTotal, c.selected && c.chosen === 'all')}
         </div>
       </div>
       {/* 항목 */}
@@ -353,7 +352,8 @@ function SalesCard({
 
         {/* 지급내역(계산 근거) */}
         <div className="my-2 rounded-lg bg-amber-50/70 border border-amber-100 px-3 py-2 text-[11px] leading-relaxed text-gray-600">
-          <p className="font-semibold text-[#8a6d2b] mb-0.5">지급내역 — {isBase7 ? '160만원 + 7% 방식' : '올인센 방식'}{c.configured === 'auto' ? ' (자동: 높은 금액)' : ''}</p>
+          <p className="font-semibold text-[#8a6d2b] mb-0.5">지급내역 — {isBase7 ? '160만원 + 7% 방식' : '올인센 방식'}</p>
+          {!c.selected && <p className="text-[10px] text-rose-500 mb-0.5">방식 미선택 — 올인센 기준으로 표시 중입니다. 이번 달 방식을 선택하세요.</p>}
           {isBase7 ? (
             <>
               <p>기본급 {man(c.basePay)}원{prorated ? ` ÷ ${SALES_PAY_MONTH_DAYS}일 × ${c.days}일` : ' (만근)'} = <b>{man(c.baseProrated)}원</b></p>
@@ -669,7 +669,7 @@ export default function PayrollTab() {
         if (!emp.name) return emp
         const key = Object.keys(salesByName).find(k =>
           k === emp.name || k.includes(emp.name) || emp.name.includes(k))
-        if (!key) return emp
+        if (!key) return { ...emp, contract_revenue: 0, contract_count: 0, performance_bonus: 0 }
         const data = salesByName[key]
         const autoPerf = data.count >= 12 ? Math.round(data.amount * 0.05) : 0
         return { ...emp, contract_revenue: data.amount, contract_count: data.count, performance_bonus: autoPerf }
@@ -832,7 +832,7 @@ export default function PayrollTab() {
       const newSalesEmps = currentSales.map(emp => {
         if (!emp.name) return emp
         const key = Object.keys(salesByName).find(k => k === emp.name || k.includes(emp.name) || emp.name.includes(k))
-        if (!key) return emp
+        if (!key) return { ...emp, contract_revenue: 0, contract_count: 0, performance_bonus: 0 }
         const rev = salesByName[key]
         const autoPerf = rev.count >= 12 ? Math.round(rev.amount * 0.05) : 0
         return { ...emp, contract_revenue: rev.amount, contract_count: rev.count, performance_bonus: autoPerf }
@@ -1015,7 +1015,7 @@ export default function PayrollTab() {
     } else {
       // 새 달: 직원 명단·기본급만 이어받고 매출·시상금·성과급은 비운 상태로 시작
       const rOps   = opsEmps.map(e => ({ ...e, fee_revenue: 0, puto_revenue: 0, performance_bonus: 0, monthly_sub_bonus: 0, awards: [], fee_details: [] }))
-      const rSales = salesEmps.map(e => ({ ...e, contract_revenue: 0, contract_count: 0, performance_bonus: 0, awards: [], work_days: undefined, memo: '' }))
+      const rSales = salesEmps.map(e => ({ ...e, contract_revenue: 0, contract_count: 0, performance_bonus: 0, awards: [], pay_mode: undefined, work_days: undefined, memo: '' }))
       const rDig   = digEmps.map(e => ({ ...e, approved_count: 0, awards: [] }))
       setOpsEmps(rOps); setSalesEmps(rSales); setDigEmps(rDig)
       if (yearMonth === thisMonth()) await autoLoad(rOps, rSales, costs)

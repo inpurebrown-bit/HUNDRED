@@ -156,18 +156,18 @@ export function buildSalesContractMap(
 // ── 영업팀 급여 구조 ─────────────────────────────────────
 // 올인센: 매출 25% + 성과급(12개↑ 5%) + 프로모션
 // 기본급+7%: 기본급 160만원(일할 가능) + 매출 7%  (성과급·프로모션 미적용)
-// 자동: 둘 중 높은 쪽 지급 / 시상금·제수당은 어느 방식이든 별도 가산
+// 방식은 매달 지급 때 직접 선택(저장은 그 달 기록에만, 다음 달로 이어지지 않음). 미선택이면 올인센으로 표시
+// 시상금·제수당은 어느 방식이든 별도 가산
 export const SALES_BASE_PAY       = 1_600_000
 export const SALES_BASE_RATE      = 0.07
 export const SALES_ALLIN_RATE     = 0.25
 export const SALES_PAY_MONTH_DAYS = 30            // 일할계산 기준일수(고정 30일)
-export const SALES_NEW_STRUCTURE_FROM = '2026-10' // 이 달부터 별도 지정이 없으면 '자동(높은 쪽)'
 
-export type SalesPayMode = 'auto' | 'base7' | 'all'
+export type SalesPayMode = 'base7' | 'all'
 
 export function calcSalesStructure(p: {
   revenue: number; perfBonus: number; promo: number
-  payMode?: SalesPayMode; basePay?: number; workDays?: number | null; yearMonth: string
+  payMode?: SalesPayMode; basePay?: number; workDays?: number | null; yearMonth?: string
 }) {
   const revenue   = Number(p.revenue) || 0
   const allInc    = Math.round(revenue * SALES_ALLIN_RATE)
@@ -177,11 +177,10 @@ export function calcSalesStructure(p: {
   const baseProrated = Math.round(basePay * days / SALES_PAY_MONTH_DAYS)
   const revInc    = Math.round(revenue * SALES_BASE_RATE)
   const baseTotal = baseProrated + revInc
-  // 지정이 없으면: 새 구조 시행월부터 자동, 그 이전 달은 기존(올인센) 그대로
-  const configured: SalesPayMode = p.payMode || (p.yearMonth >= SALES_NEW_STRUCTURE_FROM ? 'auto' : 'all')
-  const chosen: 'base7' | 'all' = configured === 'auto' ? (baseTotal > allTotal ? 'base7' : 'all') : configured
+  const selected = p.payMode === 'base7' || p.payMode === 'all'
+  const chosen: SalesPayMode = p.payMode === 'base7' ? 'base7' : 'all'
   return {
     allInc, allTotal, basePay, days, baseProrated, revInc, baseTotal,
-    configured, chosen, main: chosen === 'base7' ? baseTotal : allTotal,
+    selected, configured: chosen, chosen, main: chosen === 'base7' ? baseTotal : allTotal,
   }
 }

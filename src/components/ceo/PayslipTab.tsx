@@ -1180,10 +1180,9 @@ function SalesFinancialForm({ fin, update }: { fin: EmpFinancial; update: (p: Pa
             onChange={e => update({ promo: Number(e.target.value) })} className={inp} />
         </div>
         <div>
-          <label className={lbl}>급여 방식 <span className="text-gray-400 text-[10px]">급여·손익 탭 설정이 불러와집니다</span></label>
+          <label className={lbl}>급여 방식 <span className="text-gray-400 text-[10px]">해당 월 급여·손익 탭 선택값이 불러와집니다</span></label>
           <select value={fin.sales_pay_mode || ''} onChange={e => update({ sales_pay_mode: (e.target.value || undefined) as SalesPayMode | undefined })} className={inp}>
-            <option value="">기본(10월부터 자동 · 이전 달 올인센)</option>
-            <option value="auto">자동 (160만+7% / 올인센 중 높은 쪽)</option>
+            <option value="">미선택 (올인센으로 표시)</option>
             <option value="base7">160만원 + 7%</option>
             <option value="all">올인센 (25% + 성과급 + 프로모션)</option>
           </select>
