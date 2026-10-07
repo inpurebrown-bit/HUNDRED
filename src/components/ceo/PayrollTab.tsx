@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, calcMonthlySubBonus, calcRefundDeductions, calcDigSalary, DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
+import { calcSalesStructure, SALES_BASE_PAY, SALES_BASE_RATE, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, calcMonthlySubBonus, calcRefundDeductions, calcDigSalary, DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
 import { contractWeight } from '@/lib/supplyRules'
 
 // ─── 타입 ─────────────────────────────────────────────────
@@ -27,6 +27,10 @@ interface SalesEmployee {
   contract_count: number
   performance_bonus: number
   awards: AwardItem[]
+  pay_mode?: SalesPayMode   // 'auto'(높은 쪽) | 'base7'(160만+7%) | 'all'(올인센)
+  base_pay?: number         // 기본급(기본 160만원)
+  work_days?: number        // 일할 근무일수(1~30, 비우면 만근)
+  memo?: string             // 비고(계산 사유)
 }
 
 interface DigEmployee {
@@ -62,14 +66,17 @@ function calcOps(e: OpsEmployee) {
   return { feeInc, putoInc, subBonus, awardsSum, before, after }
 }
 
-function calcSales(e: SalesEmployee) {
-  const contractInc  = Math.round(Number(e.contract_revenue) * 0.25)
+function calcSales(e: SalesEmployee, ym: string) {
   const perfBonus    = Number(e.performance_bonus)
   const promo        = getPromo(e.contract_count)
   const awardsSum    = (e.awards || []).reduce((s, a) => s + Number(a.amount || 0), 0)
-  const before       = contractInc + perfBonus + promo + awardsSum
+  const st = calcSalesStructure({
+    revenue: Number(e.contract_revenue), perfBonus, promo,
+    payMode: e.pay_mode, basePay: e.base_pay, workDays: e.work_days, yearMonth: ym,
+  })
+  const before       = st.main + awardsSum
   const after        = Math.round(before * NET_RATE)
-  return { contractInc, perfBonus, promo, awardsSum, before, after }
+  return { ...st, contractInc: st.allInc, perfBonus, promo, awardsSum, before, after }
 }
 
 function calcDig(e: DigEmployee, yearMonth: string) {
@@ -250,19 +257,32 @@ function OpsCard({
 // ─── 영업팀 직원 카드 ─────────────────────────────────────
 
 function SalesCard({
-  emp, idx, onChange, onRemove, onAddAward, onUpdateAward, onRemoveAward,
+  emp, idx, yearMonth, onChange, onPatch, onRemove, onAddAward, onUpdateAward, onRemoveAward,
 }: {
-  emp: SalesEmployee; idx: number
+  emp: SalesEmployee; idx: number; yearMonth: string
   onChange: (i: number, f: keyof Omit<SalesEmployee, 'awards'>, v: string) => void
+  onPatch: (i: number, patch: Partial<SalesEmployee>) => void
   onRemove: (i: number) => void
   onAddAward: (i: number) => void
   onUpdateAward: (ei: number, ai: number, f: keyof AwardItem, v: string) => void
   onRemoveAward: (ei: number, ai: number) => void
 }) {
-  const c = calcSales(emp)
+  const c = calcSales(emp, yearMonth)
   const has12 = emp.contract_count >= PERF_BONUS_MIN_COUNT
   const fmtN = (n: number) => parseFloat(n.toFixed(2))
   const promoLabel = emp.contract_count > 0 ? `${fmtN(emp.contract_count)}개` : '갯수 미정'
+  const isBase7 = c.chosen === 'base7'
+  const prorated = c.days < SALES_PAY_MONTH_DAYS
+  const man = (n: number) => n.toLocaleString('ko-KR')
+
+  const modeBtn = (mode: SalesPayMode, label: string, amount: number, active: boolean) => (
+    <button key={mode} onClick={() => onPatch(idx, { pay_mode: mode })}
+      title={mode === 'auto' ? '둘 중 높은 금액을 자동 지급' : label + ' 방식으로 고정'}
+      className={`flex-1 rounded-lg px-2 py-1.5 text-left transition-colors border ${active ? 'bg-white text-[#8a6d2b] border-white shadow' : 'bg-white/10 text-white/80 border-white/20 hover:bg-white/20'}`}>
+      <span className="block text-[10px] font-semibold leading-tight">{label}{active ? ' ✓' : ''}</span>
+      <span className="block text-[11px] font-black leading-tight">{amount > 0 ? man(amount) + '원' : '-'}</span>
+    </button>
+  )
 
   return (
     <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
@@ -283,24 +303,74 @@ function SalesCard({
           <span className="text-white/30 text-[10px]">→</span>
           <span className="text-[10px] text-white/60">공제후 <span className="text-yellow-100 font-bold">{c.after > 0 ? c.after.toLocaleString('ko-KR') + '원' : '-'}</span></span>
         </div>
+        {/* 지급 방식: 160+7% / 올인센 / 자동(높은 쪽) — 각각 지급 시 금액 바로 비교 */}
+        <div className="flex gap-1.5 mt-2">
+          {modeBtn('base7', '160만+7%', c.baseTotal, c.configured === 'base7')}
+          {modeBtn('all', '올인센', c.allTotal, c.configured === 'all')}
+          {modeBtn('auto', c.configured === 'auto' ? `자동 · ${isBase7 ? '160+7%' : '올인센'} 적용` : '자동(높은 쪽)', Math.max(c.baseTotal, c.allTotal), c.configured === 'auto')}
+        </div>
       </div>
       {/* 항목 */}
       <div className="px-4 py-3 space-y-0">
         <PayRow label="계약금매출(VAT제외)" value={emp.contract_revenue} autoTag />
-        <PayRow label="계약금인센(25%)" value={c.contractInc} />
-        <PayRow
-          label={has12 ? '성과급(+5% ✓ 12개↑)' : '성과급(+5%, 12개↑)'}
-          value={emp.performance_bonus}
-          editable
-          autoTag={has12}
-          onEdit={v => onChange(idx, 'performance_bonus', v)}
-          colorClass={has12 ? 'text-violet-600' : undefined}
-        />
-        <PayRow
-          label={`프로모션(${promoLabel})`}
-          value={c.promo}
-          sub={c.promo > 0 ? '' : '15/20/25/30/35/40개 기준'}
-        />
+
+        {isBase7 ? (
+          <>
+            <PayRow label={prorated ? `기본급 ${man(c.basePay)}원 일할(${c.days}/${SALES_PAY_MONTH_DAYS}일)` : `기본급(${man(c.basePay)}원)`} value={c.baseProrated} />
+            <PayRow label={`매출인센(${Math.round(SALES_BASE_RATE * 100)}%)`} value={c.revInc} />
+            <div className="py-1 text-[10px] text-gray-300 border-b border-gray-50">성과급·프로모션은 올인센 방식에서만 적용됩니다</div>
+          </>
+        ) : (
+          <>
+            <PayRow label="계약금인센(25%)" value={c.contractInc} />
+            <PayRow
+              label={has12 ? '성과급(+5% ✓ 12개↑)' : '성과급(+5%, 12개↑)'}
+              value={emp.performance_bonus}
+              editable
+              autoTag={has12}
+              onEdit={v => onChange(idx, 'performance_bonus', v)}
+              colorClass={has12 ? 'text-violet-600' : undefined}
+            />
+            <PayRow
+              label={`프로모션(${promoLabel})`}
+              value={c.promo}
+              sub={c.promo > 0 ? '' : '15/20/25/30/35/40개 기준'}
+            />
+          </>
+        )}
+
+        {/* 일할 근무일수 (기본급 일할: 기본급 ÷ 30일 × 근무일수) */}
+        <div className="flex items-center justify-between py-1.5 border-b border-gray-50">
+          <span className="text-xs text-gray-400">일할 근무일수 <span className="text-[9px] text-gray-300">(기본급÷30일)</span></span>
+          <select value={prorated ? c.days : SALES_PAY_MONTH_DAYS}
+            onChange={e => onPatch(idx, { work_days: Number(e.target.value) >= SALES_PAY_MONTH_DAYS ? undefined : Number(e.target.value) })}
+            className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-amber-300 text-gray-700">
+            {Array.from({ length: SALES_PAY_MONTH_DAYS }, (_, i) => SALES_PAY_MONTH_DAYS - i).map(d => (
+              <option key={d} value={d}>{d === SALES_PAY_MONTH_DAYS ? '30일 (만근)' : `${d}일`}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* 지급내역(계산 근거) */}
+        <div className="my-2 rounded-lg bg-amber-50/70 border border-amber-100 px-3 py-2 text-[11px] leading-relaxed text-gray-600">
+          <p className="font-semibold text-[#8a6d2b] mb-0.5">지급내역 — {isBase7 ? '160만원 + 7% 방식' : '올인센 방식'}{c.configured === 'auto' ? ' (자동: 높은 금액)' : ''}</p>
+          {isBase7 ? (
+            <>
+              <p>기본급 {man(c.basePay)}원{prorated ? ` ÷ ${SALES_PAY_MONTH_DAYS}일 × ${c.days}일` : ' (만근)'} = <b>{man(c.baseProrated)}원</b></p>
+              <p>매출 {man(Number(emp.contract_revenue) || 0)}원 × 7% = <b>{man(c.revInc)}원</b></p>
+              <p className="mt-0.5 border-t border-amber-100 pt-0.5">합계 <b>{man(c.baseTotal)}원</b>{c.awardsSum > 0 ? ` + 시상금 ${man(c.awardsSum)}원` : ''}</p>
+              <p className="text-gray-400">비교 · 올인센이면 {man(c.allTotal)}원</p>
+            </>
+          ) : (
+            <>
+              <p>매출 {man(Number(emp.contract_revenue) || 0)}원 × 25% = <b>{man(c.contractInc)}원</b></p>
+              <p>성과급 {man(c.perfBonus)}원 + 프로모션 {man(c.promo)}원</p>
+              <p className="mt-0.5 border-t border-amber-100 pt-0.5">합계 <b>{man(c.allTotal)}원</b>{c.awardsSum > 0 ? ` + 시상금 ${man(c.awardsSum)}원` : ''}</p>
+              <p className="text-gray-400">비교 · 160만+7%{prorated ? `(${c.days}일 일할)` : ''}이면 {man(c.baseTotal)}원</p>
+            </>
+          )}
+        </div>
+
         {/* 시상금 */}
         <div className="py-1.5 border-b border-gray-50">
           <div className="flex items-center justify-between">
@@ -326,6 +396,15 @@ function SalesCard({
               <button onClick={() => onRemoveAward(idx, ai)} className="text-red-300 hover:text-red-500 text-xs">✕</button>
             </div>
           ))}
+        </div>
+
+        {/* 비고: 이렇게 계산된 이유 */}
+        <div className="pt-2">
+          <label className="text-xs text-gray-400 block mb-1">비고 <span className="text-[9px] text-gray-300">(계산 사유 · 급여명세서에도 표시)</span></label>
+          <textarea value={emp.memo || ''} rows={2}
+            onChange={e => onPatch(idx, { memo: e.target.value })}
+            placeholder="예) 9/25 입사, 160만원+7% 방식, 5일 일할계산"
+            className="w-full text-[11px] border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-300 text-gray-600 resize-none" />
         </div>
       </div>
     </div>
@@ -936,7 +1015,7 @@ export default function PayrollTab() {
     } else {
       // 새 달: 직원 명단·기본급만 이어받고 매출·시상금·성과급은 비운 상태로 시작
       const rOps   = opsEmps.map(e => ({ ...e, fee_revenue: 0, puto_revenue: 0, performance_bonus: 0, monthly_sub_bonus: 0, awards: [], fee_details: [] }))
-      const rSales = salesEmps.map(e => ({ ...e, contract_revenue: 0, contract_count: 0, performance_bonus: 0, awards: [] }))
+      const rSales = salesEmps.map(e => ({ ...e, contract_revenue: 0, contract_count: 0, performance_bonus: 0, awards: [], work_days: undefined, memo: '' }))
       const rDig   = digEmps.map(e => ({ ...e, approved_count: 0, awards: [] }))
       setOpsEmps(rOps); setSalesEmps(rSales); setDigEmps(rDig)
       if (yearMonth === thisMonth()) await autoLoad(rOps, rSales, costs)
@@ -971,6 +1050,10 @@ export default function PayrollTab() {
 
   function updateSales(i: number, f: keyof Omit<SalesEmployee, 'awards'>, v: string) {
     setSalesEmps(prev => { const n = [...prev]; n[i] = { ...n[i], [f]: f === 'name' ? v : parseInput(v) }; return n })
+  }
+  function patchSales(i: number, patch: Partial<SalesEmployee>) {
+    editedRef.current = true
+    setSalesEmps(prev => { const n = [...prev]; n[i] = { ...n[i], ...patch }; return n })
   }
   function removeSales(i: number) { setSalesEmps(prev => prev.filter((_, j) => j !== i)) }
   function addAward(ei: number) {
@@ -1021,7 +1104,7 @@ export default function PayrollTab() {
 
   // ── 손익 집계 ─────────────────────────────────────────────
   const opsCalcs   = opsEmps.map(calcOps)
-  const salesCalcs = salesEmps.map(calcSales)
+  const salesCalcs = salesEmps.map(e => calcSales(e, yearMonth))
   const digCalcs   = digEmps.map(e => calcDig(e, yearMonth))
 
   const opsTotalBefore   = opsCalcs.reduce((s, c) => s + c.before, 0)
@@ -1121,8 +1204,8 @@ export default function PayrollTab() {
             const contracts: Array<{ company: string; amount: number; weight: number; date: string }> = matched ? salesContractMap[matched] : []
             return (
               <div key={i}>
-                <SalesCard emp={emp} idx={i}
-                  onChange={updateSales} onRemove={removeSales}
+                <SalesCard emp={emp} idx={i} yearMonth={yearMonth}
+                  onChange={updateSales} onPatch={patchSales} onRemove={removeSales}
                   onAddAward={addAward} onUpdateAward={updateAward} onRemoveAward={removeAward} />
                 {empName && (
                   <details className="mt-1 bg-amber-50 border border-amber-100 rounded-xl overflow-hidden">

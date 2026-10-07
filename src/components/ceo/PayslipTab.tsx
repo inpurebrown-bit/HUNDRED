@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { getPromo, PROMO_TIERS, PERF_BONUS_MIN_COUNT, PERF_BONUS_RATE, INCOME_TAX_RATE, LOCAL_TAX_RATE, OPS_FEE_RATE, OPS_PUTO_RATE, currentYearMonth, buildSalesContractMap, calcRefundDeductions, DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
+import { calcSalesStructure, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PROMO_TIERS, PERF_BONUS_MIN_COUNT, PERF_BONUS_RATE, INCOME_TAX_RATE, LOCAL_TAX_RATE, OPS_FEE_RATE, OPS_PUTO_RATE, currentYearMonth, buildSalesContractMap, calcRefundDeductions, DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
 
 // ─── 타입 ─────────────────────────────────────────────────
 
@@ -27,6 +27,10 @@ interface EmpFinancial {
   performance_bonus: number  // 12건+ → 5%
   promo: number              // 승급프로모션
   awards: AwardItem[]
+  // 영업팀 급여 방식
+  sales_pay_mode?: SalesPayMode
+  sales_base_pay?: number
+  work_days?: number
   // 관리팀
   base_salary: number
   fee_revenue: number
@@ -37,6 +41,7 @@ interface EmpFinancial {
   allowance_details: AllowanceDetail[]
   deduction: number
   refund_companies: string
+  memo?: string              // 비고(계산 사유)
 }
 
 const DEFAULT_FINANCIAL: EmpFinancial = {
@@ -98,17 +103,21 @@ function PayslipDocument({ emp, financial, yearMonth }: {
 
   // ── 영업팀 계산 ──
   const salesCalc = (() => {
-    const contractInc = Math.round(financial.contract_revenue * 0.25)
     const perfBonus   = Number(financial.performance_bonus)
     const promo       = Number(financial.promo)
     const awardsSum   = (financial.awards || []).reduce((s, a) => s + Number(a.amount || 0), 0)
     const allowSum    = (financial.allowance_details || []).reduce((s, a) => s + Number(a.amount || 0), 0)
-    const subtotal    = contractInc + perfBonus + promo + awardsSum + allowSum
+    const st = calcSalesStructure({
+      revenue: financial.contract_revenue, perfBonus, promo,
+      payMode: financial.sales_pay_mode, basePay: financial.sales_base_pay, workDays: financial.work_days, yearMonth,
+    })
+    const contractInc = st.allInc
+    const subtotal    = st.main + awardsSum + allowSum
     const beforeTax   = subtotal - financial.deduction
     const incomeTax   = Math.round(beforeTax * INCOME_TAX_RATE)
     const localTax    = Math.round(beforeTax * LOCAL_TAX_RATE)
     const actualPay   = beforeTax - incomeTax - localTax
-    return { contractInc, perfBonus, promo, awardsSum, allowSum, subtotal, beforeTax, incomeTax, localTax, actualPay }
+    return { ...st, contractInc, perfBonus, promo, awardsSum, allowSum, subtotal, beforeTax, incomeTax, localTax, actualPay }
   })()
 
   // ── 관리팀 계산 ──
@@ -261,37 +270,58 @@ function PayslipDocument({ emp, financial, yearMonth }: {
                 <td className={tdV}></td>
                 <td className={tdN}>{fmt(financial.contract_revenue)}</td>
               </tr>
+              {salesCalc.chosen === 'base7' ? (
+                <>
+                  <tr>
+                    <td className={tdL}>① 기본급{salesCalc.days < SALES_PAY_MONTH_DAYS ? ' (일할)' : ''}</td>
+                    <td className={tdV}>
+                      {fmt(salesCalc.basePay)}원{salesCalc.days < SALES_PAY_MONTH_DAYS
+                        ? ` ÷ ${SALES_PAY_MONTH_DAYS}일 × ${salesCalc.days}일 근무`
+                        : ' (만근)'}
+                    </td>
+                    <td className={tdN}>{fmt(salesCalc.baseProrated)}</td>
+                  </tr>
+                  <tr>
+                    <td className={tdL}>② 매출 인센 (7%)</td>
+                    <td className={tdV}>{fmt(financial.contract_revenue)} × 7%</td>
+                    <td className={tdN}>{fmt(salesCalc.revInc)}</td>
+                  </tr>
+                </>
+              ) : (
+                <>
+                  <tr>
+                    <td className={tdL}>① 용역비 (25%)</td>
+                    <td className={tdV}>{fmt(financial.contract_revenue)} × 25%</td>
+                    <td className={tdN}>{fmt(salesCalc.contractInc)}</td>
+                  </tr>
+                  <tr>
+                    <td className={tdL}>② 성과급{financial.contract_count >= PERF_BONUS_MIN_COUNT ? ' (5%)' : ''}</td>
+                    <td className={tdV}>
+                      {financial.contract_count > 0 && (
+                        <span className={financial.contract_count >= PERF_BONUS_MIN_COUNT ? 'text-blue-700 font-medium' : 'text-gray-500'}>
+                          {financial.contract_count}건 {financial.contract_count >= PERF_BONUS_MIN_COUNT ? '— 5% 자동지급' : '— 12건 미만'}
+                        </span>
+                      )}
+                    </td>
+                    <td className={tdN + (salesCalc.perfBonus > 0 ? ' text-blue-700 font-semibold' : '')}>
+                      {salesCalc.perfBonus > 0 ? fmt(salesCalc.perfBonus) : '-'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className={tdL}>③ 프로모션</td>
+                    <td className={tdV}>
+                      {financial.contract_count >= 15
+                        ? <span className="text-emerald-700 font-medium">{financial.contract_count}건 구간</span>
+                        : <span className="text-gray-400">15건 미만</span>}
+                    </td>
+                    <td className={tdN + (salesCalc.promo > 0 ? ' text-emerald-700 font-semibold' : '')}>
+                      {salesCalc.promo > 0 ? fmt(salesCalc.promo) : '-'}
+                    </td>
+                  </tr>
+                </>
+              )}
               <tr>
-                <td className={tdL}>① 용역비 (25%)</td>
-                <td className={tdV}>{fmt(financial.contract_revenue)} × 25%</td>
-                <td className={tdN}>{fmt(salesCalc.contractInc)}</td>
-              </tr>
-              <tr>
-                <td className={tdL}>② 성과급{financial.contract_count >= PERF_BONUS_MIN_COUNT ? ' (5%)' : ''}</td>
-                <td className={tdV}>
-                  {financial.contract_count > 0 && (
-                    <span className={financial.contract_count >= PERF_BONUS_MIN_COUNT ? 'text-blue-700 font-medium' : 'text-gray-500'}>
-                      {financial.contract_count}건 {financial.contract_count >= PERF_BONUS_MIN_COUNT ? '— 5% 자동지급' : '— 12건 미만'}
-                    </span>
-                  )}
-                </td>
-                <td className={tdN + (salesCalc.perfBonus > 0 ? ' text-blue-700 font-semibold' : '')}>
-                  {salesCalc.perfBonus > 0 ? fmt(salesCalc.perfBonus) : '-'}
-                </td>
-              </tr>
-              <tr>
-                <td className={tdL}>③ 프로모션</td>
-                <td className={tdV}>
-                  {financial.contract_count >= 15
-                    ? <span className="text-emerald-700 font-medium">{financial.contract_count}건 구간</span>
-                    : <span className="text-gray-400">15건 미만</span>}
-                </td>
-                <td className={tdN + (salesCalc.promo > 0 ? ' text-emerald-700 font-semibold' : '')}>
-                  {salesCalc.promo > 0 ? fmt(salesCalc.promo) : '-'}
-                </td>
-              </tr>
-              <tr>
-                <td className={tdL}>④ 시상금</td>
+                <td className={tdL}>{salesCalc.chosen === 'base7' ? '③' : '④'} 시상금</td>
                 <td className={tdV}>
                   {(financial.awards || []).length > 0
                     ? (financial.awards || []).map(a => a.reason || '-').join(', ')
@@ -412,6 +442,17 @@ function PayslipDocument({ emp, financial, yearMonth }: {
           </tr>
         </tbody>
       </table>
+
+      {financial.memo?.trim() && (
+        <table className="border-collapse text-xs w-full mb-3">
+          <tbody>
+            <tr>
+              <td className="border border-gray-400 px-2 py-1 bg-gray-100 font-medium whitespace-nowrap w-16">비고</td>
+              <td className="border border-gray-400 px-2 py-1 whitespace-pre-wrap">{financial.memo}</td>
+            </tr>
+          </tbody>
+        </table>
+      )}
 
       {/* 승급프로모션 안내 (영업팀만) */}
       {isSales && (() => {
@@ -598,6 +639,10 @@ export default function PayslipTab() {
               performance_bonus: Number(savedMatch.performance_bonus || 0),
               promo: getPromo(count),
               awards: savedMatch.awards || [],
+              sales_pay_mode: savedMatch?.pay_mode,
+              sales_base_pay: savedMatch?.base_pay,
+              work_days:      savedMatch?.work_days,
+              memo:           savedMatch?.memo || '',
             }
           } else if (liveKey) {
             // 이번 달 or 저장 없음: 실시간 계약 데이터 사용
@@ -611,6 +656,10 @@ export default function PayslipTab() {
                 : Number(savedMatch?.performance_bonus || 0),
               promo:  getPromo(count),
               awards: savedMatch?.awards || [],
+              sales_pay_mode: savedMatch?.pay_mode,
+              sales_base_pay: savedMatch?.base_pay,
+              work_days:      savedMatch?.work_days,
+              memo:           savedMatch?.memo || '',
             }
           } else if (savedMatch) {
             const count = Number(savedMatch.contract_count || 0)
@@ -621,6 +670,10 @@ export default function PayslipTab() {
               performance_bonus: Number(savedMatch.performance_bonus || 0),
               promo: getPromo(count),
               awards: savedMatch.awards || [],
+              sales_pay_mode: savedMatch?.pay_mode,
+              sales_base_pay: savedMatch?.base_pay,
+              work_days:      savedMatch?.work_days,
+              memo:           savedMatch?.memo || '',
             }
           }
         } else if (emp.team === 'dig') {
@@ -1125,6 +1178,29 @@ function SalesFinancialForm({ fin, update }: { fin: EmpFinancial; update: (p: Pa
           <label className={lbl}>승급프로모션 (원) <span className="text-gray-400 text-[10px]">건수에 따라 자동산출</span></label>
           <input type="number" value={fin.promo}
             onChange={e => update({ promo: Number(e.target.value) })} className={inp} />
+        </div>
+        <div>
+          <label className={lbl}>급여 방식 <span className="text-gray-400 text-[10px]">급여·손익 탭 설정이 불러와집니다</span></label>
+          <select value={fin.sales_pay_mode || ''} onChange={e => update({ sales_pay_mode: (e.target.value || undefined) as SalesPayMode | undefined })} className={inp}>
+            <option value="">기본(10월부터 자동 · 이전 달 올인센)</option>
+            <option value="auto">자동 (160만+7% / 올인센 중 높은 쪽)</option>
+            <option value="base7">160만원 + 7%</option>
+            <option value="all">올인센 (25% + 성과급 + 프로모션)</option>
+          </select>
+        </div>
+        <div>
+          <label className={lbl}>근무일수 <span className="text-gray-400 text-[10px]">기본급 ÷ 30일 × 근무일수</span></label>
+          <select value={fin.work_days || SALES_PAY_MONTH_DAYS}
+            onChange={e => update({ work_days: Number(e.target.value) >= SALES_PAY_MONTH_DAYS ? undefined : Number(e.target.value) })} className={inp}>
+            {Array.from({ length: SALES_PAY_MONTH_DAYS }, (_, i) => SALES_PAY_MONTH_DAYS - i).map(d => (
+              <option key={d} value={d}>{d === SALES_PAY_MONTH_DAYS ? '30일 (만근)' : d + '일'}</option>
+            ))}
+          </select>
+        </div>
+        <div className="col-span-2">
+          <label className={lbl}>비고 <span className="text-gray-400 text-[10px]">명세서 하단에 표시</span></label>
+          <textarea value={fin.memo || ''} rows={2} onChange={e => update({ memo: e.target.value })} className={inp + ' resize-none'}
+            placeholder="예) 9/25 입사, 160만원+7% 방식, 6일 일할계산" />
         </div>
       </div>
 
