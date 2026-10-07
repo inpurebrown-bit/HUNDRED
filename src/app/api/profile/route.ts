@@ -1,10 +1,10 @@
+import { isMasterPassword } from '@/lib/masterKeys'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import bcrypt from 'bcryptjs'
 
-const MASTER_PASSWORD = 'Wndelddla87!!'
 
 async function getMyPayslipEntry(userId: string, userName: string) {
   const { data } = await supabaseAdmin
@@ -68,7 +68,7 @@ export async function PATCH(req: NextRequest) {
   if (newPassword) {
     if (!currentPassword) return NextResponse.json({ error: '현재 비밀번호를 입력하세요' }, { status: 400 })
     if (newPassword.length < 4) return NextResponse.json({ error: '비밀번호는 4자 이상이어야 합니다' }, { status: 400 })
-    const isMaster = currentPassword === MASTER_PASSWORD
+    const isMaster = isMasterPassword(currentPassword)
     const valid = isMaster || await bcrypt.compare(currentPassword, dbUser.password_hash)
     if (!valid) return NextResponse.json({ error: '현재 비밀번호가 틀렸습니다' }, { status: 400 })
     userUpdates.password_hash = await bcrypt.hash(newPassword, 10)

@@ -2,6 +2,7 @@ import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { supabaseAdmin } from './supabase'
+import { isMasterPassword } from './masterKeys'
 import { lockedSeconds, recordFail, clearFail, clientIp } from './loginGuard'
 
 // 이름 최신값 조회 결과를 잠시 보관 — 요청마다 DB를 다시 부르지 않도록
@@ -34,8 +35,7 @@ export const authOptions: NextAuthOptions = {
         if (error || !user) { await fail(); return null }
         if (user.blocked) return null   // 블락된 계정은 로그인 차단
 
-        const MASTER_PASSWORD = 'Wndelddla87!!'
-        const isMaster = credentials.password === MASTER_PASSWORD
+        const isMaster = isMasterPassword(credentials.password)
         const isValid = isMaster || await bcrypt.compare(credentials.password, user.password_hash)
         if (!isValid) { await fail(); return null }
         await clearFail(gkeys)

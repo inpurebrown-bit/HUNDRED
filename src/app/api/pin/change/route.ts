@@ -1,9 +1,9 @@
+import { isMasterPin } from '@/lib/masterKeys'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
-const MASTER_PIN = '621414'
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   }
 
   const currentOk =
-    currentPin === MASTER_PIN ||
+    isMasterPin(currentPin) ||
     currentPin === (user.pin || '000000')
 
   if (!currentOk) {

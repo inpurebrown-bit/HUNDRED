@@ -1,10 +1,10 @@
+import { isMasterPassword } from '@/lib/masterKeys'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import bcrypt from 'bcryptjs'
 
-const MASTER_PASSWORD = 'Wndelddla87!!'
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
 
   if (!dbUser) return NextResponse.json({ error: '사용자 없음' }, { status: 404 })
 
-  const isMaster = password === MASTER_PASSWORD
+  const isMaster = isMasterPassword(password)
   const valid    = isMaster || await bcrypt.compare(password, dbUser.password_hash)
 
   if (!valid) return NextResponse.json({ error: '비밀번호가 틀렸습니다' }, { status: 401 })
