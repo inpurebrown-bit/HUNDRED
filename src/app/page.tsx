@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, ReactNode } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import FloatingInquiry from '@/components/home/FloatingInquiry'
+import NoticePopups from '@/components/home/NoticePopups'
 import HeroSlider from '@/components/home/HeroSlider'
 import IntroVideo from '@/components/home/IntroVideo'
 import GrowthStages from '@/components/home/GrowthStages'
@@ -134,6 +135,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-[#FAF8F3] text-[#1B2A45] overflow-x-hidden">
       <FloatingInquiry />
+      <NoticePopups />
 
       {/* ── 네비게이션 ── */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-colors duration-300 ${scrolled ? 'bg-white/95 backdrop-blur-md border-b border-[#E8E2D4] shadow-sm' : 'bg-transparent border-b border-white/10'}`}>
@@ -190,8 +192,11 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* 어두운 배너에서 밝은 영역으로 부드럽게 */}
+      <div className="h-20 bg-gradient-to-b from-[#0b1220] to-white" />
+
       {/* ── 핵심 서비스 ── */}
-      <section id="서비스" className="py-20 md:py-28 px-4 md:px-8 bg-white">
+      <section id="서비스" className="pt-6 pb-20 md:pb-28 px-4 md:px-8 bg-white">
         <div className="max-w-6xl mx-auto">
           <Reveal className="text-center mb-12">
             <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] mb-3">SERVICES</p>
@@ -231,18 +236,20 @@ export default function HomePage() {
         </div>
       </section>
 
+      <div className="h-14 bg-gradient-to-b from-white to-[#0d1626]" />
       {/* ── 성장 단계별 (마우스를 올리면 펼쳐지는 패널) ── */}
-      <section id="성장단계" className="py-20 md:py-28 px-4 md:px-8 bg-[#F2EFE8]">
+      <section id="성장단계" className="pt-6 pb-20 md:pb-28 px-4 md:px-8 bg-[#0d1626] text-white">
         <div className="max-w-6xl mx-auto">
           <Reveal className="text-center mb-10">
             <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] mb-3">GROWTH STAGES</p>
-            <h2 className="text-xl md:text-3xl font-medium text-[#1B2A45]/80">예비 창업부터 중견·중소기업까지</h2>
+            <h2 className="text-xl md:text-3xl font-medium text-white/80">예비 창업부터 중견·중소기업까지</h2>
             <p className="text-xl md:text-3xl font-black mt-1">생애주기 진단으로 필요한 지원을 찾아드립니다</p>
           </Reveal>
           <Reveal><GrowthStages /></Reveal>
         </div>
       </section>
 
+      <div className="h-14 bg-gradient-to-b from-[#0d1626] to-[#FAF8F3]" />
       {/* ── 대표 영상 (HOME_VIDEO.src 설정 시 표시) ── */}
       <IntroVideo />
 

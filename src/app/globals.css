@@ -490,3 +490,11 @@ button.w-full[class*="bg-emerald-"], button.w-full[class*="bg-amber-"], button.w
   background-image: linear-gradient(100deg, #0b2140, color-mix(in srgb, #0b2140 55%, #4a5a9a)) !important; background-color: #0b2140 !important; color: #fff !important;
   box-shadow: 0 10px 22px -10px rgba(11,33,64,.7);
 }
+
+/* 홈페이지 다크 폼: 입력칸도 어둡게 */
+.hc-dark-form input:not([type=checkbox]):not([type=radio]), .hc-dark-form select, .hc-dark-form textarea {
+  background-color: rgba(255,255,255,.06) !important; color: #fff !important; border-color: rgba(255,255,255,.15) !important; box-shadow: none !important;
+}
+.hc-dark-form input::placeholder, .hc-dark-form textarea::placeholder { color: rgba(255,255,255,.3) !important }
+.hc-dark-form select option { color: #111827; background: #fff }
+.hc-dark-form input:focus, .hc-dark-form select:focus, .hc-dark-form textarea:focus { border-color: #C5A258 !important; box-shadow: 0 0 0 3px rgba(197,162,88,.18) !important }
