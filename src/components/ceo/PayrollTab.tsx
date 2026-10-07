@@ -308,6 +308,7 @@ function SalesCard({
           {modeBtn('base7', '160만+7%', c.baseTotal, c.selected && c.chosen === 'base7')}
           {modeBtn('all', '올인센', c.allTotal, c.selected && c.chosen === 'all')}
         </div>
+        {!c.selected && <p className="text-[10px] text-white/80 mt-1">방식 미선택 · 올인센 기준 표시 중</p>}
       </div>
       {/* 항목 */}
       <div className="px-4 py-3 space-y-0">
@@ -348,27 +349,6 @@ function SalesCard({
               <option key={d} value={d}>{d === SALES_PAY_MONTH_DAYS ? '30일 (만근)' : `${d}일`}</option>
             ))}
           </select>
-        </div>
-
-        {/* 지급내역(계산 근거) */}
-        <div className="my-2 rounded-lg bg-amber-50/70 border border-amber-100 px-3 py-2 text-[11px] leading-relaxed text-gray-600">
-          <p className="font-semibold text-[#8a6d2b] mb-0.5">지급내역 — {isBase7 ? '160만원 + 7% 방식' : '올인센 방식'}</p>
-          {!c.selected && <p className="text-[10px] text-rose-500 mb-0.5">방식 미선택 — 올인센 기준으로 표시 중입니다. 이번 달 방식을 선택하세요.</p>}
-          {isBase7 ? (
-            <>
-              <p>기본급 {man(c.basePay)}원{prorated ? ` ÷ ${SALES_PAY_MONTH_DAYS}일 × ${c.days}일` : ' (만근)'} = <b>{man(c.baseProrated)}원</b></p>
-              <p>매출 {man(Number(emp.contract_revenue) || 0)}원 × 7% = <b>{man(c.revInc)}원</b></p>
-              <p className="mt-0.5 border-t border-amber-100 pt-0.5">합계 <b>{man(c.baseTotal)}원</b>{c.awardsSum > 0 ? ` + 시상금 ${man(c.awardsSum)}원` : ''}</p>
-              <p className="text-gray-400">비교 · 올인센이면 {man(c.allTotal)}원</p>
-            </>
-          ) : (
-            <>
-              <p>매출 {man(Number(emp.contract_revenue) || 0)}원 × 25% = <b>{man(c.contractInc)}원</b></p>
-              <p>성과급 {man(c.perfBonus)}원 + 프로모션 {man(c.promo)}원</p>
-              <p className="mt-0.5 border-t border-amber-100 pt-0.5">합계 <b>{man(c.allTotal)}원</b>{c.awardsSum > 0 ? ` + 시상금 ${man(c.awardsSum)}원` : ''}</p>
-              <p className="text-gray-400">비교 · 160만+7%{prorated ? `(${c.days}일 일할)` : ''}이면 {man(c.baseTotal)}원</p>
-            </>
-          )}
         </div>
 
         {/* 시상금 */}

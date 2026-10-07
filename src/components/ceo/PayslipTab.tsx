@@ -1006,7 +1006,29 @@ export default function PayslipTab() {
                     <h3 className="font-bold text-gray-900">{selectedEmp.name || '(이름 없음)'}</h3>
                     <p className="text-xs text-gray-400 mt-0.5">{selectedEmp.team === 'ops' ? '관리팀' : selectedEmp.team === 'dig' ? '발굴팀' : '영업팀'} · {yearMonth}</p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 items-center flex-wrap justify-end">
+                    {selectedEmp.team !== 'ops' && selectedEmp.team !== 'dig' && (() => {
+                      const st = calcSalesStructure({
+                        revenue: currentFin.contract_revenue, perfBonus: currentFin.performance_bonus, promo: currentFin.promo,
+                        payMode: currentFin.sales_pay_mode, basePay: currentFin.sales_base_pay, workDays: currentFin.work_days, yearMonth,
+                      })
+                      const btn = (mode: SalesPayMode, label: string, amount: number) => {
+                        const on = st.selected && st.chosen === mode
+                        return (
+                          <button key={mode} onClick={() => updateFin({ sales_pay_mode: mode })}
+                            className={`text-left rounded-lg border px-3 py-1.5 transition-colors ${on ? 'bg-[#1B2A45] border-[#1B2A45] text-white' : 'bg-white border-gray-200 text-gray-600 hover:border-[#1B2A45]/40'}`}>
+                            <span className="block text-[10px] font-semibold leading-tight">{label}{on ? ' ✓' : ''}</span>
+                            <span className="block text-xs font-black leading-tight">{amount > 0 ? fmt(amount) + '원' : '-'}</span>
+                          </button>
+                        )
+                      }
+                      return (
+                        <div className="flex gap-1.5 mr-1">
+                          {btn('base7', '160만+7%', st.baseTotal)}
+                          {btn('all', '올인센', st.allTotal)}
+                        </div>
+                      )
+                    })()}
                     <button onClick={() => setEditMode(m => !m)}
                       className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
                         editMode ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
