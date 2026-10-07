@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { calcSalesStructure, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PROMO_TIERS, PERF_BONUS_MIN_COUNT, PERF_BONUS_RATE, INCOME_TAX_RATE, LOCAL_TAX_RATE, OPS_FEE_RATE, OPS_PUTO_RATE, currentYearMonth, buildSalesContractMap, calcRefundDeductions, DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
 
 // ─── 타입 ─────────────────────────────────────────────────
@@ -546,6 +546,10 @@ export default function PayslipTab() {
   const [editMode, setEditMode]     = useState(false)
   const [userPicker, setUserPicker] = useState<{ id: string; name: string; role: string }[] | null>(null)
   const [pickerQuery, setPickerQuery] = useState('')
+  // 월/직원 선택 시 자동 불러오기 제어
+  const loadedMonthRef = useRef('')                       // 자동 불러오기를 마친 월
+  const loadSeq        = useRef(0)                        // 빠르게 월을 바꿀 때 이전 응답이 덮어쓰지 않도록
+  const attemptedRef   = useRef<Set<string>>(new Set())   // 이번 월에 이미 불러오기를 시도한 직원
 
   // 직원 개인정보 로드
   useEffect(() => {
@@ -590,6 +594,7 @@ export default function PayslipTab() {
   // 급여계산기(payroll) 에서 자동 불러오기
   // 이번 달: 실시간 고객 DB 우선 / 과거 달: 저장된 payroll 확정값 우선 (환수 차감 등 이미 반영된 값)
   async function handleLoad() {
+    const myToken = ++loadSeq.current
     setLoading(true); setMsg('')
     try {
       const [payRes, custRes, refundRes] = await Promise.all([
@@ -761,6 +766,8 @@ export default function PayslipTab() {
         }
       }
 
+      if (myToken !== loadSeq.current) return   // 더 최신 불러오기가 진행 중이면 이 결과는 버림
+      employees.forEach(e => attemptedRef.current.add(e.id))
       setFinancials(prev => {
         const next = { ...prev }
         for (const [id, patch] of Object.entries(updates)) {
@@ -775,7 +782,28 @@ export default function PayslipTab() {
         : '이름이 일치하는 직원이 없습니다'
       )
     } catch { setMsg('불러오기 실패') }
-    finally { setLoading(false) }
+    finally { if (myToken === loadSeq.current) setLoading(false) }
+  }
+
+  // 월을 고르면(또는 처음 열면) 해당 월 급여를 자동으로 불러온다 — 버튼을 따로 누를 필요 없음
+  useEffect(() => {
+    if (employees.length === 0) return
+    if (loadedMonthRef.current === yearMonth) return
+    loadedMonthRef.current = yearMonth
+    attemptedRef.current = new Set()
+    setFinancials({})        // 이전 달 값이 남아 보이지 않도록 비우고 새로 채움
+    handleLoad()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [yearMonth, employees.length])
+
+  // 직원 클릭: 해당 직원 데이터가 아직 없으면 바로 불러온다
+  function selectEmp(id: string) {
+    setSelectedId(id)
+    setEditMode(false)
+    if (!financials[id] && !attemptedRef.current.has(id) && !loading) {
+      attemptedRef.current.add(id)
+      handleLoad()
+    }
   }
 
   // 직원 추가: users 목록 불러와 피커 표시
@@ -864,7 +892,7 @@ export default function PayslipTab() {
             className="border border-white/20 bg-white/10 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none" />
           <button onClick={handleLoad} disabled={loading}
             className="bg-white/10 hover:bg-white/20 disabled:opacity-40 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">
-            {loading ? '불러오는 중...' : '급여계산기에서 불러오기'}
+            {loading ? '불러오는 중...' : '다시 불러오기'}
           </button>
           <button onClick={handleSave} disabled={saving}
             className="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">
@@ -940,7 +968,7 @@ export default function PayslipTab() {
                   )}
                   {employees.filter(e => e.team === 'sales').map(emp => (
                     <EmpListItem key={emp.id} emp={emp} fin={financials[emp.id]} selectedId={selectedId}
-                      onSelect={() => { setSelectedId(emp.id); setEditMode(false) }} />
+                      onSelect={() => selectEmp(emp.id)} />
                   ))}
                   {/* 관리팀 */}
                   {employees.filter(e => e.team === 'ops').length > 0 && (
@@ -948,7 +976,7 @@ export default function PayslipTab() {
                   )}
                   {employees.filter(e => e.team === 'ops').map(emp => (
                     <EmpListItem key={emp.id} emp={emp} fin={financials[emp.id]} selectedId={selectedId}
-                      onSelect={() => { setSelectedId(emp.id); setEditMode(false) }} />
+                      onSelect={() => selectEmp(emp.id)} />
                   ))}
                   {/* 발굴팀 */}
                   {employees.filter(e => e.team === 'dig').length > 0 && (
@@ -956,7 +984,7 @@ export default function PayslipTab() {
                   )}
                   {employees.filter(e => e.team === 'dig').map(emp => (
                     <EmpListItem key={emp.id} emp={emp} fin={financials[emp.id]} selectedId={selectedId}
-                      onSelect={() => { setSelectedId(emp.id); setEditMode(false) }} />
+                      onSelect={() => selectEmp(emp.id)} />
                   ))}
                 </div>
               )}
