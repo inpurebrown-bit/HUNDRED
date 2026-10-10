@@ -341,7 +341,9 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
         const isPending  = inst === '⏳ 대표 승인 대기'
         const isHoldingG = inst === '🔒 홀딩'
         const isSpecial  = isPending || isHoldingG || inst === '신규 유입' || inst === '🔧 핸들링' || inst === CERT_GROUP
-        const isOpen = !collapsed[inst]
+        // 처음 화면: 진행 중인 업체가 있거나 특별 그룹이면 펼치고, 대기만 있는 기관은 접어서 한눈에 보이게 (눌러서 열기)
+        const hasActive = isSpecial || items.some(c => !isUpcoming(c, inst))
+        const isOpen = collapsed[inst] === undefined ? hasActive : !collapsed[inst]
 
         // 진행/대기 분리 (특수 그룹 제외)
         const activeItems   = isSpecial ? items : items.filter(c => !isUpcoming(c, inst))
@@ -349,40 +351,34 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
 
         return (
           <div key={inst}>
-            <button onClick={() => setCollapsed(p => ({ ...p, [inst]: !p[inst] }))}
-              className={`w-full flex items-center justify-between py-2.5 px-4 rounded-xl mb-2 transition-colors ${
-                isPending    ? 'bg-rose-500 hover:bg-rose-600'
-                : isHoldingG ? 'bg-indigo-600 hover:bg-indigo-700'
-                : isIndirect ? 'bg-violet-600 hover:bg-violet-700'
-                : inst === CERT_GROUP   ? 'bg-teal-600 hover:bg-teal-700'
-                : inst === '신규 유입'  ? 'bg-sky-500 hover:bg-sky-600'
-                : inst === '🔧 핸들링' ? 'bg-slate-500 hover:bg-slate-600'
-                : 'bg-[#1B2A45] hover:bg-[#1B2A45]/90'
+            <button onClick={() => setCollapsed(p => ({ ...p, [inst]: isOpen }))}
+              className={`w-full flex items-center justify-between gap-3 rounded-2xl border border-gray-100 bg-white shadow-sm px-5 py-3.5 mb-3 transition-all hover:shadow-md border-l-[6px] ${
+                isPending    ? 'border-l-rose-500'
+                : isHoldingG ? 'border-l-indigo-500'
+                : isIndirect ? 'border-l-violet-500'
+                : inst === CERT_GROUP   ? 'border-l-teal-500'
+                : inst === '신규 유입'  ? 'border-l-sky-500'
+                : inst === '🔧 핸들링' ? 'border-l-slate-400'
+                : 'border-l-[#0b2140]'
               }`}>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-white font-bold text-sm">{inst}</span>
-                <span className="bg-[#C5A258] text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                  진행 {activeItems.length}
-                </span>
-                {upcomingItems.length > 0 && (
-                  <span className="bg-gray-400 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                    대기 {upcomingItems.length}
-                  </span>
-                )}
-                {isIndirect && <span className="text-white/60 text-[10px]">간접자금</span>}
-                {inst === CERT_GROUP && CERT_PROGRAMS.map(p => {
-                  const n = items.filter(x => certOf(x).includes(p)).length
-                  return n > 0 ? <span key={p} className="text-[10px] text-white/90 bg-white/15 rounded-full px-2 py-0.5">{CERT_SHORT[p]} {n}</span> : null
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="text-[#0b2140] font-black text-[17px]">{inst}</span>
+                <span className="bg-[#0b2140] text-white text-[13px] font-bold px-3 py-1 rounded-full">진행 {activeItems.length}</span>
+                {upcomingItems.length > 0 && <span className="bg-gray-100 text-gray-600 text-[13px] font-bold px-3 py-1 rounded-full">대기 {upcomingItems.length}</span>}
+                {isIndirect && <span className="text-violet-600 text-[12.5px] font-semibold">간접자금</span>}
+                {inst === CERT_GROUP && CERT_PROGRAMS.map(pp => {
+                  const n = items.filter(x => certOf(x).includes(pp)).length
+                  return n > 0 ? <span key={pp} className="text-[12.5px] text-teal-700 bg-teal-50 rounded-full px-2.5 py-0.5 font-semibold">{CERT_SHORT[pp]} {n}</span> : null
                 })}
               </div>
-              <span className="text-white/60 text-xs">{isOpen ? '▲' : '▼'}</span>
+              <span className="text-gray-400 text-sm shrink-0">{isOpen ? '▲' : '▼'}</span>
             </button>
             {isOpen && (
               inst === '신규 유입' ? (
                 // 신규유입: 1차흡수 대기 / 2차흡수 대기 좌우 분리
                 <div className="flex gap-0 items-start">
                   <div className="w-1/2 min-w-0 pr-3">
-                    <p className="text-[9px] font-bold text-sky-500 mb-1.5 uppercase tracking-wide">1차흡수 대기</p>
+                    <p className="text-[13px] font-bold text-sky-600 mb-2">1차 흡수 대기</p>
                     {(() => {
                       const s1 = items.filter(c => (c.details?.absorption_stage ?? 1) !== 2)
                       return s1.length > 0 ? (
@@ -404,7 +400,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
                     })()}
                   </div>
                   <div className="w-1/2 min-w-0 border-l-2 border-dashed border-orange-200 pl-3">
-                    <p className="text-[9px] font-bold text-orange-500 mb-1.5 uppercase tracking-wide">2차흡수 대기</p>
+                    <p className="text-[13px] font-bold text-orange-600 mb-2">2차 흡수 대기</p>
                     {(() => {
                       const s2 = items.filter(c => (c.details?.absorption_stage ?? 1) === 2)
                       return s2.length > 0 ? (
@@ -437,6 +433,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
                 // 기관 그룹: 진행 / 대기 좌우 분리
                 <div className="flex gap-0 items-start">
                   <div className="w-[30%] min-w-0 pr-3">
+                    <p className="text-[13px] font-bold text-[#0b2140] mb-2">진행 중</p>
                     {activeItems.length > 0 ? (
                       <div className="hc-cardgrid">
                         {activeItems.map(c => (
@@ -448,7 +445,7 @@ function InstitutionGroupedView({ cases, openPanelIds, onToggle, onScriptToggle,
                     )}
                   </div>
                   <div className="w-[70%] min-w-0 border-l-2 border-dashed border-gray-200 pl-3">
-                    <p className="text-[9px] font-bold text-gray-400 mb-1.5 uppercase tracking-wide">다음 자금 대기</p>
+                    <p className="text-[13px] font-bold text-gray-500 mb-2">다음 자금 대기</p>
                     {upcomingItems.length > 0 ? (
                       <div className="hc-cardgrid">
                         {upcomingItems.map(c => (
@@ -874,92 +871,67 @@ export default function OpsCeoTab() {
   const viewCases = view === 'refund' ? refundCases : view === 'completed' ? completedCases : view === 'newdb' ? newdbCases : view === 'expired' ? expiredCases : activeCases
 
   return (
-    <div className="space-y-4 pb-8 max-w-5xl mx-auto">
-      {/* 헤더 */}
-      <div className="bg-[#1B2A45] rounded-xl px-5 py-4">
-        <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
-          <h2 className="font-bold text-white text-base">자금팀 현황</h2>
-          <div className="flex items-center gap-2">
-            <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="업체·담당자·기관 검색..."
-              className="bg-white/10 text-white placeholder-white/40 text-xs px-3 py-1.5 rounded-lg border border-white/20 focus:outline-none focus:bg-white/20 w-36" />
-            <button onClick={load}
-              className="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition-colors">
-              새로고침
-            </button>
-          </div>
-        </div>
-        {/* 통계 */}
-        {(() => {
-          const now = new Date()
-          const mk = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`
-          const thisFee      = (revData?.thisMonthOps || []).reduce((s: number, e: any) => s + (e.amount||0), 0)
-          const thisContract = (revData?.thisMonthOpsContracts || []).reduce((s: number, e: any) => s + (e.amount||0), 0)
-          const thisTotal    = thisFee + thisContract
-          const monthLabel   = now.getMonth() + 1
-          return (
-            <>
-              <div className="grid grid-cols-5 gap-2 mb-2">
-                <div className="bg-white/10 rounded-lg px-2 py-2 text-center">
-                  <p className="text-white/50 text-[9px]">진행업체</p>
-                  <p className="text-white font-black text-lg">{activeCases.length}</p>
-                </div>
-                <div className="bg-orange-500/20 rounded-lg px-2 py-2 text-center cursor-pointer" onClick={() => setView('expired')}>
-                  <p className="text-orange-300/70 text-[9px]">기간만료</p>
-                  <p className="text-orange-300 font-black text-lg">{expiredCases.length}</p>
-                </div>
-                <div className="bg-white/10 rounded-lg px-2 py-2 text-center">
-                  <p className="text-white/50 text-[9px]">신규DB</p>
-                  <p className="text-white font-black text-lg">{newdbCases.length}</p>
-                </div>
-                <div className="bg-white/10 rounded-lg px-2 py-2 text-center">
-                  <p className="text-white/50 text-[9px]">환불</p>
-                  <p className="text-white font-black text-lg">{refundCases.length}</p>
-                </div>
-                <div className="bg-white/10 rounded-lg px-2 py-2 text-center">
-                  <p className="text-white/50 text-[9px]">종료</p>
-                  <p className="text-white font-black text-lg">{completedCases.length}</p>
-                </div>
+    <div className="space-y-5 pb-8 max-w-[1500px] mx-auto">
+      {(() => {
+        const now = new Date()
+        const thisFee      = (revData?.thisMonthOps || []).reduce((sum: number, e: any) => sum + (e.amount || 0), 0)
+        const thisContract = (revData?.thisMonthOpsContracts || []).reduce((sum: number, e: any) => sum + (e.amount || 0), 0)
+        const monthLabel   = now.getMonth() + 1
+        return (
+          <>
+            {/* 제목 · 검색 · 도구 */}
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="text-[26px] font-black text-[#0b2140] leading-tight">관리팀</h2>
+                <p className="text-[13.5px] text-gray-500 mt-0.5">자금 진행 현황 · {monthLabel}월</p>
               </div>
-              {/* 이달 매출 요약 */}
-              <div className="grid grid-cols-3 gap-2 mb-3">
-                <div className="bg-emerald-500/20 border border-emerald-400/30 rounded-lg px-2 py-2 text-center col-span-1">
-                  <p className="text-emerald-300/70 text-[9px]">{monthLabel}월 수수료</p>
-                  <p className="text-emerald-300 font-black text-base">{revData ? fmtM(thisFee) : '—'}</p>
-                </div>
-                <div className="bg-sky-500/20 border border-sky-400/30 rounded-lg px-2 py-2 text-center col-span-1">
-                  <p className="text-sky-300/70 text-[9px]">{monthLabel}월 계약</p>
-                  <p className="text-sky-300 font-black text-base">{revData ? fmtM(thisContract) : '—'}</p>
-                </div>
-                <div className="bg-white/15 border border-white/20 rounded-lg px-2 py-2 text-center col-span-1">
-                  <p className="text-white/50 text-[9px]">{monthLabel}월 합계</p>
-                  <p className="text-white font-black text-base">{revData ? fmtM(thisTotal) : '—'}</p>
-                </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <input value={search} onChange={e => setSearch(e.target.value)}
+                  placeholder="업체 · 담당자 · 기관 검색"
+                  className="w-64 bg-white border-[1.5px] border-gray-200 focus:border-[#b8995a] rounded-2xl px-4 py-2.5 text-[14px] outline-none transition-colors" />
+                <button onClick={load} className="text-[13.5px] font-semibold bg-white border-[1.5px] border-gray-200 hover:bg-gray-50 text-[#0b2140] px-4 py-2.5 rounded-2xl transition-colors">새로고침</button>
+                <button onClick={() => setShowInstMgr(true)} className="text-[13.5px] font-semibold bg-white border-[1.5px] border-gray-200 hover:bg-gray-50 text-gray-600 px-4 py-2.5 rounded-2xl transition-colors">⚙ 자금 관리</button>
               </div>
-            </>
-          )
-        })()}
-        {/* 뷰 탭 */}
-        <div className="flex gap-1.5 flex-wrap items-center">
-          {MENU.map(m => (
-            <button key={m.key} onClick={() => setView(m.key)}
-              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                view === m.key ? 'bg-white text-[#1B2A45]' : 'bg-white/10 text-white/70 hover:bg-white/20'
-              }`}>
-              {m.label}
-              {m.count !== null && (
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                  view === m.key ? 'bg-[#1B2A45] text-white' : 'bg-white/20 text-white'
-                }`}>{m.count}</span>
-              )}
-            </button>
-          ))}
-          <button onClick={() => setShowInstMgr(true)}
-            className="ml-auto flex items-center gap-1 text-[11px] px-2.5 py-1.5 rounded-lg bg-white/10 text-white/60 hover:bg-white/20 transition-colors">
-            ⚙️ 자금 관리
-          </button>
-        </div>
-      </div>
+            </div>
+
+            {/* 핵심 숫자 */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <button onClick={() => setView('active')} className="text-left rounded-3xl p-5 text-white bg-gradient-to-br from-[#10203a] to-[#0a1424] hover:-translate-y-0.5 transition-transform">
+                <p className="text-[13.5px] text-white/65 font-semibold">진행 중 업체</p>
+                <p className="text-[34px] leading-tight font-black tabular-nums">{activeCases.length}<span className="text-[16px] text-white/50 font-semibold"> 곳</span></p>
+              </button>
+              <button onClick={() => setView('expired')} className={`text-left rounded-3xl p-5 border hover:-translate-y-0.5 transition-transform ${expiredCases.length > 0 ? 'bg-orange-50 border-orange-200' : 'bg-white border-gray-100'}`}>
+                <p className={`text-[13.5px] font-semibold ${expiredCases.length > 0 ? 'text-orange-700' : 'text-gray-500'}`}>계약 기간 만료</p>
+                <p className={`text-[34px] leading-tight font-black tabular-nums ${expiredCases.length > 0 ? 'text-orange-600' : 'text-[#0b2140]'}`}>{expiredCases.length}<span className="text-[16px] text-gray-400 font-semibold"> 곳</span></p>
+              </button>
+              <div className="rounded-3xl p-5 bg-white border border-gray-100">
+                <p className="text-[13.5px] text-gray-500 font-semibold">{monthLabel}월 수수료 매출</p>
+                <p className="text-[34px] leading-tight font-black tabular-nums text-[#a8873f]">{revData ? fmtM(thisFee) : '—'}</p>
+              </div>
+              <div className="rounded-3xl p-5 bg-white border border-gray-100">
+                <p className="text-[13.5px] text-gray-500 font-semibold">{monthLabel}월 계약 매출</p>
+                <p className="text-[34px] leading-tight font-black tabular-nums text-[#0b2140]">{revData ? fmtM(thisContract) : '—'}</p>
+                <p className="text-[12.5px] text-gray-400 mt-0.5">합계 {revData ? fmtM(thisFee + thisContract) : '—'}</p>
+              </div>
+            </div>
+
+            {/* 메뉴 (대시보드 박스 밖, 한눈에 보이는 알약 탭) */}
+            <div className="flex gap-2 flex-wrap items-center">
+              {MENU.map(m => (
+                <button key={m.key} onClick={() => setView(m.key)}
+                  className={`flex items-center gap-2 text-[14px] px-4 py-2.5 rounded-full font-bold transition-all ${
+                    view === m.key ? 'bg-gradient-to-r from-[#0b2140] to-[#4a5a9a] text-white shadow-[0_8px_18px_-8px_rgba(11,33,64,.7)]' : 'bg-white text-gray-600 border border-gray-200 hover:border-[#b8995a]'
+                  }`}>
+                  {m.label}
+                  {m.count !== null && (
+                    <span className={`text-[12.5px] px-2 py-0.5 rounded-full font-bold ${view === m.key ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'}`}>{m.count}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </>
+        )
+      })()}
 
       {/* ── 기관(자금) 관리 모달 ── */}
       {showInstMgr && (

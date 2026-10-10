@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
 
   const query = supabaseAdmin
     .from('contracts')
-    .select('id, customer_id, sales_user_id, sales_user_name, contract_amount, memo, status, ops_user_id, ops_user_name, created_at, customers(name, phone, company)')
+    .select('id, customer_id, sales_user_id, sales_user_name, contract_amount, memo, status, ops_user_id, ops_user_name, created_at, customers(name, phone, details)')
     .order('created_at', { ascending: false })
 
   const finalQuery = user.role === 'sales'
@@ -56,5 +56,6 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await finalQuery
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ contracts: data })
+  const contracts = (data || []).map((c: any) => ({ ...c, customers: c.customers ? { ...c.customers, company: c.customers.details?.company || c.customers.name } : c.customers }))
+  return NextResponse.json({ contracts })
 }

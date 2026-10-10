@@ -244,8 +244,8 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
     e.preventDefault()
   }
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const res = await fetch('/api/customers')
       const data = await res.json()
@@ -295,15 +295,38 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || '등록 실패')
-      // 폼 초기화 (닫지 않음 — 연속 등록용)
-      setForm({ ...EMPTY_HK })
+      // 폼 초기화 (닫지 않음 — 연속 등록용). 담당자는 그대로 유지
+      setForm({ ...EMPTY_HK, assign_id: form.assign_id })
       setPasteText('')
       setParseStatus(null)
       const assignedTo = selectedUser ? ` → ${selectedUser.name} 배정` : ' (미배정)'
       setToast(`등록 완료${assignedTo}`)
-      setTimeout(() => setToast(null), 3000)
-      load()
+      setTimeout(() => setToast(null), 2500)
+      load(true)
     } catch (e: any) { alert(e.message) } finally { setSubmitting(false) }
+  }
+
+  // 이름 버튼으로 배정 — 확인창에 업체명과 담당자를 함께 보여줘서 잘못 눌러도 바로 알 수 있음
+  async function assignTo(e: HankyungEntry, u: SalesUser, currentName?: string | null) {
+    const company = (e as any).details?.company || (e as any).company || e.name
+    const msg = currentName
+      ? `"${company}"\n${currentName} → ${u.name} 으로 변경할까요?`
+      : `"${company}"\n업체를 ${u.name}에게 배정할까요?`
+    if (!confirm(msg)) return
+    setPatching(e.id)
+    try {
+      const res = await fetch(`/api/customers/${e.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sales_user_id: u.id, sales_user_name: u.name, status: 'lead' }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || '배정 실패')
+      setEntries(prev => prev.filter(x => x.id !== e.id))   // 목록을 새로 불러오지 않고 바로 정리 → 화면이 흔들리지 않음
+      setReassignMode(p => ({ ...p, [e.id]: false }))
+      setToast(`${company} → ${u.name} 배정 완료`)
+      setTimeout(() => setToast(null), 2500)
+      load(true)
+    } catch (err: any) { alert(err.message) } finally { setPatching(null) }
   }
 
   // 배정 / 재배정 공통 함수
@@ -366,8 +389,8 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
       />
 
       {toast && (
-        <div className="mb-3 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-700">
-          {toast}
+        <div className="fixed top-20 right-6 z-[300] px-5 py-3 bg-emerald-600 text-white rounded-2xl text-sm font-bold shadow-xl" style={{ animation: 'hc-rise .35s ease both' }}>
+          ✓ {toast}
         </div>
       )}
 
@@ -389,11 +412,9 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
               onChange={e => setPasteText(e.target.value)}
               placeholder="여기에 DB 행을 붙여넣으세요 (Ctrl+V)"
             />
-            {parseStatus && (
-              <p className={`text-[11px] mt-1 font-medium ${parseStatus.startsWith('✓') ? 'text-emerald-600' : 'text-amber-600'}`}>
-                {parseStatus}
-              </p>
-            )}
+            <p className={`text-[12px] mt-1 font-medium min-h-[18px] ${parseStatus?.startsWith('✓') ? 'text-emerald-600' : 'text-amber-600'}`}>
+              {parseStatus || '\u00A0'}
+            </p>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
@@ -447,21 +468,25 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
             </div>
           </div>
           {/* 담당자 배정 */}
-          <div className="flex items-end gap-3 pt-2 border-t border-[#F0EDE6]">
-            <div className="flex-1">
-              <label className={lbl}>담당자 배정 <span className="text-red-400 font-normal">(미배정 시 팀장 010DB에 안 들어감)</span></label>
-              <select className={inp} value={form.assign_id} onChange={e => set('assign_id', e.target.value)}>
-                <option value="">-- 담당자 선택 (필수 권장) --</option>
-                {salesUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
+          <div className="pt-3 border-t border-[#F0EDE6]">
+            <label className={lbl}>담당자 배정 <span className="text-red-400 font-normal">(미배정 시 팀장 010DB에 안 들어감 · 연속 등록해도 선택이 유지됩니다)</span></label>
+            <div className="flex flex-wrap items-center gap-2.5 mt-1.5">
+              {salesUsers.length === 0 && <span className="text-xs text-gray-400">담당자 목록을 불러오는 중…</span>}
+              {salesUsers.map(u => (
+                <button type="button" key={u.id} onClick={() => set('assign_id', form.assign_id === u.id ? '' : u.id)}
+                  className={`px-5 py-2.5 rounded-2xl text-[14px] font-bold border-2 transition-all ${form.assign_id === u.id ? 'bg-[#0b2140] text-white border-[#0b2140] shadow-md' : 'bg-white text-gray-500 border-gray-200 hover:border-[#b8995a]'}`}>
+                  {form.assign_id === u.id ? '✓ ' : ''}{u.name}
+                </button>
+              ))}
+              <div className="flex-1" />
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-8 py-2.5 bg-gradient-to-r from-[#0b2140] to-[#4a5a9a] text-white text-[14px] font-bold rounded-2xl hover:-translate-y-0.5 transition-all disabled:opacity-50"
+              >
+                {submitting ? '등록 중...' : '등록'}
+              </button>
             </div>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-6 py-2 bg-[#1B2A45] text-white text-sm font-semibold rounded-xl hover:bg-[#2D4070] transition-colors disabled:opacity-50"
-            >
-              {submitting ? '등록 중...' : '등록'}
-            </button>
           </div>
         </form>
       )}
@@ -520,29 +545,18 @@ function HankyungDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
                         </button>
                       </div>
                     ) : (
-                      // 미배정 또는 재배정 모드
-                      <div className="flex items-center gap-1.5 w-full">
+                      // 미배정 — 이름 버튼을 누르면 확인 후 바로 배정
+                      <div className="flex flex-wrap items-center gap-1.5 w-full">
                         {isReassign && (
-                          <button
-                            onClick={() => setReassignMode(p => ({ ...p, [e.id]: false }))}
-                            className="text-[10px] text-gray-400 hover:text-gray-600 px-1"
-                          >✕</button>
+                          <button onClick={() => setReassignMode(p => ({ ...p, [e.id]: false }))} className="text-[11px] text-gray-400 hover:text-gray-600 px-1">✕</button>
                         )}
-                        <select
-                          className="flex-1 border border-[#E8E2D4] rounded-lg px-2 py-1.5 text-xs focus:outline-none min-w-0"
-                          value={assignSelect[e.id] ?? ''}
-                          onChange={ev => setAssignSelect(p => ({ ...p, [e.id]: ev.target.value }))}
-                        >
-                          <option value="">{isReassign ? '변경할 담당자' : '담당자 선택'}</option>
-                          {salesUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                        </select>
-                        <button
-                          onClick={() => handleAssign(e.id, isReassign ? e.sales_user_name : null)}
-                          disabled={!assignSelect[e.id] || patching === e.id}
-                          className={"px-3 py-1.5 text-white text-xs font-semibold rounded-lg disabled:opacity-40 " + (isReassign ? 'bg-orange-500 hover:bg-orange-600' : 'bg-[#1B2A45] hover:bg-[#2D4070]')}
-                        >
-                          {patching === e.id ? '...' : isReassign ? '변경' : '배정'}
-                        </button>
+                        {salesUsers.map(u => (
+                          <button key={u.id} disabled={patching === e.id}
+                            onClick={() => assignTo(e, u, isReassign ? e.sales_user_name : null)}
+                            className={`px-3 py-1.5 text-[12.5px] font-bold rounded-xl border-2 disabled:opacity-40 transition-colors ${isReassign ? 'border-orange-300 text-orange-600 hover:bg-orange-50' : 'border-[#0b2140]/20 text-[#0b2140] hover:bg-[#0b2140] hover:text-white'}`}>
+                            → {u.name}
+                          </button>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -992,7 +1006,7 @@ function LeadDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
         if (c.status !== 'lead') return false
         const dbSrc = (c as any).details?.db_source
         if (EXCLUDED_SOURCES.includes(dbSrc)) return false
-        return dbSrc === '홈페이지문의' || (c as any).source === 'lead_form' || !dbSrc
+        return dbSrc === '홈페이지문의' || (c as any).source === 'lead_form'
       }))
     } catch (e: any) {
       setError(e.message)
@@ -1056,9 +1070,7 @@ function LeadDBSection({ salesUsers }: { salesUsers: SalesUser[] }) {
   return (
     <div>
       {toast && (
-        <div className="mb-3 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-700">
-          {toast}
-        </div>
+        <div className="fixed top-20 right-6 z-[300] px-5 py-3 bg-emerald-600 text-white rounded-2xl text-sm font-bold shadow-xl">✓ {toast}</div>
       )}
       <SectionHeader
         title="리드폼 DB"
@@ -1362,18 +1374,8 @@ export default function AssignBoard() {
 
       <Divider />
 
-      {/* Section 1: 직접 공급 DB */}
-      <SupplyDBSection salesUsers={usersLoading ? [] : salesUsers} />
-
-      <Divider />
-
-      {/* Section 2: 리드폼 DB (홈페이지 유입) */}
+      {/* 리드폼 DB (홈페이지 문의 유입 — 앞으로 들어오는 건만) */}
       <LeadDBSection salesUsers={usersLoading ? [] : salesUsers} />
-
-      <Divider />
-
-      {/* Section 3: 계약 배정 대기 */}
-      <ContractAssignSection opsUsers={usersLoading ? [] : opsUsers} />
 
     </div>
   )

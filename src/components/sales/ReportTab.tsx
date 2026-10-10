@@ -148,6 +148,8 @@ export default function ReportTab({ userId, userName }: Props) {
   const [submitType, setSubmitType] = useState<'morning' | 'daily'>('morning')
   const [loading, setLoading] = useState(false)
   const [pastReports, setPastReports] = useState<any[]>([])
+  // 전날 보고에서 오늘 마감보고로 가져온 항목 표시 (같은 항목 중복 방지)
+  const [pulled, setPulled] = useState<Set<string>>(new Set())
   const [viewReport, setViewReport] = useState<any | null>(null)
   // 수정 모드
   const [editDate, setEditDate] = useState<string | null>(null)
@@ -288,6 +290,15 @@ export default function ReportTab({ userId, userName }: Props) {
       setEditDate(null)
     }
     setLoading(false)
+  }
+
+  // ── 전날 보고 항목 1건을 오늘 마감보고에 추가 ──────────────
+  function pullItem(field: string, item: any, key: string) {
+    if (pulled.has(key)) return
+    const { _locked, ...clean } = item || {}
+    setDaily(p => ({ ...p, [field]: [...(((p as any)[field] as any[]) || []), clean] }))
+    setPulled(prev => new Set(prev).add(key))
+    setActiveReport('daily')
   }
 
   // ── 배열 아이템 헬퍼 ─────────────────────────────────
@@ -456,7 +467,7 @@ export default function ReportTab({ userId, userName }: Props) {
               {yesterdayDaily && (
                 <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
                   <p className="text-[11px] font-bold text-blue-700 mb-2">어제 마감보고</p>
-                  <DailyDetailView data={yesterdayDaily.data} />
+                  <DailyDetailView data={yesterdayDaily.data} onPull={pullItem} pulled={pulled} />
                 </div>
               )}
             </div>
@@ -875,7 +886,7 @@ export default function ReportTab({ userId, userName }: Props) {
             <div className="p-6">
               {viewReport.report_type === 'morning'
                 ? <MorningDetailView data={viewReport.data} />
-                : <DailyDetailView data={viewReport.data} />
+                : <DailyDetailView data={viewReport.data} onPull={pullItem} pulled={pulled} />
               }
             </div>
           </div>
@@ -1400,7 +1411,19 @@ function MorningDetailView({ data }: { data: any }) {
 }
 
 // ── 마감보고 상세 뷰 ──────────────────────────────────────
-function DailyDetailView({ data }: { data: any }) {
+// 전날 보고 항목 옆의 "금일보고등록" 버튼 — 해당 업체 한 건만 오늘 마감보고로 가져온다
+function PullBtn({ field, item, k, onPull, pulled }: { field: string; item: any; k: string; onPull?: (field: string, item: any, key: string) => void; pulled?: Set<string> }) {
+  if (!onPull) return null
+  const done = !!pulled?.has(k)
+  return (
+    <button type="button" disabled={done} onClick={e => { e.stopPropagation(); onPull(field, item, k) }}
+      className={`ml-auto shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-colors ${done ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-white text-[#0b2140] border-[#b8995a]/60 hover:bg-[#b8995a]/10'}`}>
+      {done ? '등록됨 ✓' : '금일보고등록'}
+    </button>
+  )
+}
+
+function DailyDetailView({ data, onPull, pulled }: { data: any; onPull?: (field: string, item: any, key: string) => void; pulled?: Set<string> }) {
   const goal = Number(data?.goal || 0)
   const month = Number(data?.month_contracts || 0)
   const remaining = goal > 0 ? Math.max(0, goal - month) : null
@@ -1447,6 +1470,7 @@ function DailyDetailView({ data }: { data: any }) {
                     {item.status === '재통화예정' && item.callback_date && (
                       <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded-full">{item.callback_date}</span>
                     )}
+                    <PullBtn field="supply_db" item={item} k={`supply_db-${i}`} onPull={onPull} pulled={pulled} />
                   </div>
                   {item.content && <p className="text-xs text-gray-500">{item.content}</p>}
                 </div>
@@ -1476,6 +1500,7 @@ function DailyDetailView({ data }: { data: any }) {
                     {item.status === '재통화예정' && item.callback_date && (
                       <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded-full">{item.callback_date}</span>
                     )}
+                    <PullBtn field="outbound" item={item} k={`outbound-${i}`} onPull={onPull} pulled={pulled} />
                   </div>
                   {item.content && <p className="text-xs text-gray-500">{item.content}</p>}
                 </div>
@@ -1497,6 +1522,7 @@ function DailyDetailView({ data }: { data: any }) {
                   <p className="text-sm font-semibold text-gray-800">{m.company}</p>
                   <p className="text-xs text-gray-500">{m.date} {m.time} {m.location && `· ${m.location}`}</p>
                 </div>
+                <PullBtn field="meetings" item={m} k={`meetings-${i}`} onPull={onPull} pulled={pulled} />
               </div>
             ))}
           </div>
@@ -1515,6 +1541,7 @@ function DailyDetailView({ data }: { data: any }) {
                   <p className="text-sm font-semibold text-gray-800">{p.company} ({p.ceo_name})</p>
                   <p className="text-xs text-gray-500">{p.phone} · 최초콜 {p.first_call_date}</p>
                 </div>
+                <PullBtn field="payment_waiting" item={p} k={`payment_waiting-${i}`} onPull={onPull} pulled={pulled} />
               </div>
             ))}
           </div>
@@ -1535,6 +1562,7 @@ function DailyDetailView({ data }: { data: any }) {
                     : w.probability === '중' ? 'bg-yellow-100 text-yellow-600'
                     : 'bg-red-100 text-red-500'
                   }`}>{w.probability}</span>
+                  <PullBtn field="worried" item={w} k={`worried-${i}`} onPull={onPull} pulled={pulled} />
                 </div>
                 {w.reason && <p className="text-xs text-gray-500">사유: {w.reason}</p>}
                 {w.content && <p className="text-xs text-gray-500">내용: {w.content}</p>}

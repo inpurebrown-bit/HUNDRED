@@ -237,6 +237,11 @@ interface MonthSectionProps {
   putoContractCount?: number  // 관리실장 김윤지 뿌토 계약건수
 }
 
+// 금액을 '1,520만' / '1.25억' 형태로 (소수점은 둘째 자리까지)
+function man2(v: number): string {
+  return v >= 100000000 ? parseFloat((v / 100000000).toFixed(2)) + '억' : Math.round(v / 10000).toLocaleString('ko-KR') + '만'
+}
+
 function fmtKrw(n: number): string {
   if (n <= 0) return '-'
   if (n >= 100000000) return (n / 100000000).toFixed(1) + '억원'
@@ -434,9 +439,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
     async function load() {
       setLoading(true)
       try {
-        // ① 구글 캘린더 자동 동기화 (저장된 설정으로 백그라운드 갱신)
-        //    이벤트 로드 전에 먼저 동기화해서 최신 데이터 보장
-        await fetch('/api/events/gcal').catch(() => null)
+        // 구글 캘린더 동기화는 화면 로딩이 끝난 뒤 백그라운드로 (아래 finally) — 기다리지 않는다
 
         const [
           revRes,
@@ -574,6 +577,12 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
         // silently ignore
       } finally {
         setLoading(false)
+        // 화면을 먼저 보여준 뒤 구글 캘린더를 동기화하고, 끝나면 일정만 다시 불러온다
+        fetch('/api/events/gcal')
+          .then(() => fetch('/api/events'))
+          .then(r => r.json())
+          .then(d => setEvents(d.events ?? []))
+          .catch(() => {})
       }
     }
     load()
@@ -866,97 +875,121 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
   return (
     <div className="space-y-5 pb-10 overflow-x-hidden">
 
-      {/* ══ 퀵 액션 + 매출 요약 ══ */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* ══ 오늘 해야 할 일 ══ */}
+      <div className="grid grid-cols-3 gap-3">
         {[
-          { label: '오늘 보고', count: todayReports.length,   nav: () => onNavigate?.('minutesreports'), base: 'border-[#E8E2D4] text-[#1B2A45]',   num: 'text-[#1B2A45]',    hover: 'hover:bg-[#1B2A45] hover:border-[#1B2A45] hover:text-white' },
-          { label: '오늘 일정', count: todayEvents.length,    nav: () => onNavigate?.('calendar'),       base: 'border-[#E8E2D4] text-[#1B2A45]',   num: 'text-[#1B2A45]',    hover: 'hover:bg-[#1B2A45] hover:border-[#1B2A45] hover:text-white' },
-          { label: '심사요청',  count: allCustomers.filter((c: any) => c.details?.inspection_status === 'pending').length, nav: () => onNavigate?.('sales', 'inspection'), base: 'border-amber-200 text-amber-700', num: 'text-amber-600', hover: 'hover:bg-amber-500 hover:border-amber-500 hover:text-white' },
-          { label: 'A/S요청',   count: allCustomers.filter((c: any) => c.details?.as_requested === true && !c.details?.as_resolved).length, nav: () => onNavigate?.('sales', 'as'), base: 'border-orange-200 text-orange-700', num: 'text-orange-500', hover: 'hover:bg-orange-500 hover:border-orange-500 hover:text-white' },
+          { label: '오늘 보고', unit: '건', count: todayReports.length, nav: () => onNavigate?.('minutesreports'), warn: false },
+          { label: '오늘 일정', unit: '건', count: todayEvents.length, nav: () => onNavigate?.('calendar'), warn: false },
+          { label: '심사 요청', unit: '건', count: allCustomers.filter((c: any) => c.details?.inspection_status === 'pending').length, nav: () => onNavigate?.('sales', 'inspection'), warn: true },
         ].map(item => (
           <button key={item.label} onClick={item.nav}
-            className={`group flex items-center gap-2 bg-white border rounded-xl px-3 py-2 transition-all duration-150 ${item.base} ${item.hover}`}>
-            <span className="text-[11px] font-medium group-hover:text-white/80">{item.label}</span>
-            {loading ? <Skeleton className="h-4 w-6" /> : (
-              <span className={`text-sm font-black group-hover:text-white ${item.num}`}>
-                {item.count}<span className="text-[10px] font-medium ml-0.5">건</span>
-              </span>
+            className={`text-left rounded-2xl border px-5 py-4 transition-all hover:-translate-y-0.5 hover:shadow-md ${item.warn && item.count > 0 ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-100'}`}>
+            <p className="text-[13px] font-semibold text-gray-500">{item.label}</p>
+            {loading ? <Skeleton className="h-8 w-14 mt-1" /> : (
+              <p className={`text-[30px] leading-tight font-black mt-0.5 ${item.warn && item.count > 0 ? 'text-amber-600' : 'text-[#0b2140]'}`}>{item.count}<span className="text-[14px] font-semibold text-gray-400 ml-0.5">{item.unit}</span></p>
             )}
           </button>
         ))}
-
-        <div className="flex-1" />
-
-        {/* 이달 매출 요약 칩 */}
-        <div className="flex items-center gap-2">
-          <div className="bg-[#1B2A45] rounded-xl px-3 py-2 flex items-center gap-2">
-            <span className="text-[10px] text-white/50 font-medium">영업</span>
-            {loading ? <Skeleton className="h-4 w-12 bg-white/20" /> : (
-              <span className="text-sm font-black text-white">
-                {thisMonthSalesRaw >= 10000 ? (thisMonthSalesRaw/10000).toFixed(0)+'만' : thisMonthSalesRaw > 0 ? thisMonthSalesRaw.toLocaleString() : '-'}
-              </span>
-            )}
-          </div>
-          <div className="bg-emerald-700 rounded-xl px-3 py-2 flex items-center gap-2">
-            <span className="text-[10px] text-white/50 font-medium">관리</span>
-            {loading ? <Skeleton className="h-4 w-12 bg-white/20" /> : (
-              <span className="text-sm font-black text-white">{thisMonthOpsDisplay}</span>
-            )}
-          </div>
-        </div>
       </div>
 
-      {/* ══ 2주 일정 캘린더 ══ */}
-      <TwoWeekCalendar events={events} monthlyExpenses={monthlyExpenses} onNavigate={onNavigate} />
+      {/* ══ 이번 달 한눈에 ══ */}
+      {(() => {
+        const man = (v: number) => v >= 100000000 ? parseFloat((v / 100000000).toFixed(2)) + '억' : Math.round(v / 10000).toLocaleString('ko-KR') + '만'
+        const cnt = thisMonthContracts.reduce((sum, c) => sum + contractWeight(c.contract_amount, c.vat_included), 0)
+        const total = thisMonthSalesRaw + thisMonthOpsRaw
+        const lastTotal = lastMonthSalesRaw + lastMonthOpsRaw
+        const d = lastTotal > 0 ? (total - lastTotal) / lastTotal : null
+        return (
+          <div className="rounded-3xl p-6 md:p-7 text-white bg-gradient-to-br from-[#10203a] to-[#0a1424] shadow-[0_24px_50px_-28px_rgba(11,33,64,.8)]">
+            <div className="flex flex-wrap items-end justify-between gap-2 mb-4">
+              <div>
+                <p className="text-[12px] tracking-[0.25em] text-[#C5A258] font-semibold">THIS MONTH</p>
+                <h2 className="text-[22px] font-black mt-1">{thisMonth}월, 지금까지</h2>
+              </div>
+              {d !== null && <p className="text-[13px] font-bold" style={{ color: d >= 0 ? '#7ee0b5' : '#ff9b9b' }}>지난달 전체보다 {d >= 0 ? '▲' : '▼'}{Math.abs(d * 100).toFixed(0)}%</p>}
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {[
+                { label: '총 매출', v: loading ? null : man(total), strong: true },
+                { label: '영업팀 매출', v: loading ? null : man(thisMonthSalesRaw) },
+                { label: '관리팀 매출', v: loading ? null : man(thisMonthOpsRaw) },
+                { label: '계약 건수', v: loading ? null : (cnt % 1 === 0 ? cnt : cnt.toFixed(1)) + '건', sub: `진행 중 ${thisInProgress}건` },
+              ].map(k => (
+                <div key={k.label} className={`rounded-2xl px-4 py-4 ${k.strong ? 'bg-white/[.14] border border-white/25' : 'bg-white/[.07]'}`}>
+                  <p className="text-[13px] text-white/65 font-semibold">{k.label}</p>
+                  {k.v === null ? <Skeleton className="h-8 w-20 mt-1 bg-white/20" /> : <p className={`text-[26px] md:text-[30px] leading-tight font-black mt-1 tabular-nums ${k.strong ? 'text-[#E8D080]' : ''}`}>{k.v}</p>}
+                  {k.sub && <p className="text-[12.5px] text-white/50 mt-0.5">{k.sub}</p>}
+                </div>
+              ))}
+            </div>
+            <p className="text-[12.5px] text-white/45 mt-3">월별 추이·남은 돈·세금은 <button onClick={() => onNavigate?.('analytics')} className="underline text-[#E8D080]">손익·급여 → 매출 관리</button>에서 확인하세요.</p>
+          </div>
+        )
+      })()}
 
-      {/* ══ 결제율 대시보드 ══ */}
-      <div ref={chartRef}>
+      {/* ══ 영업팀 · 관리팀 현황 (목표·결제율·오늘 공급 입력 / 진행·대기·단계별·매출·계약) ══ */}
+      <div ref={chartRef} className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 md:p-7">
         <PayRateTab />
       </div>
 
-      {/* ══ 최근 3개월 현황 ══ */}
-      <div ref={thisMonthRef} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <MonthSection
-          title={`${thisMonth}월 현황`}
-          loading={loading}
-          contractCount={thisMonthContracts.reduce((s, c) => s + contractWeight(c.contract_amount, c.vat_included), 0)}
-          inProgressCount={thisInProgress}
-          taxAmount={thisMonthTax}
-          employeeRows={thisMonthRows}
-          salesRevenueAmount={thisMonthSalesRaw}
-          opsRevenueAmount={thisMonthOpsRaw}
-          vatRevenue={thisVatRevenue}
-          opsUserRows={thisMonthOpsUserRows}
-          putoContractCount={revenueData?.putoContractCount ?? 0}
-        />
-        <MonthSection
-          title={`${lastMonth}월 현황`}
-          loading={loading}
-          contractCount={lastMonthContracts.reduce((s, c) => s + contractWeight(c.contract_amount, c.vat_included), 0)}
-          inProgressCount={lastInProgress}
-          taxAmount={lastMonthTax}
-          employeeRows={lastMonthRows}
-          salesRevenueAmount={lastMonthSalesRaw}
-          opsRevenueAmount={lastMonthOpsRaw}
-          vatRevenue={lastVatRevenue}
-          opsUserRows={lastMonthOpsUserRows}
-        />
-        <MonthSection
-          title={`${twoAgoMonth}월 현황`}
-          loading={loading}
-          contractCount={twoAgoContracts.reduce((s, c) => s + contractWeight(c.contract_amount, c.vat_included), 0)}
-          inProgressCount={twoAgoInProgress}
-          taxAmount={twoAgoTax}
-          employeeRows={twoAgoRows}
-          salesRevenueAmount={twoAgoSalesRaw}
-          opsRevenueAmount={twoAgoOpsRaw}
-          vatRevenue={twoAgoVatRevenue}
-          opsUserRows={twoAgoOpsUserRows}
-        />
+      {/* ══ 일정 · 공지 ══ */}
+      <div className="grid xl:grid-cols-2 gap-5 items-start">
+        <TwoWeekCalendar events={events} monthlyExpenses={monthlyExpenses} onNavigate={onNavigate} />
+        <NoticeSection />
       </div>
 
-      {/* ══ 공지사항 ══ */}
-      <NoticeSection />
+
+      {/* ══ 지난 3개월 현황 (평소엔 접어둠 — 월별 추이·세금은 손익·급여 > 매출 관리에서 한눈에 확인) ══ */}
+      <details className="group bg-white rounded-2xl border border-gray-100 shadow-sm">
+        <summary className="cursor-pointer list-none px-5 py-4 flex items-center justify-between">
+          <div>
+            <p className="text-[15px] font-black text-[#0b2140]">최근 3개월 현황 보기</p>
+            <p className="text-[12.5px] text-gray-400 mt-0.5">이번 달 · 지난달 · 지지난달 직원별 현황과 매출·부가세·세금</p>
+          </div>
+          <span className="text-xs text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+        </summary>
+        <div className="px-4 pb-5">
+        <div ref={thisMonthRef} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <MonthSection
+            title={`${thisMonth}월 현황`}
+            loading={loading}
+            contractCount={thisMonthContracts.reduce((s, c) => s + contractWeight(c.contract_amount, c.vat_included), 0)}
+            inProgressCount={thisInProgress}
+            taxAmount={thisMonthTax}
+            employeeRows={thisMonthRows}
+            salesRevenueAmount={thisMonthSalesRaw}
+            opsRevenueAmount={thisMonthOpsRaw}
+            vatRevenue={thisVatRevenue}
+            opsUserRows={thisMonthOpsUserRows}
+            putoContractCount={revenueData?.putoContractCount ?? 0}
+          />
+          <MonthSection
+            title={`${lastMonth}월 현황`}
+            loading={loading}
+            contractCount={lastMonthContracts.reduce((s, c) => s + contractWeight(c.contract_amount, c.vat_included), 0)}
+            inProgressCount={lastInProgress}
+            taxAmount={lastMonthTax}
+            employeeRows={lastMonthRows}
+            salesRevenueAmount={lastMonthSalesRaw}
+            opsRevenueAmount={lastMonthOpsRaw}
+            vatRevenue={lastVatRevenue}
+            opsUserRows={lastMonthOpsUserRows}
+          />
+          <MonthSection
+            title={`${twoAgoMonth}월 현황`}
+            loading={loading}
+            contractCount={twoAgoContracts.reduce((s, c) => s + contractWeight(c.contract_amount, c.vat_included), 0)}
+            inProgressCount={twoAgoInProgress}
+            taxAmount={twoAgoTax}
+            employeeRows={twoAgoRows}
+            salesRevenueAmount={twoAgoSalesRaw}
+            opsRevenueAmount={twoAgoOpsRaw}
+            vatRevenue={twoAgoVatRevenue}
+            opsUserRows={twoAgoOpsUserRows}
+          />
+        </div>
+        </div>
+      </details>
 
     </div>
   )

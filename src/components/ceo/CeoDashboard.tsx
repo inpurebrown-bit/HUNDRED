@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, FormEvent, ReactNode } from 'react'
+import { useState, useRef, useEffect, FormEvent, ReactNode, Fragment } from 'react'
 import { signOut, useSession } from 'next-auth/react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import Image from 'next/image'
@@ -25,6 +25,7 @@ import SplitView from '@/components/shared/SplitView'
 import TabErrorBoundary from '@/components/shared/TabErrorBoundary'
 import DigManageTab from './DigManageTab'
 import AuthCodeTab from './AuthCodeTab'
+import RevenueAnalytics from './RevenueAnalytics'
 
 // ── 공통 서브탭 바 컴포넌트 ────────────────────────────────────
 function SubTabBar<T extends string>({ tabs, active, onChange }: {
@@ -73,6 +74,30 @@ function AnalyticsTab() {
   )
 }
 
+// 도구 통합 탭 — 코드 요청 · DB 쓰레기통 · AI 로그 (가끔 쓰는 관리 기능)
+function ToolsTab({ codeCount, delCount }: { codeCount: number; delCount: number }) {
+  const [sub, setSub] = useState<'authcode' | 'trash' | 'ailogs' | 'freelancer' | 'profile'>(codeCount > 0 ? 'authcode' : delCount > 0 ? 'trash' : 'authcode')
+  return (
+    <div>
+      <SubTabBar
+        tabs={[
+          { key: 'authcode' as const, label: codeCount > 0 ? `코드 요청 (${codeCount})` : '코드 요청' },
+          { key: 'trash' as const, label: delCount > 0 ? `DB 쓰레기통 (${delCount})` : 'DB 쓰레기통' },
+          { key: 'ailogs' as const, label: 'AI 로그' },
+          { key: 'freelancer' as const, label: '프리랜서 관리대장' },
+          { key: 'profile' as const, label: '사원정보' },
+        ]}
+        active={sub} onChange={setSub}
+      />
+      {sub === 'authcode' && <AuthCodeTab />}
+      {sub === 'trash' && <TrashOnlyTab />}
+      {sub === 'ailogs' && <AiLogsTab />}
+      {sub === 'freelancer' && <FreelancerTab />}
+      {sub === 'profile' && <div className="space-y-8"><MyProfileTab /><PinManageTab /></div>}
+    </div>
+  )
+}
+
 // 회의록·보고함 통합 탭
 function MinutesReportsTab() {
   const [sub, setSub] = useState<'minutes' | 'ops_minutes' | 'reports'>('reports')
@@ -93,24 +118,9 @@ function MinutesReportsTab() {
   )
 }
 
-// 직원관리 통합 탭
+// 직원관리 탭 (프리랜서 관리대장·사원정보는 도구 탭으로 이동)
 function StaffManageTab() {
-  const [sub, setSub] = useState<'employees' | 'freelancer' | 'profile'>('employees')
-  return (
-    <div>
-      <SubTabBar
-        tabs={[
-          { key: 'employees'  as const, label: '직원 관리' },
-          { key: 'freelancer' as const, label: '프리랜서 관리대장' },
-          { key: 'profile'    as const, label: '사원정보' },
-        ]}
-        active={sub} onChange={setSub}
-      />
-      {sub === 'employees' && <EmployeeManageSection />}
-      {sub === 'freelancer' && <FreelancerTab />}
-      {sub === 'profile' && <div className="space-y-8"><MyProfileTab /><PinManageTab /></div>}
-    </div>
-  )
+  return <EmployeeManageSection />
 }
 
 interface Message {
@@ -137,7 +147,7 @@ export default function CeoDashboard() {
   const { data: session } = useSession()
   const ceoName = session?.user?.name ?? '대표'
   const ceoId = (session?.user as any)?.id ?? ''
-  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'staffmanage' | 'minutesreports' | 'calendar' | 'ailogs' | 'trash' | 'dbmanage' | 'profile' | 'dig' | 'authcode'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'staffmanage' | 'minutesreports' | 'calendar' | 'ailogs' | 'trash' | 'authcode' | 'tools' | 'dbmanage' | 'profile' | 'dig' | 'authcode'>('overview')
   const [menuOpen, setMenuOpen] = useState(false)
   const [salesInitialView, setSalesInitialView] = useState<'customers' | 'inspection' | 'as' | 'transfer' | 'diary' | undefined>(undefined)
   const [salesInitialStatusTab, setSalesInitialStatusTab] = useState<'all' | 'lead' | 'db010' | 'contracted' | 'emotional' | 'trash' | undefined>(undefined)
@@ -251,18 +261,18 @@ export default function CeoDashboard() {
   }, [])
 
   const tabs = [
+    // ── 사업 (매출·손익·팀 성과) ──
     { key: 'overview',       label: '전체 현황' },
-    { key: 'dig',            label: '발굴팀' },
-    { key: 'assign',         label: '계약 배정' },
+    { key: 'analytics',      label: '손익·급여' },
     { key: 'sales',          label: '영업팀' },
     { key: 'ops',            label: '관리팀' },
-    { key: 'analytics',      label: '손익·급여' },
-    { key: 'staffmanage',    label: '직원관리' },
+    { key: 'dig',            label: '발굴팀' },
+    { key: 'assign',         label: '계약 배정' },
+    // ── 운영 (보고·일정·직원·도구) ──
     { key: 'minutesreports', label: '회의록·보고' },
     { key: 'calendar',       label: '일정관리' },
-    { key: 'ailogs',         label: 'AI 로그' },
-    { key: 'authcode',       label: authCodeCount > 0 ? `코드 요청 (${authCodeCount})` : '코드 요청' },
-    { key: 'trash',          label: deleteReqCount > 0 ? `DB 쓰레기통 (${deleteReqCount})` : 'DB 쓰레기통' },
+    { key: 'staffmanage',    label: '직원관리' },
+    { key: 'tools',          label: (authCodeCount + deleteReqCount) > 0 ? `도구 (${authCodeCount + deleteReqCount})` : '도구' },
   ]
 
   return (
@@ -378,8 +388,11 @@ export default function CeoDashboard() {
                   )}
                 </div>
                 {tabs.map(tab => (
+                  <Fragment key={tab.key}>
+                  {(tab.key === 'overview' || tab.key === 'minutesreports') && (
+                    <p className="px-4 pt-3 pb-1 text-[11px] font-bold tracking-widest text-[#a8873f]">{tab.key === 'overview' ? '사업' : '운영'}</p>
+                  )}
                   <button
-                    key={tab.key}
                     onClick={() => { setActiveTab(tab.key as any); setMenuOpen(false) }}
                     className={`w-full text-left px-4 py-3 text-sm transition-colors flex items-center gap-3 ${
                       activeTab === tab.key
@@ -391,6 +404,7 @@ export default function CeoDashboard() {
                     {activeTab !== tab.key && <span className="w-1.5 h-1.5 shrink-0" />}
                     {tab.label}
                   </button>
+                  </Fragment>
                 ))}
               </div>
             </>
@@ -401,7 +415,9 @@ export default function CeoDashboard() {
       {/* ── 데스크탑 탭바 ── */}
       <div className="hidden md:flex bg-white border-b border-gray-200 sticky top-[52px] z-20 px-6 overflow-x-auto shadow-sm">
         {tabs.map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key as any)}
+          <Fragment key={tab.key}>
+          {tab.key === 'minutesreports' && <span className="w-px h-6 bg-gray-200 mx-2 self-center shrink-0" aria-hidden />}
+          <button onClick={() => setActiveTab(tab.key as any)}
             className={`relative px-4 py-3 text-sm whitespace-nowrap shrink-0 transition-colors font-medium ${
               activeTab === tab.key
                 ? 'text-[#1B2A45]'
@@ -412,6 +428,7 @@ export default function CeoDashboard() {
               <span className="absolute bottom-0 left-2 right-2 h-[2px] bg-[#C5A258] rounded-full" />
             )}
           </button>
+          </Fragment>
         ))}
       </div>
 
@@ -435,9 +452,7 @@ export default function CeoDashboard() {
         {activeTab === 'staffmanage'    && <StaffManageTab />}
         {activeTab === 'minutesreports' && <MinutesReportsTab />}
         {activeTab === 'calendar'       && <CalendarTab />}
-        {activeTab === 'ailogs'         && <AiLogsTab />}
-        {activeTab === 'authcode'       && <AuthCodeTab />}
-        {activeTab === 'trash'          && <TrashOnlyTab />}
+        {activeTab === 'tools'          && <ToolsTab codeCount={authCodeCount} delCount={deleteReqCount} />}
         {activeTab === 'dbmanage'       && <DuplicateOnlyTab />}
       </div>
 
@@ -1143,6 +1158,113 @@ function KimYunjiCard({ totalOpsRevenue, putoContractCount, fmt }: {
 }
 
 // ─── 매출 관리 ───────────────────────────────────────────
+// ── 월별 매출 추이 (최근 6개월) — 영업팀/관리팀 막대 + 금액 표시 + 6개월 합계 ──
+function MonthlyRevenueChart({ monthly }: { monthly: any[] }) {
+  const [on, setOn] = useState(false)
+  useEffect(() => { const t = setTimeout(() => setOn(true), 60); return () => clearTimeout(t) }, [])
+  const rows = (monthly || []) as { month: string; fullMonth?: string; 영업팀: number; 관리팀: number; 합계: number }[]
+  const empty = rows.every(m => !m.합계)
+  const nowKey = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}` })()
+  const man = (v: number) => v >= 100000000 ? (parseFloat((v / 100000000).toFixed(2)) + '억') : Math.round(v / 10000).toLocaleString() + '만'
+  const won = (v: number) => Math.round(v).toLocaleString() + '원'
+  const sumS = rows.reduce((s, m) => s + (m.영업팀 || 0), 0)
+  const sumO = rows.reduce((s, m) => s + (m.관리팀 || 0), 0)
+  const peak = Math.max(1, ...rows.flatMap(m => [m.영업팀 || 0, m.관리팀 || 0]))
+  // 눈금: 최대값을 보기 좋은 단위로 올림
+  const step = (() => { const raw = peak / 4; const pow = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / pow; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * pow })()
+  const top = step * 4
+  const ticks = [4, 3, 2, 1, 0].map(i => i * step)
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-5 md:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <div>
+          <h3 className="text-sm font-bold text-[#0b2140]">월별 매출 추이</h3>
+          <p className="text-[11px] text-gray-400 mt-0.5">최근 6개월 · 영업팀 / 관리팀</p>
+        </div>
+        <div className="flex items-center gap-3 text-[11px] text-gray-500">
+          <span className="flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-full bg-[#0b2140]" />영업팀</span>
+          <span className="flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-full bg-[#b8995a]" />관리팀</span>
+        </div>
+      </div>
+
+      {empty ? (
+        <p className="text-center text-gray-400 text-sm py-10">아직 매출 데이터가 없습니다.</p>
+      ) : (
+        <>
+          <div className="relative h-[260px] pl-12">
+            {/* 가로 눈금선 */}
+            {ticks.map(t => (
+              <div key={t} className="absolute left-0 right-0 flex items-center" style={{ bottom: `calc(28px + (100% - 48px) * ${t / top})` }}>
+                <span className="w-11 pr-2 text-right text-[10px] text-gray-300 tabular-nums">{t === 0 ? '0' : man(t)}</span>
+                <span className="flex-1 border-t border-dashed border-gray-100" />
+              </div>
+            ))}
+            {/* 막대 */}
+            <div className="absolute left-12 right-0 top-6 bottom-7 flex items-end justify-around">
+              {rows.map(m => {
+                const cur = m.fullMonth === nowKey
+                const h = (v: number) => (on ? Math.max(v > 0 ? 2 : 0, (v / top) * 100) : 0) + '%'
+                return (
+                  <div key={m.month} className={`group relative flex-1 h-full flex items-end justify-center gap-1.5 md:gap-2.5 rounded-xl transition-colors ${cur ? 'bg-[#b8995a]/[.07]' : 'hover:bg-gray-50'}`}>
+                    {[
+                      { v: m.영업팀 || 0, bar: 'from-[#243b6b] to-[#0b2140]', txt: 'text-[#0b2140]' },
+                      { v: m.관리팀 || 0, bar: 'from-[#e6d4a3] to-[#b8995a]', txt: 'text-[#a8873f]' },
+                    ].map((s, i) => (
+                      <div key={i} className="relative h-full w-[34%] max-w-[44px] flex items-end">
+                        <span className={`absolute left-1/2 -translate-x-1/2 text-[10px] md:text-[11px] font-bold tabular-nums whitespace-nowrap ${s.txt}`}
+                          style={{ bottom: `calc(${on ? Math.max(s.v > 0 ? 2 : 0, (s.v / top) * 100) : 0}% + 4px)`, transition: 'bottom 1s cubic-bezier(.16,1,.3,1)' }}>
+                          {s.v > 0 ? man(s.v) : ''}
+                        </span>
+                        <div className={`w-full rounded-t-lg bg-gradient-to-t ${s.bar} shadow-[0_6px_14px_-8px_rgba(11,33,64,.5)]`}
+                          style={{ height: h(s.v), transition: 'height 1s cubic-bezier(.16,1,.3,1)' }} />
+                      </div>
+                    ))}
+                    {/* 마우스를 올리면 정확한 금액 */}
+                    <div className="pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 -translate-y-full z-10 hidden group-hover:block bg-[#0b2140] text-white rounded-lg px-3 py-2 text-[11px] whitespace-nowrap shadow-xl">
+                      <p className="font-bold mb-1">{m.month}</p>
+                      <p>영업팀 {won(m.영업팀 || 0)}</p>
+                      <p>관리팀 {won(m.관리팀 || 0)}</p>
+                      <p className="text-[#E8D080] font-bold mt-1 pt-1 border-t border-white/15">합계 {won(m.합계 || 0)}</p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            {/* 월 라벨 */}
+            <div className="absolute left-12 right-0 bottom-0 h-6 flex justify-around">
+              {rows.map(m => (
+                <span key={m.month} className={`flex-1 text-center text-[11px] ${m.fullMonth === nowKey ? 'font-black text-[#0b2140]' : 'text-gray-400'}`}>
+                  {m.month}{m.fullMonth === nowKey ? ' ●' : ''}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* 6개월 합계 */}
+          <div className="grid grid-cols-3 gap-2.5 md:gap-3 mt-5">
+            <div className="rounded-xl bg-[#0b2140]/[.05] border border-[#0b2140]/10 px-3 py-3 text-center">
+              <p className="text-[10px] text-[#0b2140]/60 font-semibold">영업팀 6개월 합계</p>
+              <p className="text-base md:text-lg font-black text-[#0b2140] mt-0.5 tabular-nums">{man(sumS)}</p>
+              <p className="text-[10px] text-gray-400 tabular-nums">{won(sumS)}</p>
+            </div>
+            <div className="rounded-xl bg-[#b8995a]/10 border border-[#b8995a]/25 px-3 py-3 text-center">
+              <p className="text-[10px] text-[#a8873f] font-semibold">관리팀 6개월 합계</p>
+              <p className="text-base md:text-lg font-black text-[#a8873f] mt-0.5 tabular-nums">{man(sumO)}</p>
+              <p className="text-[10px] text-gray-400 tabular-nums">{won(sumO)}</p>
+            </div>
+            <div className="rounded-xl bg-gradient-to-br from-[#10203a] to-[#0a1424] px-3 py-3 text-center">
+              <p className="text-[10px] text-white/60 font-semibold">전체 합계</p>
+              <p className="text-base md:text-lg font-black text-[#E8D080] mt-0.5 tabular-nums">{man(sumS + sumO)}</p>
+              <p className="text-[10px] text-white/45 tabular-nums">{won(sumS + sumO)}</p>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function RevenueTab() {
   const [data, setData] = useState<any>(null)
   const [customers, setCustomers] = useState<any[]>([])
@@ -1245,32 +1367,19 @@ function RevenueTab() {
 
   return (
     <div className="space-y-6 pb-8">
+      {/* ── 경영 분석: 매출·비용·순이익 추이, 성장 여부, 팀별 본전, 목표 시뮬레이션, 세금 ── */}
+      <RevenueAnalytics data={data} />
 
-      {/* ── 이달 매출 상단 요약 ── */}
-      <div className="bg-gradient-to-r from-[#1B2A45] to-[#263d66] rounded-2xl p-5 text-white">
-        <div className="flex items-center justify-between mb-4">
+      {/* ── 상세 내역 (이달 계약·수수료 목록, 직원별 실적) ── */}
+      <details className="group bg-white rounded-2xl border border-gray-100 shadow-sm">
+        <summary className="cursor-pointer list-none px-5 py-4 flex items-center justify-between">
           <div>
-            <p className="text-[11px] text-white/60 font-medium">{thisMonthStr.replace('-', '년 ')}월 매출</p>
-            <p className="text-3xl font-black mt-0.5">{fmt(thisMonthSalesTotal + thisMonthOpsTotal)}원</p>
+            <p className="text-sm font-black text-[#0b2140]">상세 내역 보기</p>
+            <p className="text-[11px] text-gray-400 mt-0.5">이달 영업 계약 · 관리팀 수수료 목록, 이번 달 성과, 직원별 실적</p>
           </div>
-          {revenueChange !== null && (
-            <div className={`text-center px-3 py-1.5 rounded-xl ${Number(revenueChange) >= 0 ? 'bg-emerald-500/30' : 'bg-red-400/30'}`}>
-              <p className="text-lg font-black">{Number(revenueChange) >= 0 ? '▲' : '▼'}{Math.abs(Number(revenueChange))}%</p>
-              <p className="text-[10px] text-white/70">전월 대비</p>
-            </div>
-          )}
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white/10 rounded-xl p-3">
-            <p className="text-[10px] text-white/60 mb-1">영업팀 ({thisMonthSales.length}건)</p>
-            <p className="text-xl font-black">{fmt(thisMonthSalesTotal)}원</p>
-          </div>
-          <div className="bg-white/10 rounded-xl p-3">
-            <p className="text-[10px] text-white/60 mb-1">관리팀 ({thisMonthOps.length}건)</p>
-            <p className="text-xl font-black">{fmt(thisMonthOpsTotal)}원</p>
-          </div>
-        </div>
-      </div>
+          <span className="text-xs text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+        </summary>
+        <div className="px-4 pb-5 space-y-6">
 
       {/* ── 이달 매출 내역 상세 ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1338,109 +1447,6 @@ function RevenueTab() {
         </div>
       </div>
 
-      {/* ── 세금 현황 ── */}
-      {data && (() => {
-        const lastYr: number = data.lastYear ?? (new Date().getFullYear() - 1)
-        const thisYr: number = data.thisYear ?? new Date().getFullYear()
-        const annualRev = data.annualRevenue || {}
-        const prevH2 = data.vatPrevH2 || {}
-        const currH1 = data.vatCurrH1 || {}
-        const currH2 = data.vatCurrH2 || {}
-
-        const rows = [
-          { label: `${lastYr}년 종소세`, year: lastYr, reportYear: lastYr + 1 },
-          { label: `${thisYr}년 종소세`, year: thisYr, reportYear: thisYr + 1 },
-        ]
-
-        return (
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-gray-700">세금 현황</h3>
-
-            {/* 종합소득세 */}
-            <div className="bg-white rounded-xl border border-orange-100 overflow-hidden">
-              <div className="px-4 py-2.5 bg-orange-50 border-b border-orange-100">
-                <p className="text-xs font-bold text-orange-800">종합소득세 (종소세) — 매출 10% 기준</p>
-                <p className="text-[10px] text-orange-500 mt-0.5">보유 권장액 (실제 세율·공제는 세무사 확인)</p>
-              </div>
-              <div className="divide-y divide-gray-50">
-                {rows.map(({ label, year, reportYear }) => {
-                  const annual = annualRev[String(year)] || { sales: 0, ops: 0, total: 0 }
-                  const estimated = Math.round(annual.total * 0.1)
-                  const isCurrentYear = year === thisYr
-                  return (
-                    <div key={year} className="px-4 py-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-gray-700">{label}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${isCurrentYear ? 'bg-blue-50 text-blue-500' : 'bg-gray-50 text-gray-400'}`}>
-                          신고 {reportYear}년 5월
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-4 gap-2 text-[11px] items-end">
-                        <div>
-                          <p className="text-gray-400 mb-0.5">영업팀 매출</p>
-                          <p className="font-semibold text-gray-700">{fmt(annual.sales)}원</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-400 mb-0.5">관리팀 매출</p>
-                          <p className="font-semibold text-gray-700">{fmt(annual.ops)}원</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-400 mb-0.5">합산 매출</p>
-                          <p className="font-bold text-gray-900">{fmt(annual.total)}원</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-gray-400 mb-0.5">예상 종소세 (10%)</p>
-                          <p className="text-base font-black text-orange-600">{fmt(estimated)}원</p>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* 부가세 */}
-            <div className="bg-white rounded-xl border border-teal-100 overflow-hidden">
-              <div className="px-4 py-2.5 bg-teal-50 border-b border-teal-100">
-                <p className="text-xs font-bold text-teal-800">부가세 (VAT 10%)</p>
-                <p className="text-[10px] text-teal-500 mt-0.5">세금계산서 발행 건 / 영업착수금(부가세포함) + 관리팀수수료(계산서요청) 합산</p>
-              </div>
-              <div className="divide-y divide-gray-50">
-                {[
-                  { label: prevH2.period || `${lastYr}년 7~12월`, d: prevH2, subLabel: '2기 확정 신고 (다음년 1월 25일)' },
-                  { label: currH1.period || `${thisYr}년 1~6월`, d: currH1, subLabel: '1기 확정 신고 (7월 25일)' },
-                  { label: currH2.period || `${thisYr}년 7~12월`, d: currH2, subLabel: '2기 확정 신고 (다음년 1월 25일)', current: true },
-                ].map(({ label, d, subLabel, current }: any) => (
-                  <div key={label} className={`px-4 py-3 ${current ? 'bg-teal-50/50' : ''}`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
-                        {label}
-                        {current && <span className="text-[9px] bg-teal-500 text-white px-1.5 py-0.5 rounded-full font-bold">진행중</span>}
-                      </span>
-                      <span className="text-[10px] text-gray-400">{subLabel}</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-[11px]">
-                      <div>
-                        <p className="text-gray-400 mb-0.5">영업팀 착수금</p>
-                        <p className="font-semibold text-teal-700">{fmt(d.sales_vat || 0)}원</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-400 mb-0.5">관리팀 수수료</p>
-                        <p className="font-semibold text-teal-700">{fmt(d.ops_vat || 0)}원</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-400 mb-0.5">합계 부가세</p>
-                        <p className="font-bold text-teal-900 text-sm">{fmt(d.total_vat || 0)}원</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )
-      })()}
-
       {/* 이번 달 성과 */}
       <div>
         <h3 className="text-sm font-semibold text-gray-700 mb-3">이번 달 성과</h3>
@@ -1465,77 +1471,6 @@ function RevenueTab() {
             <p className="text-xs text-gray-400 mt-1">총 {totalContractCount}건 계약</p>
           </div>
         </div>
-      </div>
-
-      {/* 총계 카드 */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: '영업팀 총 매출', value: data.totalSales, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: '관리팀 총 매출', value: data.totalOps, color: 'text-violet-600', bg: 'bg-violet-50' },
-          { label: '통합 총 매출', value: data.total, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-        ].map(s => (
-          <div key={s.label} className={`${s.bg} rounded-xl p-5 text-center`}>
-            <p className={`text-2xl font-black ${s.color}`}>{fmt(s.value)}원</p>
-            <p className="text-xs text-gray-500 mt-1">{s.label}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* 월별 차트 */}
-      <div className="bg-white rounded-xl border border-gray-100 p-5">
-        <h3 className="text-sm font-semibold text-gray-800 mb-4">월별 매출 추이 (최근 6개월)</h3>
-        {data.monthly.every((m: any) => m.합계 === 0) ? (
-          <p className="text-center text-gray-400 text-sm py-8">아직 매출 데이터가 없습니다.</p>
-        ) : (
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={data.monthly} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-              <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-              <YAxis tickFormatter={(v: number) => fmt(v)} tick={{ fontSize: 11 }} width={55} />
-              <Tooltip formatter={(v: number) => v.toLocaleString() + '원'} />
-              <Legend />
-              <Bar dataKey="영업팀" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="관리팀" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        )}
-      </div>
-
-      {/* 월별 손익 연동 */}
-      <div className="bg-white rounded-xl border border-gray-100 p-5">
-        <div className="flex items-center gap-3 mb-4">
-          <h3 className="text-sm font-semibold text-gray-800">월별 손익 연동</h3>
-          <input
-            type="month"
-            value={pnlMonth}
-            onChange={e => setPnlMonth(e.target.value)}
-            className="border border-gray-200 rounded px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-          {pnlLoading && <span className="text-xs text-gray-400">불러오는 중...</span>}
-        </div>
-        {!pnlData ? (
-          <p className="text-center text-gray-400 text-sm py-6">
-            {pnlLoading ? '불러오는 중...' : `${pnlMonth} 급여 데이터가 없습니다.`}
-          </p>
-        ) : pnl && (
-          <div className="grid grid-cols-4 gap-3">
-            {[
-              { label: '총매출', value: pnl.totalRevenue, color: 'text-blue-700', bg: 'bg-blue-50' },
-              { label: '인건비', value: pnl.laborCost, color: 'text-amber-700', bg: 'bg-amber-50' },
-              { label: '운영비', value: pnl.otherTotal, color: 'text-violet-700', bg: 'bg-violet-50' },
-              {
-                label: '순이익',
-                value: pnl.netProfit,
-                color: pnl.netProfit >= 0 ? 'text-emerald-700' : 'text-red-700',
-                bg: pnl.netProfit >= 0 ? 'bg-emerald-50' : 'bg-red-50',
-              },
-            ].map(s => (
-              <div key={s.label} className={`${s.bg} rounded-lg p-4 text-center`}>
-                <p className="text-xs text-gray-500 mb-1">{s.label}</p>
-                <p className={`text-lg font-black ${s.color}`}>{fmt(s.value)}원</p>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* 직원별 실적 */}
@@ -1593,6 +1528,8 @@ function RevenueTab() {
 
       {/* 관리실장 김윤지 현황 */}
       <KimYunjiCard totalOpsRevenue={data.totalOps || 0} putoContractCount={data.putoContractCount || 0} fmt={fmt} />
+        </div>
+      </details>
     </div>
   )
 }
@@ -1642,6 +1579,10 @@ function EmployeeManageSection() {
   }
 
   const roleLabel: Record<string, string> = { sales: '영업팀', ops: '관리팀', dig: '발굴팀', ceo: '대표' }
+  const [showInactive, setShowInactive] = useState(false)
+  const isInactive = (e: EmpRow) => !!e.blocked || /tester/i.test((e.username || '') + ' ' + (e.name || ''))
+  const activeEmps = employees.filter(e => !isInactive(e))
+  const inactiveEmps = employees.filter(isInactive)
   const roleBg: Record<string, string> = { sales: 'bg-sky-100 text-sky-700', ops: 'bg-violet-100 text-violet-700', dig: 'bg-orange-100 text-orange-700', ceo: 'bg-amber-100 text-amber-700' }
 
   const load = async () => {
@@ -1777,11 +1718,11 @@ function EmployeeManageSection() {
   }
 
   return (
-    <div className="space-y-4 max-w-3xl">
-      <div className="flex items-center justify-between">
+    <div className="space-y-5 max-w-3xl">
+      <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
-          <h3 className="text-sm font-bold text-gray-800">직원 관리</h3>
-          <p className="text-xs text-gray-400 mt-0.5">이름·아이디·비밀번호 수정, 팀이관, 계정 삭제</p>
+          <h2 className="text-[26px] font-black text-[#0b2140] leading-tight">직원관리</h2>
+          <p className="text-[13.5px] text-gray-500 mt-0.5">{(['sales', 'ops', 'dig'] as const).map(r => `${roleLabel[r]} ${activeEmps.filter(e => e.role === r).length}명`).join(' · ')}</p>
         </div>
         <div className="flex gap-2">
           <button onClick={load} className="px-3 py-1.5 text-xs bg-white border border-gray-200 text-gray-600 rounded-xl hover:border-gray-400 transition-colors">새로고침</button>
@@ -1835,8 +1776,33 @@ function EmployeeManageSection() {
       ) : employees.length === 0 ? (
         <div className="bg-white border border-[#E8E2D4] rounded-xl p-12 text-center text-sm text-gray-400">직원이 없습니다</div>
       ) : (
-        <div className="bg-white border border-[#E8E2D4] rounded-xl overflow-hidden">
-          {employees.map(emp => (
+        <>
+        {(['sales', 'ops', 'dig'] as const).map(r => {
+          const list = activeEmps.filter(e => e.role === r)
+          return (
+            <div key={r}>
+              <p className="text-[15px] font-black text-[#0b2140] mb-2 px-1">{roleLabel[r]} <span className="text-gray-400 font-semibold">{list.length}</span></p>
+              {list.length === 0
+                ? <div className="bg-white border border-dashed border-gray-200 rounded-3xl p-6 text-center text-[13.5px] text-gray-400">{r === 'dig' ? '아직 발굴팀 직원이 없습니다 (직원 추가에서 만들 수 있어요)' : '직원이 없습니다'}</div>
+                : <div className="bg-white border border-gray-100 shadow-sm rounded-3xl overflow-hidden">{list.map(renderRow)}</div>}
+            </div>
+          )
+        })}
+        {inactiveEmps.length > 0 && (
+          <div>
+            <button onClick={() => setShowInactive(v => !v)} className="text-[13.5px] font-bold text-gray-500 hover:text-[#0b2140] px-1 py-1">
+              {showInactive ? '▲' : '▼'} 비활성 계정 {inactiveEmps.length}개 (테스트 · 블락 · 퇴사)
+            </button>
+            {showInactive && <div className="bg-white border border-gray-100 shadow-sm rounded-3xl overflow-hidden mt-2">{inactiveEmps.map(renderRow)}</div>}
+          </div>
+        )}
+        </>
+      )}
+    </div>
+  )
+
+  function renderRow(emp: EmpRow) {
+    return (
             <div key={emp.id} className={`border-b border-gray-50 last:border-b-0 ${emp.id === newlyCreatedId ? 'bg-green-50' : ''}`}>
               {editId === emp.id ? (
                 /* 수정 폼 */
@@ -1931,11 +1897,8 @@ function EmployeeManageSection() {
                 </div>
               )}
             </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
+    )
+  }
 }
 
 // ─── 보고함 ──────────────────────────────────────────────

@@ -206,7 +206,18 @@ export async function POST(req: NextRequest) {
   let resolvedOwnerId: string | null = owner_id ?? null
   let resolvedOpsName: string | null = ops_user_name ?? null
 
-  if (!resolvedOwnerId && !resolvedOpsName) {
+  // 담당자 이름만 넘어온 경우(관리팀 직접 추가 등) 이름으로 담당자 ID를 찾고, 없으면 로그인한 관리팀 본인으로 배정
+  // (owner_id 는 DB에서 필수값이라 비어 있으면 저장이 거부된다)
+  if (!resolvedOwnerId && resolvedOpsName) {
+    const { data: named } = await supabaseAdmin.from('users').select('id').eq('role', 'ops').eq('name', resolvedOpsName).limit(1)
+    if (named && named.length > 0) resolvedOwnerId = String(named[0].id)
+  }
+  if (!resolvedOwnerId && user.role === 'ops') {
+    resolvedOwnerId = String(user.id)
+    if (!resolvedOpsName) resolvedOpsName = user.name || null
+  }
+
+  if (!resolvedOwnerId) {
     const { data: opsUsers } = await supabaseAdmin
       .from('users')
       .select('id, name')

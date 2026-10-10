@@ -34,7 +34,21 @@ export const LOCAL_TAX_RATE       = 0.003
 export const OPS_FEE_RATE         = 0.10 // 수수료 매출의 10%
 export const OPS_PUTO_RATE        = 0.40 // 뿌토 매출의 40%
 export const OPS_MONTHLY_SUB_RATE = 0.05 // 월정기권(수수료없음) 계약금의 5% → 관리팀장 보너스
-export const NET_RATE             = 0.967 // 원천징수(3.3%) 후 실수령율
+export const NET_RATE             = 0.967 // (참고용) 원천징수 3.3% 후 실수령율 — 계산에는 calcWithholding 사용
+
+// ── 원천징수 (세무사 기준: 10원 미만 절사) ─────────────────
+//  소득세     = 세전 지급액 × 3%        → 10원 미만 절사
+//  지방소득세 = 소득세 × 10% (0.3%)      → 10원 미만 절사
+//  실수령액   = 세전 지급액 − 소득세 − 지방소득세
+//  예) 2,975,000원 → 89,250 + 8,920 = 2,876,830원 / 2,023,500원 → 60,700 + 6,070 = 1,956,730원
+export function calcWithholding(before: number): { incomeTax: number; localTax: number; tax: number; after: number } {
+  const gross = Math.round(Number(before) || 0)
+  if (gross <= 0) return { incomeTax: 0, localTax: 0, tax: 0, after: gross }
+  // 실수 오차로 10원 단위가 틀어지지 않도록 소수 6자리에서 한 번 맞춘 뒤 절사
+  const incomeTax = Math.floor(Math.round(gross * 3 / 100 * 1e6) / 1e6 / 10) * 10
+  const localTax  = Math.floor(Math.round(incomeTax * 10 / 100 * 1e6) / 1e6 / 10) * 10
+  return { incomeTax, localTax, tax: incomeTax + localTax, after: gross - incomeTax - localTax }
+}
 
 // ── 실시간 영업팀 계약 집계 ───────────────────────────────
 // PayrollTab / PayslipTab 공통 — 인별 계약 매출·개수 한 번만 계산
@@ -122,7 +136,7 @@ export function calcDigSalary(
   const extraCnt  = Math.max(0, approvedCount - DIG_DAILY_GOAL)
   const incentive = extraCnt * DIG_BONUS_PER_EXTRA
   const before    = base + incentive
-  const after     = Math.round(before * NET_RATE)
+  const after     = calcWithholding(before).after
   return { base, incentive, total: before, before, after }
 }
 

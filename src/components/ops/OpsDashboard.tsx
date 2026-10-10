@@ -3334,7 +3334,7 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
       const customerId = custData?.customer?.id || custData?.id || null
 
       // ops_case 생성 (stage: new_db)
-      await fetch('/api/ops-cases', {
+      const caseRes = await fetch('/api/ops-cases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -3347,9 +3347,18 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
           timeline: [{ user: userName, content: `신규DB 직접 추가: ${addForm.company}`, created_at: nowKST() }],
         }),
       })
+      if (!caseRes.ok) {
+        const err = await caseRes.json().catch(() => ({}))
+        alert(`뿌토DB 등록에 실패했습니다.
+${err.error || caseRes.status}
+입력한 내용은 그대로 남아 있으니 다시 시도해 주세요.`)
+        return
+      }
       setAddForm(EMPTY_ADD_FORM)
       setAddModal(false)
       onAdded?.()
+    } catch {
+      alert('네트워크 오류로 뿌토DB 등록에 실패했습니다. 다시 시도해 주세요.')
     } finally {
       setAddSaving(false)
     }

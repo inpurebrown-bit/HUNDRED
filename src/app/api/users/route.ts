@@ -22,6 +22,8 @@ export async function GET(req: NextRequest) {
         .from('users')
         .select('id, name')
         .eq('role', role)
+        .or('blocked.is.null,blocked.eq.false')   // 비활성(차단) 직원은 목록에서 제외
+        .not('username', 'ilike', '%tester%')      // 시험용 계정 제외
         .order('name')
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
       return NextResponse.json({ users: data })
@@ -34,7 +36,8 @@ export async function GET(req: NextRequest) {
     .select('id, name, username, role, blocked')
     .order('name')
 
-  const finalQuery = role ? query.eq('role', role) : query
+  // 팀별 목록(role 지정)에서는 비활성(차단) 직원을 제외 — 직원관리 전체 목록(role 없음)에서는 그대로 보임
+  const finalQuery = role ? query.eq('role', role).or('blocked.is.null,blocked.eq.false').not('username', 'ilike', '%tester%') : query
 
   const { data, error } = await finalQuery
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

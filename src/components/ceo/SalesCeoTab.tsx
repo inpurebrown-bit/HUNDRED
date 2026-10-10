@@ -1005,8 +1005,10 @@ export default function SalesCeoTab({ initialView, initialStatusTab, initialSear
     }
 
     return salesPeople.map(name => {
-      const cfg = supplyConfig[name] || { supplied: 0, goal: 30, base: 0 }
-      const selfSupplied: number = (cfg as any).self_supplied || 0
+      const rawCfg = supplyConfig[name] || { supplied: 0, goal: 30, base: 0 }
+      // 값이 비어 있어도 NaN 이 되지 않도록 숫자로 정리
+      const cfg = { ...rawCfg, supplied: Number(rawCfg.supplied) || 0, goal: Number(rawCfg.goal) || 0, base: Number(rawCfg.base) || 0 }
+      const selfSupplied: number = Number((rawCfg as any).self_supplied) || 0
       const supplied = getPayrateSupply(name, cfg.supplied)
 
       // 모든 계약된 고객 (해당 영업사원)
@@ -1641,11 +1643,11 @@ export default function SalesCeoTab({ initialView, initialStatusTab, initialSear
 
       {/* ── 공급 현황 패널 (한경연 vs 자체공급) ── */}
       {supplyStats.length > 0 && (
-        <div className="bg-white border border-[#E8E2D4] rounded-2xl overflow-hidden">
-          <div className="px-5 py-3 bg-gray-50 border-b border-[#E8E2D4] flex items-center justify-between">
-            <span className="text-sm font-bold text-gray-700">공급 현황</span>
-            <span className="text-[10px] text-gray-400">한경연 DB vs 자체공급 · 이번달 누계</span>
-          </div>
+        <details className="group bg-white border border-[#E8E2D4] rounded-2xl overflow-hidden">
+          <summary className="cursor-pointer list-none px-5 py-3.5 bg-gray-50 flex items-center justify-between">
+            <span className="text-[15px] font-black text-[#0b2140]">공급 현황 <span className="text-[12.5px] font-medium text-gray-400 ml-1">이번 달 누계 · 눌러서 펼치기</span></span>
+            <span className="text-xs text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+          </summary>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -1653,8 +1655,8 @@ export default function SalesCeoTab({ initialView, initialStatusTab, initialSear
                   <th className="text-left px-4 py-2 text-gray-500 font-semibold">영업사원</th>
                   <th className="text-center px-3 py-2 text-sky-600 font-semibold">한경연<br/>공급수</th>
                   <th className="text-center px-3 py-2 text-sky-600 font-semibold">한경연<br/>결제율</th>
-                  <th className="text-center px-3 py-2 text-emerald-600 font-semibold">자체공급<br/>건수</th>
-                  <th className="text-center px-3 py-2 text-emerald-600 font-semibold">자체공급<br/>결제율</th>
+                  {supplyStats.some(x => x.selfSupplied > 0) && <th className="text-center px-3 py-2 text-emerald-600 font-semibold">자체공급<br/>건수</th>}
+                  {supplyStats.some(x => x.selfSupplied > 0) && <th className="text-center px-3 py-2 text-emerald-600 font-semibold">자체공급<br/>결제율</th>}
                   <th className="text-center px-3 py-2 text-gray-500 font-semibold">목표달성</th>
                 </tr>
               </thead>
@@ -1675,6 +1677,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab, initialSear
                         {s.supplied > 0 ? s.rate.toFixed(1) + '%' : '—'}
                       </span>
                     </td>
+                    {supplyStats.some(x => x.selfSupplied > 0) && (<>
                     <td className="px-3 py-2.5 text-center">
                       {s.selfSupplied > 0 ? (
                         <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 font-black text-sm px-2 py-0.5 rounded-full">{s.selfSupplied}</span>
@@ -1687,6 +1690,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab, initialSear
                         {s.selfSupplied > 0 ? s.selfRate.toFixed(1) + '%' : '—'}
                       </span>
                     </td>
+                    </>)}
                     <td className="px-3 py-2.5 text-center">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${s.achievePct >= 100 ? 'bg-emerald-100 text-emerald-700' : s.achievePct >= 60 ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
                         {s.achievePct.toFixed(0)}%
@@ -1697,33 +1701,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab, initialSear
               </tbody>
             </table>
           </div>
-        </div>
-      )}
-
-      {/* ── A/S 승인 → 공급 DB 보충 알림 배너 ── */}
-      {asApprovedList.length > 0 && !supplyBannerDismissed && (
-        <div className="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 flex items-center gap-3">
-          <span className="text-xl font-bold text-amber-500">!</span>
-          <div className="flex-1">
-            <p className="text-sm font-bold text-amber-800">공급 DB 보충 필요</p>
-            <p className="text-xs text-amber-600">A/S 승인 {asApprovedList.length}건 확인됨 · 소진된 DB {asApprovedList.length}개를 보충해주세요</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setCeoView('as')}
-            className="text-xs bg-amber-500 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-amber-600 transition-colors"
-          >
-            A/S 확인
-          </button>
-          <button
-            type="button"
-            onClick={() => setSupplyBannerDismissed(true)}
-            className="text-gray-400 hover:text-gray-600 text-lg leading-none px-1"
-            title="닫기"
-          >
-            ✕
-          </button>
-        </div>
+        </details>
       )}
 
       {/* ── 영업사원 탭 ── */}

@@ -20,6 +20,16 @@ export default function OpsMinutesTab() {
   const [prepDate, setPrepDate] = useState(yesterdayStr())
   const [reports, setReports] = useState<OpsReport[]>([])
   const [loading, setLoading] = useState(false)
+  // 처음 열 때: 어제에 보고가 없으면(주말·휴일) 가장 최근 관리팀 보고가 있는 날짜로 자동 이동
+  useEffect(() => {
+    fetch('/api/reports').then(r => r.json()).then(d => {
+      const all: OpsReport[] = d.reports || []
+      const t = todayStr()
+      const ds = all.filter(r => r.report_type === 'ops_daily').map(r => r.report_date).sort()
+      const pick = ds.filter(x => x < t).slice(-1)[0] || ds.slice(-1)[0]
+      if (pick) setPrepDate(pick)
+    }).catch(() => {})
+  }, [])
 
   async function loadReports(date: string) {
     setLoading(true)

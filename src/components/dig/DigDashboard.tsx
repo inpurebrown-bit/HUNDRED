@@ -474,7 +474,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
   const lblCls   = 'block text-xs font-semibold text-gray-500 mb-1'
 
   return (
-    <div className="min-h-screen bg-[#F7F6F2]">
+    <div className="min-h-screen page-bg bg-[#F7F6F2]">
 
       {/* 토스트 */}
       {toast && (

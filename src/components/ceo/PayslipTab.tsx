@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { calcSalesStructure, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PROMO_TIERS, PERF_BONUS_MIN_COUNT, PERF_BONUS_RATE, INCOME_TAX_RATE, LOCAL_TAX_RATE, OPS_FEE_RATE, OPS_PUTO_RATE, currentYearMonth, buildSalesContractMap, calcRefundDeductions, DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
+import { calcSalesStructure, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PROMO_TIERS, PERF_BONUS_MIN_COUNT, PERF_BONUS_RATE, INCOME_TAX_RATE, LOCAL_TAX_RATE, calcWithholding, OPS_FEE_RATE, OPS_PUTO_RATE, currentYearMonth, buildSalesContractMap, calcRefundDeductions, DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
 
 // ─── 타입 ─────────────────────────────────────────────────
 
@@ -93,9 +93,9 @@ function PayslipDocument({ emp, financial, yearMonth }: {
     ? emp.resident_id.replace(/^(\d{6})-?(\d{1})\d{6}$/, '$1-$2******')
     : ''
 
-  const tdL = 'border border-gray-400 px-2 py-1 text-xs bg-gray-100 font-medium whitespace-nowrap'
-  const tdV = 'border border-gray-400 px-2 py-1 text-xs'
-  const tdN = 'border border-gray-400 px-2 py-1 text-xs text-right'
+  const tdL = 'px-4 py-2.5 text-[13px] font-semibold text-[#0b2140] border-b border-gray-100 whitespace-nowrap align-top'
+  const tdV = 'px-3 py-2.5 text-[12px] text-gray-500 border-b border-gray-100 align-top'
+  const tdN = 'px-4 py-2.5 text-[13.5px] text-right tabular-nums text-[#0b2140] border-b border-gray-100 align-top'
 
   const refundNames = financial.refund_companies?.trim()
     ? financial.refund_companies.split('|').map(s => s.trim()).filter(Boolean)
@@ -114,9 +114,7 @@ function PayslipDocument({ emp, financial, yearMonth }: {
     const contractInc = st.allInc
     const subtotal    = st.main + awardsSum + allowSum
     const beforeTax   = subtotal - financial.deduction
-    const incomeTax   = Math.round(beforeTax * INCOME_TAX_RATE)
-    const localTax    = Math.round(beforeTax * LOCAL_TAX_RATE)
-    const actualPay   = beforeTax - incomeTax - localTax
+    const { incomeTax, localTax, after: actualPay } = calcWithholding(beforeTax)
     return { ...st, contractInc, perfBonus, promo, awardsSum, allowSum, subtotal, beforeTax, incomeTax, localTax, actualPay }
   })()
 
@@ -129,9 +127,7 @@ function PayslipDocument({ emp, financial, yearMonth }: {
     const allowSum  = (financial.allowance_details || []).reduce((s, a) => s + Number(a.amount || 0), 0)
     const subtotal  = Number(financial.base_salary) + feeInc + putoInc + Number(financial.ops_performance_bonus) + subBonus + awardsSum + allowSum
     const beforeTax = subtotal - financial.deduction
-    const incomeTax = Math.round(beforeTax * INCOME_TAX_RATE)
-    const localTax  = Math.round(beforeTax * LOCAL_TAX_RATE)
-    const actualPay = beforeTax - incomeTax - localTax
+    const { incomeTax, localTax, after: actualPay } = calcWithholding(beforeTax)
     return { feeInc, putoInc, subBonus, awardsSum, allowSum, subtotal, beforeTax, incomeTax, localTax, actualPay }
   })()
 
@@ -144,9 +140,7 @@ function PayslipDocument({ emp, financial, yearMonth }: {
     const allowSum  = (financial.allowance_details || []).reduce((s, a) => s + Number(a.amount || 0), 0)
     const subtotal  = base + incentive + allowSum
     const beforeTax = subtotal - financial.deduction
-    const incomeTax = Math.round(beforeTax * INCOME_TAX_RATE)
-    const localTax  = Math.round(beforeTax * LOCAL_TAX_RATE)
-    const actualPay = beforeTax - incomeTax - localTax
+    const { incomeTax, localTax, after: actualPay } = calcWithholding(beforeTax)
     return { base, incentive, extraCnt, allowSum, subtotal, beforeTax, incomeTax, localTax, actualPay }
   })()
 
@@ -157,81 +151,76 @@ function PayslipDocument({ emp, financial, yearMonth }: {
   return (
     <div
       id="payslip-print"
-      className="bg-white p-6 text-gray-900 relative"
-      style={{ fontFamily: 'Malgun Gothic, 맑은 고딕, sans-serif', minWidth: 580, maxWidth: 780, margin: '0 auto' }}
+      className="bg-white text-gray-900 relative overflow-hidden"
+      style={{ fontFamily: "'Pretendard Variable', Pretendard, 'Malgun Gothic', sans-serif", minWidth: 580, maxWidth: 780, margin: '0 auto', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' } as React.CSSProperties}
     >
-      {/* 워터마크 */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0" style={{ opacity: 0.055 }}>
-        <div className="text-center">
-          <div className="font-black leading-none" style={{ color: '#C5A258', fontFamily: 'serif', fontSize: 120 }}>100</div>
-          <div className="font-bold tracking-[0.3em]" style={{ color: '#1B2A45', fontSize: 28 }}>HUNDRED</div>
-          <div className="tracking-[0.5em]" style={{ color: '#1B2A45', fontSize: 12 }}>CONSULTANCY</div>
+      {/* 위쪽 포인트 줄 */}
+      <div style={{ height: 8, background: 'linear-gradient(90deg,#0b2140,#b8995a,#e6d4a3)' }} />
+
+      {/* 로고 워터마크 */}
+      <div className="absolute inset-0 pointer-events-none select-none z-0" style={{ backgroundImage: "url('/brand/logo-watermark.webp')", backgroundRepeat: 'no-repeat', backgroundPosition: 'center 55%', backgroundSize: '62%', opacity: 0.55 }} />
+
+      <div className="relative z-10 px-9 pt-8 pb-7">
+        {/* 머리말 */}
+        <div className="flex items-start justify-between gap-6 pb-5 border-b-2 border-[#0b2140]">
+          <div>
+            <img src="/brand/logo-full.webp" alt="HUNDRED Consulting" style={{ height: 64, width: 'auto' }} />
+            <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
+              헌드레드 컨설팅 · 사업자 {COMPANY.business_number}<br />
+              대표 {COMPANY.ceo_name} · {COMPANY.phone}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[11px] tracking-[0.35em] text-[#a8873f] font-bold">PAYMENT STATEMENT</p>
+            <h1 className="text-[21px] whitespace-nowrap font-black text-[#0b2140] leading-tight mt-1">{title}</h1>
+            <p className="text-[12px] text-gray-500 mt-2">기준월 <b className="text-[#0b2140]">{yearMonth}</b> · {isSales ? '영업팀' : isDig ? '발굴팀' : '관리팀'}</p>
+            <p className="text-[12px] text-gray-400">작성일 {today}</p>
+          </div>
         </div>
-      </div>
 
-      {/* 작성일 */}
-      <div className="text-right text-xs mb-1 text-gray-500">작성일: {today}</div>
-
-      {/* 제목 */}
-      <div className="bg-gray-200 border border-gray-400 text-center py-3 mb-3">
-        <h1 className="text-lg font-bold tracking-widest">{title}</h1>
-      </div>
-
-      {/* 발행사 정보 */}
-      <div className="flex justify-between items-start mb-3 text-xs text-gray-500 border-b border-gray-200 pb-2">
-        <div className="space-y-0.5">
-          <span className="font-semibold text-gray-700">헌드레드 컨설팅</span>
-          <span className="ml-3">사업자: {COMPANY.business_number}</span>
-          <span className="ml-3">대표: {COMPANY.ceo_name}</span>
-          <span className="ml-3">전화: {COMPANY.phone}</span>
+        {/* 수급자 정보 */}
+        <div className="mt-5 rounded-2xl bg-[#f6f7fb] border border-[#e4e7ee] px-5 py-4 grid grid-cols-2 gap-x-8 gap-y-3 text-[12.5px]">
+          {[
+            ['성명', emp.name || '-'],
+            ['주민등록번호', maskedResidentId || '-'],
+            ['전화번호', emp.phone || '-'],
+            [`계좌 (${emp.bank_name})`, emp.bank_account || '-'],
+          ].map(([k, v]) => (
+            <div key={k as string} className="flex items-baseline gap-3">
+              <span className="w-24 shrink-0 text-gray-500">{k}</span>
+              <span className="font-bold text-[#0b2140]">{v}</span>
+            </div>
+          ))}
+          <div className="col-span-2 flex items-baseline gap-3">
+            <span className="w-24 shrink-0 text-gray-500">주소</span>
+            <span className="font-bold text-[#0b2140]">{emp.address || '-'}</span>
+          </div>
         </div>
-        <div className="text-right space-y-0.5">
-          <div>기준월: <b className="text-gray-800">{yearMonth}</b></div>
-          <div>팀: <b className="text-gray-800">{isSales ? '영업팀' : isDig ? '발굴팀' : '관리팀'}</b></div>
-        </div>
-      </div>
 
-      {/* 소득자 정보 */}
-      <table className="border-collapse text-xs w-full mb-3">
-        <thead>
-          <tr>
-            <th colSpan={4} className="border border-gray-400 px-2 py-1 bg-gray-200 text-center font-bold">
-              소득자 (수급자) 정보
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td className={tdL}>성명</td>
-            <td className={tdV}>{emp.name || '-'}</td>
-            <td className={tdL}>주민등록번호</td>
-            <td className={tdV}>{maskedResidentId || '-'}</td>
-          </tr>
-          <tr>
-            <td className={tdL}>전화번호</td>
-            <td className={tdV}>{emp.phone || '-'}</td>
-            <td className={tdL}>계좌 ({emp.bank_name})</td>
-            <td className={tdV}>{emp.bank_account || '-'}</td>
-          </tr>
-          <tr>
-            <td className={tdL}>주소</td>
-            <td className={tdV} colSpan={3}>{emp.address || '-'}</td>
-          </tr>
-        </tbody>
-      </table>
+        {/* 핵심 금액 */}
+        <div className="mt-5 grid grid-cols-3 gap-3">
+          <div className="rounded-2xl border border-[#e4e7ee] px-4 py-3.5">
+            <p className="text-[11.5px] text-gray-500 font-semibold">공제 전 지급 총액</p>
+            <p className="text-[19px] font-black text-[#0b2140] tabular-nums mt-0.5">{fmt(beforeTax)}원</p>
+          </div>
+          <div className="rounded-2xl border border-[#e4e7ee] px-4 py-3.5">
+            <p className="text-[11.5px] text-gray-500 font-semibold">원천세 합계</p>
+            <p className="text-[19px] font-black text-red-600 tabular-nums mt-0.5">-{fmt(incomeTax + localTax)}원</p>
+          </div>
+          <div className="rounded-2xl px-4 py-3.5 text-white" style={{ background: 'linear-gradient(135deg,#0e2446,#0a1b36)' }}>
+            <p className="text-[11.5px] text-white/65 font-semibold">실지급액</p>
+            <p className="text-[21px] font-black tabular-nums mt-0.5" style={{ color: '#E8D080' }}>{fmt(actualPay)}원</p>
+          </div>
+        </div>
 
       {/* 용역비 지급 내역 */}
-      <table className="border-collapse text-xs w-full mb-3">
+      <p className="mt-6 mb-2 text-[14px] font-black text-[#0b2140]">용역비 지급 내역</p>
+      <table className="border-collapse w-full mb-4 rounded-2xl overflow-hidden" style={{ borderSpacing: 0 }}>
         <thead>
-          <tr>
-            <th colSpan={3} className="border border-gray-400 px-2 py-1 bg-gray-200 text-center font-bold">
-              용역비 지급 내역
-            </th>
-          </tr>
-          <tr>
-            <th className="border border-gray-400 px-2 py-1 bg-gray-100 text-center w-1/3">항목</th>
-            <th className="border border-gray-400 px-2 py-1 bg-gray-100 text-center w-1/3">내용</th>
-            <th className="border border-gray-400 px-2 py-1 bg-gray-100 text-center w-1/3">금액 (원)</th>
+          <tr style={{ background: '#0b2140' }}>
+            <th className="px-4 py-2.5 text-left text-[12px] font-bold text-white w-[30%]">항목</th>
+            <th className="px-3 py-2.5 text-left text-[12px] font-bold text-white">내용</th>
+            <th className="px-4 py-2.5 text-right text-[12px] font-bold text-white w-[26%]">금액 (원)</th>
           </tr>
         </thead>
         <tbody>
@@ -391,10 +380,10 @@ function PayslipDocument({ emp, financial, yearMonth }: {
           )}
 
           {/* 소계 */}
-          <tr className="bg-gray-50">
-            <td className="border border-gray-400 px-2 py-1 text-xs font-bold">소계</td>
+          <tr style={{ background: '#f6f7fb' }}>
+            <td className={tdL}>소계</td>
             <td className={tdV}></td>
-            <td className={tdN + ' font-bold'}>{fmt(isDig ? digCalc.subtotal : isSales ? salesCalc.subtotal : opsCalc.subtotal)}</td>
+            <td className={tdN + ' font-black'}>{fmt(isDig ? digCalc.subtotal : isSales ? salesCalc.subtotal : opsCalc.subtotal)}</td>
           </tr>
 
           {/* 환수금 */}
@@ -405,53 +394,41 @@ function PayslipDocument({ emp, financial, yearMonth }: {
           </tr>
 
           {/* 공제 전 총액 */}
-          <tr>
-            <td colSpan={2} className="border border-gray-400 px-2 py-1 text-xs bg-blue-100 font-bold text-blue-900">
-              공제 전 지급 총액
-            </td>
-            <td className="border border-gray-400 px-2 py-1 text-sm font-bold text-blue-700 text-right bg-blue-50">
-              {fmt(beforeTax)}
-            </td>
+          <tr style={{ background: '#eef1f8' }}>
+            <td colSpan={2} className="px-4 py-3 text-[13px] font-black text-[#0b2140] border-b border-gray-100">공제 전 지급 총액</td>
+            <td className="px-4 py-3 text-[15px] font-black text-[#0b2140] text-right tabular-nums border-b border-gray-100">{fmt(beforeTax)}</td>
           </tr>
 
           {/* 원천세 */}
           <tr>
             <td className={tdL}>원천세 — 소득세 3.0%</td>
-            <td className={tdV}>{fmt(beforeTax)} × 3.0%</td>
+            <td className={tdV}>{fmt(beforeTax)} × 3.0% (10원 미만 절사)</td>
             <td className={tdN + ' text-red-600'}>-{fmt(incomeTax)}</td>
           </tr>
           <tr>
             <td className={tdL}>원천세 — 지방소득세 0.3%</td>
-            <td className={tdV}>{fmt(beforeTax)} × 0.3%</td>
+            <td className={tdV}>소득세 {fmt(incomeTax)} × 10% = 0.3% (10원 미만 절사)</td>
             <td className={tdN + ' text-red-600'}>-{fmt(localTax)}</td>
           </tr>
-          <tr>
-            <td className="border border-gray-400 px-2 py-1 text-xs bg-gray-100 font-bold">원천세 합계</td>
+          <tr style={{ background: '#f6f7fb' }}>
+            <td className={tdL}>원천세 합계</td>
             <td className={tdV}></td>
-            <td className={tdN + ' text-red-600 font-bold'}>-{fmt(incomeTax + localTax)}</td>
+            <td className={tdN + ' text-red-600 font-black'}>-{fmt(incomeTax + localTax)}</td>
           </tr>
 
           {/* 실지급액 */}
-          <tr>
-            <td colSpan={2} className="border border-gray-400 px-2 py-1 bg-emerald-100 font-bold text-emerald-900">
-              실지급액
-            </td>
-            <td className="border border-gray-400 px-2 py-1 text-base font-black text-emerald-700 text-right bg-emerald-50">
-              {fmt(actualPay)}원
-            </td>
+          <tr style={{ background: 'linear-gradient(135deg,#0e2446,#0a1b36)' }}>
+            <td colSpan={2} className="px-4 py-3.5 text-[14px] font-black text-white">실지급액</td>
+            <td className="px-4 py-3.5 text-[18px] font-black text-right tabular-nums" style={{ color: '#E8D080' }}>{fmt(actualPay)}원</td>
           </tr>
         </tbody>
       </table>
 
       {financial.memo?.trim() && (
-        <table className="border-collapse text-xs w-full mb-3">
-          <tbody>
-            <tr>
-              <td className="border border-gray-400 px-2 py-1 bg-gray-100 font-medium whitespace-nowrap w-16">비고</td>
-              <td className="border border-gray-400 px-2 py-1 whitespace-pre-wrap">{financial.memo}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div className="mb-4 rounded-2xl bg-[#fbf8f0] border border-[#b8995a]/30 px-5 py-3.5 text-[12.5px]">
+          <p className="font-black text-[#a8873f] mb-1">비고</p>
+          <p className="whitespace-pre-wrap text-gray-700 leading-relaxed">{financial.memo}</p>
+        </div>
       )}
 
       {/* 승급프로모션 안내 (영업팀만) */}
@@ -462,14 +439,14 @@ function PayslipDocument({ emp, financial, yearMonth }: {
           <table className="border-collapse text-xs w-full mb-3">
             <thead>
               <tr>
-                <th colSpan={3} className="border border-gray-400 px-2 py-1 bg-gray-100 text-center font-bold">
+                <th colSpan={3} className="border border-gray-200 px-2 py-1 bg-gray-100 text-center font-bold">
                   프로모션 구간 안내
                 </th>
               </tr>
               <tr>
                 {row1.map(t => (
                   <th key={t.label}
-                    className={`border border-gray-400 px-2 py-1 text-center text-[10px] font-medium w-1/3 ${
+                    className={`border border-gray-200 px-2 py-1 text-center text-[10px] font-medium w-1/3 ${
                       financial.contract_count > 0 && getPromo(financial.contract_count) === t.amount
                         ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-50 text-gray-500'
                     }`}>
@@ -482,7 +459,7 @@ function PayslipDocument({ emp, financial, yearMonth }: {
               <tr>
                 {row1.map(t => (
                   <td key={t.amount}
-                    className={`border border-gray-400 px-2 py-1 text-center text-[10px] ${
+                    className={`border border-gray-200 px-2 py-1 text-center text-[10px] ${
                       financial.contract_count > 0 && getPromo(financial.contract_count) === t.amount
                         ? 'bg-emerald-50 font-bold text-emerald-700' : 'text-gray-500'
                     }`}>
@@ -493,7 +470,7 @@ function PayslipDocument({ emp, financial, yearMonth }: {
               <tr>
                 {row2.map(t => (
                   <th key={t.label}
-                    className={`border border-gray-400 px-2 py-1 text-center text-[10px] font-medium ${
+                    className={`border border-gray-200 px-2 py-1 text-center text-[10px] font-medium ${
                       financial.contract_count > 0 && getPromo(financial.contract_count) === t.amount
                         ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-50 text-gray-500'
                     }`}>
@@ -504,7 +481,7 @@ function PayslipDocument({ emp, financial, yearMonth }: {
               <tr>
                 {row2.map(t => (
                   <td key={t.amount}
-                    className={`border border-gray-400 px-2 py-1 text-center text-[10px] ${
+                    className={`border border-gray-200 px-2 py-1 text-center text-[10px] ${
                       financial.contract_count > 0 && getPromo(financial.contract_count) === t.amount
                         ? 'bg-emerald-50 font-bold text-emerald-700' : 'text-gray-500'
                     }`}>
@@ -518,16 +495,17 @@ function PayslipDocument({ emp, financial, yearMonth }: {
       })()}
 
       {/* 수급자 확인 */}
-      <div className="mt-4 border-t border-gray-300 pt-4 text-xs text-gray-700 space-y-1">
-        <p className="font-bold text-gray-600 mb-1.5">◆ 수급자 확인</p>
-        <p>성명: <span className="font-semibold">{emp.name || '—'}</span></p>
-        <p>주민번호: <span className="font-mono">{maskedResidentId || '—'}</span></p>
-        <p>주소: {emp.address || '—'}</p>
-        <p>계좌: {emp.bank_name} {emp.bank_account || '—'}</p>
+      <div className="mt-5 pt-4 border-t border-gray-200 text-[12px] text-gray-500 flex items-end justify-between gap-6">
+        <div className="leading-relaxed">
+          <p className="font-bold text-[#0b2140] mb-1">수급자 확인</p>
+          <p>{emp.name || '—'} · {maskedResidentId || '—'}</p>
+          <p>{emp.bank_name} {emp.bank_account || '—'}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-[13px] text-[#0b2140] font-semibold">귀하의 노고에 진심으로 감사드립니다.</p>
+          <p className="text-[12px] text-[#a8873f] font-bold mt-0.5">헌드레드 컨설팅</p>
+        </div>
       </div>
-
-      <div className="mt-5 text-center text-sm text-gray-600 py-3 border-t border-gray-200">
-        ♥ 귀하의 노고에 진심으로 감사드립니다. -헌드레드 컨설팅
       </div>
     </div>
   )

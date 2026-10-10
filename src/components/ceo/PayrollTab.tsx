@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { calcSalesStructure, SALES_BASE_PAY, SALES_BASE_RATE, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, calcMonthlySubBonus, calcRefundDeductions, calcDigSalary, DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
+import { calcWithholding, calcSalesStructure, SALES_BASE_PAY, SALES_BASE_RATE, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, calcMonthlySubBonus, calcRefundDeductions, calcDigSalary, DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
 import { contractWeight } from '@/lib/supplyRules'
 
 // ─── 타입 ─────────────────────────────────────────────────
@@ -62,7 +62,7 @@ function calcOps(e: OpsEmployee) {
   const subBonus = Number(e.monthly_sub_bonus || 0)
   const awardsSum = (e.awards || []).reduce((s, a) => s + Number(a.amount || 0), 0)
   const before   = Number(e.base_salary) + feeInc + putoInc + Number(e.performance_bonus) + subBonus + awardsSum
-  const after    = Math.round(before * NET_RATE)
+  const after    = calcWithholding(before).after
   return { feeInc, putoInc, subBonus, awardsSum, before, after }
 }
 
@@ -75,7 +75,7 @@ function calcSales(e: SalesEmployee, ym: string) {
     payMode: e.pay_mode, basePay: e.base_pay, workDays: e.work_days, yearMonth: ym,
   })
   const before       = st.main + awardsSum
-  const after        = Math.round(before * NET_RATE)
+  const after        = calcWithholding(before).after
   return { ...st, contractInc: st.allInc, perfBonus, promo, awardsSum, before, after }
 }
 
@@ -100,13 +100,19 @@ function calcDig(e: DigEmployee, yearMonth: string) {
   const base = calcDigSalary(e.approved_count, workedDays, totalDays)
   const awardsSum = (e.awards || []).reduce((s, a) => s + Number(a.amount || 0), 0)
   const before = base.before + awardsSum
-  const after  = Math.round(before * NET_RATE)
+  const after  = calcWithholding(before).after
   return { ...base, awardsSum, before, after }
 }
 
 // ─── 유틸 ─────────────────────────────────────────────────
 
 const thisMonth = currentYearMonth
+// 큰 금액을 '1.25억' / '1,520만' 으로 (소수점은 둘째 자리까지)
+function fmtM2(v: number): string {
+  const a = Math.abs(v), sign = v < 0 ? '-' : ''
+  return a >= 100_000_000 ? sign + parseFloat((a / 100_000_000).toFixed(2)) + '억' : sign + Math.round(a / 10_000).toLocaleString('ko-KR') + '만'
+}
+
 function won(n: number) {
   if (!n) return '-'
   return n.toLocaleString('ko-KR') + '원'
@@ -1122,19 +1128,19 @@ export default function PayrollTab() {
   const namedDig   = digEmps.filter(e => e.name.trim())
 
   return (
-    <div className="space-y-6 pb-10 max-w-4xl mx-auto"
+    <div className="space-y-6 pb-10 max-w-[1500px] mx-auto"
       onChangeCapture={() => { editedRef.current = true }}
       onClickCapture={e => { const t = (e.target as HTMLElement).closest('button'); if (t && /추가|✕|×|삭제/.test(t.textContent || '')) editedRef.current = true }}>
 
       {/* ── 헤더 바 ── */}
       <div className="flex items-center gap-3 flex-wrap">
         <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          className="border-[1.5px] border-gray-200 rounded-2xl px-4 py-2.5 text-[15px] font-semibold focus:outline-none focus:border-[#b8995a] bg-white" />
 
         <button
           onClick={isCurrentMonth ? () => autoLoad() : prevMonthLoad}
           disabled={autoLoading}
-          className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 disabled:opacity-40 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
+          className="flex items-center gap-1.5 bg-white hover:bg-gray-50 disabled:opacity-40 text-[#0b2140] border-[1.5px] border-gray-200 px-4 py-2.5 rounded-2xl text-[14px] font-bold transition-colors">
           {autoLoading ? '반영 중...' : isCurrentMonth ? '이달 매출 자동 반영' : '불러오기'}
         </button>
 
@@ -1150,7 +1156,7 @@ export default function PayrollTab() {
             finally { setSaving(false) }
           }}
           disabled={saving}
-          className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors">
+          className="flex items-center gap-1.5 bg-gradient-to-r from-[#0b2140] to-[#4a5a9a] hover:-translate-y-0.5 disabled:opacity-40 text-white px-6 py-2.5 rounded-2xl text-[14px] font-bold shadow-[0_10px_22px_-10px_rgba(11,33,64,.7)] transition-all">
           {saving ? '저장 중...' : '저장하기'}
         </button>
 
@@ -1170,15 +1176,39 @@ export default function PayrollTab() {
         )}
       </div>
 
-      {/* ── 영업팀 | 구분선 | 관리팀 ── */}
-      <div className="flex gap-0 items-stretch">
+      {/* ── 핵심 요약 ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="rounded-3xl p-5 bg-white border border-gray-100 shadow-sm">
+          <p className="text-[14px] text-gray-500 font-semibold">총 매출</p>
+          <p className="text-[28px] leading-tight font-black text-[#0b2140] tabular-nums mt-1">{totalRevenue > 0 ? fmtM2(totalRevenue) : '—'}</p>
+          <p className="text-[12.5px] text-gray-400 tabular-nums">{totalRevenue > 0 ? totalRevenue.toLocaleString('ko-KR') + '원' : ''}</p>
+        </div>
+        <div className="rounded-3xl p-5 bg-white border border-gray-100 shadow-sm">
+          <p className="text-[14px] text-gray-500 font-semibold">총 비용 <span className="font-normal text-gray-400">(세금적립·인건비·운영비)</span></p>
+          <p className="text-[28px] leading-tight font-black text-red-500 tabular-nums mt-1">{totalRevenue > 0 ? fmtM2(tax + laborCost + otherTotal) : '—'}</p>
+          <p className="text-[12.5px] text-gray-400 tabular-nums">{totalRevenue > 0 ? (tax + laborCost + otherTotal).toLocaleString('ko-KR') + '원' : ''}</p>
+        </div>
+        <div className={`rounded-3xl p-5 border shadow-sm ${netProfit >= 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
+          <p className={`text-[14px] font-semibold ${netProfit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>순이익</p>
+          <p className={`text-[28px] leading-tight font-black tabular-nums mt-1 ${netProfit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{totalRevenue > 0 ? fmtM2(netProfit) : '—'}</p>
+          <p className="text-[12.5px] text-gray-500">{totalRevenue > 0 ? `이익률 ${((netProfit / totalRevenue) * 100).toFixed(1)}%` : ''}</p>
+        </div>
+        <div className="rounded-3xl p-5 text-white bg-gradient-to-br from-[#10203a] to-[#0a1424] shadow-sm">
+          <p className="text-[14px] text-white/65 font-semibold">대표 실수령 <span className="font-normal text-white/45">(개인지출 뺀 뒤)</span></p>
+          <p className={`text-[28px] leading-tight font-black tabular-nums mt-1 ${realTakeHome >= 0 ? 'text-[#E8D080]' : 'text-[#ff9b9b]'}`}>{totalRevenue > 0 ? fmtM2(realTakeHome) : '—'}</p>
+          <p className="text-[12.5px] text-white/45 tabular-nums">{totalRevenue > 0 ? realTakeHome.toLocaleString('ko-KR') + '원' : ''}</p>
+        </div>
+      </div>
+
+      {/* ── 팀별 급여 (영업팀 · 관리팀 · 발굴팀) ── */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 items-start">
 
         {/* 영업팀 */}
-        <div className="flex-1 min-w-0 pr-5 space-y-3">
+        <div className="min-w-0 space-y-3 bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center justify-between mb-1">
-            <h3 className="text-sm font-bold text-[#C5A258]">영업팀</h3>
+            <h3 className="text-[18px] font-black text-[#0b2140]">영업팀</h3>
             {namedSales.length > 0 && (
-              <div className="flex items-center gap-2 text-[10px] text-gray-400">
+              <div className="flex items-center gap-2 text-[13px] text-gray-500">
                 <span>전 <span className="font-bold text-blue-600">{salesTotalBefore.toLocaleString('ko-KR')}원</span></span>
                 <span className="text-gray-300">|</span>
                 <span>후 <span className="font-bold text-[#C5A258]">{salesTotalAfter.toLocaleString('ko-KR')}원</span></span>
@@ -1231,15 +1261,12 @@ export default function PayrollTab() {
           </button>
         </div>
 
-        {/* 구분선 */}
-        <div className="w-px bg-gray-200 self-stretch mx-1 shrink-0" />
-
         {/* 관리팀 */}
-        <div className="flex-1 min-w-0 pl-5 space-y-3">
+        <div className="min-w-0 space-y-3 bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center justify-between mb-1">
-            <h3 className="text-sm font-bold text-[#1B2A45]">관리팀</h3>
+            <h3 className="text-[18px] font-black text-[#0b2140]">관리팀</h3>
             {namedOps.length > 0 && (
-              <div className="flex items-center gap-2 text-[10px] text-gray-400">
+              <div className="flex items-center gap-2 text-[13px] text-gray-500">
                 <span>전 <span className="font-bold text-blue-600">{opsTotalBefore.toLocaleString('ko-KR')}원</span></span>
                 <span className="text-gray-300">|</span>
                 <span>후 <span className="font-bold text-[#1B2A45]">{opsTotalAfter.toLocaleString('ko-KR')}원</span></span>
@@ -1295,15 +1322,12 @@ export default function PayrollTab() {
           </button>
         </div>
 
-        {/* 구분선 */}
-        <div className="w-px bg-gray-200 self-stretch mx-1 shrink-0" />
-
         {/* 발굴팀 */}
-        <div className="flex-1 min-w-0 pl-5 space-y-3">
+        <div className="min-w-0 space-y-3 bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center justify-between mb-1">
-            <h3 className="text-sm font-bold text-orange-600">발굴팀</h3>
+            <h3 className="text-[18px] font-black text-[#0b2140]">발굴팀</h3>
             {namedDig.length > 0 && (
-              <div className="flex items-center gap-2 text-[10px] text-gray-400">
+              <div className="flex items-center gap-2 text-[13px] text-gray-500">
                 <span>전 <span className="font-bold text-blue-600">{digTotalBefore.toLocaleString('ko-KR')}원</span></span>
                 <span className="text-gray-300">|</span>
                 <span>후 <span className="font-bold text-orange-600">{digTotalAfter.toLocaleString('ko-KR')}원</span></span>
@@ -1328,37 +1352,10 @@ export default function PayrollTab() {
 
         {/* 헤더 */}
         <div className="px-5 py-4 border-b border-[#E8E2D4] flex items-center justify-between bg-gradient-to-r from-[#1B2A45]/4 to-transparent">
-          <h3 className="text-sm font-bold text-[#1B2A45]">회사 손익 요약</h3>
+          <h3 className="text-[17px] font-black text-[#0b2140]">비용 입력 · 상세 손익</h3>
           {revTotals && (
             <span className="text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-100 px-2 py-0.5 rounded-full">매출 자동 반영됨</span>
           )}
-        </div>
-
-        {/* KPI 3개 */}
-        <div className="grid grid-cols-3 divide-x divide-[#E8E2D4] border-b border-[#E8E2D4]">
-          <div className="px-5 py-4 text-center">
-            <p className="text-[10px] text-gray-400 font-medium mb-1">총 매출</p>
-            <p className="text-xl font-black text-[#1B2A45] tracking-tight">
-              {totalRevenue > 0 ? totalRevenue.toLocaleString('ko-KR') + '원' : '—'}
-            </p>
-          </div>
-          <div className="px-5 py-4 text-center">
-            <p className="text-[10px] text-gray-400 font-medium mb-1">총 매입</p>
-            <p className="text-xl font-black text-red-500 tracking-tight">
-              {totalRevenue > 0 ? (tax + laborCost + otherTotal).toLocaleString('ko-KR') + '원' : '—'}
-            </p>
-          </div>
-          <div className={`px-5 py-4 text-center ${netProfit >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
-            <p className="text-[10px] font-bold mb-1 ${netProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}">순이익</p>
-            <p className={`text-xl font-black tracking-tight ${netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-              {totalRevenue > 0 ? netProfit.toLocaleString('ko-KR') + '원' : '—'}
-            </p>
-            {totalRevenue > 0 && (
-              <p className={`text-[10px] mt-0.5 ${netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                이익률 {((netProfit / totalRevenue) * 100).toFixed(1)}%
-              </p>
-            )}
-          </div>
         </div>
 
         <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">

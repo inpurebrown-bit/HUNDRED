@@ -142,6 +142,26 @@ function NumInput({
   )
 }
 
+function AutoField({ label, field, value, autoVal, idx, onChange }: {
+  label: string; field: string; value: number; autoVal: number; idx: number
+  onChange: (i: number, f: string, v: number | string | Record<string, number>) => void
+}) {
+  const fv = (v: number) => (v % 1 === 0 ? String(v) : v.toFixed(1))
+  return (
+    <div className="text-center">
+      <p className="text-[12.5px] text-gray-500 font-semibold mb-1">{label}</p>
+      <input
+        type="number" min={0} step={0.5} value={value}
+        onChange={e => onChange(idx, field, Number(e.target.value))}
+        className="w-full text-center text-[17px] font-black text-[#0b2140] bg-white rounded-xl border-2 border-gray-100 py-2 hover:border-[#b8995a]/50 focus:outline-none focus:border-[#b8995a] tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+      />
+      {autoVal !== value && (
+        <button title={`DB 자동값(${fv(autoVal)})으로 맞추기`} onClick={() => onChange(idx, field, autoVal)} className="text-[11px] text-sky-600 hover:underline mt-1">DB값 {fv(autoVal)} 적용</button>
+      )}
+    </div>
+  )
+}
+
 function EmpCard({
   row, idx, we, tw, onChange, onRemove, autoData, selfSupplied = 0,
 }: {
@@ -186,192 +206,117 @@ function EmpCard({
   const fmtVal = (v: number) => v % 1 === 0 ? String(v) : v.toFixed(1)
   const fmtPct = (v: number | null) => v !== null ? v.toFixed(1) + '%' : '—'
 
-  // 수동편집 필드 (DB자동값 동기화 버튼 포함)
-  function EditableAutoField({
-    label, field, value, autoVal, color,
-  }: { label: string; field: string; value: number; autoVal: number; color: string }) {
-    return (
-      <div className="flex flex-col items-center gap-0.5">
-        <div className="flex items-center gap-0.5">
-          <p className={`text-[9px] font-medium ${color}`}>{label}</p>
-          {autoVal !== value && (
-            <button
-              title={`DB자동값(${fmtVal(autoVal)})으로 동기화`}
-              onClick={() => onChange(idx, field, autoVal)}
-              className="text-[8px] text-gray-400 hover:text-blue-500 transition-colors"
-            >동기화</button>
-          )}
-        </div>
-        <div className="relative w-full">
-          <input
-            type="number" min={0} step={0.5} value={value}
-            onChange={e => onChange(idx, field, Number(e.target.value))}
-            className="w-full text-center text-sm font-bold text-gray-800 bg-white rounded-xl
-              border border-gray-200 px-1 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300
-              [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-          />
-          {autoVal > 0 && autoVal !== value && (
-            <span className="absolute -bottom-3 left-0 right-0 text-center text-[7px] text-gray-400">DB:{fmtVal(autoVal)}</span>
-          )}
-        </div>
-      </div>
-    )
-  }
+  const todayVal = Number(dailySupplies[String(todayDay)] || 0)
+  const tone = achievePct >= 100 ? '#12805c' : achievePct >= 60 ? '#0b2140' : '#c0392b'
 
   return (
-    <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
-      {/* ── 헤더 ── */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-[#1B2A45] text-white flex items-center justify-center text-sm font-bold shrink-0">
+    <div className="rounded-3xl border border-gray-100 bg-white shadow-sm p-5 md:p-6 space-y-5">
+      {/* ── 이름 · 상태 ── */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#10203a] to-[#0a1424] text-[#E8D080] flex items-center justify-center text-lg font-black shrink-0">
             {(row.name || '?').charAt(0)}
           </div>
           <input
             type="text" value={row.name}
             onChange={e => onChange(idx, 'name', e.target.value)}
             placeholder="직원명"
-            className="font-bold text-gray-800 bg-transparent border-b border-transparent
-              hover:border-gray-300 focus:border-blue-500 focus:outline-none text-sm w-28"
+            className="text-[19px] font-black text-[#0b2140] bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#b8995a] focus:outline-none w-36 min-w-0"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <PaceBadge status={status} score={score} />
-          <button onClick={() => onRemove(idx)} className="text-gray-300 hover:text-red-400 text-xs transition-colors">✕</button>
+          <button onClick={() => onRemove(idx)} className="text-gray-300 hover:text-red-400 text-sm transition-colors" title="이 직원 카드 삭제">✕</button>
         </div>
       </div>
 
-      {/* ── 5개 수치 ── */}
-      <div className="grid grid-cols-5 gap-1.5 pb-3">
-        {/* 목표 — 직원이 본인 대시보드에서 설정한 값 (읽기전용) */}
-        <div className="flex flex-col items-center gap-0.5">
-          <p className="text-[9px] text-gray-400 font-medium">목표</p>
-          <div className="w-full text-center text-sm font-bold text-gray-800 bg-gray-50 rounded-xl border border-gray-200 px-1 py-2">
-            {Number(row.target) || '—'}
-          </div>
-        </div>
-        {/* 공급수 - 일별 합산 자동 */}
-        <div className="flex flex-col items-center gap-0.5">
-          <p className="text-[9px] text-sky-500 font-medium">한경연</p>
-          <div className="w-full text-center text-sm font-bold text-sky-700 bg-sky-50 rounded-xl border border-sky-100 px-1 py-2">
-            {supplyCount}
-          </div>
-          {selfSupplied > 0 && (
-            <span className="text-[8px] bg-emerald-100 text-emerald-700 rounded-full px-1.5 py-0.5 font-bold mt-0.5 whitespace-nowrap">
-              자체 {selfSupplied}건
-            </span>
-          )}
-        </div>
-        {/* 공급결제 - 수동 (DB자동값 참고) */}
-        <EditableAutoField label="공급결제" field="supply_payment"
-          value={supplyPayment} autoVal={autoData.supply_payment} color="text-emerald-600" />
-        {/* 직접수 - 자동집계 + 대표 차감 버튼 */}
-        <div className="flex flex-col items-center gap-0.5">
-          <div className="flex items-center gap-0.5">
-            <p className="text-[9px] font-medium text-violet-600">직접수</p>
-            {directAdjustment < 0 && (
-              <span className="text-[8px] text-red-400 font-bold">{directAdjustment}</span>
-            )}
-          </div>
-          <div className="w-full text-center text-sm font-bold text-violet-700 bg-violet-50 rounded-xl border border-violet-100 px-1 py-2">
-            {directCount}
-          </div>
-          <button
-            title="직접수 1개 취소 (실수 등록 시 대표만 사용)"
-            onClick={() => onChange(idx, 'direct_adjustment', directAdjustment - 1)}
-            className="text-[8px] text-red-300 hover:text-red-500 hover:bg-red-50 rounded px-1 py-0.5 transition-colors font-semibold"
-          >−1 취소</button>
-          {directAdjustment < 0 && (
-            <button
-              title="차감 취소 (복원)"
-              onClick={() => onChange(idx, 'direct_adjustment', directAdjustment + 1)}
-              className="text-[8px] text-gray-300 hover:text-gray-500 hover:bg-gray-50 rounded px-1 py-0.5 transition-colors"
-            >+1 복원</button>
-          )}
-        </div>
-        {/* 직접결제 - 수동 */}
-        <EditableAutoField label="직접결제" field="direct_payment"
-          value={directPayment} autoVal={autoData.direct_payment} color="text-purple-600" />
-      </div>
-
-      {/* ── 목표 달성률 ── */}
+      {/* ── 달성 현황 ── */}
       <div>
-        <div className="flex justify-between mb-1">
-          <span className="text-[10px] text-gray-400">목표 달성률</span>
-          <span className="text-[10px] font-bold text-gray-600">{fmtVal(total)} / {Number(row.target)}개 · {achievePct}%</span>
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <p className="text-[13px] text-gray-500 font-semibold">총결제 / 목표</p>
+            <p className="text-[36px] leading-none font-black tabular-nums mt-1" style={{ color: '#0b2140' }}>
+              {fmtVal(total)}<span className="text-[17px] font-semibold text-gray-400"> / {Number(row.target) || '—'}건</span>
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[30px] leading-none font-black tabular-nums" style={{ color: tone }}>{achievePct}%</p>
+            <p className="text-[13px] text-gray-500 mt-1">{needed > 0 ? `목표까지 ${fmtVal(needed)}건` : '목표 달성 🎉'}</p>
+          </div>
         </div>
-        <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-          <div className={`h-full rounded-full transition-all ${achievePct >= 100 ? 'bg-emerald-500' : achievePct >= 60 ? 'bg-blue-500' : 'bg-amber-400'}`}
-            style={{ width: `${Math.min(100, achievePct)}%` }} />
-        </div>
-      </div>
-
-      {/* ── 6박스: 총결제 / 공급결제율 / 직접결제율 / 총결제율 / 공급예정 / 목표까지 ── */}
-      <div className="grid grid-cols-3 gap-1.5">
-        <div className="bg-emerald-50 rounded-xl py-2 text-center">
-          <p className="text-[9px] text-emerald-500">총결제</p>
-          <p className="text-base font-black text-emerald-700">{fmtVal(total)}</p>
-        </div>
-        <div className="bg-blue-50 rounded-xl py-2 text-center">
-          <p className="text-[9px] text-blue-500">공급결제율</p>
-          <p className="text-sm font-black text-blue-700">{fmtPct(supplyRate)}</p>
-          {supplyRate !== null && (
-            <p className={`text-[9px] mt-0.5 ${rateGrade(supplyRate, 40).cls}`}>{rateGrade(supplyRate, 40).label}</p>
-          )}
-        </div>
-        <div className="bg-violet-50 rounded-xl py-2 text-center">
-          <p className="text-[9px] text-violet-500">직접결제율</p>
-          <p className="text-sm font-black text-violet-700">{fmtPct(directRate)}</p>
-        </div>
-        <div className="bg-teal-50 rounded-xl py-2 text-center">
-          <p className="text-[9px] text-teal-600">총결제율</p>
-          <p className="text-sm font-black text-teal-700">{fmtPct(totalRate)}</p>
-          {totalRate !== null && (
-            <p className={`text-[9px] mt-0.5 ${rateGrade(totalRate, 30).cls}`}>{rateGrade(totalRate, 30).label}</p>
-          )}
-        </div>
-        <div className={`rounded-xl py-2 text-center ${dailyRec === 0 && supplyRate !== null ? 'bg-red-50' : 'bg-amber-50'}`}>
-          <p className={`text-[9px] ${dailyRec === 0 && supplyRate !== null ? 'text-red-500' : 'text-amber-600'}`}>공급예정</p>
-          <p className={`text-sm font-black ${dailyRec === 0 && supplyRate !== null ? 'text-red-600' : 'text-amber-700'}`}>
-            {supplyRate === null ? '—' : dailyRec === 0 ? '공급중단' : `${supplyNeeded}개`}
-          </p>
-          {dailyRec > 0 && <p className="text-[8px] text-amber-400">내일 권장</p>}
-        </div>
-        <div className={`rounded-xl py-2 text-center ${needed > 0 ? 'bg-rose-50' : 'bg-gray-100'}`}>
-          <p className={`text-[9px] ${needed > 0 ? 'text-rose-400' : 'text-gray-400'}`}>목표까지</p>
-          <p className={`text-sm font-black ${needed > 0 ? 'text-rose-600' : 'text-gray-500'}`}>
-            {needed > 0 ? `${fmtVal(needed)}개` : '완료'}
-          </p>
+        <div className="h-3.5 rounded-full bg-gray-100 overflow-hidden mt-3">
+          <div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.min(100, achievePct)}%`, background: achievePct >= 100 ? '#12805c' : 'linear-gradient(90deg,#0b2140,#b8995a)' }} />
         </div>
       </div>
 
-      {/* ── 일별 공급 입력 (접기/펼치기) ── */}
-      <div>
-        <button
-          onClick={() => setShowDaily(v => !v)}
-          className="w-full flex items-center justify-between py-1.5 px-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
-        >
-          <span className="text-[9px] text-gray-500 font-semibold">
-            일별 공급 입력
-            <span className="ml-1.5 text-sky-600 font-black">합계 {supplyCount}개</span>
-          </span>
-          <span className="text-[9px] text-gray-400">{showDaily ? '▲ 접기' : '▼ 펼치기'}</span>
+      {/* ── 결제율 ── */}
+      <div className="grid grid-cols-3 gap-2.5">
+        <div className="rounded-2xl bg-[#0b2140]/[.06] px-3 py-3 text-center">
+          <p className="text-[13px] text-gray-500 font-semibold">총결제율</p>
+          <p className="text-[26px] leading-tight font-black text-[#0b2140] tabular-nums">{fmtPct(totalRate)}</p>
+          {totalRate !== null && <p className={`text-[12.5px] ${rateGrade(totalRate, 30).cls}`}>{rateGrade(totalRate, 30).label}</p>}
+        </div>
+        <div className="rounded-2xl bg-sky-50 px-3 py-3 text-center">
+          <p className="text-[13px] text-sky-700 font-semibold">공급 결제율</p>
+          <p className="text-[26px] leading-tight font-black text-sky-800 tabular-nums">{fmtPct(supplyRate)}</p>
+          {supplyRate !== null && <p className={`text-[12.5px] ${rateGrade(supplyRate, 40).cls}`}>{rateGrade(supplyRate, 40).label}</p>}
+        </div>
+        <div className="rounded-2xl bg-violet-50 px-3 py-3 text-center">
+          <p className="text-[13px] text-violet-700 font-semibold">직접 결제율</p>
+          <p className="text-[26px] leading-tight font-black text-violet-800 tabular-nums">{fmtPct(directRate)}</p>
+        </div>
+      </div>
+
+      {/* ── 갯수 ── */}
+      <div className="grid grid-cols-4 gap-2.5">
+        <div className="text-center">
+          <p className="text-[12.5px] text-gray-500 font-semibold mb-1">공급수</p>
+          <div className="rounded-xl bg-gray-50 border border-gray-100 py-2.5 text-[17px] font-black text-[#0b2140] tabular-nums">{supplyCount}</div>
+          {selfSupplied > 0 && <p className="text-[11px] text-emerald-600 font-bold mt-1">자체 {selfSupplied}건</p>}
+        </div>
+        <AutoField label="공급 결제" field="supply_payment" value={supplyPayment} autoVal={autoData.supply_payment} idx={idx} onChange={onChange} />
+        <div className="text-center">
+          <p className="text-[12.5px] text-gray-500 font-semibold mb-1">직접수{directAdjustment < 0 && <span className="text-red-400 ml-1">{directAdjustment}</span>}</p>
+          <div className="rounded-xl bg-gray-50 border border-gray-100 py-2.5 text-[17px] font-black text-[#0b2140] tabular-nums">{directCount}</div>
+          <div className="flex justify-center gap-1 mt-1">
+            <button title="직접수 1개 취소 (실수 등록 시)" onClick={() => onChange(idx, 'direct_adjustment', directAdjustment - 1)} className="text-[11px] text-red-400 hover:bg-red-50 rounded px-1.5 py-0.5 font-semibold">−1</button>
+            {directAdjustment < 0 && <button title="차감 복원" onClick={() => onChange(idx, 'direct_adjustment', directAdjustment + 1)} className="text-[11px] text-gray-400 hover:bg-gray-100 rounded px-1.5 py-0.5">+1</button>}
+          </div>
+        </div>
+        <AutoField label="직접 결제" field="direct_payment" value={directPayment} autoVal={autoData.direct_payment} idx={idx} onChange={onChange} />
+      </div>
+
+      {/* ── 오늘 DB 공급 갯수 (직접 입력) ── */}
+      <div className="rounded-2xl border border-[#b8995a]/35 bg-[#b8995a]/[.08] p-4">
+        <p className="text-[13px] font-black text-[#0b2140] mb-2.5">오늘({now.getMonth() + 1}/{todayDay}) DB 공급 갯수 <span className="font-medium text-gray-500">— 직접 입력</span></p>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <div className="flex items-baseline gap-1.5">
+            <input
+              type="number" min={0} value={todayVal || ''} placeholder="0"
+              onChange={e => onChange(idx, 'daily_supplies', { ...dailySupplies, [String(todayDay)]: Number(e.target.value) || 0 })}
+              className="w-24 text-center text-[30px] font-black text-[#0b2140] bg-white rounded-2xl border-2 border-[#b8995a]/50 py-1.5 focus:outline-none focus:border-[#b8995a] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+            <span className="text-[15px] font-bold text-gray-500">개</span>
+          </div>
+          <div className="text-[13.5px] text-gray-600 leading-relaxed">
+            이번 달 합계 <b className="text-[#0b2140] text-[16px]">{supplyCount}개</b>
+            {supplyRate !== null && <><br />{dailyRec === 0 ? <b className="text-red-500">공급 중단 권장 구간</b> : <>내일 권장 <b className="text-[#a8873f]">{supplyNeeded}개</b></>}</>}
+          </div>
+        </div>
+        <button onClick={() => setShowDaily(v => !v)} className="mt-3 text-[12.5px] font-semibold text-[#a8873f] hover:underline">
+          {showDaily ? '▲ 날짜별 입력 접기' : '▼ 날짜별로 보기·수정'}
         </button>
         {showDaily && (
-          <div className="mt-2 grid grid-cols-7 gap-1">
+          <div className="mt-3 grid grid-cols-7 gap-1.5">
             {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => (
-              <div key={day} className={`text-center ${day === todayDay ? 'ring-2 ring-blue-400 rounded-lg' : ''}`}>
-                <p className={`text-[8px] font-medium mb-0.5 ${day === todayDay ? 'text-blue-600 font-black' : 'text-gray-400'}`}>{day}</p>
+              <div key={day} className={`text-center ${day === todayDay ? 'ring-2 ring-[#b8995a] rounded-lg' : ''}`}>
+                <p className={`text-[11px] mb-0.5 ${day === todayDay ? 'text-[#a8873f] font-black' : 'text-gray-400'}`}>{day}</p>
                 <input
                   type="number" min={0}
                   value={dailySupplies[String(day)] || ''}
                   placeholder="0"
-                  onChange={e => {
-                    const v = Number(e.target.value) || 0
-                    onChange(idx, 'daily_supplies', { ...dailySupplies, [String(day)]: v })
-                  }}
-                  className="w-full text-center text-[10px] font-bold text-gray-700 bg-white rounded border border-gray-200 py-1
-                    focus:outline-none focus:ring-1 focus:ring-blue-300
-                    [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  onChange={e => onChange(idx, 'daily_supplies', { ...dailySupplies, [String(day)]: Number(e.target.value) || 0 })}
+                  className="w-full text-center text-[13px] font-bold text-gray-700 bg-white rounded-lg border border-gray-200 py-1.5 focus:outline-none focus:border-[#b8995a] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
             ))}
@@ -399,6 +344,7 @@ function PayRateSubView() {
   const [employeeCount, setEmployeeCount] = useState(0)
   // 관리팀 이번달 매출 (수수료 + 계약)
   const [opsRevenue, setOpsRevenue] = useState<{ fee: number; contract: number } | null>(null)
+  const [opsContractCount, setOpsContractCount] = useState(0)
   // 관리팀 진행 케이스 요약
   const [opsCases,   setOpsCases]   = useState<any[]>([])
   // 인별 자동집계: 공급결제(공가) / 직접수(직가DB) / 직접결제(직가계약)
@@ -438,6 +384,7 @@ function PayRateSubView() {
         setOpsCases(casesJson.cases || [])
 
         // 관리팀 이번달 매출 집계
+        setOpsContractCount(Array.isArray(revJson.thisMonthOpsContracts) ? revJson.thisMonthOpsContracts.length : 0)
         const revThisMonth = (revJson.monthly || []).find((m: any) => m.fullMonth === month)
         setOpsRevenue({
           fee:      revThisMonth ? Number(revThisMonth['관리팀'] || 0) : 0,
@@ -889,43 +836,68 @@ function PayRateSubView() {
   // 총결제율 = (공가+직가) / 공급갯수 × 100
   const totTotalRate = totSupply > 0 ? (totPayment / totSupply * 100) : null
 
+  const man = (v: number) => (v >= 100000000 ? parseFloat((v / 100000000).toFixed(2)) + '억' : Math.round(v / 10000).toLocaleString('ko-KR') + '만')
+
+  // ── 관리팀 현황 계산 (관리팀 화면과 같은 기준) ──
+  const INST_LIST = ['중진공', '소진공(혁신)', '소진공(신취)', '소진공(재도전)', '기보', '신보', '재단', '서민금융(미소)']
+  const REFUND_KEYS = new Set(['환불', 'refunded'])
+  const DONE_KEYS = new Set(['종료', '완료', 'completed'])
+  const PENDING_R = new Set(['환불예정'])
+  const PENDING_D = new Set(['종료예정'])
+  const INDIRECT_INST = new Set(['기보', '신보', '재단'])
+  const UPCOMING = new Set(['', '미선택', '서류받는중', '접수전'])
+  const isHolding = (c: any) => !!c.details?.is_holding
+  const isHandling = (c: any) => !!(c.details?.handling_no_contact || c.details?.handling_no_fit || c.details?.handling_mindless)
+  const activeCases = opsCases.filter(c => !c.is_completed && !c.is_refund && !REFUND_KEYS.has(c.stage ?? '') && !DONE_KEYS.has(c.stage ?? ''))
+  const regularCases = activeCases.filter(c => !PENDING_R.has(c.stage ?? '') && !PENDING_D.has(c.stage ?? '') && !isHolding(c) && !isHandling(c))
+  // 진행 중 = 직접/간접 자금 중 하나라도 접수 이후 단계, 대기 = 아직 서류·접수 전
+  const startedCase = (c: any) => [c.details?.direct_stage, c.details?.indirect_stage].some((st: string) => st && !UPCOMING.has(st))
+  const inProgressN = regularCases.filter(startedCase).length
+  const waitingN = regularCases.length - inProgressN
+  const instStats = INST_LIST.map(inst => {
+    const matched = regularCases.filter(c => (c.institution || '').split(',').map((x: string) => x.trim()).includes(inst))
+    const isIndirect = INDIRECT_INST.has(inst)
+    const waiting = matched.filter(c => UPCOMING.has(isIndirect ? (c.details?.indirect_stage || '') : (c.details?.direct_stage || '')))
+    return { inst, label: inst === '서민금융(미소)' ? '미소' : inst, active: matched.length - waiting.length, waiting: waiting.length, total: matched.length }
+  }).filter(x => x.total > 0)
+  const hasStageAny = (c: any, set: string[]) => { const t = new Set(set); return t.has(c.details?.direct_stage ?? '') || t.has(c.details?.indirect_stage ?? '') || t.has(c.stage ?? '') }
+  const companyName = (c: any) => c.customers?.details?.company || c.customers?.name || c.customer_name || '-'
+  const stageGroups = [
+    { label: '반려보정', tone: 'bg-orange-50 border-orange-200 text-orange-800', dot: 'bg-orange-500', cases: activeCases.filter(c => hasStageAny(c, ['반려보정'])) },
+    { label: '실사대기', tone: 'bg-amber-50 border-amber-200 text-amber-800', dot: 'bg-amber-500', cases: activeCases.filter(c => hasStageAny(c, ['실사대기'])) },
+    { label: '자금승인 · 입금대기', tone: 'bg-emerald-50 border-emerald-200 text-emerald-800', dot: 'bg-emerald-500', cases: activeCases.filter(c => hasStageAny(c, ['승인대기', '승인', '입금전'])) },
+  ].filter(g => g.cases.length > 0)
+  const opsTotal = (opsRevenue?.fee || 0) + (opsRevenue?.contract || 0)
+
   return (
-    <div className="space-y-5 pb-8">
+    <div className="space-y-8 pb-4">
 
-
-
-      {/* ─── 👥 직원별 현황 (영업일기준보다 먼저) ─── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-gray-800">직원별 현황
-            <span className="ml-2 text-[10px] text-gray-400 font-normal">{month}</span>
-          </h3>
+      {/* ═════════ 영업팀 ═════════ */}
+      <section>
+        <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-[19px] font-black text-[#0b2140]">영업팀 <span className="text-[14px] font-semibold text-gray-400 ml-1">{month.replace('-', '년 ')}월</span></h3>
+            <p className="text-[13px] text-gray-500 mt-0.5">목표 · 결제율 · 갯수 · 달성률, 오늘 DB 공급 갯수는 카드에서 직접 입력하세요</p>
+          </div>
           <div className="flex items-center gap-2">
-            {/* 이전 기록 복구 버튼 — 공급수/목표가 날아갔을 때 */}
-            {employees.length > 0 && employees.every(r =>
-              Number(r.target) === 0 && Object.keys(r.daily_supplies || {}).length === 0
-            ) && (
-              <button
-                onClick={recoverFromPrevRecord}
-                disabled={recovering}
-                className="text-[11px] font-bold bg-rose-50 hover:bg-rose-100 disabled:opacity-40 text-rose-700 border border-rose-200 px-3 py-1.5 rounded-lg transition-colors"
-              >
-                {recovering ? '복구 중…' : '🔁 이전 기록 복구'}
-              </button>
+            {employees.length > 0 && employees.every(r => Number(r.target) === 0 && Object.keys(r.daily_supplies || {}).length === 0) && (
+              <button onClick={recoverFromPrevRecord} disabled={recovering} className="text-[12.5px] font-bold bg-rose-50 hover:bg-rose-100 disabled:opacity-40 text-rose-700 border border-rose-200 px-3 py-1.5 rounded-lg">{recovering ? '복구 중…' : '🔁 이전 기록 복구'}</button>
             )}
-            {/* 전월 목표 복사 — 목표만 0일 때 */}
             {employees.length > 0 && employees.every(r => Number(r.target) === 0) && (
-              <button
-                onClick={copyPrevMonthTargets}
-                disabled={copyingPrev}
-                className="text-[11px] font-bold bg-amber-50 hover:bg-amber-100 disabled:opacity-40 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-lg transition-colors"
-              >
-                {copyingPrev ? '복사 중…' : '📋 전월 목표 복사'}
-              </button>
+              <button onClick={copyPrevMonthTargets} disabled={copyingPrev} className="text-[12.5px] font-bold bg-amber-50 hover:bg-amber-100 disabled:opacity-40 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-lg">{copyingPrev ? '복사 중…' : '📋 전월 목표 복사'}</button>
             )}
           </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+        {employees.length >= 2 && (
+          <div className="rounded-3xl p-5 mb-4 text-white bg-gradient-to-br from-[#10203a] to-[#0a1424] grid grid-cols-3 gap-3 text-center shadow-[0_18px_40px_-26px_rgba(11,33,64,.8)]">
+            <div><p className="text-[13px] text-white/60 font-semibold">팀 목표</p><p className="text-[28px] font-black tabular-nums">{totTarget}<span className="text-[14px] text-white/50"> 건</span></p></div>
+            <div><p className="text-[13px] text-white/60 font-semibold">팀 총결제</p><p className="text-[28px] font-black tabular-nums text-[#7ee0b5]">{totPayment % 1 === 0 ? totPayment : totPayment.toFixed(1)}<span className="text-[14px] text-white/50"> 건</span></p></div>
+            <div><p className="text-[13px] text-white/60 font-semibold">팀 총결제율</p><p className="text-[28px] font-black tabular-nums text-[#E8D080]">{totTotalRate !== null ? totTotalRate.toFixed(1) + '%' : '—'}</p></div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           {employees.filter(r => r.name !== TESTER).map((row, i) => (
             <EmpCard
               key={i} row={row} idx={i} we={we} tw={tw}
@@ -935,231 +907,88 @@ function PayRateSubView() {
             />
           ))}
         </div>
-        {employees.length >= 2 && (
-          <div className="mt-4 bg-[#1B2A45] rounded-2xl p-4 grid grid-cols-3 gap-3 text-white text-center">
-            <div>
-              <p className="text-[10px] text-white/50 mb-0.5">총 목표</p>
-              <p className="text-lg font-black">{totTarget}</p>
+      </section>
+
+      {/* ═════════ 관리팀 ═════════ */}
+      {(opsRevenue !== null || opsCases.length > 0) && (
+        <section>
+          <div className="mb-4">
+            <h3 className="text-[19px] font-black text-[#0b2140]">관리팀 <span className="text-[14px] font-semibold text-gray-400 ml-1">{month.replace('-', '년 ')}월</span></h3>
+            <p className="text-[13px] text-gray-500 mt-0.5">진행 중 · 대기 중, 단계별 업체, 매출, 계약 건수</p>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+            <div className="rounded-3xl p-4 text-white bg-gradient-to-br from-[#10203a] to-[#0a1424]">
+              <p className="text-[13px] text-white/60 font-semibold">이번 달 매출</p>
+              <p className="text-[28px] leading-tight font-black text-[#E8D080] tabular-nums mt-1">{man(opsTotal)}</p>
+              <p className="text-[12.5px] text-white/50 mt-0.5">수수료 {man(opsRevenue?.fee || 0)} · 계약 {man(opsRevenue?.contract || 0)}</p>
             </div>
-            <div>
-              <p className="text-[10px] text-white/50 mb-0.5">총 결제</p>
-              <p className="text-lg font-black text-emerald-400">{totPayment}</p>
+            <div className="rounded-3xl border border-gray-100 bg-white p-4">
+              <p className="text-[13px] text-gray-500 font-semibold">계약</p>
+              <p className="text-[28px] leading-tight font-black text-[#0b2140] tabular-nums mt-1">{opsContractCount}<span className="text-[15px] text-gray-400 font-semibold"> 건</span></p>
+              <p className="text-[12.5px] text-gray-400 mt-0.5">이번 달 관리팀 계약</p>
             </div>
-            <div>
-              <p className="text-[10px] text-white/50 mb-0.5">총결제율</p>
-              <p className="text-lg font-black text-teal-400">
-                {totTotalRate !== null ? totTotalRate.toFixed(1) + '%' : '—'}
-              </p>
+            <div className="rounded-3xl border border-sky-100 bg-sky-50 p-4">
+              <p className="text-[13px] text-sky-700 font-semibold">진행 중</p>
+              <p className="text-[28px] leading-tight font-black text-sky-800 tabular-nums mt-1">{inProgressN}<span className="text-[15px] text-sky-500 font-semibold"> 건</span></p>
+              <p className="text-[12.5px] text-sky-600/70 mt-0.5">접수 이후 단계</p>
+            </div>
+            <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+              <p className="text-[13px] text-gray-600 font-semibold">대기 중</p>
+              <p className="text-[28px] leading-tight font-black text-gray-700 tabular-nums mt-1">{waitingN}<span className="text-[15px] text-gray-400 font-semibold"> 건</span></p>
+              <p className="text-[12.5px] text-gray-400 mt-0.5">서류·접수 전</p>
             </div>
           </div>
-        )}
 
-        {/* ─── 관리팀 매출 + 진행 현황 (직원별현황 카드 내 통합) ─── */}
-        {(opsRevenue !== null || opsCases.length > 0) && (() => {
-        const INST_LIST = [
-          '중진공', '소진공(혁신)', '소진공(신취)', '소진공(재도전)',
-          '기보', '신보', '재단', '서민금융(미소)',
-        ]
-        // ── OpsCeoTab과 동일한 필터링 로직 ──
-        const REFUND_KEYS   = new Set(['환불', 'refunded'])
-        const DONE_KEYS     = new Set(['종료', '완료', 'completed'])
-        const PENDING_R     = new Set(['환불예정'])
-        const PENDING_D     = new Set(['종료예정'])
-
-        const isHolding  = (c: any) => !!(c.details?.is_holding)
-        const isHandling = (c: any) => !!(
-          c.details?.handling_no_contact || c.details?.handling_no_fit || c.details?.handling_mindless
-        )
-
-        // 전체 활성 케이스 (종료/환불/완료 제외)
-        const activeCases = opsCases.filter(c =>
-          !c.is_completed && !c.is_refund &&
-          !REFUND_KEYS.has(c.stage ?? '') && !DONE_KEYS.has(c.stage ?? '')
-        )
-
-        // 기관별 카드에 표시되는 regularCases (OpsCeoTab의 기관 그룹과 동일)
-        const regularCases = activeCases.filter(c =>
-          !PENDING_R.has(c.stage ?? '') && !PENDING_D.has(c.stage ?? '') &&
-          !isHolding(c) && !isHandling(c)
-        )
-
-        // 기관별 집계 (regularCases 기준 — 실제 ops 화면 카드 수와 일치)
-        // 진행/대기 기준: direct_stage or indirect_stage (OpsCeoTab과 동일)
-        const INDIRECT_INST = new Set(['기보', '신보', '재단'])
-        const UPCOMING = new Set(['', '미선택', '서류받는중', '접수전'])
-
-        const instStats = INST_LIST.map(inst => {
-          const matched = regularCases.filter(c =>
-            (c.institution || '').split(',').map((s: string) => s.trim()).includes(inst)
-          )
-          const isIndirect = INDIRECT_INST.has(inst)
-          // 기관별 세부 단계로 대기 판별
-          const waiting = matched.filter(c => {
-            const stg = isIndirect
-              ? (c.details?.indirect_stage || '')
-              : (c.details?.direct_stage   || '')
-            return UPCOMING.has(stg)
-          })
-          return {
-            inst,
-            label: inst === '서민금융(미소)' ? '미소' : inst,
-            active: matched.length - waiting.length,
-            waiting: waiting.length,
-            total: matched.length,
-          }
-        }).filter(s => s.total > 0)
-
-        // 단계별 업체 목록
-        // direct_stage / indirect_stage / stage 세 곳 중 하나라도 해당하면 포함
-        const hasStageAny = (c: any, stageSet: string[]) => {
-          const s = new Set(stageSet)
-          return s.has(c.details?.direct_stage ?? '') ||
-                 s.has(c.details?.indirect_stage ?? '') ||
-                 s.has(c.stage ?? '')
-        }
-        // 업체명 우선순위: details.company > customers.name > customer_name
-        const companyName = (c: any) =>
-          c.customers?.details?.company ||
-          c.customers?.name ||
-          c.customer_name || '-'
-
-        const stageGroups = [
-          {
-            label: '반려보정',
-            color: 'bg-orange-100 text-orange-700 border-orange-200',
-            dot: 'bg-orange-500',
-            cases: activeCases.filter(c => hasStageAny(c, ['반려보정'])),
-          },
-          {
-            label: '실사대기',
-            color: 'bg-amber-100 text-amber-700 border-amber-200',
-            dot: 'bg-amber-500',
-            cases: activeCases.filter(c => hasStageAny(c, ['실사대기'])),
-          },
-          {
-            label: '자금승인·입금대기',
-            color: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-            dot: 'bg-emerald-500',
-            cases: activeCases.filter(c => hasStageAny(c, ['승인대기', '승인', '입금전'])),
-          },
-        ].filter(g => g.cases.length > 0)
-
-        return (
-          <div className="border-t border-gray-100 mt-5 pt-5 space-y-4">
-            <h3 className="text-sm font-bold text-gray-800">관리팀 현재 매출 &amp; 진행 현황 <span className="text-[11px] text-gray-400 font-normal">({month})</span></h3>
-
-            {/* 매출 요약 */}
-            {opsRevenue !== null && (
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-violet-50 rounded-2xl px-3 py-3 text-center">
-                  <p className="text-[9px] text-violet-400 font-semibold mb-1">수수료 매출</p>
-                  <p className="text-xl font-black text-violet-700 leading-tight">
-                    {opsRevenue.fee >= 100000000
-                      ? (opsRevenue.fee / 100000000).toFixed(1) + '억'
-                      : opsRevenue.fee >= 10000
-                        ? Math.round(opsRevenue.fee / 10000) + '만'
-                        : opsRevenue.fee.toLocaleString()}
-                  </p>
-                  <p className="text-[8px] text-violet-400 mt-0.5">원</p>
-                </div>
-                <div className="bg-emerald-50 rounded-2xl px-3 py-3 text-center">
-                  <p className="text-[9px] text-emerald-500 font-semibold mb-1">계약 매출</p>
-                  <p className="text-xl font-black text-emerald-700 leading-tight">
-                    {opsRevenue.contract >= 100000000
-                      ? (opsRevenue.contract / 100000000).toFixed(1) + '억'
-                      : opsRevenue.contract >= 10000
-                        ? Math.round(opsRevenue.contract / 10000) + '만'
-                        : opsRevenue.contract.toLocaleString()}
-                  </p>
-                  <p className="text-[8px] text-emerald-400 mt-0.5">원</p>
-                </div>
-                <div className="bg-[#1B2A45] rounded-2xl px-3 py-3 text-center">
-                  <p className="text-[9px] text-white/50 font-semibold mb-1">합계</p>
-                  <p className="text-xl font-black text-white leading-tight">
-                    {(() => {
-                      const total = opsRevenue.fee + opsRevenue.contract
-                      return total >= 100000000
-                        ? (total / 100000000).toFixed(1) + '억'
-                        : total >= 10000
-                          ? Math.round(total / 10000) + '만'
-                          : total.toLocaleString()
-                    })()}
-                  </p>
-                  <p className="text-[8px] text-white/40 mt-0.5">원</p>
-                </div>
-              </div>
-            )}
-
-            {/* 기관별 현황 */}
-            {instStats.length > 0 && (
-              <div>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">기관별 현황</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                  {instStats.map(s => (
-                    <div key={s.inst} className="flex items-center justify-between gap-2 bg-gray-50 rounded-xl px-3 py-2 min-w-0">
-                      <span className="text-xs font-bold text-gray-700 truncate min-w-0 flex-1">{s.label}</span>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {s.active > 0 && (
-                          <span className="text-[10px] bg-blue-100 text-blue-700 rounded-full px-2 py-0.5 font-semibold whitespace-nowrap">
-                            진행중 {s.active}
-                          </span>
-                        )}
-                        {s.waiting > 0 && (
-                          <span className="text-[10px] bg-gray-200 text-gray-600 rounded-full px-2 py-0.5 font-semibold whitespace-nowrap">
-                            대기 {s.waiting}
-                          </span>
-                        )}
-                      </div>
+          {instStats.length > 0 && (
+            <div className="mb-5">
+              <p className="text-[14px] font-black text-[#0b2140] mb-2.5">기관별 현황</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                {instStats.map(x => (
+                  <div key={x.inst} className="rounded-2xl border border-gray-100 bg-white px-3.5 py-3">
+                    <p className="text-[14px] font-black text-[#0b2140] truncate">{x.label}</p>
+                    <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                      <span className="text-[12.5px] font-bold bg-sky-100 text-sky-700 rounded-full px-2.5 py-0.5">진행 {x.active}</span>
+                      <span className="text-[12.5px] font-bold bg-gray-100 text-gray-600 rounded-full px-2.5 py-0.5">대기 {x.waiting}</span>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
+          )}
 
-            {/* 단계별 업체 */}
-            {stageGroups.length > 0 && (
-              <div>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">단계별 업체</p>
-                <div className="space-y-2">
-                  {stageGroups.map(g => (
-                    <div key={g.label} className={`flex items-start gap-2 border rounded-xl px-3 py-2 ${g.color}`}>
-                      <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${g.dot}`} />
-                      <div className="min-w-0">
-                        <span className="text-[10px] font-bold mr-2">{g.label}</span>
-                        <span className="text-[10px] opacity-60">({g.cases.length}건)</span>
-                        <p className="text-xs font-medium mt-0.5 leading-relaxed">
-                          {g.cases.map(c => companyName(c)).join(' · ')}
-                        </p>
-                      </div>
+          {stageGroups.length > 0 && (
+            <div>
+              <p className="text-[14px] font-black text-[#0b2140] mb-2.5">단계별 업체</p>
+              <div className="space-y-2.5">
+                {stageGroups.map(g => (
+                  <div key={g.label} className={`flex items-start gap-3 border rounded-2xl px-4 py-3 ${g.tone}`}>
+                    <span className={`mt-2 w-2.5 h-2.5 rounded-full shrink-0 ${g.dot}`} />
+                    <div className="min-w-0">
+                      <p className="text-[14px] font-black">{g.label} <span className="font-semibold opacity-70">({g.cases.length}건)</span></p>
+                      <p className="text-[14px] font-medium mt-1 leading-relaxed">{g.cases.map(c => companyName(c)).join(' · ')}</p>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
+          )}
 
-            {instStats.length === 0 && stageGroups.length === 0 && opsCases.length === 0 && (
-              <p className="text-xs text-gray-400 text-center py-2">진행 중인 케이스 없음</p>
-            )}
-          </div>
-        )
-      })()}
-      </div>
+          {instStats.length === 0 && stageGroups.length === 0 && (
+            <p className="text-[13.5px] text-gray-400 text-center py-3">진행 중인 케이스가 없어요</p>
+          )}
+        </section>
+      )}
 
-      {/* ─── 저장 ─── */}
-      <div className="flex items-center justify-end gap-3">
-        {saveMsg && (
-          <span className={`text-sm font-medium ${saveMsg.includes('완료') ? 'text-emerald-600' : 'text-red-500'}`}>
-            {saveMsg}
-          </span>
-        )}
+      {/* ─── 저장 · 불러오기 ─── */}
+      <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
+        {saveMsg && <span className={`text-sm font-medium ${saveMsg.includes('완료') || saveMsg.includes('✓') ? 'text-emerald-600' : 'text-red-500'}`}>{saveMsg}</span>}
         <button onClick={handleReload} disabled={reloading || saving}
-          className="bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white
-            px-5 py-2.5 rounded-2xl text-sm font-bold shadow-sm transition-colors">
+          className="bg-white hover:bg-gray-50 disabled:opacity-40 text-[#0b2140] border-2 border-gray-200 px-5 py-2.5 rounded-2xl text-[13.5px] font-bold transition-colors">
           {reloading ? '불러오는 중…' : '🔄 DB 불러오기'}
         </button>
         <button onClick={handleSave} disabled={saving}
-          className="bg-[#1B2A45] hover:bg-[#263d66] disabled:opacity-40 text-white
-            px-7 py-2.5 rounded-2xl text-sm font-bold shadow-sm transition-colors">
+          className="bg-gradient-to-r from-[#0b2140] to-[#4a5a9a] hover:-translate-y-0.5 disabled:opacity-40 text-white px-8 py-2.5 rounded-2xl text-[13.5px] font-bold shadow-[0_10px_22px_-10px_rgba(11,33,64,.7)] transition-all">
           {saving ? '저장 중…' : '저장'}
         </button>
       </div>

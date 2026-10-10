@@ -30,14 +30,29 @@ function uid() { return Math.random().toString(36).slice(2) }
 export default function MinutesTab() {
   // 어제 마감보고 기준 날짜 (조정 가능)
   const [prepDate, setPrepDate] = useState(yesterdayStr())
+  // 오전보고 날짜도 따로 선택 (기본: 가장 최근 오전보고가 있는 날)
+  const [morningDate, setMorningDate] = useState(todayStr())
+  // 처음 열 때: 주말·휴일이면 '어제'에 보고가 없으므로, 가장 최근 보고가 있는 날짜를 자동으로 잡는다
+  useEffect(() => {
+    fetch('/api/reports').then(r => r.json()).then(d => {
+      const all: Report[] = d.reports || []
+      const t = todayStr()
+      const dates = (type: string, pred: (x: string) => boolean) =>
+        all.filter(r => r.report_type === type && pred(r.report_date)).map(r => r.report_date).sort()
+      const ld = dates('daily', x => x < t).slice(-1)[0] || dates('daily', () => true).slice(-1)[0]
+      const lm = dates('morning', x => x <= t).slice(-1)[0] || dates('morning', () => true).slice(-1)[0]
+      if (ld) setPrepDate(ld)
+      if (lm) setMorningDate(lm)
+    }).catch(() => {})
+  }, [])
   const [dailyReports, setDailyReports] = useState<Report[]>([])
   const [morningReports, setMorningReports] = useState<Report[]>([])
   const [loading, setLoading] = useState(false)
   const [nextDayChecks, setNextDayChecks] = useState<Record<string, NextDayCheck[]>>({})
 
-  async function loadReports(dateForDaily: string) {
+  async function loadReports(dateForDaily: string, dateForMorning: string) {
     setLoading(true)
-    const todayDate = todayStr()
+    const todayDate = dateForMorning
     const r1 = await fetch(`/api/reports?date=${dateForDaily}`)
     const d1 = await r1.json()
     const allYesterday: Report[] = d1.reports || []
@@ -49,9 +64,9 @@ export default function MinutesTab() {
     setLoading(false)
   }
 
-  useEffect(() => { loadReports(prepDate) }, [prepDate])
+  useEffect(() => { loadReports(prepDate, morningDate) }, [prepDate, morningDate])
 
-  const today = todayStr()
+  const today = morningDate
   const allNames = [...new Set([
     ...dailyReports.map(r => r.user_name),
     ...morningReports.map(r => r.user_name),
@@ -81,8 +96,17 @@ export default function MinutesTab() {
               className="border border-white/20 bg-white/10 text-white rounded-lg px-2 py-1 text-xs focus:outline-none"
             />
           </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-white/60">오전보고 날짜</label>
+            <input
+              type="date"
+              value={morningDate}
+              onChange={e => setMorningDate(e.target.value)}
+              className="border border-white/20 bg-white/10 text-white rounded-lg px-2 py-1 text-xs focus:outline-none"
+            />
+          </div>
           <button
-            onClick={() => loadReports(prepDate)}
+            onClick={() => loadReports(prepDate, morningDate)}
             className="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
           >
             새로고침
