@@ -1172,10 +1172,10 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                     />
                   </div>
 
-                  <div className="p-3 grid grid-cols-1 lg:grid-cols-3 gap-3 items-stretch">
+                  <div className="p-3 grid grid-cols-1 lg:grid-cols-[5fr_7fr] gap-3 items-stretch">
                     {/* 환불 차감 알림 — 기본 접힌 상태 */}
                     {thisMonthRefunds.length > 0 && (
-                      <details className="lg:col-span-3 bg-red-50 border border-red-100 rounded-xl overflow-hidden">
+                      <details className="lg:col-span-2 bg-red-50 border border-red-100 rounded-xl overflow-hidden">
                         <summary className="px-3 py-2 cursor-pointer select-none flex items-center justify-between">
                           <span className="text-[9px] font-bold text-red-400 uppercase tracking-widest">이달 환불 차감</span>
                           <span className="text-[9px] font-bold text-red-500">-{thisMonthRefundWeight}개 / -{thisMonthRefundAmount.toLocaleString('ko-KR')}원</span>
@@ -1190,6 +1190,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                         </div>
                       </details>
                     )}
+                    <div className="flex flex-col gap-3">
                     {/* 공급 채널 (한경연 + 자체공급 묶음) */}
                     <div className="border border-sky-100 rounded-2xl overflow-hidden">
                       <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest px-3 pt-2.5 pb-1.5 bg-sky-50/60">공급 채널</p>
@@ -1325,97 +1326,98 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                         })()}
                       </div>
                     </div>
-                  </div>
-                </div>
-              )
-            })()}
-
-            {/* ── 주차별 목표 (영업일 기준, 빨간날 제외) ── */}
-            {(() => {
-              const goal = Number(monthlyGoal)
-              if (!(goal > 0)) return null
-              const kstToday = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(0, 10)
-              const todayDay = Number(kstToday.slice(8, 10))
-              const lastDay = new Date(yr, mo + 1, 0).getDate()
-              // 월~일 기준 주차 (1주차는 1일부터 첫 일요일까지)
-              const weeks: { no: number; start: number; end: number; days: number }[] = []
-              for (let st = 1; st <= lastDay;) {
-                const dow = new Date(yr, mo, st).getDay()
-                const en = Math.min(lastDay, st + (dow === 0 ? 0 : 7 - dow))
-                let days = 0
-                for (let d = st; d <= en; d++) if (isBusinessDay(new Date(yr, mo, d))) days++
-                weeks.push({ no: weeks.length + 1, start: st, end: en, days })
-                st = en + 1
-              }
-              // 이번달 계약 (날짜별 가중 개수)
-              const dated = customers
-                .filter(c => c.status === 'contracted' && ((c as any).details?.contract_date || '').slice(0, 7) === thisMonth)
-                .map(c => ({
-                  day: Number(((c as any).details?.contract_date || '').slice(8, 10)),
-                  w: contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included),
-                }))
-              const totalNow = Math.max(0, dated.reduce((a, x) => a + x.w, 0) + myExtraWeight - thisMonthRefundWeight)
-              const r1 = (v: number) => Math.round(v * 10) / 10
-              const f1 = (v: number) => (r1(v) % 1 === 0 ? String(r1(v)) : r1(v).toFixed(1))
-              let cumDays = 0
-              const rows = weeks.filter(w => w.days > 0).map(w => {
-                cumDays += w.days
-                const cumTarget = goal * cumDays / bizTotal
-                const weekTarget = goal * w.days / bizTotal
-                const isCurrent = todayDay >= w.start && todayDay <= w.end
-                const isPast = w.end < todayDay
-                const cum = isCurrent ? totalNow : isPast ? dated.filter(x => x.day <= w.end).reduce((a, x) => a + x.w, 0) : null
-                const gap = cum === null ? null : cum - cumTarget
-                let need: number | null = null
-                if (isCurrent && cum !== null) {
-                  let left = 0
-                  for (let d = todayDay; d <= w.end; d++) if (isBusinessDay(new Date(yr, mo, d))) left++
-                  need = left > 0 ? Math.max(0, Math.ceil(((cumTarget - cum) / left) * 10) / 10) : null
-                }
-                return { ...w, cumTarget, weekTarget, isCurrent, cum, gap, need }
-              })
-              return (
-                <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-                  <div className="px-5 pt-4 pb-2 flex items-end justify-between flex-wrap gap-2">
-                    <div>
-                      <h3 className="text-[16px] font-black text-[#0b2140]">{mo + 1}월 주차별 목표</h3>
-                      <p className="text-[12px] text-gray-400 mt-0.5">영업일 {bizTotal}일 기준 · 하루 {f1(goal / bizTotal)}개 · 공휴일 제외</p>
                     </div>
-                    <p className="text-[12px] text-gray-500">월 목표 <b className="text-[#0b2140] text-[15px]">{goal}개</b></p>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-center text-[13px] min-w-[560px]">
-                      <thead>
-                        <tr className="text-gray-400 text-[11.5px] border-y border-gray-100 bg-gray-50/60">
-                          <th className="py-2 font-semibold">주차</th>
-                          <th className="py-2 font-semibold">영업일</th>
-                          <th className="py-2 font-semibold">누적 목표</th>
-                          <th className="py-2 font-semibold">주차 목표</th>
-                          <th className="py-2 font-semibold">현재 개수</th>
-                          <th className="py-2 font-semibold">부족 / 초과</th>
-                          <th className="py-2 font-semibold">금일 필요</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {rows.map(r => (
-                          <tr key={r.no} className={r.isCurrent ? 'bg-red-50/70 font-bold text-[#0b2140]' : 'text-gray-600'}>
-                            <td className="py-2.5">{r.no}주차 <span className="block text-[10.5px] font-normal text-gray-400">{mo + 1}/{r.start}~{r.end}</span></td>
-                            <td className="py-2.5">{r.days}일</td>
-                            <td className="py-2.5 tabular-nums">{f1(r.cumTarget)}</td>
-                            <td className="py-2.5 tabular-nums">{f1(r.weekTarget)}</td>
-                            <td className="py-2.5 tabular-nums">{r.cum === null ? '-' : f1(r.cum)}</td>
-                            <td className={`py-2.5 tabular-nums ${r.gap === null ? '' : r.gap < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
-                              {r.gap === null ? '-' : r.gap < 0 ? f1(r.gap) : '+' + f1(r.gap)}
-                            </td>
-                            <td className="py-2.5">
-                              {r.need === null ? '-' : r.need <= 0
-                                ? <span className="text-emerald-600">달성</span>
-                                : <span className="text-red-500 text-[16px] font-black">{f1(r.need)}개</span>}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    {/* ── 주차별 목표 (영업일 기준, 빨간날 제외) ── */}
+                    {(() => {
+                      const goal = Number(monthlyGoal)
+                      if (!(goal > 0)) return null
+                      const kstToday = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(0, 10)
+                      const todayDay = Number(kstToday.slice(8, 10))
+                      const lastDay = new Date(yr, mo + 1, 0).getDate()
+                      // 월~일 기준 주차 (1주차는 1일부터 첫 일요일까지)
+                      const weeks: { no: number; start: number; end: number; days: number }[] = []
+                      for (let st = 1; st <= lastDay;) {
+                        const dow = new Date(yr, mo, st).getDay()
+                        const en = Math.min(lastDay, st + (dow === 0 ? 0 : 7 - dow))
+                        let days = 0
+                        for (let d = st; d <= en; d++) if (isBusinessDay(new Date(yr, mo, d))) days++
+                        weeks.push({ no: weeks.length + 1, start: st, end: en, days })
+                        st = en + 1
+                      }
+                      // 이번달 계약 (날짜별 가중 개수)
+                      const dated = customers
+                        .filter(c => c.status === 'contracted' && ((c as any).details?.contract_date || '').slice(0, 7) === thisMonth)
+                        .map(c => ({
+                          day: Number(((c as any).details?.contract_date || '').slice(8, 10)),
+                          w: contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included),
+                        }))
+                      const totalNow = Math.max(0, dated.reduce((a, x) => a + x.w, 0) + myExtraWeight - thisMonthRefundWeight)
+                      const r1 = (v: number) => Math.round(v * 10) / 10
+                      const f1 = (v: number) => (r1(v) % 1 === 0 ? String(r1(v)) : r1(v).toFixed(1))
+                      let cumDays = 0
+                      const rows = weeks.filter(w => w.days > 0).map(w => {
+                        cumDays += w.days
+                        const cumTarget = goal * cumDays / bizTotal
+                        const weekTarget = goal * w.days / bizTotal
+                        const isCurrent = todayDay >= w.start && todayDay <= w.end
+                        const isPast = w.end < todayDay
+                        const cum = isCurrent ? totalNow : isPast ? dated.filter(x => x.day <= w.end).reduce((a, x) => a + x.w, 0) : null
+                        const gap = cum === null ? null : cum - cumTarget
+                        let need: number | null = null
+                        if (isCurrent && cum !== null) {
+                          let left = 0
+                          for (let d = todayDay; d <= w.end; d++) if (isBusinessDay(new Date(yr, mo, d))) left++
+                          need = left > 0 ? Math.max(0, Math.ceil(((cumTarget - cum) / left) * 10) / 10) : null
+                        }
+                        return { ...w, cumTarget, weekTarget, isCurrent, cum, gap, need }
+                      })
+                      return (
+                        <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden flex flex-col">
+                          <div className="px-5 pt-4 pb-2 flex items-end justify-between flex-wrap gap-2">
+                            <div>
+                              <h3 className="text-[16px] font-black text-[#0b2140]">{mo + 1}월 주차별 목표</h3>
+                              <p className="text-[12px] text-gray-400 mt-0.5">영업일 {bizTotal}일 기준 · 하루 {f1(goal / bizTotal)}개 · 공휴일 제외</p>
+                            </div>
+                            <p className="text-[12px] text-gray-500">월 목표 <b className="text-[#0b2140] text-[15px]">{goal}개</b></p>
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-center text-[14.5px] min-w-[520px]">
+                              <thead>
+                                <tr className="text-gray-400 text-[11.5px] border-y border-gray-100 bg-gray-50/60">
+                                  <th className="py-2 font-semibold">주차</th>
+                                  <th className="py-2 font-semibold">영업일</th>
+                                  <th className="py-2 font-semibold">누적 목표</th>
+                                  <th className="py-2 font-semibold">주차 목표</th>
+                                  <th className="py-2 font-semibold">현재 개수</th>
+                                  <th className="py-2 font-semibold">부족 / 초과</th>
+                                  <th className="py-2 font-semibold">금일 필요</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {rows.map(r => (
+                                  <tr key={r.no} className={r.isCurrent ? 'bg-red-50/70 font-bold text-[#0b2140]' : 'text-gray-600'}>
+                                    <td className="py-4">{r.no}주차 <span className="block text-[10.5px] font-normal text-gray-400">{mo + 1}/{r.start}~{r.end}</span></td>
+                                    <td className="py-4">{r.days}일</td>
+                                    <td className="py-4 tabular-nums">{f1(r.cumTarget)}</td>
+                                    <td className="py-4 tabular-nums">{f1(r.weekTarget)}</td>
+                                    <td className="py-4 tabular-nums">{r.cum === null ? '-' : f1(r.cum)}</td>
+                                    <td className={`py-2.5 tabular-nums ${r.gap === null ? '' : r.gap < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                                      {r.gap === null ? '-' : r.gap < 0 ? f1(r.gap) : '+' + f1(r.gap)}
+                                    </td>
+                                    <td className="py-4">
+                                      {r.need === null ? '-' : r.need <= 0
+                                        ? <span className="text-emerald-600">달성</span>
+                                        : <span className="text-red-500 text-[16px] font-black">{f1(r.need)}개</span>}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )
+                    })()}
+
                   </div>
                 </div>
               )
