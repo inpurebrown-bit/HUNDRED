@@ -15,6 +15,7 @@ import {
   getBusinessDaysInMonth,
   getElapsedBusinessDays,
   getRemainingBusinessDays,
+  isBusinessDay,
 } from '@/lib/businessDays'
 import { SUPPLY_RATE_TABLE, calcRecommendedSupply, isActiveRow, contractWeight } from '@/lib/supplyRules'
 import { calcRefundDeductions, calcExtraCounts } from '@/lib/payrollCalc'
@@ -1171,7 +1172,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                     />
                   </div>
 
-                  <div className="p-3 grid grid-cols-1 lg:grid-cols-3 gap-3 items-start">
+                  <div className="p-3 grid grid-cols-1 lg:grid-cols-3 gap-3 items-stretch">
                     {/* 환불 차감 알림 — 기본 접힌 상태 */}
                     {thisMonthRefunds.length > 0 && (
                       <details className="lg:col-span-3 bg-red-50 border border-red-100 rounded-xl overflow-hidden">
@@ -1255,9 +1256,9 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                     </div>
 
                     {/* 직접 채널 */}
-                    <div>
-                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-2">직접 채널</p>
-                      <div className="grid grid-cols-3 gap-2">
+                    <div className="border border-violet-100 rounded-2xl overflow-hidden flex flex-col">
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest px-3 pt-2.5 pb-1.5 bg-violet-50/60">직접 채널</p>
+                      <div className="grid grid-cols-3 gap-2 px-3 pb-3 pt-2 my-auto">
                         <div className="rounded-lg bg-violet-50 px-2 py-1.5 text-center">
                           <p className="text-[9px] text-violet-400 font-semibold mb-0">직접수</p>
                           <p className="text-xl font-black text-violet-700 leading-none">{dirCnt}</p>
@@ -1277,7 +1278,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                     </div>
 
                     {/* 통합 요약 */}
-                    <div className="border border-[#C5A258]/30 bg-gradient-to-r from-[#1B2A45]/5 to-[#C5A258]/5 rounded-xl px-3 py-2 grid grid-cols-3 divide-x divide-[#C5A258]/20 text-center">
+                    <div className="border border-[#C5A258]/30 bg-gradient-to-r from-[#1B2A45]/5 to-[#C5A258]/5 rounded-2xl px-3 py-4 grid grid-cols-3 divide-x divide-[#C5A258]/20 text-center items-center">
                       <div className="pr-3">
                         <p className="text-[9px] text-[#C5A258] font-bold mb-0.5 tracking-wide">총결제</p>
                         <p className={`text-xl font-black ${
@@ -1324,6 +1325,97 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                         })()}
                       </div>
                     </div>
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* ── 주차별 목표 (영업일 기준, 빨간날 제외) ── */}
+            {(() => {
+              const goal = Number(monthlyGoal)
+              if (!(goal > 0)) return null
+              const kstToday = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(0, 10)
+              const todayDay = Number(kstToday.slice(8, 10))
+              const lastDay = new Date(yr, mo + 1, 0).getDate()
+              // 월~일 기준 주차 (1주차는 1일부터 첫 일요일까지)
+              const weeks: { no: number; start: number; end: number; days: number }[] = []
+              for (let st = 1; st <= lastDay;) {
+                const dow = new Date(yr, mo, st).getDay()
+                const en = Math.min(lastDay, st + (dow === 0 ? 0 : 7 - dow))
+                let days = 0
+                for (let d = st; d <= en; d++) if (isBusinessDay(new Date(yr, mo, d))) days++
+                weeks.push({ no: weeks.length + 1, start: st, end: en, days })
+                st = en + 1
+              }
+              // 이번달 계약 (날짜별 가중 개수)
+              const dated = customers
+                .filter(c => c.status === 'contracted' && ((c as any).details?.contract_date || '').slice(0, 7) === thisMonth)
+                .map(c => ({
+                  day: Number(((c as any).details?.contract_date || '').slice(8, 10)),
+                  w: contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included),
+                }))
+              const totalNow = Math.max(0, dated.reduce((a, x) => a + x.w, 0) + myExtraWeight - thisMonthRefundWeight)
+              const r1 = (v: number) => Math.round(v * 10) / 10
+              const f1 = (v: number) => (r1(v) % 1 === 0 ? String(r1(v)) : r1(v).toFixed(1))
+              let cumDays = 0
+              const rows = weeks.filter(w => w.days > 0).map(w => {
+                cumDays += w.days
+                const cumTarget = goal * cumDays / bizTotal
+                const weekTarget = goal * w.days / bizTotal
+                const isCurrent = todayDay >= w.start && todayDay <= w.end
+                const isPast = w.end < todayDay
+                const cum = isCurrent ? totalNow : isPast ? dated.filter(x => x.day <= w.end).reduce((a, x) => a + x.w, 0) : null
+                const gap = cum === null ? null : cum - cumTarget
+                let need: number | null = null
+                if (isCurrent && cum !== null) {
+                  let left = 0
+                  for (let d = todayDay; d <= w.end; d++) if (isBusinessDay(new Date(yr, mo, d))) left++
+                  need = left > 0 ? Math.max(0, Math.ceil(((cumTarget - cum) / left) * 10) / 10) : null
+                }
+                return { ...w, cumTarget, weekTarget, isCurrent, cum, gap, need }
+              })
+              return (
+                <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+                  <div className="px-5 pt-4 pb-2 flex items-end justify-between flex-wrap gap-2">
+                    <div>
+                      <h3 className="text-[16px] font-black text-[#0b2140]">{mo + 1}월 주차별 목표</h3>
+                      <p className="text-[12px] text-gray-400 mt-0.5">영업일 {bizTotal}일 기준 · 하루 {f1(goal / bizTotal)}개 · 공휴일 제외</p>
+                    </div>
+                    <p className="text-[12px] text-gray-500">월 목표 <b className="text-[#0b2140] text-[15px]">{goal}개</b></p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-center text-[13px] min-w-[560px]">
+                      <thead>
+                        <tr className="text-gray-400 text-[11.5px] border-y border-gray-100 bg-gray-50/60">
+                          <th className="py-2 font-semibold">주차</th>
+                          <th className="py-2 font-semibold">영업일</th>
+                          <th className="py-2 font-semibold">누적 목표</th>
+                          <th className="py-2 font-semibold">주차 목표</th>
+                          <th className="py-2 font-semibold">현재 개수</th>
+                          <th className="py-2 font-semibold">부족 / 초과</th>
+                          <th className="py-2 font-semibold">금일 필요</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map(r => (
+                          <tr key={r.no} className={r.isCurrent ? 'bg-red-50/70 font-bold text-[#0b2140]' : 'text-gray-600'}>
+                            <td className="py-2.5">{r.no}주차 <span className="block text-[10.5px] font-normal text-gray-400">{mo + 1}/{r.start}~{r.end}</span></td>
+                            <td className="py-2.5">{r.days}일</td>
+                            <td className="py-2.5 tabular-nums">{f1(r.cumTarget)}</td>
+                            <td className="py-2.5 tabular-nums">{f1(r.weekTarget)}</td>
+                            <td className="py-2.5 tabular-nums">{r.cum === null ? '-' : f1(r.cum)}</td>
+                            <td className={`py-2.5 tabular-nums ${r.gap === null ? '' : r.gap < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                              {r.gap === null ? '-' : r.gap < 0 ? f1(r.gap) : '+' + f1(r.gap)}
+                            </td>
+                            <td className="py-2.5">
+                              {r.need === null ? '-' : r.need <= 0
+                                ? <span className="text-emerald-600">달성</span>
+                                : <span className="text-red-500 text-[16px] font-black">{f1(r.need)}개</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )
