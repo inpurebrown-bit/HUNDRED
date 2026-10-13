@@ -143,7 +143,7 @@ export function calcDigSalary(
 // ── 추가 입금(잔금 등) 갯수 ─────────────────────────────
 // 계약월과 다른 달에 들어온 잔금을 "입금한 달의 갯수"로만 가산한다. 매출·계약 건수·계약일은 건드리지 않음.
 // 고객 details.extra_counts: [{ date:'YYYY-MM-DD', weight:0.4, label:'잔금 200,000원 입금', amount:200000 }]
-export interface ExtraCount { name: string; weight: number; company: string; date: string; label: string; customerId: string }
+export interface ExtraCount { name: string; weight: number; amount: number; company: string; date: string; label: string; customerId: string }
 
 export function calcExtraCounts(customers: any[], yearMonth: string): ExtraCount[] {
   const out: ExtraCount[] = []
@@ -157,6 +157,7 @@ export function calcExtraCounts(customers: any[], yearMonth: string): ExtraCount
       out.push({
         name: String(c.details?.sales_user_name || c.sales_user_name || '').trim(),
         weight: w,
+        amount: parseFloat(String(e?.amount ?? 0).replace(/[^0-9.-]/g, '')) || 0,
         company: c.details?.company || c.name || '',
         date: String(e.date),
         label: e.label || '추가 입금',
@@ -165,6 +166,23 @@ export function calcExtraCounts(customers: any[], yearMonth: string): ExtraCount
     }
   }
   return out
+}
+
+/** 추가 입금(잔금 등)의 매출 금액 합계. yearMonth 없으면 전체 기간, name 있으면 그 직원 것만 */
+export function extraRevenueSum(customers: any[], yearMonth?: string, name?: string): number {
+  let sum = 0
+  for (const c of customers || []) {
+    const list = c?.details?.extra_counts
+    if (!Array.isArray(list)) continue
+    const owner = String(c.details?.sales_user_name || c.sales_user_name || '').trim()
+    if (name && !(owner === name || name.includes(owner) || owner.includes(name))) continue
+    for (const e of list) {
+      if (!((parseFloat(String(e?.weight ?? 0)) || 0) > 0)) continue
+      if (yearMonth && String(e?.date || '').slice(0, 7) !== yearMonth) continue
+      sum += parseFloat(String(e?.amount ?? 0).replace(/[^0-9.-]/g, '')) || 0
+    }
+  }
+  return sum
 }
 
 export function buildSalesContractMap(
@@ -191,12 +209,13 @@ export function buildSalesContractMap(
       date:    c.details?.contract_date || c.created_at || '',
     })
   }
-  // 잔금 등 추가 입금분 — 갯수만 가산 (매출 0)
+  // 잔금 등 추가 입금분 — 갯수와 매출을 입금한 달에 가산
   for (const ex of calcExtraCounts(customers, yearMonth)) {
     if (!ex.name) continue
     if (!map[ex.name]) map[ex.name] = { revenue: 0, count: 0, details: [] }
     map[ex.name].count += ex.weight
-    map[ex.name].details.push({ company: `${ex.company} (${ex.label})`, amount: 0, weight: ex.weight, date: ex.date })
+    map[ex.name].revenue += ex.amount
+    map[ex.name].details.push({ company: `${ex.company} (${ex.label})`, amount: ex.amount, weight: ex.weight, date: ex.date })
   }
   return map
 }

@@ -6,7 +6,7 @@ import type { Customer } from '@/components/sales/InCallTableView'
 import InCallForm, { emptyInCallData, InCallData } from '@/components/sales/InCallForm'
 import { SUPPLY_RATE_TABLE, calcRecommendedSupply, isActiveRow, contractWeight } from '@/lib/supplyRules'
 import { getElapsedBusinessDays } from '@/lib/businessDays'
-import { calcRefundDeductions, calcExtraCounts } from '@/lib/payrollCalc'
+import { calcRefundDeductions, calcExtraCounts, extraRevenueSum } from '@/lib/payrollCalc'
 
 // ── DB 이동 모드 컴포넌트 ─────────────────────────────────
 type TransferDir = 'sales_to_sales' | 'sales_to_ops' | 'ops_to_sales' | 'ops_to_ops'
@@ -926,7 +926,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab, initialSear
 
   const totalRevenue = useMemo(() =>
     customers.filter(c => c.status === 'contracted')
-      .reduce((sum, c) => sum + parseNum((c as any).details?.my_revenue), 0),
+      .reduce((sum, c) => sum + parseNum((c as any).details?.my_revenue), 0) + extraRevenueSum(customers as any[]),
   [customers])
 
   // ── 이번달 / 저번달 매출 · 계약 수 ──────────────────────
@@ -945,12 +945,12 @@ export default function SalesCeoTab({ initialView, initialStatusTab, initialSear
   [customers, thisMonthStr])
 
   const thisMonthRevenue = useMemo(() =>
-    Math.max(0, thisMonthContracted.reduce((s, c) => s + parseNum((c as any).details?.my_revenue), 0) - thisMonthRefundDeductAmt),
-  [thisMonthContracted, thisMonthRefundDeductAmt])
+    Math.max(0, thisMonthContracted.reduce((s, c) => s + parseNum((c as any).details?.my_revenue), 0) + extraRevenueSum(customers as any[], thisMonthStr) - thisMonthRefundDeductAmt),
+  [thisMonthContracted, thisMonthRefundDeductAmt, customers, thisMonthStr])
 
   const lastMonthRevenue = useMemo(() =>
-    lastMonthContracted.reduce((s, c) => s + parseNum((c as any).details?.my_revenue), 0),
-  [lastMonthContracted])
+    lastMonthContracted.reduce((s, c) => s + parseNum((c as any).details?.my_revenue), 0) + extraRevenueSum(customers as any[], lastMonthStr),
+  [lastMonthContracted, customers, lastMonthStr])
 
   const thisMonthContractCount = useMemo(() =>
     thisMonthContracted.reduce((s, c) => s + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0)
@@ -983,7 +983,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab, initialSear
       .reduce((s, x) => s + x.weight, 0)
     return {
       name,
-      revenue: Math.max(0, mine.reduce((s, c) => s + parseNum((c as any).details?.my_revenue), 0) - refundAmt),
+      revenue: Math.max(0, mine.reduce((s, c) => s + parseNum((c as any).details?.my_revenue), 0) + extraRevenueSum(customers as any[], thisMonthStr, name) - refundAmt),
       payment: mine.reduce((s, c) => s + parseNum((c as any).details?.payment_amount), 0),
       count:   Math.max(0, mine.reduce((s, c) => s + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0) + extraCount - refundCount),
       db010,
@@ -1024,7 +1024,9 @@ export default function SalesCeoTab({ initialView, initialStatusTab, initialSear
       const dbContracted = myContracted
         .filter(c => (c as any).details?.supply_source !== 'self_supply')
         .reduce((sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0)
-      const totalContracted = cfg.base + dbContracted + selfContracted
+      // 잔금 등 추가 입금 갯수(이번달)도 총 결제에 포함 (대시보드 총결제와 동일 기준)
+      const myExtra = calcExtraCounts(customers as any[], thisMonthStr).filter(x => x.name === name || name.includes(x.name) || x.name.includes(name)).reduce((s, x) => s + x.weight, 0)
+      const totalContracted = cfg.base + dbContracted + selfContracted + myExtra
       // floor(소수점 2자리 버림) — 반올림 시 12.999...→13.00이 되어 공급 오계산 방지
       const rate = supplied > 0 ? Math.floor((cfg.base + dbContracted) / supplied * 10000) / 100 : 0
       const selfRate = selfSupplied > 0 ? Math.floor(selfContracted / selfSupplied * 10000) / 100 : 0

@@ -16,7 +16,7 @@ import {
   getRemainingBusinessDays as _bizRemaining,
 } from '@/lib/businessDays'
 import { SUPPLY_RATE_TABLE, isActiveRow, contractWeight, calcRecommendedSupply } from '@/lib/supplyRules'
-import { calcRefundDeductions } from '@/lib/payrollCalc'
+import { calcRefundDeductions, calcExtraCounts } from '@/lib/payrollCalc'
 import PayRateTab from './PayRateTab'
 
 // ─── Interfaces ───────────────────────────────────────────
@@ -757,6 +757,15 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
       }
     }
 
+    // 잔금 등 추가 입금 갯수 (입금한 달에 가산)
+    if (yearMonthStr) {
+      for (const ex of calcExtraCounts(allCustomers, yearMonthStr)) {
+        const uid = Object.keys(userMap).find(k => { const n = userMap[k].name; return n === ex.name || n.includes(ex.name) || ex.name.includes(n) })
+        if (uid) userMap[uid].count += ex.weight
+        else if (ex.name) userMap[`__extra__${ex.name}`] = { name: ex.name, count: ex.weight }
+      }
+    }
+
     // 직책 제거 이름 정규화 (payrate 목표 매칭용)
     const stripTitle = (s: string) =>
       s.replace(/\s*(수석팀장|팀장|팀원|대리|과장|부장|차장|이사|수석|매니저|주임|사원).*/g, '').trim()
@@ -895,7 +904,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
       {/* ══ 이번 달 한눈에 ══ */}
       {(() => {
         const man = (v: number) => v >= 100000000 ? parseFloat((v / 100000000).toFixed(2)) + '억' : Math.round(v / 10000).toLocaleString('ko-KR') + '만'
-        const cnt = thisMonthContracts.reduce((sum, c) => sum + contractWeight(c.contract_amount, c.vat_included), 0)
+        const cnt = thisMonthContracts.reduce((sum, c) => sum + contractWeight(c.contract_amount, c.vat_included), 0) + calcExtraCounts(allCustomers, thisMonthStr).reduce((s, x) => s + x.weight, 0)
         const total = thisMonthSalesRaw + thisMonthOpsRaw
         const lastTotal = lastMonthSalesRaw + lastMonthOpsRaw
         const d = lastTotal > 0 ? (total - lastTotal) / lastTotal : null
@@ -953,7 +962,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           <MonthSection
             title={`${thisMonth}월 현황`}
             loading={loading}
-            contractCount={thisMonthContracts.reduce((s, c) => s + contractWeight(c.contract_amount, c.vat_included), 0)}
+            contractCount={thisMonthContracts.reduce((s, c) => s + contractWeight(c.contract_amount, c.vat_included), 0) + calcExtraCounts(allCustomers, thisMonthStr).reduce((s, x) => s + x.weight, 0)}
             inProgressCount={thisInProgress}
             taxAmount={thisMonthTax}
             employeeRows={thisMonthRows}
@@ -966,7 +975,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           <MonthSection
             title={`${lastMonth}월 현황`}
             loading={loading}
-            contractCount={lastMonthContracts.reduce((s, c) => s + contractWeight(c.contract_amount, c.vat_included), 0)}
+            contractCount={lastMonthContracts.reduce((s, c) => s + contractWeight(c.contract_amount, c.vat_included), 0) + calcExtraCounts(allCustomers, lastMonthStr).reduce((s, x) => s + x.weight, 0)}
             inProgressCount={lastInProgress}
             taxAmount={lastMonthTax}
             employeeRows={lastMonthRows}
@@ -978,7 +987,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
           <MonthSection
             title={`${twoAgoMonth}월 현황`}
             loading={loading}
-            contractCount={twoAgoContracts.reduce((s, c) => s + contractWeight(c.contract_amount, c.vat_included), 0)}
+            contractCount={twoAgoContracts.reduce((s, c) => s + contractWeight(c.contract_amount, c.vat_included), 0) + calcExtraCounts(allCustomers, twoAgoMonthStr).reduce((s, x) => s + x.weight, 0)}
             inProgressCount={twoAgoInProgress}
             taxAmount={twoAgoTax}
             employeeRows={twoAgoRows}

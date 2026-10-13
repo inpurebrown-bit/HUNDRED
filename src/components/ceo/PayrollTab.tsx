@@ -780,6 +780,7 @@ export default function PayrollTab() {
       const contractDetails: Record<string, Array<{ company: string; amount: number; weight: number; date: string; refund?: boolean }>> = {}
       for (const e of salesEntries) {
         if ((e as any).isRefund) continue   // 환불 항목은 아래 별도 처리
+        if ((e as any).isExtra) continue    // 추가 입금(잔금)은 아래에서 갯수·금액 함께 처리
         const name = (e.sales_user_name || '').trim()
         if (!name) continue
         if (!salesByName[name]) salesByName[name] = { amount: 0, count: 0 }
@@ -795,14 +796,15 @@ export default function PayrollTab() {
         })
       }
 
-      // 잔금 등 추가 입금분 갯수 (매출은 건드리지 않음)
+      // 잔금 등 추가 입금분 (갯수 + 매출 금액)
       for (const ex of (data.thisMonthExtraCounts || []) as any[]) {
         const name = String(ex.name || '').trim()
         if (!name) continue
         if (!salesByName[name]) salesByName[name] = { amount: 0, count: 0 }
         salesByName[name].count += Number(ex.weight) || 0
+        salesByName[name].amount += Number(ex.amount) || 0
         if (!contractDetails[name]) contractDetails[name] = []
-        contractDetails[name].push({ company: `${ex.company || ''} (${ex.label || '추가 입금'})`, amount: 0, weight: Number(ex.weight) || 0, date: ex.date || '' })
+        contractDetails[name].push({ company: `${ex.company || ''} (${ex.label || '추가 입금'})`, amount: Number(ex.amount) || 0, weight: Number(ex.weight) || 0, date: ex.date || '' })
       }
 
       // thisMonthSales에 포함된 환불 차감 항목 반영 (API가 weight deduct 포함해서 반환)

@@ -102,6 +102,25 @@ export async function GET(req: NextRequest) {
     })
     .filter(Boolean) as { id: string; amount: number; date: string; sales_user_id: string; sales_user_name: string; company: string; payment_amount?: any; vat_included?: boolean }[]
 
+  // 잔금 등 추가 입금: 입금한 달의 영업팀 매출로 포함 (개수는 별도로 이미 가산됨 → 건수에서는 제외)
+  for (const c of (custContracted || []) as any[]) {
+    const list = c.details?.extra_counts
+    if (!Array.isArray(list)) continue
+    list.forEach((e: any, i: number) => {
+      const amt = parseMoney(e?.amount)
+      if (!(amt > 0) || !(parseFloat(String(e?.weight ?? 0)) > 0) || !e?.date) return
+      salesEntries.push({
+        id: `extra_${c.id}_${i}`,
+        amount: amt,
+        date: String(e.date),
+        sales_user_id: c.owner_id || '',
+        sales_user_name: c.details?.sales_user_name || '',
+        company: `${c.details?.company || c.name || ''} (${e.label || '추가 입금'})`,
+        isExtra: true,
+      } as any)
+    })
+  }
+
   type OpsEntry = { id: string; amount: number; date: string; ops_user_id: string; ops_user_name: string; company: string; creator_role: string }
 
   // ── 관리팀 수수료 리스트 변환 ────────────────────────────────────────
@@ -354,7 +373,7 @@ export async function GET(req: NextRequest) {
     if (!id) return
     if (!salesByUser[id]) salesByUser[id] = { name: e.sales_user_name, amount: 0, count: 0 }
     salesByUser[id].amount += e.amount
-    salesByUser[id].count++
+    if (!(e as any).isExtra) salesByUser[id].count++
   })
 
   // ── 환불 차감: salesByUser.amount 에서 차감 ─────────────────────────
