@@ -1,10 +1,23 @@
 // 급여 계산 공통 함수 — PayrollTab / PayslipTab / 기타 모두 여기서 import
 import { contractWeight } from './supplyRules'
+import { getBusinessDaysInMonth, getElapsedBusinessDays } from './businessDays'
 
 // ── 날짜 헬퍼 ─────────────────────────────────────────────
 export function currentYearMonth(): string {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+// ── 퇴사 일할 (영업일 기준) ─────────────────────────────
+// 퇴사월이면 그 달 1일~퇴사일까지의 영업일 / 그 달 전체 영업일. 퇴사월이 아니면 null.
+export function resignBizProration(yearMonth: string, resignDate?: string | null): { worked: number; total: number } | null {
+  if (!resignDate || String(resignDate).slice(0, 7) !== yearMonth) return null
+  const [yr, mo] = yearMonth.split('-').map(Number)
+  const lastDay = new Date(yr, mo, 0).getDate()
+  const day = Math.min(lastDay, parseInt(String(resignDate).slice(8, 10), 10) || lastDay)
+  const total = getBusinessDaysInMonth(yr, mo - 1)
+  if (total <= 0) return null
+  return { worked: Math.min(total, getElapsedBusinessDays(yr, mo - 1, day)), total }
 }
 
 // ── 프로모션 티어 ──────────────────────────────────────────
@@ -234,20 +247,23 @@ export type SalesPayMode = 'base7' | 'all'
 
 export function calcSalesStructure(p: {
   revenue: number; perfBonus: number; promo: number
-  payMode?: SalesPayMode; basePay?: number; workDays?: number | null; yearMonth?: string
+  payMode?: SalesPayMode; basePay?: number; workDays?: number | null; yearMonth?: string; resignDate?: string | null
 }) {
   const revenue   = Number(p.revenue) || 0
   const allInc    = Math.round(revenue * SALES_ALLIN_RATE)
   const allTotal  = allInc + (Number(p.perfBonus) || 0) + (Number(p.promo) || 0)
   const basePay   = Number(p.basePay) > 0 ? Number(p.basePay) : SALES_BASE_PAY
-  const days      = Math.min(SALES_PAY_MONTH_DAYS, Math.max(1, Math.round(Number(p.workDays) || SALES_PAY_MONTH_DAYS)))
-  const baseProrated = Math.round(basePay * days / SALES_PAY_MONTH_DAYS)
+  // 퇴사월이면 영업일 기준(근무한 영업일 ÷ 그 달 영업일), 그 밖에는 기존처럼 30일 기준
+  const resign    = p.yearMonth ? resignBizProration(p.yearMonth, p.resignDate) : null
+  const totalDays = resign ? resign.total : SALES_PAY_MONTH_DAYS
+  const days      = resign ? resign.worked : Math.min(SALES_PAY_MONTH_DAYS, Math.max(1, Math.round(Number(p.workDays) || SALES_PAY_MONTH_DAYS)))
+  const baseProrated = Math.round(basePay * days / totalDays)
   const revInc    = Math.round(revenue * SALES_BASE_RATE)
   const baseTotal = baseProrated + revInc
   const selected = p.payMode === 'base7' || p.payMode === 'all'
   const chosen: SalesPayMode = p.payMode === 'base7' ? 'base7' : 'all'
   return {
-    allInc, allTotal, basePay, days, baseProrated, revInc, baseTotal,
+    allInc, allTotal, basePay, days, totalDays, resignBiz: !!resign, baseProrated, revInc, baseTotal,
     selected, configured: chosen, chosen, main: chosen === 'base7' ? baseTotal : allTotal,
   }
 }

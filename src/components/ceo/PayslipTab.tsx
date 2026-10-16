@@ -31,6 +31,7 @@ interface EmpFinancial {
   sales_pay_mode?: SalesPayMode
   sales_base_pay?: number
   work_days?: number
+  resign_date?: string
   // 관리팀
   base_salary: number
   fee_revenue: number
@@ -109,7 +110,7 @@ function PayslipDocument({ emp, financial, yearMonth }: {
     const allowSum    = (financial.allowance_details || []).reduce((s, a) => s + Number(a.amount || 0), 0)
     const st = calcSalesStructure({
       revenue: financial.contract_revenue, perfBonus, promo,
-      payMode: financial.sales_pay_mode, basePay: financial.sales_base_pay, workDays: financial.work_days, yearMonth,
+      payMode: financial.sales_pay_mode, basePay: financial.sales_base_pay, workDays: financial.work_days, yearMonth, resignDate: financial.resign_date,
     })
     const contractInc = st.allInc
     const subtotal    = st.main + awardsSum + allowSum
@@ -262,10 +263,10 @@ function PayslipDocument({ emp, financial, yearMonth }: {
               {salesCalc.chosen === 'base7' ? (
                 <>
                   <tr>
-                    <td className={tdL}>① 기본급{salesCalc.days < SALES_PAY_MONTH_DAYS ? ' (일할)' : ''}</td>
+                    <td className={tdL}>① 기본급{salesCalc.days < salesCalc.totalDays ? ' (일할)' : ''}</td>
                     <td className={tdV}>
-                      {fmt(salesCalc.basePay)}원{salesCalc.days < SALES_PAY_MONTH_DAYS
-                        ? ` ÷ ${SALES_PAY_MONTH_DAYS}일 × ${salesCalc.days}일 근무`
+                      {fmt(salesCalc.basePay)}원{salesCalc.days < salesCalc.totalDays
+                        ? ` ÷ ${salesCalc.totalDays}일${salesCalc.resignBiz ? '(영업일)' : ''} × ${salesCalc.days}일 근무`
                         : ''}
                     </td>
                     <td className={tdN}>{fmt(salesCalc.baseProrated)}</td>
@@ -625,6 +626,7 @@ export default function PayslipTab() {
               sales_pay_mode: savedMatch?.pay_mode,
               sales_base_pay: savedMatch?.base_pay,
               work_days:      savedMatch?.work_days,
+              resign_date:    savedMatch?.resign_date,
               memo:           savedMatch?.memo || '',
             }
           } else if (liveKey) {
@@ -641,6 +643,7 @@ export default function PayslipTab() {
               awards: savedMatch?.awards || [],
               sales_pay_mode: savedMatch?.pay_mode,
               sales_base_pay: savedMatch?.base_pay,
+              resign_date:    savedMatch?.resign_date,
               work_days:      savedMatch?.work_days,
               memo:           savedMatch?.memo || '',
             }
@@ -655,6 +658,7 @@ export default function PayslipTab() {
               awards: savedMatch.awards || [],
               sales_pay_mode: savedMatch?.pay_mode,
               sales_base_pay: savedMatch?.base_pay,
+              resign_date:    savedMatch?.resign_date,
               work_days:      savedMatch?.work_days,
               memo:           savedMatch?.memo || '',
             }
@@ -988,7 +992,7 @@ export default function PayslipTab() {
                     {selectedEmp.team !== 'ops' && selectedEmp.team !== 'dig' && (() => {
                       const st = calcSalesStructure({
                         revenue: currentFin.contract_revenue, perfBonus: currentFin.performance_bonus, promo: currentFin.promo,
-                        payMode: currentFin.sales_pay_mode, basePay: currentFin.sales_base_pay, workDays: currentFin.work_days, yearMonth,
+                        payMode: currentFin.sales_pay_mode, basePay: currentFin.sales_base_pay, workDays: currentFin.work_days, yearMonth, resignDate: currentFin.resign_date,
                       })
                       const btn = (mode: SalesPayMode, label: string, amount: number) => {
                         const on = st.selected && st.chosen === mode
@@ -1214,6 +1218,10 @@ function SalesFinancialForm({ fin, update }: { fin: EmpFinancial; update: (p: Pa
             <option value="base7">160만원 + 7%</option>
             <option value="all">올인센 (25% + 성과급 + 프로모션)</option>
           </select>
+        </div>
+        <div>
+          <label className={lbl}>퇴사일 <span className="text-gray-400 text-[10px]">퇴사월 기본급은 영업일 기준 일할</span></label>
+          <input type="date" value={fin.resign_date || ''} onChange={e => update({ resign_date: e.target.value || undefined })} className={inp} />
         </div>
         <div>
           <label className={lbl}>근무일수 <span className="text-gray-400 text-[10px]">기본급 ÷ 30일 × 근무일수</span></label>

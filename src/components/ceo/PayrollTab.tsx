@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { calcWithholding, calcSalesStructure, SALES_BASE_PAY, SALES_BASE_RATE, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, calcMonthlySubBonus, calcRefundDeductions, calcDigSalary, DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
+import { calcWithholding, calcSalesStructure, resignBizProration, SALES_BASE_PAY, SALES_BASE_RATE, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, calcMonthlySubBonus, calcRefundDeductions, calcDigSalary, DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
 import { contractWeight } from '@/lib/supplyRules'
 
 // ─── 타입 ─────────────────────────────────────────────────
@@ -30,6 +30,7 @@ interface SalesEmployee {
   pay_mode?: SalesPayMode   // 이번 달 지급 방식: 'base7'(160만+7%) | 'all'(올인센) — 매달 직접 선택
   base_pay?: number         // 기본급(기본 160만원)
   work_days?: number        // 일할 근무일수(1~30, 비우면 30일)
+  resign_date?: string      // 퇴사일 — 입력하면 퇴사월 기본급을 영업일 기준으로 일할
   memo?: string             // 비고(계산 사유)
 }
 
@@ -72,7 +73,7 @@ function calcSales(e: SalesEmployee, ym: string) {
   const awardsSum    = (e.awards || []).reduce((s, a) => s + Number(a.amount || 0), 0)
   const st = calcSalesStructure({
     revenue: Number(e.contract_revenue), perfBonus, promo,
-    payMode: e.pay_mode, basePay: e.base_pay, workDays: e.work_days, yearMonth: ym,
+    payMode: e.pay_mode, basePay: e.base_pay, workDays: e.work_days, yearMonth: ym, resignDate: e.resign_date,
   })
   const before       = st.main + awardsSum
   const after        = calcWithholding(before).after
@@ -92,10 +93,11 @@ function calcDig(e: DigEmployee, yearMonth: string) {
     totalDays  = daysInMonth
   }
   // 퇴사월이면 1일부터 퇴사일까지
-  if (e.resign_date && e.resign_date.slice(0, 7) === yearMonth) {
-    const resignDay = parseInt(e.resign_date.slice(8, 10), 10) || daysInMonth
-    workedDays = resignDay
-    totalDays  = daysInMonth
+  // 퇴사월이면 영업일 기준 (근무한 영업일 ÷ 그 달 영업일)
+  const rb = resignBizProration(yearMonth, e.resign_date)
+  if (rb) {
+    workedDays = rb.worked
+    totalDays  = rb.total
   }
   const base = calcDigSalary(e.approved_count, workedDays, totalDays)
   const awardsSum = (e.awards || []).reduce((s, a) => s + Number(a.amount || 0), 0)
@@ -278,7 +280,7 @@ function SalesCard({
   const fmtN = (n: number) => parseFloat(n.toFixed(2))
   const promoLabel = emp.contract_count > 0 ? `${fmtN(emp.contract_count)}개` : '갯수 미정'
   const isBase7 = c.chosen === 'base7'
-  const prorated = c.days < SALES_PAY_MONTH_DAYS
+  const prorated = c.days < c.totalDays
   const man = (n: number) => n.toLocaleString('ko-KR')
 
   const modeBtn = (mode: SalesPayMode, label: string, amount: number, active: boolean) => (
@@ -322,7 +324,7 @@ function SalesCard({
 
         {isBase7 ? (
           <>
-            <PayRow label={prorated ? `기본급 ${man(c.basePay)}원 일할(${c.days}/${SALES_PAY_MONTH_DAYS}일)` : `기본급(${man(c.basePay)}원)`} value={c.baseProrated} />
+            <PayRow label={prorated ? `기본급 ${man(c.basePay)}원 일할(${c.days}/${c.totalDays}일${c.resignBiz ? ' 영업일' : ''})` : `기본급(${man(c.basePay)}원)`} value={c.baseProrated} />
             <PayRow label={`매출인센(${Math.round(SALES_BASE_RATE * 100)}%)`} value={c.revInc} />
             <div className="py-1 text-[10px] text-gray-300 border-b border-gray-50">성과급·프로모션은 올인센 방식에서만 적용됩니다</div>
           </>
@@ -345,6 +347,13 @@ function SalesCard({
           </>
         )}
 
+        {/* 퇴사일 (퇴사월 기본급은 영업일 기준으로 일할) */}
+        <div className="flex items-center justify-between py-1.5 border-b border-gray-50">
+          <span className="text-xs text-gray-400">퇴사일 <span className="text-[9px] text-gray-300">(영업일 기준 일할)</span></span>
+          <input type="date" value={emp.resign_date || ''}
+            onChange={e => onPatch(idx, { resign_date: e.target.value || undefined })}
+            className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-amber-300 text-gray-700" />
+        </div>
         {/* 일할 근무일수 (기본급 일할: 기본급 ÷ 30일 × 근무일수) */}
         <div className="flex items-center justify-between py-1.5 border-b border-gray-50">
           <span className="text-xs text-gray-400">일할 근무일수 <span className="text-[9px] text-gray-300">(기본급÷30일)</span></span>

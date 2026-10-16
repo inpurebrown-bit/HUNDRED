@@ -4,7 +4,7 @@
 //  인건비    = 영업·관리·발굴팀 세전 지급액 (급여명세 기준)
 //  운영비    = DB 매입비 + 임대 + 관리비 + 고정비 + 기타(알바·장비 등)
 //  순이익    = 매출 − 세금적립 − 인건비 − 운영비
-import { calcSalesStructure, getPromo, calcDigSalary, OPS_FEE_RATE, OPS_PUTO_RATE } from './payrollCalc'
+import { calcSalesStructure, getPromo, calcDigSalary, OPS_FEE_RATE, OPS_PUTO_RATE, resignBizProration } from './payrollCalc'
 
 export interface MonthPnl {
   ym: string
@@ -49,7 +49,7 @@ export function calcMonthPnl(ym: string, employees: any | null): MonthPnl {
     }
     const st = calcSalesStructure({
       revenue: n(s.contract_revenue), perfBonus: n(s.performance_bonus), promo: getPromo(n(s.contract_count)),
-      payMode: s.pay_mode, basePay: s.base_pay, workDays: s.work_days, yearMonth: ym,
+      payMode: s.pay_mode, basePay: s.base_pay, workDays: s.work_days, yearMonth: ym, resignDate: s.resign_date,
     })
     salesLabor += st.main + sumAwards(s.awards)
     if (st.chosen === 'base7') salesFixed += st.baseProrated
@@ -72,7 +72,7 @@ export function calcMonthPnl(ym: string, employees: any | null): MonthPnl {
   for (const d of dig) {
     let worked: number | undefined, total: number | undefined
     if (d.join_date && String(d.join_date).slice(0, 7) === ym) { worked = daysInMonth - (parseInt(String(d.join_date).slice(8, 10), 10) || 1) + 1; total = daysInMonth }
-    if (d.resign_date && String(d.resign_date).slice(0, 7) === ym) { worked = parseInt(String(d.resign_date).slice(8, 10), 10) || daysInMonth; total = daysInMonth }
+    { const rb = resignBizProration(ym, d.resign_date); if (rb) { worked = rb.worked; total = rb.total } }
     const b = calcDigSalary(n(d.approved_count), worked, total)
     digLabor += b.before + sumAwards(d.awards)
     digFixed += b.base
