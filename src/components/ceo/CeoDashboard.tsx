@@ -54,7 +54,7 @@ function SubTabBar<T extends string>({ tabs, active, onChange }: {
 
 // 손익·급여 통합 탭
 function AnalyticsTab() {
-  const [sub, setSub] = useState<'revenue' | 'payroll' | 'payslip' | 'personal'>('revenue')
+  const [sub, setSub] = useState<'revenue' | 'payroll' | 'payslip' | 'personal' | 'planner'>('revenue')
   return (
     <div>
       <SubTabBar
@@ -63,6 +63,7 @@ function AnalyticsTab() {
           { key: 'payroll'  as const, label: '급여·손익' },
           { key: 'payslip'  as const, label: '급여명세서' },
           { key: 'personal' as const, label: '개인재무' },
+          { key: 'planner'  as const, label: '플래너' },
         ]}
         active={sub} onChange={setSub}
       />
@@ -70,7 +71,23 @@ function AnalyticsTab() {
       {sub === 'payroll'  && <PayrollTab />}
       {sub === 'payslip'  && <PayslipTab />}
       {sub === 'personal' && <PersonalFinanceTab />}
+      {sub === 'planner'  && <PlannerTab />}
     </div>
+  )
+}
+
+// 플래너 — 정산·저축·채용 계획 (CRM 실적과 연동, 화면은 iframe)
+function PlannerTab() {
+  const [h, setH] = useState(1400)
+  useEffect(() => {
+    const on = (e: MessageEvent) => {
+      if (e.origin === window.location.origin && e.data?.type === 'planner-h' && typeof e.data.h === 'number') setH(Math.max(600, Math.ceil(e.data.h) + 8))
+    }
+    window.addEventListener('message', on)
+    return () => window.removeEventListener('message', on)
+  }, [])
+  return (
+    <iframe src="/api/planner/page" title="플래너" style={{ width: '100%', height: h, border: 0, display: 'block', background: 'transparent' }} />
   )
 }
 

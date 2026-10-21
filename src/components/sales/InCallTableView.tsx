@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import NumberInput, { parseNumber, formatNumber } from '@/components/ui/NumberInput'
 import MeetingJournal from '@/components/sales/MeetingJournal'
 import { printIncall, buildCustomerSections } from '@/lib/printIncall'
@@ -64,7 +65,7 @@ function InnovationSelect({ value, onChange }: { value: string; onChange: (v: st
   }
 
   return (
-    <div className="relative" ref={ref}>
+    <div ref={ref}>
       <button type="button" onClick={() => setOpen(v => !v)}
         className="w-full text-left bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none min-h-[32px] flex flex-wrap gap-1 items-center">
         {selected.length > 0
@@ -73,7 +74,7 @@ function InnovationSelect({ value, onChange }: { value: string; onChange: (v: st
         <span className="ml-auto text-gray-300 text-[10px]">▾</span>
       </button>
       {open && (
-        <div className="absolute z-50 top-full left-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 p-3 w-72">
+        <div className="mt-1.5 bg-white rounded-xl border border-gray-200 p-3 w-full max-h-72 overflow-y-auto">
           {INNOVATION_GROUPS.map(({ group, color, options }) => (
             <div key={group} className="mb-3 last:mb-0">
               <p className="text-[10px] font-bold text-gray-500 mb-1.5">{group}</p>
@@ -799,6 +800,8 @@ function CustomerCard({
   onMarkDirect,
 }: CardProps) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number; maxH: number } | null>(null)
+  const popRef = useRef<HTMLDivElement>(null)
   const [ceoMoveOpen, setCeoMoveOpen] = useState(false)
 
   // 직가DB로 설정: status + is_direct 플래그 + db010_month 동시 설정
@@ -923,10 +926,19 @@ function CustomerCard({
   useEffect(() => {
     if (!menuOpen) return
     function handler(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+      const t = e.target as Node
+      if (menuRef.current?.contains(t) || popRef.current?.contains(t)) return
+      setMenuOpen(false)
     }
+    const close = () => setMenuOpen(false)
     document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    window.addEventListener('resize', close)
+    window.addEventListener('scroll', close, true)
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      window.removeEventListener('resize', close)
+      window.removeEventListener('scroll', close, true)
+    }
   }, [menuOpen])
 
   useEffect(() => {
@@ -1277,13 +1289,23 @@ function CustomerCard({
           >
             <button
               type="button"
-              onClick={() => setMenuOpen(v => !v)}
+              onClick={(e) => {
+                if (!menuOpen) {
+                  const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                  const top = r.bottom + 4
+                  const left = Math.max(8, Math.min(window.innerWidth - 168, r.right - 160))
+                  setMenuPos({ top, left, maxH: Math.max(160, window.innerHeight - top - 12) })
+                }
+                setMenuOpen(v => !v)
+              }}
               className="text-gray-300 hover:text-gray-600 px-1 py-0.5 rounded hover:bg-gray-100 font-bold leading-none text-sm"
             >
               ⋮
             </button>
-            {menuOpen && (
-              <div className="absolute right-0 z-50 top-full mt-1 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[140px] py-1">
+            {menuOpen && menuPos && createPortal(
+              <div ref={popRef} style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, maxHeight: menuPos.maxH, overflowY: 'auto' }}
+                className="z-[500] bg-white rounded-lg shadow-xl border border-gray-200 min-w-[150px] py-1"
+                onClick={e => e.stopPropagation()}>
                 {tabType !== 'contracted' && (
                   <button type="button" onClick={() => { setContractModalOpen(true); setMenuOpen(false) }}
                     className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-emerald-600 font-medium">
@@ -1363,7 +1385,8 @@ function CustomerCard({
                   className="w-full text-left px-3 py-2 text-xs hover:bg-red-50 text-red-500 font-medium">
                   삭제
                 </button>
-              </div>
+              </div>,
+              document.body
             )}
           </div>
         )}

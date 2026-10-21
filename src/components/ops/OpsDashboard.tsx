@@ -214,7 +214,7 @@ function InnovationSelect({ value, onChange }: { value: string; onChange: (v: st
   }, [open])
   function toggle(opt: string) { const next = selected.includes(opt) ? selected.filter(s => s !== opt) : [...selected, opt]; onChange(next.join(', ')) }
   return (
-    <div className="relative" ref={ref}>
+    <div ref={ref}>
       <button type="button" onClick={() => setOpen(v => !v)}
         className="w-full text-left bg-white border border-gray-200 rounded-lg px-2 py-1 text-xs min-h-[28px] flex flex-wrap gap-1 items-center">
         {selected.length > 0 ? selected.map(s => <span key={s} className="bg-violet-100 text-violet-800 px-1.5 py-0.5 rounded text-[10px] font-semibold">{s}</span>)
@@ -222,7 +222,7 @@ function InnovationSelect({ value, onChange }: { value: string; onChange: (v: st
         <span className="ml-auto text-gray-300 text-[10px]">▾</span>
       </button>
       {open && (
-        <div className="absolute z-50 top-full left-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 p-3 w-72">
+        <div className="mt-1.5 bg-white rounded-xl border border-gray-200 p-3 w-full max-h-72 overflow-y-auto">
           {INNOVATION_GROUPS.map(({ group, color, options }) => (
             <div key={group} className="mb-3 last:mb-0">
               <p className="text-[10px] font-bold text-gray-500 mb-1.5">{group}</p>
