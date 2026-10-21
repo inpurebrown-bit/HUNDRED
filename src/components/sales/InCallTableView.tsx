@@ -850,6 +850,14 @@ function CustomerCard({
   const [logEditMode, setLogEditMode] = useState(false)
   const [logDraft, setLogDraft] = useState<Record<string, string>>({})
   const [logSaving, setLogSaving] = useState(false)
+  const [logAutoMsg, setLogAutoMsg] = useState('')
+  const logDraftRef = useRef<Record<string, string>>({})
+  const logSavedRef = useRef('')          // 마지막으로 서버에 저장된 초안(JSON)
+  const logBusyRef = useRef(false)
+  const onUpdateRef = useRef(onUpdate)
+  onUpdateRef.current = onUpdate
+  logDraftRef.current = logDraft
+  const logDraftKey = 'incall-draft:' + customer.id
   const [emotionalOpen, setEmotionalOpen] = useState(false)
   const [emotionalMood, setEmotionalMood] = useState<'상'|'중'|'하'|''>('')
   const [meetingJournalOpen, setMeetingJournalOpen] = useState(false)
@@ -861,7 +869,7 @@ function CustomerCard({
 
   function openLogEdit() {
     const d = c.details || {} as any
-    setLogDraft({
+    const initial: Record<string, string> = {
       name:               c.name || '',
       phone:              c.phone || '',
       company:            d.company || (c as any).company || '',
@@ -894,35 +902,93 @@ function CustomerCard({
       asset_other:        d.asset_other || '',
       required_funds:     d.required_funds || '',
       solution:           d.solution || '',
-    })
+    }
+    logSavedRef.current = JSON.stringify(initial)
+    let start = initial
+    setLogAutoMsg('')
+    try {
+      const raw = localStorage.getItem(logDraftKey)
+      if (raw) {
+        const bk = JSON.parse(raw)
+        const updatedAt = Date.parse((c as any).updated_at || '') || 0
+        if (bk?.d && JSON.stringify(bk.d) !== logSavedRef.current && (bk.t || 0) > updatedAt) {
+          start = { ...initial, ...bk.d }
+          setLogAutoMsg('저장 안 된 내용을 복구했습니다')
+        }
+      }
+    } catch { /* 백업이 없어도 계속 */ }
+    setLogDraft(start)
     setLogEditMode(true)
   }
 
-  async function saveLogEdit() {
-    setLogSaving(true)
-    const { name, phone, company, region, reception_date, business_type, real_work,
-      years_in_business, employee_count, patent, revenue_2026, revenue_2025, revenue_2024, revenue_2023,
-      loan_kibo, loan_shinbo, loan_jaedan, loan_jinjong, loan_sojin, loan_other, loan_total,
-      credit_kcb, credit_nice, tax_status, assets,
-      asset_home_type, asset_home_value, asset_biz_type, asset_biz_value, asset_other,
-      required_funds, solution } = logDraft
-    await onUpdate(c.id, {
-      name,
-      phone,
-      details: {
-        company, region, reception_date, business_type, real_work,
-        years_in_business, employee_count, patent,
-        revenue_2026, revenue_2025, revenue_2024, revenue_2023,
+  // 인콜일지 저장 (auto=true: 1분마다·창을 벗어날 때 조용히 저장)
+  async function persistLog(auto: boolean): Promise<boolean> {
+    const draft = logDraftRef.current
+    const json = JSON.stringify(draft)
+    if (auto && json === logSavedRef.current) return true
+    if (logBusyRef.current) return false
+    logBusyRef.current = true
+    try {
+      const { name, phone, company, region, reception_date, business_type, real_work,
+        years_in_business, employee_count, patent, revenue_2026, revenue_2025, revenue_2024, revenue_2023,
         loan_kibo, loan_shinbo, loan_jaedan, loan_jinjong, loan_sojin, loan_other, loan_total,
         credit_kcb, credit_nice, tax_status, assets,
         asset_home_type, asset_home_value, asset_biz_type, asset_biz_value, asset_other,
-        required_funds, solution,
-      },
-    })
+        required_funds, solution } = draft
+      await onUpdateRef.current(c.id, {
+        name,
+        phone,
+        details: {
+          company, region, reception_date, business_type, real_work,
+          years_in_business, employee_count, patent,
+          revenue_2026, revenue_2025, revenue_2024, revenue_2023,
+          loan_kibo, loan_shinbo, loan_jaedan, loan_jinjong, loan_sojin, loan_other, loan_total,
+          credit_kcb, credit_nice, tax_status, assets,
+          asset_home_type, asset_home_value, asset_biz_type, asset_biz_value, asset_other,
+          required_funds, solution,
+        },
+      })
+      logSavedRef.current = json
+      try { localStorage.removeItem(logDraftKey) } catch { /* ignore */ }
+      const t = new Date()
+      setLogAutoMsg((auto ? '자동 저장됨 ' : '저장됨 ') + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0'))
+      return true
+    } catch {
+      setLogAutoMsg('저장 실패 · 다시 시도합니다')
+      return false
+    } finally {
+      logBusyRef.current = false
+    }
+  }
+
+  // 수정 중에는 입력할 때마다 이 브라우저에 백업하고, 1분마다 서버에 자동 저장
+  useEffect(() => {
+    if (!logEditMode) return
+    try {
+      if (JSON.stringify(logDraft) !== logSavedRef.current) localStorage.setItem(logDraftKey, JSON.stringify({ t: Date.now(), d: logDraft }))
+    } catch { /* 저장소를 못 써도 계속 */ }
+  }, [logDraft, logEditMode, logDraftKey])
+  useEffect(() => {
+    if (!logEditMode) return
+    const id = setInterval(() => { void persistLog(true) }, 60_000)
+    const onHide = () => { if (document.visibilityState === 'hidden') void persistLog(true) }
+    const onLeave = () => { void persistLog(true) }
+    document.addEventListener('visibilitychange', onHide)
+    window.addEventListener('pagehide', onLeave)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onHide)
+      window.removeEventListener('pagehide', onLeave)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [logEditMode])
+
+  async function saveLogEdit() {
+    setLogSaving(true)
+    await persistLog(false)
     setLogSaving(false)
     setLogEditMode(false)
   }
-
   useEffect(() => {
     if (!menuOpen) return
     function handler(e: MouseEvent) {
@@ -1703,7 +1769,7 @@ function CustomerCard({
               <div className="flex items-center justify-between mb-2 shrink-0">
                 <p className="text-[10px] font-bold text-[#1B2A45] uppercase tracking-wide">인콜일지</p>
                 {!isTransferred && (
-                  <button type="button" onClick={logEditMode ? () => setLogEditMode(false) : openLogEdit}
+                  <button type="button" onClick={logEditMode ? () => { try { localStorage.removeItem(logDraftKey) } catch { /* ignore */ } setLogEditMode(false) } : openLogEdit}
                     className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-semibold transition-colors ${
                       logEditMode
                         ? 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
@@ -1876,6 +1942,7 @@ function CustomerCard({
                     }`}>
                     {logSaving ? '저장중…' : '저장'}
                   </button>
+                  {logEditMode && <span className="text-[10px] text-gray-400 mx-2 flex-1 truncate">{logAutoMsg || '1분마다 자동 저장됩니다'}</span>}
                   <button type="button"
                     onClick={() => { if (confirm('이 고객을 삭제하시겠습니까?')) { onDelete(c.id); onExpand(null) } }}
                     className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-red-50 text-red-400 hover:bg-red-100 border border-red-100 transition-colors">
