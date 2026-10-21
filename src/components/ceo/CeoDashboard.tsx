@@ -20,6 +20,7 @@ import PinManageTab from './PinManageTab'
 import MyProfileTab from '@/components/MyProfileTab'
 import DbManageTab from './DbManageTab'
 import PersonalFinanceTab from './PersonalFinanceTab'
+import TaxCalcTab from './TaxCalcTab'
 import PullToRefresh from '@/components/ui/PullToRefresh'
 import SplitView from '@/components/shared/SplitView'
 import TabErrorBoundary from '@/components/shared/TabErrorBoundary'
@@ -54,7 +55,7 @@ function SubTabBar<T extends string>({ tabs, active, onChange }: {
 
 // 손익·급여 통합 탭
 function AnalyticsTab() {
-  const [sub, setSub] = useState<'revenue' | 'payroll' | 'payslip' | 'personal' | 'planner'>('revenue')
+  const [sub, setSub] = useState<'revenue' | 'payroll' | 'payslip' | 'tax' | 'personal' | 'planner'>('revenue')
   return (
     <div>
       <SubTabBar
@@ -62,6 +63,7 @@ function AnalyticsTab() {
           { key: 'revenue'  as const, label: '매출 관리' },
           { key: 'payroll'  as const, label: '급여·손익' },
           { key: 'payslip'  as const, label: '급여명세서' },
+          { key: 'tax'      as const, label: '세금계산' },
           { key: 'personal' as const, label: '개인재무' },
           { key: 'planner'  as const, label: '플래너' },
         ]}
@@ -70,6 +72,7 @@ function AnalyticsTab() {
       {sub === 'revenue'  && <RevenueTab />}
       {sub === 'payroll'  && <PayrollTab />}
       {sub === 'payslip'  && <PayslipTab />}
+      {sub === 'tax'      && <TaxCalcTab />}
       {sub === 'personal' && <PersonalFinanceTab />}
       {sub === 'planner'  && <PlannerTab />}
     </div>

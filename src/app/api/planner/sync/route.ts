@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { buildSalesContractMap, calcRefundDeductions, calcSalesStructure, getPromo } from '@/lib/payrollCalc'
 import { GET as revenueGET } from '@/app/api/revenue/route'
+import { DEFAULT_TAX_2026, computeTax, type TaxData } from '@/lib/taxCalc'
 
 // 대표 플래너가 쓰는 CRM 실적 묶음 (단위: 원 → 화면에서 만원으로 변환)
 function monthKey(offset = 0) {
@@ -88,7 +89,17 @@ export async function GET(req: NextRequest) {
     return { count: cnt.reduce((a, b) => a + b, 0) / 3, revenue: rev.reduce((a, b) => a + b, 0) / 3 }
   })()
 
+  // 세금계산 탭(홈택스 신고 기준)
+  let tax: any = null
+  try {
+    const { data: trow } = await supabaseAdmin.from('settings').select('value').eq('key', 'tax_calc').single()
+    const td = ((trow?.value as TaxData) && Array.isArray((trow?.value as any).quarters) ? trow?.value : DEFAULT_TAX_2026) as TaxData
+    const ts = computeTax(td)
+    tax = { asOf: td.asOf, incomeTax: ts.incomeTax, vat: ts.vat, parking: ts.parking, actual: ts.actual, h1Due: ts.h1.vatDue, h2Due: ts.h2.vatDue }
+  } catch { /* 세금 요약 실패해도 나머지는 반환 */ }
+
   return NextResponse.json({
+    tax,
     month: ym,
     sales: {
       count: Math.round(sumCount(cur) * 100) / 100,
