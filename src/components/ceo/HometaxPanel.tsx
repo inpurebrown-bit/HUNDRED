@@ -29,7 +29,7 @@ export default function HometaxPanel({ data, onApply, onFetched }: { data?: TaxD
   const [left, setLeft] = useState(0)
   const [secret7, setSecret7] = useState('')
   const [applyMsg, setApplyMsg] = useState('')
-  const ctx = useRef<{ kind: Kind; sid: string; twoWay: any } | null>(null)
+  const ctx = useRef<{ sid: string; leaders: { kind: Kind; twoWay: any }[] } | null>(null)
   const [picked, setPicked] = useState<Record<Kind, boolean>>({ vatCert: true, taxInvoice: false, cashSales: true, cashBuy: true })
   const abortRef = useRef<AbortController | null>(null)
 
@@ -70,8 +70,14 @@ export default function HometaxPanel({ data, onApply, onFetched }: { data?: TaxD
   async function confirm() {
     if (!ctx.current) return
     setPhase('loading'); setMsg('홈택스에서 가져오는 중입니다. 최대 1~2분 걸릴 수 있어요…')
-    try { handle(await call({ action: 'confirm', kind: ctx.current.kind, sid: ctx.current.sid, twoWay: ctx.current.twoWay, secret7: picked.taxInvoice ? secret7 : undefined })) }
-    catch (e: any) { if (e?.name !== 'AbortError') { setPhase('error'); setMsg('요청에 실패했습니다') } }
+    try {
+      // 승인 요청이 여러 개 왔으면 한 번에 모두 확정한다
+      const { sid, leaders } = ctx.current
+      const rs = await Promise.all(leaders.map(l => call({ action: 'confirm', kind: l.kind, sid, twoWay: l.twoWay, secret7: picked.taxInvoice ? secret7 : undefined })))
+      const bad = rs.filter(r => r.status === 'error' || r.retry)
+      if (bad.length === rs.length && rs.some(r => r.retry)) { handle(rs.find(r => r.retry)); return }
+      handle({ status: 'confirmed', errors: bad.map((r, i) => [ITEMS.find(x => x.kind === leaders[i]?.kind)?.label, r.code, r.message].filter(Boolean).join(' ')) })
+    } catch (e: any) { if (e?.name !== 'AbortError') { setPhase('error'); setMsg('요청에 실패했습니다') } }
   }
   async function reload() {
     const j = await fetch('/api/hometax/sync', { cache: 'no-store' }).then(r => r.json()).catch(() => null)
@@ -80,17 +86,21 @@ export default function HometaxPanel({ data, onApply, onFetched }: { data?: TaxD
   }
   function handle(j: any) {
     if (j.status === 'need-auth') {
-      ctx.current = { kind: j.kind || j.leader, sid: j.sid, twoWay: j.twoWay }; setPhase('waiting')
+      ctx.current = { sid: j.sid, leaders: j.leaders || [{ kind: j.kind || j.leader, twoWay: j.twoWay }] }; setPhase('waiting')
       const bad = (j.failed || []).concat((j.skipped || []).map((x: string) => ({ message: x }))).map((f: any) => [ITEMS.find(i => i.kind === f.kind)?.label, f.code, f.message].filter(Boolean).join(' ')).join(' / ')
       setMsg((j.message || '') + (bad ? ' · 제외됨: ' + bad : ''))
     }
     else if (j.status === 'confirmed' || j.status === 'collecting') {
-      setPhase('loading'); setMsg('나머지 항목을 정리하는 중…')
+      setPhase('loading'); setMsg('나머지 항목을 정리하는 중…' + (j.errors?.length ? ' · 실패: ' + j.errors.join(' / ') : ''))
       let n = 0
       const iv = setInterval(async () => { await reload(); if (++n >= 12) { clearInterval(iv); setPhase('idle'); setActive(null); setMsg('불러오기를 마쳤습니다. 아래 표를 확인하세요') } }, 8000)
       abortRef.current = { abort: () => clearInterval(iv) } as any
     }
-    else { setPhase('error'); setMsg([j.code, j.message, j.extra].filter(Boolean).join(' · ') || '알 수 없는 오류') }
+    else {
+      setPhase('error')
+      const per = (j.failed || []).map((f: any) => [ITEMS.find(i => i.kind === f.kind)?.label, f.code, f.message].filter(Boolean).join(' ')).join(' / ')
+      setMsg(per || [j.code, j.message, j.extra].filter(Boolean).join(' · ') || '알 수 없는 오류')
+    }
   }
 
   const upd = (k: keyof Profile, v: string) => setProfile(p => ({ ...p, [k]: v }))

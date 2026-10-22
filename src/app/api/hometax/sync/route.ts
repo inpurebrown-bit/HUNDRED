@@ -111,26 +111,30 @@ export async function POST(req: NextRequest) {
       for (const j of jobs) j.p = codefPost(j.rq.path, j.rq.body, 57_000).then(r => { j.res = r; j.done = true }, e => { j.err = e; j.done = true })
       // 첫 응답들이 모일 때까지 잠깐 기다린다 (승인 대기로 들어간 조회가 먼저 돌아온다)
       const t0 = Date.now()
-      while (Date.now() - t0 < 12_000 && !jobs.some(j => j.res?.code === 'CF-03002' || j.res?.data?.continue2Way) && jobs.some(j => !j.done)) await new Promise(r => setTimeout(r, 300))
-      const leader = jobs.find(j => j.res?.code === 'CF-03002' || j.res?.data?.continue2Way)
-      const failed = jobs.filter(j => j.done && j !== leader && (j.err || j.res?.code !== 'CF-00000')).map(j => ({ kind: j.kind, code: j.res?.code || '', message: j.err ? (j.err.name === 'TimeoutError' ? timeoutMsg : j.err.message) : j.res?.message }))
+      // 상품(국세청 메뉴)마다 인증 세션이 달라 승인 요청이 둘 이상 올 수 있다 — 승인 요청이 온 조회를 모두 모은다
+      const is2way = (j: Job) => j.res?.code === 'CF-03002' || !!j.res?.data?.continue2Way
+      while (Date.now() - t0 < 12_000 && jobs.some(j => !j.done && !is2way(j))) await new Promise(r => setTimeout(r, 300))
+      const leaders = jobs.filter(is2way)
+      const leader = leaders[0]
+      const failed = jobs.filter(j => j.done && !is2way(j) && (j.err || j.res?.code !== 'CF-00000')).map(j => ({ kind: j.kind, code: j.res?.code || '', message: j.err ? (j.err.name === 'TimeoutError' ? timeoutMsg : j.err.message) : [j.res?.message, j.res?.extraMessage].filter(Boolean).join(' ') }))
       const pendingKinds = jobs.filter(j => !j.done).map(j => j.kind)
 
       // 승인 없이 바로 끝난 조회(이미 세션이 열려 있는 경우)와, 승인 뒤 대기가 풀려 끝나는 조회를 저장한다
       after(async () => {
         await Promise.all(jobs.map(j => j.p))
-        for (const j of jobs) { if (j !== leader && j.res?.code === 'CF-00000') await finish(j.kind, j.res.data, j.rq.range).catch(() => {}) }
+        for (const j of jobs) { if (!leaders.includes(j) && j.res?.code === 'CF-00000') await finish(j.kind, j.res.data, j.rq.range).catch(() => {}) }
       })
 
       if (leader) {
         const d = leader.res!.data || {}
-        return NextResponse.json({ status: 'need-auth', sid, leader: leader.kind, kinds: jobs.map(j => j.kind), pending: pendingKinds, failed, skipped, method: d.method || '', twoWay: { jobIndex: d.jobIndex, threadIndex: d.threadIndex, jti: d.jti, twoWayTimestamp: d.twoWayTimestamp }, startedAt: new Date().toISOString() })
+        const tw = (x: Job) => { const y = x.res!.data || {}; return { jobIndex: y.jobIndex, threadIndex: y.threadIndex, jti: y.jti, twoWayTimestamp: y.twoWayTimestamp } }
+        return NextResponse.json({ status: 'need-auth', sid, leader: leader.kind, leaders: leaders.map(x => ({ kind: x.kind, twoWay: tw(x) })), kinds: jobs.map(j => j.kind), pending: pendingKinds, failed, skipped, method: d.method || '', twoWay: tw(leader), startedAt: new Date().toISOString() })
       }
       // 승인 요청이 없고 모두 끝났거나 실패한 경우
       const ok = jobs.filter(j => j.res?.code === 'CF-00000').map(j => j.kind)
       if (ok.length) return NextResponse.json({ status: 'collecting', kinds: jobs.map(j => j.kind), pending: pendingKinds, failed, skipped, startedAt: new Date().toISOString() })
       const first = jobs[0]
-      return NextResponse.json({ status: 'error', code: first.res?.code, message: first.err ? (first.err.name === 'TimeoutError' ? timeoutMsg : first.err.message) : first.res?.message, extra: first.res?.extraMessage })
+      return NextResponse.json({ status: 'error', code: first.res?.code, message: first.err ? (first.err.name === 'TimeoutError' ? timeoutMsg : first.err.message) : first.res?.message, extra: first.res?.extraMessage, failed: jobs.map(j => ({ kind: j.kind, code: j.res?.code || '', message: j.err ? j.err.message : [j.res?.message, j.res?.extraMessage].filter(Boolean).join(' ') })) })
     }
 
     // ── 확정: 승인 뒤 첫 조회를 마친다 (대기 중이던 나머지는 시작 요청 쪽에서 이어서 끝나 저장됨) ──
