@@ -161,7 +161,7 @@ export interface Props {
   onCeoTransfer?: (id: string, destPerson: string, destBucket: string, destRole: 'sales' | 'ops') => Promise<void>
   onMarkDirect?: (id: string) => Promise<void>  // 대표 전용: 공가→직가 전환
   showOwner?: boolean
-  groupBy?: 'date' | 'mood'   // db010 전용: 접수날짜별 or 감도별
+  groupBy?: 'date' | 'mood' | 'received'   // db010 전용: 접수날짜별 or 감도별
   scrollToId?: { id: string; nonce: number } | string   // 이 ID의 카드로 자동 스크롤 + 펼침
 }
 
@@ -2367,7 +2367,15 @@ export default function InCallTableView({
 
   const isMoodGroup = (tabType === 'emotional' && groupBy === 'mood') || (tabType === 'db010' && groupBy === 'mood')
 
-  const groups = (tabType === 'emotional' && groupBy === 'mood')
+  // 넘겨받은 DB: 담당자가 나로 바뀐 날짜별로 묶는다 (최근 넘겨받은 순)
+  const recvDate = (c: Customer) => {
+    const h: any[] = ((c as any).details?.transfer_history || []).filter((e: any) => e.to === userName)
+    return h.length ? String(h[h.length - 1].at || '').slice(0, 10) || '__none__' : '__none__'
+  }
+  const groups = groupBy === 'received'
+    ? Object.entries(customers.reduce((m: Record<string, Customer[]>, c) => { (m[recvDate(c)] ||= []).push(c); return m }, {}))
+        .sort(([a], [b]) => b.localeCompare(a)).map(([date, items]) => ({ date, items }))
+    : (tabType === 'emotional' && groupBy === 'mood')
     ? (['상', '중', '하', ''] as const).map(mood => ({
         date: mood || '__none__',
         items: customers.filter(c => (c.details?.rejection_mood || '') === mood),
@@ -2397,7 +2405,7 @@ export default function InCallTableView({
             : '감도 하'
           : date === '__none__'
           ? '날짜 미정'
-          : `${date.slice(0, 7).replace('-', '년 ')}월  ${date.slice(8, 10)}일`
+          : `${date.slice(0, 7).replace('-', '년 ')}월  ${date.slice(8, 10)}일${groupBy === 'received' ? ' 넘겨받음' : ''}`
 
         return (
           <div key={date}>

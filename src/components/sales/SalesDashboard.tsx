@@ -80,6 +80,21 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [db010GroupBy, setDb010GroupBy] = useState<'date' | 'mood'>('date')
+  // 넘겨받은 DB 보기 (퇴사자·대표가 담당자를 나로 바꿔 준 DB) — 탭별로 켜고 끈다
+  const [recvTabs, setRecvTabs] = useState<Record<string, boolean>>({})
+  const isReceived = (c: any) => ((c.details?.transfer_history || []) as any[]).some(e => e.to === userName)
+  const recvList = (tab: string, list: any[]) => (recvTabs[tab] ? list.filter(isReceived) : list)
+  const recvBtn = (tab: string, list: any[], light = true) => {
+    const n = list.filter(isReceived).length
+    if (n === 0 && !recvTabs[tab]) return null
+    const on = !!recvTabs[tab]
+    return (
+      <button onClick={() => setRecvTabs(p => ({ ...p, [tab]: !p[tab] }))}
+        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors ${on ? 'bg-amber-400 text-[#1B2A45] border-amber-400' : 'bg-white/10 text-white border-white/30 hover:bg-white/20'}`}>
+        넘겨받은 DB {n}
+      </button>
+    )
+  }
   const [emotionalGroupBy, setEmotionalGroupBy] = useState<'date' | 'mood'>('mood')
   // ── 메모장 ──────────────────────────────────────────────────────────────
   const [notepadOpen, setNotepadOpen] = useState(false)
@@ -1583,6 +1598,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 <p className="text-white/50 text-[11px] mt-0.5">총 {db010List.length}건{tabSearchQuery && ` · 검색 ${filterCustomers(db010List, tabSearchQuery).length}건`}</p>
               </div>
               <div className="flex items-center gap-2">
+                {recvBtn('db010', db010List)}
                 {/* 보기 방식 토글 */}
                 <div className="flex bg-white/10 rounded-lg p-0.5 border border-white/20">
                   <button
@@ -1654,12 +1670,12 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               </div>
             ) : (
               <InCallTableView
-                customers={filterCustomers(db010List, tabSearchQuery)}
+                customers={filterCustomers(recvList('db010', db010List), tabSearchQuery)}
                 allCustomers={customers}
                 tabType="db010"
                 salesUsers={salesUserNames}
                 userName={userName}
-                groupBy={db010GroupBy}
+                groupBy={recvTabs.db010 ? 'received' : db010GroupBy}
                 scrollToId={scrollTarget}
                 onUpdate={updateCustomer}
                 onStatusChange={async (id, status) => moveCustomer(id, status as any)}
@@ -1677,10 +1693,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 <h2 className="text-sm font-bold text-white">📂 공가 DB</h2>
                 <p className="text-white/50 text-[11px] mt-0.5">총 {activeCustomers.length}건{tabSearchQuery && ` · 검색 ${filterCustomers(activeCustomers, tabSearchQuery).length}건`}</p>
               </div>
+              <div className="flex items-center gap-2">
+              {recvBtn('customers', activeCustomers)}
               <button onClick={() => setShowNewForm(v => !v)}
                 className="bg-white/15 hover:bg-white/25 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-colors border border-white/20">
                 {showNewForm ? '✕ 취소' : '+ 공가DB 등록'}
               </button>
+              </div>
             </div>
 
             {/* 탭 내부 검색 */}
@@ -1720,12 +1739,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               </div>
             ) : (
               <InCallTableView
-                customers={filterCustomers(activeCustomers, tabSearchQuery)}
+                customers={filterCustomers(recvList('customers', activeCustomers), tabSearchQuery)}
                 allCustomers={customers}
                 opsContracts={contracts}
                 tabType="lead"
                 salesUsers={salesUserNames}
                 userName={userName}
+                groupBy={recvTabs.customers ? 'received' : 'date'}
                 scrollToId={scrollTarget}
                 onUpdate={updateCustomer}
                 onStatusChange={async (id, status) => moveCustomer(id, status as any)}
@@ -1816,6 +1836,8 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                 <h2 className="text-sm font-bold text-white">감성톡 관리 업체</h2>
                 <p className="text-white/50 text-[11px] mt-0.5">총 {emotionalCustomers.length}건{tabSearchQuery && ` · 검색 ${filterCustomers(emotionalCustomers, tabSearchQuery).length}건`} · 장기 육성 대상</p>
               </div>
+              <div className="flex items-center gap-2">
+              {recvBtn('emotional', emotionalCustomers)}
               <div className="flex bg-white/10 rounded-lg p-0.5 border border-white/20">
                 <button
                   onClick={() => setEmotionalGroupBy('mood')}
@@ -1831,6 +1853,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                   }`}>
                   등록일
                 </button>
+              </div>
               </div>
             </div>
 
@@ -1886,12 +1909,12 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
               </div>
             ) : (
               <InCallTableView
-                customers={filterCustomers(emotionalCustomers, tabSearchQuery)}
+                customers={filterCustomers(recvList('emotional', emotionalCustomers), tabSearchQuery)}
                 allCustomers={customers}
                 tabType="emotional"
                 salesUsers={salesUserNames}
                 userName={userName}
-                groupBy={emotionalGroupBy}
+                groupBy={recvTabs.emotional ? 'received' : emotionalGroupBy}
                 scrollToId={scrollTarget}
                 onUpdate={updateCustomer}
                 onStatusChange={async (id, status) => moveCustomer(id, status as any)}
