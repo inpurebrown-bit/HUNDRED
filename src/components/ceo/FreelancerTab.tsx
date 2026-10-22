@@ -13,12 +13,13 @@ interface Freelancer {
   team: 'ops' | 'sales'
   join_date: string
   note: string
+  resign_date?: string
 }
 
 const BLANK: Omit<Freelancer, 'id'> = {
   name: '', resident_id: '', address: '', phone: '',
   bank_account: '', bank_name: '카카오뱅크', team: 'sales',
-  join_date: '', note: '',
+  join_date: '', note: '', resign_date: '',
 }
 
 // 빠른 선택 버튼 목록
@@ -49,9 +50,14 @@ export default function FreelancerTab() {
   const [msg, setMsg] = useState('')
   const [showMasked, setShowMasked] = useState(true)
   // 팀 탭 필터
-  const [teamTab, setTeamTab] = useState<'all' | 'sales' | 'ops'>('all')
+  const [teamTab, setTeamTab] = useState<'all' | 'sales' | 'ops' | 'resigned'>('all')
   // 계좌번호 복사 피드백
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  // 급여명세 설정에는 이 화면에 없는 항목도 들어 있어, 저장할 때 원본을 그대로 보존한다
+  const [raw, setRaw] = useState<Record<string, any>>({})
+  const [blockedNames, setBlockedNames] = useState<Set<string>>(new Set())
+  const isResigned = (e: Freelancer) => !!e.resign_date || blockedNames.has(e.name)
+  const withRaw = (arr: Freelancer[]) => arr.map(e => ({ ...(raw[e.id] || {}), ...e }))
 
   // payslip-settings에서 직원 목록 공유
   useEffect(() => {
@@ -61,6 +67,7 @@ export default function FreelancerTab() {
       if (json.settings?.employees) {
         // payslip-settings의 employees를 freelancers로 쓰되, 추가 필드를 병합
         const emps = json.settings.employees as any[]
+        setRaw(Object.fromEntries(emps.filter(e => e.id).map(e => [e.id, e])))
         setList(emps.map(e => ({
           id: e.id || Date.now().toString(),
           name: e.name || '',
@@ -72,10 +79,13 @@ export default function FreelancerTab() {
           team: e.team || 'sales',
           join_date: e.join_date || '',
           note: e.note || '',
+          resign_date: e.resign_date || '',
         })))
       }
     }
     load()
+    // 블락(퇴사) 처리된 계정은 퇴사자로 본다
+    fetch('/api/users').then(r => r.json()).then(j => setBlockedNames(new Set((j.users || []).filter((u: any) => u.blocked).map((u: any) => u.name)))).catch(() => {})
   }, [])
 
   async function save(emp: Freelancer) {
@@ -89,7 +99,7 @@ export default function FreelancerTab() {
       const res = await fetch('/api/payslip-settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ employees: updated }),
+        body: JSON.stringify({ employees: withRaw(updated) }),
       })
       const json = await res.json()
       if (json.settings) {
@@ -111,7 +121,7 @@ export default function FreelancerTab() {
     await fetch('/api/payslip-settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ employees: updated }),
+      body: JSON.stringify({ employees: withRaw(updated) }),
     })
     setList(updated)
     setSelected(null)
@@ -140,9 +150,22 @@ export default function FreelancerTab() {
   }
 
   // 팀 탭 필터 적용
-  const filteredList = list.filter(e =>
-    teamTab === 'all' ? true : e.team === teamTab
-  )
+  const activeList = list.filter(e => !isResigned(e))
+  const resignedList = list.filter(isResigned)
+  const filteredList = teamTab === 'resigned' ? resignedList : activeList.filter(e => (teamTab === 'all' ? true : e.team === teamTab))
+
+  // 퇴사 처리 / 복직 — 급여명세의 퇴사일(resign_date)과 같은 값을 쓴다
+  async function setResign(emp: Freelancer, date: string) {
+    const next = { ...emp, resign_date: date }
+    const updated = list.map(e => (e.id === emp.id ? next : e))
+    const res = await fetch('/api/payslip-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ employees: withRaw(updated) }) })
+    if (res.ok) { setList(updated); setSelected(next); setMsg(date ? '퇴사 처리했습니다' : '복직 처리했습니다') } else setMsg('저장 실패')
+  }
+  function resignPrompt(emp: Freelancer) {
+    const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
+    const d = prompt(emp.name + ' 퇴사일을 입력하세요 (YYYY-MM-DD)', today)
+    if (d && /^d{4}-d{2}-d{2}$/.test(d.trim())) setResign(emp, d.trim())
+  }
 
   return (
     <div className="space-y-4 pb-8">
@@ -191,10 +214,11 @@ export default function FreelancerTab() {
       {/* 팀 구분 탭 */}
       <div className="flex gap-2">
         {([
-          ['all', '전체', list.length],
-          ['sales', '영업팀', list.filter(e => e.team === 'sales').length],
-          ['ops', '관리팀', list.filter(e => e.team === 'ops').length],
-        ] as ['all' | 'sales' | 'ops', string, number][]).map(([key, label, count]) => (
+          ['all', '재직 전체', activeList.length],
+          ['sales', '영업팀', activeList.filter(e => e.team === 'sales').length],
+          ['ops', '관리팀', activeList.filter(e => e.team === 'ops').length],
+          ['resigned', '퇴사', resignedList.length],
+        ] as ['all' | 'sales' | 'ops' | 'resigned', string, number][]).map(([key, label, count]) => (
           <button
             key={key}
             onClick={() => setTeamTab(key)}
@@ -204,7 +228,7 @@ export default function FreelancerTab() {
                   ? 'bg-blue-600 text-white'
                   : key === 'ops'
                     ? 'bg-violet-600 text-white'
-                    : 'bg-[#1B2A45] text-white'
+                    : key === 'resigned' ? 'bg-gray-500 text-white' : 'bg-[#1B2A45] text-white'
                 : 'bg-white border border-[#E8E2D4] text-gray-600 hover:bg-gray-50'
             }`}
           >
@@ -418,6 +442,14 @@ export default function FreelancerTab() {
                   />
                 </div>
 
+                {/* 퇴사일 */}
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">퇴사일 <span className="text-gray-300">(비우면 재직)</span></label>
+                  <input type="date" value={editData.resign_date || ''}
+                    onChange={e => setEditData(prev => prev ? { ...prev, resign_date: e.target.value } : null)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                </div>
+
                 {/* 팀 */}
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">팀</label>
@@ -481,6 +513,7 @@ export default function FreelancerTab() {
                     ['주민등록번호', showMasked ? mask(selected.resident_id) : selected.resident_id],
                     ['연락처', selected.phone],
                     ['등록일', fmt(selected.join_date)],
+                    ['퇴사일', selected.resign_date ? fmt(selected.resign_date) : (blockedNames.has(selected.name) ? '퇴사(계정 블락)' : '')],
                     ['주소', selected.address],
                   ].map(([label, value]) => value && (
                     <div key={label} className="flex gap-2">
@@ -518,6 +551,9 @@ export default function FreelancerTab() {
                   className="w-full border border-gray-200 text-gray-700 py-2 rounded-lg text-sm hover:bg-gray-50 mt-2">
                   편집
                 </button>
+                {selected.resign_date
+                  ? <button onClick={() => setResign(selected, '')} className="w-full border border-emerald-200 text-emerald-700 py-2 rounded-lg text-sm hover:bg-emerald-50">복직 처리</button>
+                  : <button onClick={() => resignPrompt(selected)} className="w-full border border-red-200 text-red-500 py-2 rounded-lg text-sm hover:bg-red-50">퇴사 처리</button>}
               </div>
             ) : null}
           </div>
@@ -527,16 +563,16 @@ export default function FreelancerTab() {
       {/* 요약 통계 */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-white rounded-xl border border-[#E8E2D4] p-4 text-center">
-          <p className="text-2xl font-black text-gray-900">{list.length}</p>
-          <p className="text-xs text-gray-500 mt-1">전체 프리랜서</p>
+          <p className="text-2xl font-black text-gray-900">{activeList.length}</p>
+          <p className="text-xs text-gray-500 mt-1">재직 프리랜서 <span className="text-gray-300">(퇴사 {resignedList.length})</span></p>
         </div>
         <div className="bg-white rounded-xl border border-[#E8E2D4] p-4 text-center">
-          <p className="text-2xl font-black text-blue-600">{list.filter(e => e.team === 'sales').length}</p>
-          <p className="text-xs text-gray-500 mt-1">영업팀</p>
+          <p className="text-2xl font-black text-blue-600">{activeList.filter(e => e.team === 'sales').length}</p>
+          <p className="text-xs text-gray-500 mt-1">영업팀 (재직)</p>
         </div>
         <div className="bg-white rounded-xl border border-[#E8E2D4] p-4 text-center">
-          <p className="text-2xl font-black text-violet-600">{list.filter(e => e.team === 'ops').length}</p>
-          <p className="text-xs text-gray-500 mt-1">관리팀</p>
+          <p className="text-2xl font-black text-violet-600">{activeList.filter(e => e.team === 'ops').length}</p>
+          <p className="text-xs text-gray-500 mt-1">관리팀 (재직)</p>
         </div>
       </div>
     </div>

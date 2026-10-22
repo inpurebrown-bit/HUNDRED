@@ -1,4 +1,5 @@
 'use client'
+import ActivityStamps from '@/components/shared/ActivityStamps'
 
 import { useState, useEffect, useRef, useCallback, FormEvent, ReactNode } from 'react'
 import { signOut, useSession } from 'next-auth/react'
@@ -1352,9 +1353,19 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                 const call = String(d.call_memo ?? '').trim()
                 const at = d.handover_at || d.contract_date || (local as any).created_at || ''
                 const who = d.sales_user_name || '영업팀'
+                // 예전에 관리팀이 인콜일지 하단에 직접 적어 둔 메모도 타임라인에 남긴다
+                const own = String((local.details as any)?.incall_journal?.notes ?? '').trim()
+                const ownEntry = own && own !== handover && own !== call ? [{ label: '관리팀 메모', content: own, at: (local as any).updated_at || at, user: '관리팀' }] : []
+                if (ownEntry.length) return [...ownEntry, ...(call && handover && call !== handover ? [{ label: '통화메모', content: call, at, user: who }, { label: '전달내용', content: handover, at, user: who }] : handover ? [{ label: '통화메모 · 전달내용', content: handover, at, user: who }] : [])]
                 if (call && handover && call !== handover) return [{ label: '통화메모', content: call, at, user: who }, { label: '전달내용', content: handover, at, user: who }]
                 return handover ? [{ label: '통화메모 · 전달내용', content: handover, at, user: who }] : []
               })()} />
+            <div className="mt-3">
+              <ActivityStamps entries={[
+                ...((local.details as any)?.activity_log || []).map((e: any) => ({ ...e, src: 'ops' })),
+                ...((local.customers?.details as any)?.activity_log || []).map((e: any) => ({ ...e, src: 'sales' })),
+              ]} />
+            </div>
           </div>
         </div>
       )}
@@ -1788,28 +1799,6 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                     </div>
                   )
                 })()}
-
-                {/* ── 통화 메모 ── */}
-                <div className="mb-0">
-                  <div className="bg-gray-700 px-3 py-1.5">
-                    <span className="text-[10px] font-bold text-white tracking-wide">통화 메모</span>
-                  </div>
-                  <div className="px-3 py-2">
-                    {incallEditing ? (
-                      <textarea
-                        value={gv('notes', cd.notes || '')}
-                        onChange={e => incallField('notes', e.target.value)}
-                        placeholder="통화 내용 / 메모를 입력하세요…"
-                        rows={3}
-                        className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-blue-300 resize-y"
-                      />
-                    ) : (
-                      <p className={`text-xs whitespace-pre-wrap ${gv('notes', cd.notes || '') ? 'text-gray-700' : 'text-gray-300'}`}>
-                        {gv('notes', cd.notes || '') || '—'}
-                      </p>
-                    )}
-                  </div>
-                </div>
 
                 {/* ── 인콜결과 + 재통화 (컴팩트) ── */}
                 <div className="bg-gray-50 border-t border-gray-100 px-3 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5">

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendPushNotification } from '@/lib/pushNotify'
+import { diffOps, withLog } from '@/lib/activityLog'
 
 // 프론트 alias → DB 컬럼명 변환
 function toDbPatch(body: Record<string, any>) {
@@ -57,7 +58,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   // 권한 확인
   const { data: existing } = await supabaseAdmin
     .from('ops_cases')
-    .select('owner_id, ops_user_name, stage, customer_name')
+    .select('owner_id, ops_user_name, stage, customer_name, institution, details, timeline')
     .eq('id', id)
     .single()
 
@@ -77,6 +78,12 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   const patch = toDbPatch(body)
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: '수정할 필드 없음' }, { status: 400 })
+  }
+
+  // 타임스탬프 (관리팀 행위) — 클라이언트가 보낸 activity_log는 무시하고 서버 기록을 유지
+  {
+    const logs = diffOps(existing as any, patch, { name: user.name, role: user.role })
+    if (patch.details || logs.length) patch.details = withLog(patch.details ?? existing.details, existing.details, logs)
   }
 
   const { data, error } = await supabaseAdmin

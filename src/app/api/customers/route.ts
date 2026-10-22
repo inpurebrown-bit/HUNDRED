@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { normalizeCustomers, toDbRow } from '@/lib/customerUtils'
+import { nowKstIso } from '@/lib/activityLog'
 
 // GET: 내 고객 목록 조회
 export async function GET(req: NextRequest) {
@@ -69,6 +70,7 @@ export async function POST(req: NextRequest) {
   }
 
   const insertRow = toDbRow(body, assignedUserId, assignedUserName)
+  insertRow.details = { ...insertRow.details, activity_log: [{ at: nowKstIso(), by: user.name || '—', role: user.role, action: 'DB 등록', detail: assignedUserName ? `담당 ${assignedUserName}` : undefined }] }
 
   const { data, error } = await supabaseAdmin
     .from('customers')

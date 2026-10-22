@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { normalizeCustomers, statusPatch } from '@/lib/customerUtils'
 import { sendPushNotification } from '@/lib/pushNotify'
+import { diffCustomer, withLog } from '@/lib/activityLog'
 
 // PATCH: 고객 정보 수정
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -16,7 +17,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
 
   const { data: existing } = await supabaseAdmin
     .from('customers')
-    .select('owner_id, status, name, details')
+    .select('owner_id, status, name, details, call_timeline')
     .eq('id', id)
     .single()
 
@@ -66,6 +67,16 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   const finalStatus = updateBody.status ?? existing.status
   if (finalStatus === 'contracted' && updateBody.details) {
     delete updateBody.details.sub_status
+  }
+
+  // 타임스탬프: 단계·담당자·일정·메모 등 큰 변화를 누가 했는지와 함께 남긴다
+  {
+    const logs = diffCustomer(
+      existing as any,
+      { status: updateBody.status ?? existing.status, details: updateBody.details ?? existing.details, call_timeline: updateBody.call_timeline },
+      { name: user.name, role: user.role },
+    )
+    if (updateBody.details || logs.length) updateBody.details = withLog(updateBody.details ?? existing.details, existing.details, logs)
   }
 
   const { data, error } = await supabaseAdmin

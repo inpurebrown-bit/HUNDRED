@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { nowKstIso } from '@/lib/activityLog'
 
 /**
  * 실제 ops_cases 컬럼:
@@ -235,6 +236,7 @@ export async function POST(req: NextRequest) {
     ...(details || {}),
     ...(resolvedOpsName ? { ops_user_name: resolvedOpsName } : {}),
     ...(customer_id     ? { customer_id }                    : {}),
+    activity_log: [{ at: nowKstIso(), by: user.name || '—', role: user.role, action: '관리팀 접수', detail: resolvedOpsName ? `담당 ${resolvedOpsName}` : undefined }],
   }
 
   const baseRow: Record<string, any> = {

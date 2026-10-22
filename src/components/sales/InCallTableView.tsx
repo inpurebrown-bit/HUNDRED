@@ -1,4 +1,5 @@
 'use client'
+import ActivityStamps, { type StampEntry } from '@/components/shared/ActivityStamps'
 
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
@@ -2316,6 +2317,9 @@ function CustomerCard({
                   </div>
                 )
               })()}
+
+              {/* 타임스탬프 — 이 카드에서 일어난 행위 기록 */}
+              <ActivityStamps entries={((c.details as any)?.activity_log || []) as StampEntry[]} />
             </div>
           </div>
           </div>{/* fixed panel */}
