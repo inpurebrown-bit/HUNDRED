@@ -15,10 +15,14 @@ export interface TaxData {
   year: number
   asOf: string                      // 기준일 (엑셀 날짜 칸)
   quarters: TaxQuarter[]
-  paid: { q1: number | null; q3: number | null }   // 1기 예정 / 2기 예정에 낸 금액
+  // q1/q3: 1기·2기 예정(고지)에 낸 금액 · h1Final: 1기 확정(7/25)에 실제 낸 금액(기록용) · interim: 11월 종소세 중간예납에 낸 금액
+  paid: { q1: number | null; q3: number | null; h1Final?: number | null; interim?: number | null }
   incomeTaxRate: number            // 종소세 적립률 (기본 10%, 1년 매출 공급가 기준)
   source: '수동' | '홈택스'
   syncedAt?: string
+  // 카드 매출은 홈택스로 못 읽어서 월별 총액(부가세 포함)을 직접 입력한다. 입력한 달이 있으면 그 분기의 카드 매출은 월별 합계를 쓴다.
+  cardMonthly?: Record<string, number | null>   // 'YYYYMM' → 총액
+  cardThrough?: string                          // 카드 입력을 어디(날짜)까지 했는지 — 정산일 기준
   // 홈택스 부가세과세표준증명으로 확인된 반기별 신고 매출(공급가·세액). 있으면 해당 반기의 매출은 이 값을 따른다.
   reported?: { h1?: ReportedHalf; h2?: ReportedHalf }
 }
@@ -55,16 +59,32 @@ export interface TaxSummary {
   h1: { sales: Amt; buy: Amt; salesCash: Amt; salesCard: Amt; buyCash: Amt; buyCard: Amt; vatDue: number }
   h2: { sales: Amt; buy: Amt; salesCash: Amt; salesCard: Amt; buyCash: Amt; buyCard: Amt; vatDue: number }
   year: { sales: Amt; buy: Amt }
-  incomeTax: number      // 현재 가지고 있어야 되는 종소세
-  vat: number            // 현재 가지고 있어야 되는 부가세
-  parking: number        // 파킹통장에 있어야 되는 금액
-  paidTotal: number      // 예정 신고로 이미 낸 금액
-  actual: number         // 실제 있어야 될 금액
+  incomeTax: number      // 지금 가지고 있어야 되는 종소세 (올해 귀속분, 내년 5/31 납부 · 중간예납 낸 만큼 뺌)
+  vat: number            // 지금 가지고 있어야 되는 부가세 (아직 안 낸 기간만)
+  parking: number        // 파킹통장에 있어야 되는 금액 = 종소세 + 부가세
+  paidTotal: number      // 예정(고지)으로 이미 낸 금액
+  actual: number         // = parking (이미 낸 금액은 각 항목에서 뺀 뒤의 값)
+  // ── 세무 일정 기준 정리 ──
+  today: string
+  h1Info: { settled: boolean; net: number; paidFinal: number; due: string }
+  h2Net: number
+  h2Settled: boolean
+  h2Due: string
+  nextVat: { label: string; due: string; amount: number } | null   // 다음에 내야 하는 부가세
+  alreadyPaidVat: number   // 올해 이미 낸 부가세 (1기 확정 납부 + 예정 납부)
+  interimPaid: number
+  incomeTaxGross: number   // 중간예납 빼기 전 종소세
+  incomeTaxDue: string
 }
 
-export function computeTax(d: TaxData): TaxSummary {
-  const qs = d.quarters.map(q => {
-    const salesCash = cellAmt(q.salesCash), salesCard = cellAmt(q.salesCard), buyCash = cellAmt(q.buyCash), buyCard = cellAmt(q.buyCard)
+const kstToday = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
+
+export function computeTax(d: TaxData, now?: string): TaxSummary {
+  const qs = d.quarters.map((q, qi) => {
+    const ms = [0, 1, 2].map(i => `${d.year}${String(qi * 3 + 1 + i).padStart(2, '0')}`)
+    const monthly = ms.filter(m => d.cardMonthly?.[m] != null && d.cardMonthly[m] !== ('' as any))
+    const cardCell: TaxCell = monthly.length ? { total: monthly.reduce((s, m) => s + (Number(d.cardMonthly![m]) || 0), 0), supply: null } : q.salesCard
+    const salesCash = cellAmt(q.salesCash), salesCard = cellAmt(cardCell), buyCash = cellAmt(q.buyCash), buyCard = cellAmt(q.buyCard)
     return { key: q.key, sales: addAmt(salesCash, salesCard), buy: addAmt(buyCash, buyCard), salesCash, salesCard, buyCash, buyCard }
   })
   const half = (a: typeof qs[number], b: typeof qs[number]) => {
@@ -77,10 +97,30 @@ export function computeTax(d: TaxData): TaxSummary {
     if (r && (r.supply || r.tax)) { h.sales = { total: r.supply + r.tax, supply: r.supply, tax: r.tax }; h.vatDue = Math.round(r.tax - h.buy.tax) }
   }
   const year = { sales: addAmt(h1.sales, h2.sales), buy: addAmt(h1.buy, h2.buy) }
+  // ── 세무 일정 ──
+  // 부가세: 1기(1~6월)는 7/25, 2기(7~12월)는 다음 해 1/25에 신고·납부. 기한이 지난 기간은 이미 냈으니 들고 있을 필요가 없다.
+  //        예정(고지) 때 낸 금액은 확정 신고에서 빼준다.
+  // 종소세: 올해 귀속분은 다음 해 5/31 신고·납부. 11월 중간예납으로 낸 금액은 빼준다.
+  const today = now || kstToday()
+  const q1Paid = Number(d.paid?.q1) || 0, q3Paid = Number(d.paid?.q3) || 0, interim = Number(d.paid?.interim) || 0
+  const h1Due = `${d.year}-07-25`, h2Due = `${d.year + 1}-01-25`, itDue = `${d.year + 1}-05-31`
+  const h1Settled = today > h1Due, h2Settled = today > h2Due, itSettled = today > itDue
+  const h1Net = Math.round(h1.vatDue - q1Paid)      // 1기 확정 때 내는 세액
+  const h2Net = Math.round(h2.vatDue - q3Paid)      // 2기 확정 때 내는 세액
+  const hold = (n: number, settled: boolean) => (settled ? 0 : Math.max(0, n))
+  const vat = hold(h1Net, h1Settled) + hold(h2Net, h2Settled)
   const incomeTaxRaw = year.sales.supply * (d.incomeTaxRate ?? 0.1)
-  const vatRaw = year.sales.tax - year.buy.tax
-  const incomeTax = Math.round(incomeTaxRaw), vat = Math.round(vatRaw)
-  const parking = Math.round(incomeTaxRaw + vatRaw)
-  const paidTotal = (Number(d.paid?.q1) || 0) + (Number(d.paid?.q3) || 0)
-  return { quarters: qs, h1, h2, year, incomeTax, vat, parking, paidTotal, actual: parking - paidTotal }
+  const incomeTaxGross = Math.round(incomeTaxRaw)
+  const incomeTax = itSettled ? 0 : Math.max(0, incomeTaxGross - interim)
+  const parking = incomeTax + vat
+  const paidTotal = q1Paid + q3Paid
+  const h1PaidFinal = Number(d.paid?.h1Final) || (h1Settled ? Math.max(0, h1Net) : 0)
+  const nextVat = !h1Settled ? { label: '1기(1~6월) 부가세', due: h1Due, amount: Math.max(0, h1Net) }
+    : !h2Settled ? { label: '2기(7~12월) 부가세', due: h2Due, amount: Math.max(0, h2Net) } : null
+  const alreadyPaidVat = q1Paid + q3Paid + (h1Settled ? h1PaidFinal : 0)
+  return {
+    quarters: qs, h1, h2, year, h1Info: { settled: h1Settled, net: h1Net, paidFinal: h1PaidFinal, due: h1Due },
+    incomeTax, vat, parking, paidTotal, actual: parking,
+    today, h2Net, h2Settled, h2Due, nextVat, alreadyPaidVat, interimPaid: interim, incomeTaxGross, incomeTaxDue: itDue,
+  }
 }

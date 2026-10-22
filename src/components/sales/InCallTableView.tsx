@@ -1022,6 +1022,13 @@ function CustomerCard({
 
   const c = customer
   const expanded = expandedId === c.id
+  // 카드가 펼쳐진 동안은 뒤쪽 화면이 스크롤되지 않게 잠근다
+  useEffect(() => {
+    if (!expanded) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [expanded])
   const isTransferred = !!(c.details as any)?.ops_transferred
 
   // 확장 패널 열리면 배경 스크롤 잠금 (iOS 호환)
@@ -1374,7 +1381,7 @@ function CustomerCard({
             </button>
             {menuOpen && menuPos && createPortal(
               <div ref={popRef} style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, maxHeight: menuPos.maxH, overflowY: 'auto' }}
-                className="z-[500] bg-white rounded-lg shadow-xl border border-gray-200 min-w-[150px] py-1"
+                className="z-[500] bg-white rounded-lg shadow-xl border border-gray-200 w-[150px] py-1"
                 onClick={e => e.stopPropagation()}>
                 {tabType !== 'contracted' && (
                   <button type="button" onClick={() => { setContractModalOpen(true); setMenuOpen(false) }}
@@ -1649,7 +1656,7 @@ function CustomerCard({
           {/* 배경 오버레이 */}
           <div className="fixed inset-0 bg-black/40 z-[199]" onClick={() => onExpand(null)} />
           {/* 우측 슬라이딩 패널 */}
-          <div ref={expandedRef} className="fixed top-0 right-0 bottom-0 w-full md:w-[680px] bg-[#FAFAF8] z-[200] flex flex-col overflow-y-auto md:overflow-hidden shadow-2xl">
+          <div ref={expandedRef} className="fixed top-0 right-0 bottom-0 w-full md:w-[560px] bg-[#FAFAF8] z-[200] flex flex-col overflow-y-auto md:overflow-hidden shadow-2xl">
 
           {/* 상단 액션 바 */}
           <div className="sticky md:static top-0 shrink-0 flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b border-gray-100 bg-white z-10">
@@ -2223,6 +2230,9 @@ function CustomerCard({
                     )}
                   </div>
 
+                  {/* 타임스탬프 — 타임라인이 길어져도 바로 열 수 있게 위쪽에 둔다 */}
+                  <ActivityStamps entries={((c.details as any)?.activity_log || []) as StampEntry[]} />
+
                   {/* 타임라인 */}
                   <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                     <p className="text-[10px] font-bold text-blue-700 mb-2">타임라인</p>
@@ -2247,7 +2257,7 @@ function CustomerCard({
                     </div>
                     {tlError && <p className="text-[10px] text-red-500 mb-2">{tlError}</p>}
                     {c.call_timeline && c.call_timeline.length > 0 ? (
-                      <div className="space-y-2">
+                      <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                         {(c.call_timeline as any[]).slice().reverse().map((entry: any, i: number) => {
                           const { date, time } = formatKST(entry.created_at || '')
                           const initials = entry.user ? entry.user.slice(-2) : '??'
@@ -2281,6 +2291,8 @@ function CustomerCard({
                   </div>
                 </>
               )}
+
+              {isTransferred && <ActivityStamps entries={((c.details as any)?.activity_log || []) as StampEntry[]} />}
 
               {/* 계약 후: 본인이 계약 당시까지 남긴 기록만 (자금팀 진행 내용은 제외) */}
               {isTransferred && (() => {
@@ -2317,9 +2329,6 @@ function CustomerCard({
                   </div>
                 )
               })()}
-
-              {/* 타임스탬프 — 이 카드에서 일어난 행위 기록 */}
-              <ActivityStamps entries={((c.details as any)?.activity_log || []) as StampEntry[]} />
             </div>
           </div>
           </div>{/* fixed panel */}

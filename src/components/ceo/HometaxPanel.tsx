@@ -122,11 +122,14 @@ export default function HometaxPanel({ data, onApply, onFetched }: { data?: TaxD
     const done: string[] = []
     for (const q of qs) {
       const p: { salesCash?: TaxCell; salesCard?: TaxCell; buyCash?: TaxCell } = {}
-      if (q.have.tis && q.have.cs) p.salesCash = { total: q.sales.total, supply: q.sales.supply }
-      if (q.have.tib && q.have.cb) p.buyCash = { total: q.buy.total, supply: q.buy.supply }
-      if (p.salesCash || p.salesCard || p.buyCash) { patch['q' + q.q] = p; done.push(`${q.q}기${p.salesCash ? ' 현금매출' : ''}${p.salesCard ? ' 카드매출' : ''}${p.buyCash ? ' 매입' : ''}`) }
+      // 세금계산서와 현금영수증이 둘 다 읽힌 달만 합산한다 (이번 달처럼 일부만 읽힌 분기도 읽힌 달까지 반영)
+      const both = (a?: Record<string, any>, b?: Record<string, any>) => q.ms.filter(m => a?.[m] !== undefined && b?.[m] !== undefined)
+      const sm = both(hd.taxInvoiceSales, hd.cashSales), bm = both(hd.taxInvoiceBuy, hd.cashBuy)
+      if (sm.length) { const a = sumMonths(hd.taxInvoiceSales, sm), b = sumMonths(hd.cashSales, sm); p.salesCash = { total: a.total + b.total, supply: a.supply + b.supply } }
+      if (bm.length) { const a = sumMonths(hd.taxInvoiceBuy, bm), b = sumMonths(hd.cashBuy, bm); p.buyCash = { total: a.total + b.total, supply: a.supply + b.supply } }
+      if (p.salesCash || p.salesCard || p.buyCash) { patch['q' + q.q] = p; done.push(`${q.q}기${p.salesCash ? ` 매출(${sm.length}개월)` : ''}${p.buyCash ? ` 매입(${bm.length}개월)` : ''}`) }
     }
-    if (!done.length) { setApplyMsg('세 달이 모두 읽힌 분기가 아직 없습니다. 세금계산서·현금영수증·카드 매출을 먼저 불러오세요.'); return }
+    if (!done.length) { setApplyMsg('세금계산서와 현금영수증이 함께 읽힌 달이 아직 없습니다. 먼저 불러오세요.'); return }
     onApply?.(patch); setApplyMsg('표에 반영했습니다: ' + done.join(', '))
   }
 
@@ -182,6 +185,9 @@ export default function HometaxPanel({ data, onApply, onFetched }: { data?: TaxD
         className="mt-3 px-6 py-2.5 rounded-full text-[14px] font-bold text-white bg-gradient-to-r from-[#0b2140] to-[#4a5a9a] disabled:opacity-40">
         선택한 항목 한 번에 불러오기 (승인 1회)
       </button>
+      {info && !info.configured && <p className="mt-2 text-[12.5px] font-bold text-[#b3261e]">버튼이 눌리지 않는 이유: 이 서버에 CODEF 키(CODEF_CLIENT_ID, CODEF_CLIENT_SECRET)가 설정되지 않았습니다. Vercel 환경변수에 넣고 다시 배포하면 켜집니다.</p>}
+      {info?.configured && picked.taxInvoice && secret7.length !== 7 && <p className="mt-2 text-[12.5px] font-bold text-[#b3261e]">세금계산서를 읽으려면 주민등록번호 뒤 7자리를 입력하세요. (안 읽을 거면 세금계산서 체크를 해제)</p>}
+      {info?.configured && !profile.userName && <p className="mt-2 text-[12.5px] font-bold text-[#b3261e]">위의 "연결 정보"에 이름·생년월일·전화번호를 먼저 저장하세요.</p>}
 
       {/* 진행 상태 */}
       <div className="mt-3 flex flex-wrap items-center gap-3">

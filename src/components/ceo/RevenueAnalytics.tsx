@@ -464,24 +464,24 @@ export default function RevenueAnalytics({ data }: { data: any }) {
             {tax && (
               <div className="grid md:grid-cols-4 gap-3 mb-3">
                 <div className="rounded-2xl border border-teal-100 bg-teal-50/50 p-4">
-                  <p className="text-[12.5px] font-bold text-teal-700">{h2 ? '하반기' : '전반기'} 내야 되는 부가세</p>
-                  <p className="text-2xl font-black text-teal-800 tabular-nums mt-1">{man(h2 ? tax.summary.h2.vatDue : tax.summary.h1.vatDue)}</p>
-                  <p className="text-[12px] text-teal-600 font-semibold mt-1">신고·납부 {vatDue}</p>
+                  <p className="text-[12.5px] font-bold text-teal-700">{tax.summary.nextVat ? `다음 부가세 (${tax.summary.nextVat.label})` : '부가세'}</p>
+                  <p className="text-2xl font-black text-teal-800 tabular-nums mt-1">{man(tax.summary.nextVat?.amount || 0)}</p>
+                  <p className="text-[12px] text-teal-600 font-semibold mt-1">{tax.summary.nextVat ? `신고·납부 ${tax.summary.nextVat.due.slice(5).replace('-', '/')}` : '모두 납부 완료'}</p>
                 </div>
                 <div className="rounded-2xl border border-orange-100 bg-orange-50/50 p-4">
-                  <p className="text-[12.5px] font-bold text-orange-700">종소세 적립 필요 (올해)</p>
+                  <p className="text-[12.5px] font-bold text-orange-700">종소세 적립 필요 (올해 귀속)</p>
                   <p className="text-2xl font-black text-orange-700 tabular-nums mt-1">{man(tax.summary.incomeTax)}</p>
                   <p className="text-[12px] text-orange-600 font-semibold mt-1">신고 {thisYr + 1}년 5월</p>
                 </div>
                 <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
                   <p className="text-[12.5px] font-bold text-gray-600">파킹통장에 있어야 할 금액</p>
                   <p className="text-2xl font-black text-[#0b2140] tabular-nums mt-1">{man(tax.summary.parking)}</p>
-                  <p className="text-[12px] text-gray-500 mt-1">종소세 {man(tax.summary.incomeTax)} + 부가세 {man(tax.summary.vat)}</p>
+                  <p className="text-[12px] text-gray-500 mt-1">종소세 {man(tax.summary.incomeTax)} + 아직 안 낸 부가세 {man(tax.summary.vat)}</p>
                 </div>
                 <div className="rounded-2xl p-4 text-white bg-gradient-to-br from-[#10203a] to-[#0a1424]">
-                  <p className="text-[12.5px] font-bold text-white/65">실제 있어야 될 금액</p>
-                  <p className="text-2xl font-black text-[#E8D080] tabular-nums mt-1">{man(tax.summary.actual)}</p>
-                  <p className="text-[12px] text-white/50 mt-1">예정 신고 낸 금액 {man(tax.summary.paidTotal)} 반영</p>
+                  <p className="text-[12.5px] font-bold text-white/65">올해 이미 낸 부가세</p>
+                  <p className="text-2xl font-black text-[#E8D080] tabular-nums mt-1">{man(tax.summary.alreadyPaidVat)}</p>
+                  <p className="text-[12px] text-white/50 mt-1">{tax.summary.h1Info.settled ? '1기(전반기) 7/25 납부 완료분 포함' : '예정 납부분'}</p>
                 </div>
               </div>
             )}

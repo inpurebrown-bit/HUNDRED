@@ -623,6 +623,26 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
   const [local, setLocal] = useState<OpsCase>({ ...c })
   const [activeDetailTab, setActiveDetailTab] = useState<DetailTab>('진행현황')
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // 저장 대기 중인 변경분 — 여러 번 눌러도 서로 덮어쓰지 않도록 모아서 보낸다 (창을 닫아도 마저 저장)
+  const pendingRef = useRef<Record<string, any>>({})
+  const onSaveRef = useRef(onSave)
+  onSaveRef.current = onSave
+  const idRef = useRef(c.id)
+  idRef.current = c.id
+  function mergePending(patch: Record<string, any>) {
+    const cur = pendingRef.current
+    pendingRef.current = { ...cur, ...patch, ...(cur.details || patch.details ? { details: { ...(cur.details || {}), ...(patch.details || {}) } } : {}) }
+  }
+  function flushPending() {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
+    const p = pendingRef.current
+    if (Object.keys(p).length === 0) return
+    pendingRef.current = {}
+    onSaveRef.current(idRef.current, p)
+  }
+  // 직접 저장하는 곳(즉시 저장)도 대기 중인 변경분을 함께 보낸다
+  function savePatch(patch: Record<string, any>) { mergePending(patch); flushPending() }
+  useEffect(() => () => { flushPending() }, [])
   // pwVisible 제거됨 — 기관ID/PW 필드는 항상 평문 표시
   const [salesLogOpen, setSalesLogOpen] = useState(false)
   // 인콜일지 수정모드
@@ -688,7 +708,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
     const merged = { ...(local.details || {}), ...patch }
     setLocal(prev => ({ ...prev, details: merged }))
-    onSave(c.id, { details: merged })
+    savePatch({ details: merged })
   }
   // 여러 detail 필드를 한 번에 업데이트 (두 번 호출 시 덮어씌움 방지)
   function detailFields(patch: Record<string, any>) {
@@ -697,14 +717,17 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
     schedule({ details: merged })
   }
   function toggleDetail(key: string) {
-    detailField(key, !local.details?.[key])
+    const nv = !local.details?.[key]
+    const next = { ...local, details: { ...(local.details || {}), [key]: nv } }
+    setLocal(next)
+    schedule({ details: { ...(local.details || {}), [key]: nv } }, true)
   }
   function toggleInstitution(inst: string) {
     const current = (local.institution || '').split(',').map((s: string) => s.trim()).filter(Boolean)
     const next = current.includes(inst) ? current.filter((s: string) => s !== inst) : [...current, inst]
     const val = next.join(', ')
     setLocal(prev => ({ ...prev, institution: val }))
-    schedule({ institution: val })
+    schedule({ institution: val }, true)
   }
   async function handleDirectVisitDate(val: string) {
     detailField('direct_visit_date', val)
@@ -765,7 +788,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
     schedule({
       progress_stage: nextStage,
       timeline: updatedTimeline,
-    })
+    }, true)
   }
   function handleCeoApprove() {
     const targetStage = local.progress_stage === '환불예정' ? '환불' : '종료'
@@ -840,7 +863,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
       }
 
       setLocal(prev => ({ ...prev, ...patch, details: patch.details }))
-      onSave(c.id, patch)
+      savePatch(patch)
     } catch {
       alert('네트워크 오류')
     }
@@ -879,7 +902,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
         alert(`저장 실패: ${err?.error || res.status}`)
         return
       }
-      onSave(c.id, { details: mergedDetails })
+      savePatch({ details: mergedDetails })
       setFeeSaved(true)
     } catch (e) {
       console.error('[handleFeeSave] network error:', e)
@@ -888,9 +911,11 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
       setFeeSaving(false)
     }
   }
-  function schedule(patch: Record<string, any>) {
+  function schedule(patch: Record<string, any>, immediate = false) {
+    mergePending(patch)
     if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => onSave(c.id, patch), 1500)
+    if (immediate) { flushPending(); return }
+    timerRef.current = setTimeout(flushPending, 700)
   }
 
   const d = local.details || {}
@@ -1345,6 +1370,12 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
               <div className="flex-1 h-px bg-gray-100" />
               <span className="text-[10px] text-gray-300">마지막 수정: {new Date(c.updated_at).toLocaleString('ko-KR')}</span>
             </div>
+            <div className="mb-2">
+              <ActivityStamps entries={[
+                ...((local.details as any)?.activity_log || []).map((e: any) => ({ ...e, src: 'ops' })),
+                ...((local.customers?.details as any)?.activity_log || []).map((e: any) => ({ ...e, src: 'sales' })),
+              ]} />
+            </div>
             <TimelineSection initialTimeline={local.timeline || []} onSchedule={schedule} userName={userRole === 'ceo' ? 'ceo' : userName}
               salesTimeline={local.customers?.call_timeline || []}
               salesMemos={(() => {
@@ -1360,12 +1391,6 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                 if (call && handover && call !== handover) return [{ label: '통화메모', content: call, at, user: who }, { label: '전달내용', content: handover, at, user: who }]
                 return handover ? [{ label: '통화메모 · 전달내용', content: handover, at, user: who }] : []
               })()} />
-            <div className="mt-3">
-              <ActivityStamps entries={[
-                ...((local.details as any)?.activity_log || []).map((e: any) => ({ ...e, src: 'ops' })),
-                ...((local.customers?.details as any)?.activity_log || []).map((e: any) => ({ ...e, src: 'sales' })),
-              ]} />
-            </div>
           </div>
         </div>
       )}
@@ -1908,7 +1933,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                         onClick={() => {
                           const mergedDetails = { ...(local.details || {}), fee_locked: false }
                           setLocal({ ...local, details: mergedDetails })
-                          onSave(c.id, { details: mergedDetails })
+                          savePatch({ details: mergedDetails })
                           setFeeSaved(false)
                         }}
                         className="text-[9px] bg-amber-100 hover:bg-amber-200 text-amber-700 px-2 py-0.5 rounded font-bold transition-colors">
@@ -1925,7 +1950,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                             payment_amount: '',
                           }
                           setLocal({ ...local, details: mergedDetails })
-                          onSave(c.id, { details: mergedDetails })
+                          savePatch({ details: mergedDetails })
                           setFeeSaved(false)
                         }}
                         className="text-[9px] bg-red-100 hover:bg-red-200 text-red-600 px-2 py-0.5 rounded font-bold transition-colors">
@@ -2162,7 +2187,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                       alert(`저장 실패: ${err2?.error || res2.status}`)
                       return
                     }
-                    onSave(c.id, { details: mergedDetails2 })
+                    savePatch({ details: mergedDetails2 })
                   } catch {
                     alert('네트워크 오류로 저장에 실패했습니다.')
                   }
@@ -2178,7 +2203,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ details: mergedDetails2 }),
                   })
-                  onSave(c.id, { details: mergedDetails2 })
+                  savePatch({ details: mergedDetails2 })
                 }
 
                 return (
@@ -2484,7 +2509,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
           onSaveReport={(report) => {
             const merged = { ...(local.details || {}), credit_report: report }
             setLocal({ ...local, details: merged })
-            onSave(c.id, { details: merged })
+            savePatch({ details: merged })
           }}
         />
       )}
@@ -2501,7 +2526,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
           onSave={(patch) => {
             const merged = { ...(local.details || {}), ...patch }
             setLocal(prev => ({ ...prev, details: { ...(prev.details || {}), ...patch } }))
-            onSave(c.id, { details: merged })
+            savePatch({ details: merged })
           }}
         />
       )}
@@ -4748,7 +4773,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [splitActive, setSplitActive] = useState(false)
-  const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const saveChain = useRef<Record<string, Promise<void>>>({})
   const [openPanelIds, setOpenPanelIds] = useState<string[]>([])
   const [closingPanelIds, setClosingPanelIds] = useState<string[]>([])
   const [installPrompt, setInstallPrompt] = useState<any>(null)
@@ -4905,6 +4930,14 @@ export default function OpsDashboard({ userId, userName }: Props) {
     }
   }
 
+  // 카드가 열려 있는 동안은 뒤쪽 화면이 스크롤되지 않게 잠근다
+  useEffect(() => {
+    if (openPanelIds.length === 0) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [openPanelIds.length > 0])
+
   const handleSave = useCallback((id: string, patch: Record<string, any>) => {
     setCases(prev => prev.map(c => {
       if (c.id !== id) return c
@@ -4912,14 +4945,14 @@ export default function OpsDashboard({ userId, userName }: Props) {
       const mergedTimeline = patch.timeline !== undefined ? patch.timeline : c.timeline
       return { ...c, ...patch, details: mergedDetails, timeline: mergedTimeline }
     }))
-    if (autoSaveTimers.current[id]) clearTimeout(autoSaveTimers.current[id])
-    autoSaveTimers.current[id] = setTimeout(async () => {
-      await fetch(`/api/ops-cases/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
-      })
-    }, 1500)
+    // 지연 없이 바로 저장 — 같은 카드의 저장은 순서대로 이어서 보낸다 (앞선 변경이 뒤 변경에 덮이지 않도록)
+    const prevSave = saveChain.current[id] || Promise.resolve()
+    saveChain.current[id] = prevSave.then(() => fetch(`/api/ops-cases/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+      keepalive: true,
+    })).then(() => {}, () => {})
   }, [])
 
   const q = searchQuery.trim().toLowerCase()
@@ -5476,6 +5509,12 @@ export default function OpsDashboard({ userId, userName }: Props) {
         <div
           className="fixed inset-0 bg-black/40 z-[99] transition-opacity duration-300"
           onClick={closeAllPanels}
+          onWheel={e => {
+            // 카드 밖(배경)에서 스크롤해도 배경이 아니라 가장 최근에 연 카드가 움직이게 한다
+            const els = document.querySelectorAll('[data-ops-panel]')
+            const el = els[els.length - 1] as HTMLElement | undefined
+            if (el) el.scrollTop += e.deltaY
+          }}
         />
       )}
 
@@ -5486,8 +5525,8 @@ export default function OpsDashboard({ userId, userName }: Props) {
         const rightOffset = panelIndex === 0 ? 'right-0' : 'right-0 md:right-[530px]'
         const isClosing = closingPanelIds.includes(id)
         return (
-          <div key={id}
-            className={`fixed top-0 bottom-0 ${rightOffset} w-full md:w-[520px] shadow-2xl overflow-y-auto z-[100] transition-transform duration-300 ease-in-out ${isClosing ? 'translate-x-full' : 'translate-x-0'} ${c.details?.contract_type === '월정기권' ? 'bg-purple-50' : 'bg-white'}`}
+          <div key={id} data-ops-panel={id}
+            className={`fixed top-0 bottom-0 overscroll-contain ${rightOffset} w-full md:w-[520px] shadow-2xl overflow-y-auto z-[100] transition-transform duration-300 ease-in-out ${isClosing ? 'translate-x-full' : 'translate-x-0'} ${c.details?.contract_type === '월정기권' ? 'bg-purple-50' : 'bg-white'}`}
             onClick={e => e.stopPropagation()}
           >
             <div className={`sticky top-0 border-b px-5 py-3 flex items-center justify-between z-10 ${c.details?.contract_type === '월정기권' ? 'bg-purple-600 border-purple-700' : 'bg-white border-gray-100'}`}>

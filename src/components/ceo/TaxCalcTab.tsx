@@ -116,20 +116,54 @@ export default function TaxCalcTab() {
         onFetched={() => { fetch('/api/tax-calc', { cache: 'no-store' }).then(r => r.json()).then(j => { if (j.data) setData(j.data) }).catch(() => {}) }}
         onApply={patch => edit(d => ({ ...d, quarters: d.quarters.map(q => (patch[q.key] ? { ...q, ...patch[q.key] } : q)) as TaxQuarter[], source: '홈택스' }))} />
 
+      {/* 정산 결과 — 20일 정산용 */}
+      <div className="rounded-3xl bg-gradient-to-br from-[#10203a] to-[#0a1424] text-white p-5">
+        <p className="text-[13px] font-bold text-white/60">지금 정산하면 — 통장에 이만큼 있으면 됩니다</p>
+        <div className="grid sm:grid-cols-3 gap-4 mt-2">
+          <div><p className="text-[12.5px] text-white/55">부가세 통장</p><p className="text-[32px] font-black text-[#E8D080] tabular-nums leading-tight">{won(s.vat)}원</p><p className="text-[12px] text-white/40">{s.nextVat ? `${s.nextVat.label} · ${s.nextVat.due.slice(5).replace('-', '/')} 납부` : '모두 납부 완료'}{s.h1Info.settled ? ' · 1기는 7/25 납부 완료라 제외' : ''}</p></div>
+          <div><p className="text-[12.5px] text-white/55">세금 통장 (종소세)</p><p className="text-[32px] font-black text-[#E8D080] tabular-nums leading-tight">{won(s.incomeTax)}원</p><p className="text-[12px] text-white/40">올해 매출 공급가 {won(s.year.sales.supply)}원 × {Math.round((data.incomeTaxRate ?? 0.1) * 100)}% · 내년 5/31 납부</p></div>
+          <div><p className="text-[12.5px] text-white/55">합계</p><p className="text-[32px] font-black text-white tabular-nums leading-tight">{won(s.parking)}원</p><p className="text-[12px] text-white/40">종소세는 매입(경비) 계산 없이 매출 기준으로 넉넉하게 잡았습니다</p></div>
+        </div>
+        <p className="text-[12.5px] text-white/50 mt-3">반영 범위 · 홈택스 자료: {data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' 에 읽은 분까지' : '아직 안 읽음(엑셀 입력값)'} · 카드 매출: {data.cardThrough ? data.cardThrough.slice(5).replace('-', '/') + ' 까지 입력' : '아래에서 입력'}</p>
+      </div>
+
+      {/* 카드 매출 직접 입력 */}
+      <div className="rounded-3xl bg-[#fffaf0] border-[1.5px] border-[#ecd9a6] p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+          <p className="inline-block bg-[#b8995a] text-white text-[12px] font-bold px-3 py-1 rounded-full">카드 매출 직접 입력</p>
+          <label className="flex items-center gap-2 text-[13px] font-semibold text-gray-600">카드 입력 기준일
+            <input type="date" value={data.cardThrough || ''} onChange={e => edit(d => ({ ...d, cardThrough: e.target.value }))}
+              className="border-[1.5px] border-gray-200 rounded-xl px-3 py-1.5 text-[13.5px] font-bold text-[#0b2140] bg-white outline-none focus:border-[#b8995a]" />
+          </label>
+        </div>
+        <p className="text-[12.5px] text-gray-500 mb-3">홈택스로 못 읽는 카드 매출은 달별 총액(부가세 포함)만 적으세요. 부가세는 자동으로 빼고 계산합니다. 정산일이 20일이면 이번 달 칸에는 1~20일 카드 합계를 적으면 됩니다. 칸이 비어 있으면 아래 분기별 카드 칸의 값을 씁니다.</p>
+        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+          {Array.from({ length: 12 }, (_, i) => {
+            const ym = `${data.year}${String(i + 1).padStart(2, '0')}`
+            return (
+              <label key={ym} className="block"><span className="text-[12.5px] font-semibold text-gray-500">{i + 1}월</span>
+                <NumIn value={data.cardMonthly?.[ym] ?? null} onChange={v => edit(d => ({ ...d, cardMonthly: { ...(d.cardMonthly || {}), [ym]: v } }))} placeholder="-" /></label>
+            )
+          })}
+        </div>
+      </div>
+
       {/* 한눈에 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Tile label="현재 가지고 있어야 되는 종소세" v={s.incomeTax} sub={`1년 매출 공급가 × ${Math.round((data.incomeTaxRate ?? 0.1) * 100)}%`} />
-        <Tile label="현재 가지고 있어야 되는 부가세" v={s.vat} sub="매출세액 − 매입세액" />
-        <Tile label="파킹통장에 있어야 되는 금액" v={s.parking} />
-        <Tile label="실제 있어야 될 금액" v={s.actual} sub={s.paidTotal > 0 ? `예정 신고 ${won(s.paidTotal)}원 낸 뒤` : '예정 신고로 낸 금액 없음'} dark />
+        <Tile label={`종소세 적립 (${s.incomeTaxDue.replace(/-/g, '.')} 납부)`} v={s.incomeTax} sub={`올해 귀속 · 1년 매출 공급가 × ${Math.round((data.incomeTaxRate ?? 0.1) * 100)}% 추정${s.interimPaid > 0 ? ` − 중간예납 ${won(s.interimPaid)}원` : ''}`} />
+        <Tile label={s.nextVat ? `부가세 적립 (${s.nextVat.label} · ${s.nextVat.due.slice(5).replace('-', '/')} 납부)` : '부가세 적립'} v={s.vat} sub={s.h1Info.settled ? '1기(전반기)는 7/25에 신고·납부 완료 → 제외, 2기(하반기)분만 보관' : '1기·2기 모두 아직 안 낸 부가세'} />
+        <Tile label="올해 이미 낸 부가세" v={s.alreadyPaidVat} sub={s.h1Info.settled ? `1기 확정(7/25) ${won(s.h1Info.paidFinal)}원${s.paidTotal > 0 ? ` + 예정 ${won(s.paidTotal)}원` : ''}` : '예정 납부분'} />
+        <Tile label="파킹통장에 있어야 하는 금액" v={s.parking} sub="종소세 + 아직 안 낸 부가세" dark />
       </div>
 
       {/* 직접 입력 */}
       <div className="rounded-3xl bg-[#fffaf0] border-[1.5px] border-[#ecd9a6] p-5">
         <p className="inline-block bg-[#b8995a] text-white text-[12px] font-bold px-3 py-1 rounded-full mb-3">수정할 곳</p>
-        <div className="grid sm:grid-cols-3 gap-3">
-          <label className="block"><span className="text-[13px] font-semibold text-gray-600">1기 예정에 낸 금액</span><NumIn value={data.paid?.q1} onChange={v => edit(d => ({ ...d, paid: { ...d.paid, q1: v } }))} placeholder="없으면 비움" /></label>
-          <label className="block"><span className="text-[13px] font-semibold text-gray-600">2기 예정에 낸 금액</span><NumIn value={data.paid?.q3} onChange={v => edit(d => ({ ...d, paid: { ...d.paid, q3: v } }))} placeholder="없으면 비움" /></label>
+        <div className="grid sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <label className="block"><span className="text-[13px] font-semibold text-gray-600">1기 확정(7/25)에 실제 낸 금액 <span className="font-normal text-gray-400">(기록용)</span></span><NumIn value={data.paid?.h1Final} onChange={v => edit(d => ({ ...d, paid: { ...d.paid, h1Final: v } }))} placeholder={s.h1Info.net > 0 ? won(s.h1Info.net) : '없으면 비움'} /></label>
+          <label className="block"><span className="text-[13px] font-semibold text-gray-600">11월 종소세 중간예납에 낸 금액</span><NumIn value={data.paid?.interim} onChange={v => edit(d => ({ ...d, paid: { ...d.paid, interim: v } }))} placeholder="없으면 비움" /></label>
+          <label className="block"><span className="text-[13px] font-semibold text-gray-600">1기 예정(4월 고지)에 낸 금액</span><NumIn value={data.paid?.q1} onChange={v => edit(d => ({ ...d, paid: { ...d.paid, q1: v } }))} placeholder="없으면 비움" /></label>
+          <label className="block"><span className="text-[13px] font-semibold text-gray-600">2기 예정(10월 고지)에 낸 금액</span><NumIn value={data.paid?.q3} onChange={v => edit(d => ({ ...d, paid: { ...d.paid, q3: v } }))} placeholder="없으면 비움" /></label>
           <label className="block"><span className="text-[13px] font-semibold text-gray-600">종소세 적립률 (%)</span>
             <input inputMode="decimal" defaultValue={String(Math.round((data.incomeTaxRate ?? 0.1) * 1000) / 10)} key={String(data.incomeTaxRate)}
               onBlur={e => { const n = parseFloat(e.target.value); if (!isNaN(n)) edit(d => ({ ...d, incomeTaxRate: n / 100 })) }}
@@ -173,7 +207,7 @@ export default function TaxCalcTab() {
 
       {/* 반기·1년 합계 */}
       <div className="grid lg:grid-cols-2 gap-4">
-        {[{ t: '전반기 (1~6월)', h: s.h1, due: '신고·납부 7월 25일' }, { t: '하반기 (7~12월)', h: s.h2, due: '신고·납부 다음 해 1월 25일' }].map(x => (
+        {[{ t: '전반기 (1~6월)', h: s.h1, net: s.h1Info.net, settled: s.h1Info.settled, pre: data.paid?.q1, due: '신고·납부 7월 25일' }, { t: '하반기 (7~12월)', h: s.h2, net: s.h2Net, settled: s.h2Settled, pre: data.paid?.q3, due: '신고·납부 다음 해 1월 25일' }].map(x => (
           <div key={x.t} className="bg-white border border-gray-100 shadow-sm rounded-3xl p-5">
             <div className="flex items-center justify-between">
               <p className="text-[16px] font-black text-[#0b2140]">{x.t}</p>
@@ -189,9 +223,10 @@ export default function TaxCalcTab() {
               </tbody>
             </table>
             <div className="mt-3 rounded-2xl bg-[#fff6d6] px-4 py-3 flex items-center justify-between">
-              <span className="text-[14px] font-bold text-[#8a6d2b]">내야 되는 부가세</span>
-              <span className="text-[22px] font-black text-[#b3261e] tabular-nums">{won(x.h.vatDue)}원</span>
+              <span className="text-[14px] font-bold text-[#8a6d2b]">{x.settled ? '납부 완료한 부가세' : '내야 되는 부가세'}</span>
+              <span className={'text-[22px] font-black tabular-nums ' + (x.settled ? 'text-gray-500' : 'text-[#b3261e]')}>{won(x.net)}원</span>
             </div>
+            <p className="text-[12px] text-gray-500 mt-1.5">매출세액 − 매입세액 = {won(x.h.vatDue)}원{Number(x.pre) > 0 ? ` − 예정에 낸 ${won(Number(x.pre))}원` : ''}{x.settled ? ' · 기한이 지나 신고·납부한 기간이라 적립금에서 제외' : ''}</p>
           </div>
         ))}
       </div>
@@ -202,7 +237,12 @@ export default function TaxCalcTab() {
           <tbody><Row3 label="1년 합계 매출" a={s.year.sales} bold /><Row3 label="1년 합계 매입" a={s.year.buy} bold /></tbody>
         </table>
       </div>
-      <p className="text-[12.5px] text-gray-400">참고용 계산입니다. 신고 금액은 세무사 확인 후 확정하세요.</p>
+      <div className="rounded-2xl bg-gray-50 border border-gray-100 px-4 py-3 text-[12.5px] text-gray-500 leading-relaxed">
+        <p className="font-bold text-gray-600 mb-1">계산 기준 (개인 일반과세자)</p>
+        <p>· 부가세: 1기(1~6월)는 7/25, 2기(7~12월)는 다음 해 1/25에 신고·납부합니다. 기한이 지난 기간은 이미 낸 것으로 보고 적립금에서 뺍니다. 예정(고지)으로 낸 금액은 확정 신고 때 차감됩니다.</p>
+        <p>· 종소세: 올해 귀속분을 다음 해 5/31에 신고·납부합니다. 11월에 중간예납을 내면 그만큼 차감됩니다. 실제 세액은 (매출 − 필요경비)에 6~45% 누진세율이라, 여기서는 매출 공급가 × 적립률로 넉넉하게 잡은 추정치입니다.</p>
+        <p>· 참고용 계산입니다. 신고 금액은 세무사 확인 후 확정하세요.</p>
+      </div>
     </div>
   )
 }

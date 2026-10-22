@@ -6,6 +6,7 @@ export interface ActLog { at: string; by: string; role: string; action: string; 
 export interface Actor { name: string; role: string }
 
 const MAX_LOGS = 400
+const UNDO_MS = 10 * 1000             // 10초 안에 같은 버튼을 되돌리면 기록을 남기지 않는다
 const COALESCE_MS = 30 * 60 * 1000   // 같은 사람이 같은 종류를 30분 안에 반복 수정하면 한 줄로 합친다
 
 export const nowKstIso = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().replace('Z', '+09:00')
@@ -59,6 +60,11 @@ const OPS_RULES: Record<string, Rule> = {
   payment_entries:   { label: '입금 내역', kind: 'edit' },
   handling_memo:     { label: '처리 메모', kind: 'edit' },
   incall_journal:    { label: '인콜일지', kind: 'edit' },
+  absorption_stage:  { label: '흡수 단계', kind: 'value' },
+  revenue_owner:     { label: '매출 귀속', kind: 'value' },
+  fee_payment_type:  { label: '수수료 결제방식', kind: 'value' },
+  cert_programs:     { label: '인증서 프로그램', kind: 'edit' },
+  consulting_status: { label: '컨설팅 상태', kind: 'value' },
   fee_amount:        { label: '수수료 입력', kind: 'edit' },
   contract_notes:    { label: '계약 메모', kind: 'edit' },
 }
@@ -89,6 +95,17 @@ function diffDetails(prev: any, next: any, rules: Record<string, Rule>, a: Actor
   }
 }
 
+// 규칙에 없는 키라도 날짜·단계·상태·유형 값이 바뀌면 남긴다 (글자 입력성 필드는 제외)
+function diffGeneric(prev: any, next: any, known: Set<string>, a: Actor, out: ActLog[]) {
+  for (const k of Object.keys(next || {})) {
+    if (known.has(k) || k === 'activity_log' || k === 'incall_journal' || k === 'sales_customer_info') continue
+    const pv = prev?.[k], nv = next[k]
+    if (same(pv, nv)) continue
+    if (typeof nv === 'boolean' || typeof pv === 'boolean') { if (!!pv !== !!nv) push(out, a, `체크: ${k}`, nv ? '켬' : '끔'); continue }
+    if (/(_date|_stage|_status|_type|_mood|_result)$/.test(k) && typeof nv !== 'object') push(out, a, k, nv ? (str(pv) ? `${short(pv)} → ${short(nv)}` : short(nv)) : `${short(pv)} 삭제`)
+  }
+}
+
 /** 영업팀 고객 카드 변경 내역 */
 export function diffCustomer(
   existing: { status?: string; owner_id?: string | null; details?: any; call_timeline?: any[] },
@@ -104,6 +121,7 @@ export function diffCustomer(
   if (nt.length > pt.length) push(out, a, '타임라인 기록 추가', short(nt[nt.length - 1]?.content, 30))
   else if (nt.length < pt.length) push(out, a, '타임라인 기록 삭제')
   diffDetails(pd, nd, CUSTOMER_RULES, a, out)
+  diffGeneric(pd, nd, new Set([...Object.keys(CUSTOMER_RULES), 'sub_status', 'transfer_history', 'db010_month', 'sales_user_name']), a, out)
   return out
 }
 
@@ -128,19 +146,32 @@ export function diffOps(
     const known = new Set(Object.keys(OPS_RULES))
     diffDetails(existing.details || {}, patch.details, OPS_RULES, a, out)
     // 규칙에 없는 true/false 버튼도 놓치지 않는다
-    for (const k of Object.keys(patch.details)) {
-      if (known.has(k) || k === 'activity_log') continue
-      const pv = existing.details?.[k], nv = patch.details[k]
-      if (typeof nv === 'boolean' && !!pv !== nv) push(out, a, `체크: ${k}`, nv ? '켬' : '끔')
-    }
+    diffGeneric(existing.details || {}, patch.details, known, a, out)
   }
   return out
 }
 
 /** 기존 기록 뒤에 새 기록을 붙인다. 같은 사람의 같은 "수정"은 30분 안에 한 줄로 합친다. */
+function invert(detail?: string) {
+  if (!detail) return ''
+  if (detail.includes(' → ')) { const [x, y] = detail.split(' → '); return `${y} → ${x}` }
+  return detail.split(' ').map(t => (t.startsWith('+') ? '−' + t.slice(1) : t.startsWith('−') ? '+' + t.slice(1) : t)).join(' ')
+}
+const flagBase = (s: string) => s.replace(/ (체크|해제)$/, '')
+function isUndo(prev: ActLog, e: ActLog) {
+  if (prev.by !== e.by || Date.parse(e.at) - Date.parse(prev.at) > UNDO_MS) return false
+  if (/ (체크|해제)$/.test(e.action) && /(체크|해제)$/.test(prev.action)) return flagBase(prev.action) === flagBase(e.action) && prev.action !== e.action
+  if (prev.action !== e.action) return false
+  if (e.action.startsWith('체크:')) return false
+  return !!prev.detail && prev.detail === invert(e.detail)
+}
+
 export function mergeLogs(existing: ActLog[] | undefined, added: ActLog[]): ActLog[] {
   const log = [...(existing || [])]
   for (const e of added) {
+    // 방금(10초 안에) 한 행위를 같은 사람이 되돌리면 둘 다 지운다
+    const idx = log.length - 1 - [...log].reverse().findIndex(p => isUndo(p, e))
+    if (log.length && [...log].reverse().some(p => isUndo(p, e))) { log.splice(idx, 1); continue }
     const last = log[log.length - 1]
     const mergeable = /(등록|수정)$/.test(e.action) || e.action === '인콜일지 수정'
     if (mergeable && last && last.action === e.action && last.by === e.by && Date.parse(e.at) - Date.parse(last.at) < COALESCE_MS) {
