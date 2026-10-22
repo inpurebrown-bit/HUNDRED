@@ -183,11 +183,11 @@ function getOpsStageStyle(stage: string): { bg: string; label: string } {
 
 // ── CEO 카드 이동 모달 ────────────────────────────────────────────────
 const SALES_BUCKETS = [
-  { label: '고객DB',   value: 'lead',       color: 'bg-sky-500 text-white' },
-  { label: '010DB',    value: 'db010',      color: 'bg-violet-500 text-white' },
-  { label: '계약업체', value: 'contracted', color: 'bg-emerald-500 text-white' },
+  { label: '직가DB',   value: 'db010',      color: 'bg-violet-500 text-white' },
+  { label: '공가DB',   value: 'lead',       color: 'bg-sky-500 text-white' },
+  { label: '계약 업체', value: 'contracted', color: 'bg-emerald-500 text-white' },
   { label: '감성톡',   value: 'emotional',  color: 'bg-pink-500 text-white' },
-  { label: '거절',     value: 'trash',      color: 'bg-gray-400 text-white' },
+  { label: '자체거절', value: 'trash',      color: 'bg-gray-400 text-white' },
 ]
 const OPS_BUCKETS = [
   { label: '신규DB',     value: 'new_db',       color: 'bg-sky-500 text-white' },
@@ -534,6 +534,9 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
       commission_amount:   contractType === '월정기권' ? '' : (commAmount > 0 ? formatNumber(commAmount) : ''),
       contract_type:       contractType,
       result_memo:         opsMemo,
+      call_memo:           initialMemo,                 // 계약 전 통화메모
+      handover_memo:       opsMemo,                     // 계약 당시 자금팀 전달내용
+      handover_at:         new Date().toISOString(),
       no_refund:           noRefund,
       group_chat_invited:  groupChatInvited,
       coop_request_sent:   coopRequestSent,
@@ -2277,6 +2280,42 @@ function CustomerCard({
                   </div>
                 </>
               )}
+
+              {/* 계약 후: 본인이 계약 당시까지 남긴 기록만 (자금팀 진행 내용은 제외) */}
+              {isTransferred && (() => {
+                const d: any = c.details || {}
+                const handover = String(d.handover_memo ?? d.result_memo ?? '').trim()
+                const call = String(d.call_memo ?? '').trim()
+                const tl: any[] = c.call_timeline || []
+                if (!handover && !call && tl.length === 0) return null
+                return (
+                  <div className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] space-y-2.5">
+                    <p className="text-[10px] font-bold text-blue-700">내가 남긴 기록 <span className="font-normal text-gray-400">(계약 당시까지 · 읽기 전용)</span></p>
+                    {call && call !== handover && (
+                      <div><p className="text-[9px] font-bold text-amber-700 mb-0.5">통화메모</p><p className="text-[11px] text-gray-600 whitespace-pre-wrap leading-relaxed">{call}</p></div>
+                    )}
+                    {handover && (
+                      <div><p className="text-[9px] font-bold text-amber-700 mb-0.5">{call && call !== handover ? '자금팀 전달내용' : '통화메모 · 자금팀 전달내용'}</p><p className="text-[11px] text-gray-600 whitespace-pre-wrap leading-relaxed">{handover}</p></div>
+                    )}
+                    {tl.length > 0 && (
+                      <div>
+                        <p className="text-[9px] font-bold text-amber-700 mb-1">타임라인</p>
+                        <div className="space-y-1.5">
+                          {tl.slice().reverse().map((entry: any, i: number) => {
+                            const { date, time } = formatKST(entry.created_at || '')
+                            return (
+                              <div key={i} className="text-[11px] text-gray-600">
+                                <span className="font-mono text-[9px] text-gray-400 mr-1.5">{date} {time}</span>
+                                <span className="whitespace-pre-wrap">{entry.content}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
           </div>
           </div>{/* fixed panel */}

@@ -8,6 +8,9 @@ export const CODEF_PATHS = {
   taxReportList: '/v1/kr/public/nt/hometax/tax-report-details',     // 세금신고내역 (세목별 신고 목록)
   generalVat: '/v1/kr/public/nt/report/general-taxpayer-vat',       // 일반과세자 부가가치세 신고서
   vatStandardCert: '/v1/kr/public/nt/proof-issue/additional-tax-standard',   // 부가세과세표준증명 (반기별 신고 매출)
+  cashSales: '/v1/kr/public/nt/cash-receipt/sales-details',          // 현금영수증 매출내역
+  cashBuy: '/v1/kr/public/nt/cash-receipt/purchase-details',        // 현금영수증 매입내역
+  taxInvoiceStat: '/v1/kr/public/nt/tax-invoice/sales-purchase-statistics', // 전자세금계산서 기간별 매출/매입 통계
 } as const
 
 export function codefConfigured(): boolean {

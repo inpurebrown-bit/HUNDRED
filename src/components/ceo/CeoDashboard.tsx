@@ -1,5 +1,6 @@
 'use client'
 
+import DbHandoverTab from './DbHandoverTab'
 import { useState, useRef, useEffect, FormEvent, ReactNode, Fragment } from 'react'
 import { signOut, useSession } from 'next-auth/react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
@@ -96,7 +97,7 @@ function PlannerTab() {
 
 // 도구 통합 탭 — 코드 요청 · DB 쓰레기통 · AI 로그 (가끔 쓰는 관리 기능)
 function ToolsTab({ codeCount, delCount }: { codeCount: number; delCount: number }) {
-  const [sub, setSub] = useState<'authcode' | 'trash' | 'ailogs' | 'freelancer' | 'profile'>(codeCount > 0 ? 'authcode' : delCount > 0 ? 'trash' : 'authcode')
+  const [sub, setSub] = useState<'authcode' | 'trash' | 'ailogs'>(codeCount > 0 ? 'authcode' : delCount > 0 ? 'trash' : 'authcode')
   return (
     <div>
       <SubTabBar
@@ -104,16 +105,12 @@ function ToolsTab({ codeCount, delCount }: { codeCount: number; delCount: number
           { key: 'authcode' as const, label: codeCount > 0 ? `코드 요청 (${codeCount})` : '코드 요청' },
           { key: 'trash' as const, label: delCount > 0 ? `DB 쓰레기통 (${delCount})` : 'DB 쓰레기통' },
           { key: 'ailogs' as const, label: 'AI 로그' },
-          { key: 'freelancer' as const, label: '프리랜서 관리대장' },
-          { key: 'profile' as const, label: '사원정보' },
         ]}
         active={sub} onChange={setSub}
       />
       {sub === 'authcode' && <AuthCodeTab />}
       {sub === 'trash' && <TrashOnlyTab />}
       {sub === 'ailogs' && <AiLogsTab />}
-      {sub === 'freelancer' && <FreelancerTab />}
-      {sub === 'profile' && <div className="space-y-8"><MyProfileTab /><PinManageTab /></div>}
     </div>
   )
 }
@@ -138,9 +135,27 @@ function MinutesReportsTab() {
   )
 }
 
-// 직원관리 탭 (프리랜서 관리대장·사원정보는 도구 탭으로 이동)
+// 직원관리 탭 — 직원 목록 · 퇴사자 DB 분배 · 프리랜서 관리대장 · 사원정보
 function StaffManageTab() {
-  return <EmployeeManageSection />
+  const [sub, setSub] = useState<'emp' | 'handover' | 'freelancer' | 'profile'>('emp')
+  const [handoverCount, setHandoverCount] = useState(0)
+  return (
+    <div>
+      <SubTabBar
+        tabs={[
+          { key: 'emp' as const, label: '직원 목록' },
+          { key: 'handover' as const, label: handoverCount > 0 ? `퇴사자 DB 분배 (${handoverCount})` : '퇴사자 DB 분배' },
+          { key: 'freelancer' as const, label: '프리랜서 관리대장' },
+          { key: 'profile' as const, label: '사원정보' },
+        ]}
+        active={sub} onChange={setSub}
+      />
+      {sub === 'emp' && <EmployeeManageSection onResigned={() => setSub('handover')} />}
+      {sub === 'handover' && <DbHandoverTab onCount={setHandoverCount} />}
+      {sub === 'freelancer' && <FreelancerTab />}
+      {sub === 'profile' && <div className="space-y-8"><MyProfileTab /><PinManageTab /></div>}
+    </div>
+  )
 }
 
 interface Message {
@@ -1566,7 +1581,7 @@ function DuplicateOnlyTab() {
 
 // ─── 직원 관리 섹션 (생성·수정·팀이관) ──────────────────────
 interface EmpRow { id: string; name: string; username: string; role: string; blocked?: boolean; info_locked?: boolean }
-function EmployeeManageSection() {
+function EmployeeManageSection({ onResigned }: { onResigned?: () => void } = {}) {
   const [employees, setEmployees] = useState<EmpRow[]>([])
   const [loading, setLoading] = useState(false)
   const [newlyCreatedId, setNewlyCreatedId] = useState<string | null>(null)
@@ -1712,6 +1727,7 @@ function EmployeeManageSection() {
       }
 
       setEmployees(p => p.map(e => e.id === emp.id ? { ...e, blocked: true } : e))
+      setTimeout(() => { if (emp.role === 'sales' && confirm(emp.name + '이(가) 들고 있던 DB를 지금 다른 영업사원에게 분배할까요?\n(나중에는 직원관리 → 퇴사자 DB 분배 탭에서 할 수 있습니다)')) onResigned?.() }, 300)
       alert(`${emp.name} 퇴사 처리 완료 (${dateToUse})\n급여탭에서 일할계산이 자동 적용됩니다.`)
     } catch { alert('퇴사 처리 중 오류가 발생했습니다.') }
     finally { setResigningId(null) }

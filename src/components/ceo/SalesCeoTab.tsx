@@ -1119,6 +1119,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab, initialSear
       await updateCustomer(id, {
         details: {
           sales_user_name: destPerson,
+          ...(destBucket === 'db010' ? { db010_month: new Date().toISOString().slice(0, 7), is_direct: true } : {}),
           transfer_history: [
             ...((customers.find(x => x.id === id) as any)?.details?.transfer_history || []),
             { from: (customers.find(x => x.id === id) as any)?.details?.sales_user_name || '—', to: destPerson, at: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10), by: 'CEO' },

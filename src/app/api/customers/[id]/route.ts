@@ -53,6 +53,14 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     updateBody.details = { ...(updateBody.details || existing.details || {}), ...incomingDetails }
   }
 
+  // 담당자(영업) 변경: 이름만 바꾸면 그 직원 화면에 안 나오므로 소유자(owner_id)도 함께 옮긴다
+  const newSalesName = body.sales_user_name ?? body.details?.sales_user_name
+  if (user.role === 'ceo' && newSalesName && body.owner_id === undefined && body.sales_user_id === undefined
+      && newSalesName !== (existing.details as any)?.sales_user_name) {
+    const { data: su } = await supabaseAdmin.from('users').select('id').eq('name', newSalesName).eq('role', 'sales').maybeSingle()
+    if (su?.id) updateBody.owner_id = su.id
+  }
+
   // ⚡ 안전장치: 계약 상태인 고객에 sub_status가 끼어들지 않도록 강제 제거
   // (프론트 state에 stale sub_status가 남아있을 때 재기입 방지)
   const finalStatus = updateBody.status ?? existing.status

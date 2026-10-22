@@ -112,7 +112,9 @@ export default function TaxCalcTab() {
       </div>
 
       {/* 홈택스 불러오기 (CODEF 간편인증) */}
-      <HometaxPanel data={data} onFetched={() => { fetch('/api/tax-calc', { cache: 'no-store' }).then(r => r.json()).then(j => { if (j.data) setData(j.data) }).catch(() => {}) }} />
+      <HometaxPanel data={data}
+        onFetched={() => { fetch('/api/tax-calc', { cache: 'no-store' }).then(r => r.json()).then(j => { if (j.data) setData(j.data) }).catch(() => {}) }}
+        onApply={patch => edit(d => ({ ...d, quarters: d.quarters.map(q => (patch[q.key] ? { ...q, ...patch[q.key] } : q)) as TaxQuarter[], source: '홈택스' }))} />
 
       {/* 한눈에 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

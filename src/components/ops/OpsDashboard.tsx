@@ -316,10 +316,12 @@ type DetailTab = typeof DETAIL_TABS[number]
 // ──────────────────────────────────────────────────────────────────────
 // TimelineSection
 // ──────────────────────────────────────────────────────────────────────
-function TimelineSection({ initialTimeline, onSchedule, userName }: {
+function TimelineSection({ initialTimeline, onSchedule, userName, salesTimeline, salesMemos }: {
   initialTimeline: any[]
   onSchedule: (patch: Record<string, any>) => void
   userName?: string
+  salesTimeline?: any[]                                   // 영업팀 인콜카드 타임라인 (실시간)
+  salesMemos?: { label: string; content: string; at?: string; user?: string }[]   // 통화메모 · 전달내용
 }) {
   const [tl, setTl] = useState<any[]>(initialTimeline || [])
   const [text, setText] = useState('')
@@ -333,6 +335,17 @@ function TimelineSection({ initialTimeline, onSchedule, userName }: {
     setText('')
   }
 
+  // 저장된 기록 + 영업팀 기록(읽기 전용)을 시간순으로 합친다.
+  // 자금팀으로 넘길 때 복사해 둔 영업팀 기록은 실시간 기록으로 대신 보여 중복을 막는다.
+  const liveSales = (salesTimeline || []).length > 0
+  const items: { entry: any; idx: number; ro?: string }[] = [
+    ...tl.map((entry, idx) => ({ entry, idx })).filter(x => !(liveSales && x.entry.source === 'sales')),
+    ...(salesTimeline || []).map(e => ({ entry: { ...e, source: 'sales' }, idx: -1, ro: '' })),
+    ...(salesMemos || []).filter(m => m.content?.trim()).map(m => ({ entry: { user: m.user || '영업팀', content: m.content, created_at: m.at || '', source: 'sales' }, idx: -1, ro: m.label })),
+  ]
+  const tOf = (e: any) => { const t = new Date(e.created_at || e.date || '').getTime(); return isNaN(t) ? 0 : t }
+  const sorted = items.map((x, i) => ({ ...x, i })).sort((a, b) => tOf(a.entry) - tOf(b.entry) || a.i - b.i)
+
   return (
     <div className="space-y-2">
       <div className="flex gap-1">
@@ -342,12 +355,13 @@ function TimelineSection({ initialTimeline, onSchedule, userName }: {
           className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400/50" />
         <button onClick={add} className="text-xs bg-violet-500 text-white px-2 py-1 rounded hover:bg-violet-600">추가</button>
       </div>
-      {tl.length === 0 ? (
+      {sorted.length === 0 ? (
         <p className="text-[10px] text-gray-300 text-center py-1">타임라인이 없습니다</p>
       ) : (
         <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
-          {[...tl].reverse().map((entry: any, i: number) => {
-            const realIdx = tl.length - 1 - i
+          {[...sorted].reverse().map((it, i: number) => {
+            const entry = it.entry
+            const realIdx = it.idx
             const isSales = entry.source === 'sales'
             const isAuto  = entry.user === '자동기록'
             const kst = formatKST(entry.created_at || entry.date || '')
@@ -366,11 +380,12 @@ function TimelineSection({ initialTimeline, onSchedule, userName }: {
                   <div className="flex items-center gap-1.5">
                     <span className={`text-[10px] font-semibold ${nameColor}`}>{user || '—'}</span>
                     {isSales && <span className="text-[9px] bg-violet-100 text-violet-600 px-1 py-0.5 rounded font-bold">영업팀</span>}
+                    {it.ro && <span className="text-[9px] bg-amber-100 text-amber-700 px-1 py-0.5 rounded font-bold">{it.ro}</span>}
                     <span className="text-[10px] text-gray-300">{kst.date} {kst.time}</span>
                   </div>
                   <p className="text-xs text-gray-700 mt-0.5">{content}</p>
                 </div>
-                <button
+                {realIdx >= 0 && <button
                   type="button"
                   onClick={() => {
                     const updated = tl.filter((_: any, idx: number) => idx !== realIdx)
@@ -379,7 +394,7 @@ function TimelineSection({ initialTimeline, onSchedule, userName }: {
                   }}
                   className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-xs shrink-0 px-1 py-0.5 rounded hover:bg-red-50"
                   title="삭제"
-                >✕</button>
+                >✕</button>}
               </div>
             )
           })}
@@ -1329,7 +1344,17 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
               <div className="flex-1 h-px bg-gray-100" />
               <span className="text-[10px] text-gray-300">마지막 수정: {new Date(c.updated_at).toLocaleString('ko-KR')}</span>
             </div>
-            <TimelineSection initialTimeline={local.timeline || []} onSchedule={schedule} userName={userRole === 'ceo' ? 'ceo' : userName} />
+            <TimelineSection initialTimeline={local.timeline || []} onSchedule={schedule} userName={userRole === 'ceo' ? 'ceo' : userName}
+              salesTimeline={local.customers?.call_timeline || []}
+              salesMemos={(() => {
+                const d: any = local.customers?.details || {}
+                const handover = String(d.handover_memo ?? d.result_memo ?? '').trim()
+                const call = String(d.call_memo ?? '').trim()
+                const at = d.handover_at || d.contract_date || (local as any).created_at || ''
+                const who = d.sales_user_name || '영업팀'
+                if (call && handover && call !== handover) return [{ label: '통화메모', content: call, at, user: who }, { label: '전달내용', content: handover, at, user: who }]
+                return handover ? [{ label: '통화메모 · 전달내용', content: handover, at, user: who }] : []
+              })()} />
           </div>
         </div>
       )}
@@ -1785,40 +1810,6 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                     )}
                   </div>
                 </div>
-
-                {/* ── 영업팀 통화메모 (읽기전용) ── */}
-                {(() => {
-                  const salesTL: any[] = local.customers?.call_timeline || []
-                  if (salesTL.length === 0) return null
-                  return (
-                    <div className="border-t border-emerald-100">
-                      <div className="bg-emerald-600 px-3 py-1.5 flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold text-white tracking-wide">영업팀 통화메모</span>
-                        <span className="text-[9px] bg-white/20 text-white px-1.5 py-0.5 rounded-full">{salesTL.length}건</span>
-                      </div>
-                      <div className="divide-y divide-emerald-50">
-                        {[...salesTL].reverse().map((entry: any, i: number) => {
-                          const kst = formatKST(entry.date || entry.created_at || '')
-                          const author = entry.user || entry.author || entry.user_name || '영업팀'
-                          const content = entry.content || entry.text || entry.memo || ''
-                          const result = entry.call_result || entry.result || ''
-                          const closing = entry.closing_result || ''
-                          return (
-                            <div key={i} className="px-3 py-2 hover:bg-emerald-50/50 transition-colors">
-                              <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                                <span className="text-[10px] font-bold text-emerald-700">{author}</span>
-                                {result && <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">{result}</span>}
-                                {closing && <span className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-bold">{closing}</span>}
-                                <span className="text-[10px] text-gray-300 ml-auto">{kst.date} {kst.time}</span>
-                              </div>
-                              {content && <p className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">{content}</p>}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )
-                })()}
 
                 {/* ── 인콜결과 + 재통화 (컴팩트) ── */}
                 <div className="bg-gray-50 border-t border-gray-100 px-3 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5">

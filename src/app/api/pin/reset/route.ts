@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
     .eq('id', targetUserId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  await supabaseAdmin.from('settings').delete().eq('key', `pin_fail_${targetUserId}`)
 
   return NextResponse.json({ ok: true, resetTo: pin })
 }
