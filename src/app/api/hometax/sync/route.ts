@@ -63,7 +63,7 @@ function monthWindow() {
   return { startD: u(from), endD: u(to), startM: u(from).slice(0, 6), endM: u(to).slice(0, 6) }
 }
 
-function buildRequest(kind: Kind, profile: CodefProfile, sid: string, secret7?: string): { path: string; body: Record<string, any>; range: any } | { error: string } {
+function buildRequest(kind: Kind, profile: CodefProfile, sid: string, secret7?: string): { path: string; body: Record<string, any>; range: any; alts?: Record<string, any>[] } | { error: string } {
   const c: any = simpleAuthBase(profile, sid)
   // 상품마다 세션 식별값 이름이 달라 id, ssoId 둘 다 보낸다
   const common: Record<string, any> = { loginType: '5', loginTypeLevel: c.loginTypeLevel, userName: c.userName, phoneNo: c.phoneNo, ...(c.telecom ? { telecom: c.telecom } : {}), id: sid, ssoId: sid }
@@ -79,7 +79,11 @@ function buildRequest(kind: Kind, profile: CodefProfile, sid: string, secret7?: 
   // 세금계산서 통계: 주민등록번호 13자리가 필요하다 (뒤 7자리는 저장하지 않고 요청에만 사용)
   if (!secret7 || !/^\d{7}$/.test(secret7)) return { error: '세금계산서 조회에는 주민등록번호 뒤 7자리가 필요합니다. (저장하지 않고 이번 요청에만 사용합니다)' }
   const id13 = String(profile.birth).slice(2, 8) + secret7
-  return { path: CODEF_PATHS.taxInvoiceStat, range: { start: w.startM, end: w.endM }, body: { ...common, organization: '0002', loginIdentity: id13, inquiryType: '01', searchType: '01', startDate: w.startM, endDate: w.endM, type: '0', ...(biz ? { identity: biz } : {}) } }
+  // 올해 1월부터 이번 달까지만 조회한다 (홈택스 통계 화면은 기간이 길면 CF-12701로 실패하는 경우가 있다). 그래도 실패하면 조건을 바꿔 다시 시도한다.
+  const k = kst(), ym = (d: Date) => `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+  const startY = `${k.getUTCFullYear()}01`, endY = ym(k), start3 = ym(new Date(Date.UTC(k.getUTCFullYear(), k.getUTCMonth() - 2, 1)))
+  const mk = (startDate: string, withBiz: boolean) => ({ ...common, organization: '0002', loginIdentity: id13, inquiryType: '01', searchType: '01', startDate, endDate: endY, type: '0', ...(withBiz && biz ? { identity: biz } : {}) })
+  return { path: CODEF_PATHS.taxInvoiceStat, range: { start: startY, end: endY }, body: mk(startY, true), alts: [mk(startY, false), mk(start3 < startY ? startY : start3, true)] }
 }
 
 const timeoutMsg = '홈택스 응답이 늦어 중단했습니다. 잠시 뒤 다시 시도해 주세요.'
@@ -87,6 +91,15 @@ const errText = (e: any) => (e?.name === 'TimeoutError' ? timeoutMsg : e?.messag
 const is2way = (r: CodefResult) => r.code === 'CF-03002' || !!r.data?.continue2Way
 const twoWayOf = (r: CodefResult) => { const y = r.data || {}; return { jobIndex: y.jobIndex, threadIndex: y.threadIndex, jti: y.jti, twoWayTimestamp: y.twoWayTimestamp } }
 const failText = (r: CodefResult) => [r.code, r.message, r.extraMessage].filter(Boolean).join(' ')
+
+// 홈택스 화면 오류(CF-12xxx 등)로 실패하면 대체 조건으로 다시 시도한다. 성공하지 못하면 처음 오류를 그대로 돌려준다.
+async function retryVariants(rq: { path: string; alts?: Record<string, any>[] }, r: CodefResult, budgetMs: number): Promise<CodefResult> {
+  if (is2way(r) || r.code === 'CF-00000') return r
+  for (const alt of rq.alts || []) {
+    try { const x = await codefPost(rq.path, alt, budgetMs); if (x.code === 'CF-00000') return x } catch { /* 다음 조건 */ }
+  }
+  return rq.alts?.length ? { ...r, extraMessage: [r.extraMessage, '(대체 조건 ' + rq.alts.length + '가지도 실패 — 조회 기간에 세금계산서가 없어도 홈택스가 이렇게 실패로 응답할 수 있습니다)'].filter(Boolean).join(' ') } : r
+}
 
 // 항목을 순서대로 한 번에 하나씩 읽는다. 승인 요청(2차 인증)이 나오면 거기서 멈추고 어떤 항목의 승인인지 알려 준다.
 // 같은 세션(sid)으로 이어 읽어서 앞 승인이 뒤 항목에도 통하면 추가 승인 없이 끝나고, 통하지 않으면 그 항목만 다시 승인받는다.
@@ -103,7 +116,7 @@ async function advance(profile: CodefProfile, sid: string, queue: Kind[], secret
     const rq = buildRequest(kind, profile, sid, secret7)
     if ('error' in rq) { failed.push({ kind, message: rq.error }); continue }
     let r: CodefResult
-    try { r = await codefPost(rq.path, rq.body, Math.max(10_000, 56_000 - (Date.now() - t0))) } catch (e: any) { failed.push({ kind, message: errText(e) }); continue }
+    try { r = await codefPost(rq.path, rq.body, Math.max(10_000, 56_000 - (Date.now() - t0))); r = await retryVariants(rq, r, Math.max(8_000, 56_000 - (Date.now() - t0))) } catch (e: any) { failed.push({ kind, message: errText(e) }); continue }
     if (is2way(r)) return { status: 'need-auth', sid, kind, twoWay: twoWayOf(r), method: r.data?.method || '', queue: rest, done, failed }
     if (r.code !== 'CF-00000') { failed.push({ kind, message: failText(r) }); continue }
     try { await finish(kind, r.data, rq.range); done.push(kind) } catch (e: any) { failed.push({ kind, message: errText(e) }) }
@@ -138,7 +151,9 @@ export async function POST(req: NextRequest) {
       const queue = pick(body.queue)
       const rq = buildRequest(kind, profile, String(body.sid), secret7)
       if ('error' in rq) return NextResponse.json({ status: 'next', sid: body.sid, queue, done: [], failed: [{ kind, message: rq.error }] })
-      const r = await codefPost(rq.path, { ...rq.body, simpleAuth: '1', is2Way: true, twoWayInfo: body.twoWay }, 55_000)
+      const t0 = Date.now()
+      let r = await codefPost(rq.path, { ...rq.body, simpleAuth: '1', is2Way: true, twoWayInfo: body.twoWay }, 55_000)
+      r = await retryVariants(rq, r, Math.max(8_000, 58_000 - (Date.now() - t0)))
       if (is2way(r)) return NextResponse.json({ status: 'need-auth', retry: true, sid: body.sid, kind, twoWay: body.twoWay, queue, done: [], failed: [], message: '아직 승인되지 않았습니다. 승인한 뒤 다시 눌러 주세요. (홈택스 응답: ' + (failText(r) || '없음') + ')' })
       if (r.code !== 'CF-00000') return NextResponse.json({ status: 'next', sid: body.sid, queue, done: [], failed: [{ kind, message: failText(r) }] })
       await finish(kind, r.data, rq.range)
