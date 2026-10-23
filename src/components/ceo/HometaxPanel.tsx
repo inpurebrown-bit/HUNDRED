@@ -29,7 +29,9 @@ export default function HometaxPanel({ data, onApply, onFetched }: { data?: TaxD
   const [left, setLeft] = useState(0)
   const [secret7, setSecret7] = useState('')
   const [applyMsg, setApplyMsg] = useState('')
-  const ctx = useRef<{ sid: string; leaders: { kind: Kind; twoWay: any }[] } | null>(null)
+  const ctx = useRef<{ sid: string; kind: Kind; twoWay: any; queue: Kind[] } | null>(null)
+  const tally = useRef<{ done: Kind[]; failed: string[] }>({ done: [], failed: [] })
+  const [authNo, setAuthNo] = useState(0)
   const [picked, setPicked] = useState<Record<Kind, boolean>>({ vatCert: true, taxInvoice: false, cashSales: true, cashBuy: true })
   const abortRef = useRef<AbortController | null>(null)
 
@@ -46,7 +48,7 @@ export default function HometaxPanel({ data, onApply, onFetched }: { data?: TaxD
     setLeft(270)
     const id = setInterval(() => setLeft(s => (s > 0 ? s - 1 : 0)), 1000)
     return () => clearInterval(id)
-  }, [phase])
+  }, [phase, authNo])
 
   async function saveProfile() {
     const p = { ...profile, phoneNo: profile.phoneNo.replace(/[^0-9]/g, ''), birth: profile.birth.replace(/[^0-9]/g, ''), bizNo: profile.bizNo.replace(/[^0-9]/g, '') }
@@ -60,46 +62,52 @@ export default function HometaxPanel({ data, onApply, onFetched }: { data?: TaxD
     return r.json()
   }
   function cancel() { abortRef.current?.abort(); ctx.current = null; setPhase('idle'); setActive(null); setMsg('취소했습니다') }
-  async function start() {
-    const kinds = ITEMS.map(i => i.kind).filter(k => picked[k])
-    if (!kinds.length) { setMsg('불러올 항목을 골라 주세요'); return }
-    setActive(kinds[0]); setPhase('requesting'); setMsg('')
-    try { handle(await call({ action: 'start', kinds, secret7: picked.taxInvoice ? secret7 : undefined })) }
+  const labelOf = (k?: Kind) => ITEMS.find(i => i.kind === k)?.label || ''
+  // 항목을 하나씩 차례로 읽는다 — 승인이 필요한 항목에서 멈추고, 승인하면 이어서 읽는다
+  async function run(body: any) {
+    try { handle(await call({ ...body, secret7: picked.taxInvoice ? secret7 : undefined })) }
     catch (e: any) { if (e?.name !== 'AbortError') { setPhase('error'); setMsg('요청에 실패했습니다') } }
   }
-  async function confirm() {
-    if (!ctx.current) return
-    setPhase('loading'); setMsg('홈택스에서 가져오는 중입니다. 최대 1~2분 걸릴 수 있어요…')
-    try {
-      // 승인 요청이 여러 개 왔으면 한 번에 모두 확정한다
-      const { sid, leaders } = ctx.current
-      const rs = await Promise.all(leaders.map(l => call({ action: 'confirm', kind: l.kind, sid, twoWay: l.twoWay, secret7: picked.taxInvoice ? secret7 : undefined })))
-      const bad = rs.filter(r => r.status === 'error' || r.retry)
-      if (bad.length === rs.length && rs.some(r => r.retry)) { handle(rs.find(r => r.retry)); return }
-      handle({ status: 'confirmed', errors: bad.map((r, i) => [ITEMS.find(x => x.kind === leaders[i]?.kind)?.label, r.code, r.message].filter(Boolean).join(' ')) })
-    } catch (e: any) { if (e?.name !== 'AbortError') { setPhase('error'); setMsg('요청에 실패했습니다') } }
+  function start() {
+    const kinds = ITEMS.map(i => i.kind).filter(k => picked[k])
+    if (!kinds.length) { setMsg('불러올 항목을 골라 주세요'); return }
+    tally.current = { done: [], failed: [] }
+    setActive(kinds[0]); setPhase('requesting'); setMsg('')
+    void run({ action: 'start', kinds })
+  }
+  function confirm() {
+    const c = ctx.current
+    if (!c) return
+    setPhase('loading'); setMsg(labelOf(c.kind) + ' 가져오는 중입니다. 최대 1~2분 걸릴 수 있어요…')
+    void run({ action: 'confirm', kind: c.kind, sid: c.sid, twoWay: c.twoWay, queue: c.queue })
   }
   async function reload() {
     const j = await fetch('/api/hometax/sync', { cache: 'no-store' }).then(r => r.json()).catch(() => null)
     if (j?.data) setHd(j.data)
     onFetched?.()
   }
+  async function finishAll() {
+    await reload()
+    ctx.current = null; setActive(null)
+    const { done, failed } = tally.current
+    const okTxt = done.length ? `${done.map(labelOf).join(', ')} 불러왔습니다. 아래 표를 확인하세요.` : ''
+    if (failed.length) { setPhase('error'); setMsg([okTxt, '실패: ' + failed.join(' / ')].filter(Boolean).join(' · ')) }
+    else { setPhase('idle'); setMsg(okTxt || '불러오기를 마쳤습니다') }
+  }
   function handle(j: any) {
+    for (const k of j.done || []) tally.current.done.push(k)
+    for (const f of j.failed || []) tally.current.failed.push([labelOf(f.kind), f.message].filter(Boolean).join(' '))
     if (j.status === 'need-auth') {
-      ctx.current = { sid: j.sid, leaders: j.leaders || [{ kind: j.kind || j.leader, twoWay: j.twoWay }] }; setPhase('waiting')
-      const bad = (j.failed || []).concat((j.skipped || []).map((x: string) => ({ message: x }))).map((f: any) => [ITEMS.find(i => i.kind === f.kind)?.label, f.code, f.message].filter(Boolean).join(' ')).join(' / ')
-      setMsg((j.message || '') + (bad ? ' · 제외됨: ' + bad : ''))
-    }
-    else if (j.status === 'confirmed' || j.status === 'collecting') {
-      setPhase('loading'); setMsg('나머지 항목을 정리하는 중…' + (j.errors?.length ? ' · 실패: ' + j.errors.join(' / ') : ''))
-      let n = 0
-      const iv = setInterval(async () => { await reload(); if (++n >= 12) { clearInterval(iv); setPhase('idle'); setActive(null); setMsg('불러오기를 마쳤습니다. 아래 표를 확인하세요') } }, 8000)
-      abortRef.current = { abort: () => clearInterval(iv) } as any
-    }
-    else {
-      setPhase('error')
-      const per = (j.failed || []).map((f: any) => [ITEMS.find(i => i.kind === f.kind)?.label, f.code, f.message].filter(Boolean).join(' ')).join(' / ')
-      setMsg(per || [j.code, j.message, j.extra].filter(Boolean).join(' · ') || '알 수 없는 오류')
+      ctx.current = { sid: j.sid, kind: j.kind, twoWay: j.twoWay, queue: j.queue || [] }
+      setActive(j.kind); setPhase('waiting'); setMsg(j.message || '')
+      if (!j.retry) setAuthNo(n => n + 1)    // 새 승인 요청이면 남은 시간을 다시 센다
+    } else if (j.status === 'next') {
+      if (j.queue?.length) { setPhase('loading'); setMsg('다음 항목을 읽는 중…'); void run({ action: 'next', sid: j.sid, kinds: j.queue }) }
+      else void finishAll()
+    } else if (j.status === 'done') {
+      void finishAll()
+    } else {
+      setPhase('error'); setMsg([j.code, j.message, j.extra].filter(Boolean).join(' · ') || '알 수 없는 오류')
     }
   }
 
@@ -150,7 +158,7 @@ export default function HometaxPanel({ data, onApply, onFetched }: { data?: TaxD
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-[18px] font-black text-[#0b2140]">홈택스에서 불러오기 <span className="text-[13px] font-bold text-gray-400">CODEF 간편인증 · {info?.env === 'prod' ? '정식' : info?.env === 'sandbox' ? '샌드박스(테스트 데이터)' : '데모'}</span></p>
-          <p className="text-[13px] text-gray-500 mt-0.5">카카오톡 승인은 한 번만 하면 선택한 항목을 모두 읽습니다. 읽은 자료는 월별로 정리해 아래에 보여줍니다.</p>
+          <p className="text-[13px] text-gray-500 mt-0.5">항목을 하나씩 차례로 읽습니다. 홈택스가 항목마다 승인을 다시 요구하면 그 항목 이름과 함께 안내합니다. 읽은 자료는 월별로 정리해 아래에 보여줍니다.</p>
         </div>
         {info && !info.configured && <span className="text-[12.5px] font-bold text-[#b3261e] bg-[#fde7e3] px-3 py-1.5 rounded-full">CODEF 키 미설정</span>}
       </div>
@@ -193,7 +201,7 @@ export default function HometaxPanel({ data, onApply, onFetched }: { data?: TaxD
       </div>
       <button onClick={start} disabled={!info?.configured || busy || (picked.taxInvoice && secret7.length !== 7)}
         className="mt-3 px-6 py-2.5 rounded-full text-[14px] font-bold text-white bg-gradient-to-r from-[#0b2140] to-[#4a5a9a] disabled:opacity-40">
-        선택한 항목 한 번에 불러오기 (승인 1회)
+        선택한 항목 불러오기
       </button>
       {info && !info.configured && <p className="mt-2 text-[12.5px] font-bold text-[#b3261e]">버튼이 눌리지 않는 이유: 이 서버에 CODEF 키(CODEF_CLIENT_ID, CODEF_CLIENT_SECRET)가 설정되지 않았습니다. Vercel 환경변수에 넣고 다시 배포하면 켜집니다.</p>}
       {info?.configured && picked.taxInvoice && secret7.length !== 7 && <p className="mt-2 text-[12.5px] font-bold text-[#b3261e]">세금계산서를 읽으려면 주민등록번호 뒤 7자리를 입력하세요. (안 읽을 거면 세금계산서 체크를 해제)</p>}
@@ -205,7 +213,7 @@ export default function HometaxPanel({ data, onApply, onFetched }: { data?: TaxD
         {phase === 'waiting' && (
           <div className="rounded-2xl bg-[#fffaf0] border-[1.5px] border-[#ecd9a6] px-4 py-3 flex flex-wrap items-center gap-3">
             <div>
-              <p className="text-[14px] font-black text-[#0b2140]">{AUTHS.find(a => a[0] === profile.authLevel)?.[1] || '간편인증'} 앱에서 인증 요청을 승인하세요</p>
+              <p className="text-[14px] font-black text-[#0b2140]">{AUTHS.find(a => a[0] === profile.authLevel)?.[1] || '간편인증'} 앱에서 「{labelOf(active ?? undefined)}」 인증 요청을 승인하세요</p>
               <p className="text-[12.5px] text-gray-500">승인한 뒤 아래 버튼을 눌러 주세요 · 남은 시간 {Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}{msg ? ' · ' + msg : ''}</p>
             </div>
             <button onClick={confirm} className="px-5 py-2 rounded-full text-[14px] font-bold text-white bg-[#0b2140]">승인했어요</button>

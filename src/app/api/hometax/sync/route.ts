@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse, after } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -8,11 +8,12 @@ import { DEFAULT_TAX_2026, type TaxData } from '@/lib/taxCalc'
 import { aggregateCash, aggregateTaxInvoice, type HometaxData } from '@/lib/hometaxData'
 
 // 홈택스(CODEF) 불러오기 — 대표 전용.
-// 한 번 승인으로 여러 항목을 읽는다: 같은 세션 식별값으로 여러 조회를 동시에 걸어 두면,
-// 첫 조회가 승인(2차 인증)을 받는 동안 나머지는 대기하다가 승인 한 번으로 모두 처리된다.
+// 항목을 같은 세션으로 하나씩 차례로 읽는다 (동시에 걸면 항목마다 승인 요청이 따로 와서 꼬인다).
+// 승인(2차 인증)이 필요한 항목에서 멈추고, 승인 뒤 이어서 읽는다. 클라이언트가 응답의 queue를 들고 다음 요청을 보낸다.
 //  GET  : 연결 정보·읽어 둔 원자료·키 설정 여부
-//  POST { action:'start', kinds:[...], secret7? }  → 조회를 동시에 걸고, 승인에 쓸 정보를 돌려준다
-//  POST { action:'confirm', kind, sid, twoWay, secret7? } → 승인 뒤 첫 조회를 확정 (대기 중이던 나머지는 백그라운드에서 끝나 저장됨)
+//  POST { action:'start', kinds:[...], secret7? }  → 새 세션으로 읽기 시작. need-auth(승인 필요) | next(남은 항목 있음) | done
+//  POST { action:'next', sid, kinds:[...], secret7? } → 같은 세션으로 남은 항목을 이어 읽기
+//  POST { action:'confirm', kind, sid, twoWay, queue, secret7? } → 승인한 항목을 확정하고 남은 queue를 돌려준다
 export const maxDuration = 60
 
 type Kind = 'vatCert' | 'taxInvoice' | 'cashSales' | 'cashBuy'
@@ -82,6 +83,33 @@ function buildRequest(kind: Kind, profile: CodefProfile, sid: string, secret7?: 
 }
 
 const timeoutMsg = '홈택스 응답이 늦어 중단했습니다. 잠시 뒤 다시 시도해 주세요.'
+const errText = (e: any) => (e?.name === 'TimeoutError' ? timeoutMsg : e?.message || '홈택스 불러오기에 실패했습니다.')
+const is2way = (r: CodefResult) => r.code === 'CF-03002' || !!r.data?.continue2Way
+const twoWayOf = (r: CodefResult) => { const y = r.data || {}; return { jobIndex: y.jobIndex, threadIndex: y.threadIndex, jti: y.jti, twoWayTimestamp: y.twoWayTimestamp } }
+const failText = (r: CodefResult) => [r.code, r.message, r.extraMessage].filter(Boolean).join(' ')
+
+// 항목을 순서대로 한 번에 하나씩 읽는다. 승인 요청(2차 인증)이 나오면 거기서 멈추고 어떤 항목의 승인인지 알려 준다.
+// 같은 세션(sid)으로 이어 읽어서 앞 승인이 뒤 항목에도 통하면 추가 승인 없이 끝나고, 통하지 않으면 그 항목만 다시 승인받는다.
+async function advance(profile: CodefProfile, sid: string, queue: Kind[], secret7?: string) {
+  const t0 = Date.now()
+  const rest = [...queue]
+  const done: Kind[] = [], failed: { kind: Kind; message: string }[] = []
+  let first = true
+  while (rest.length) {
+    // 한 요청은 60초 안에 끝나야 하므로 오래 걸렸으면 나머지는 다음 요청으로 넘긴다
+    if (!first && Date.now() - t0 > 15_000) return { status: 'next', sid, queue: rest, done, failed }
+    first = false
+    const kind = rest.shift()!
+    const rq = buildRequest(kind, profile, sid, secret7)
+    if ('error' in rq) { failed.push({ kind, message: rq.error }); continue }
+    let r: CodefResult
+    try { r = await codefPost(rq.path, rq.body, Math.max(10_000, 56_000 - (Date.now() - t0))) } catch (e: any) { failed.push({ kind, message: errText(e) }); continue }
+    if (is2way(r)) return { status: 'need-auth', sid, kind, twoWay: twoWayOf(r), method: r.data?.method || '', queue: rest, done, failed }
+    if (r.code !== 'CF-00000') { failed.push({ kind, message: failText(r) }); continue }
+    try { await finish(kind, r.data, rq.range); done.push(kind) } catch (e: any) { failed.push({ kind, message: errText(e) }) }
+  }
+  return { status: 'done', sid, queue: [] as Kind[], done, failed }
+}
 
 export async function POST(req: NextRequest) {
   const deny = await ceoOnly(); if (deny) return deny
@@ -91,68 +119,34 @@ export async function POST(req: NextRequest) {
   const profile = (await readSetting('codef_profile')) as CodefProfile | null
   if (!profile?.userName || !profile?.birth || !profile?.phoneNo) return NextResponse.json({ status: 'error', message: '연결 정보(이름·생년월일·전화번호)를 먼저 저장해 주세요.' })
   const secret7 = body.secret7 ? String(body.secret7) : undefined
+  const pick = (ks: any): Kind[] => (Array.isArray(ks) ? ks : []).filter((k: any) => KINDS.includes(k))
 
   try {
-    // ── 시작: 여러 조회를 같은 세션으로 동시에 건다 ──
-    if (body.action === 'start') {
-      const wanted: Kind[] = (Array.isArray(body.kinds) && body.kinds.length ? body.kinds : ['vatCert', 'cashSales', 'cashBuy']).filter((k: any) => KINDS.includes(k))
+    // ── 시작 / 이어서 읽기 ──
+    if (body.action === 'start' || body.action === 'next') {
+      const wanted = pick(body.kinds)
       if (!wanted.length) return NextResponse.json({ status: 'error', message: '불러올 항목을 골라 주세요.' })
-      const sid = 'crm-' + randomUUID()
-      type Job = { kind: Kind; rq: { path: string; body: Record<string, any>; range: any }; res?: CodefResult; err?: any; done: boolean; p?: Promise<void> }
-      const jobs: Job[] = []
-      const skipped: string[] = []
-      for (const kind of wanted) {
-        const rq = buildRequest(kind, profile, sid, secret7)
-        if ('error' in rq) { skipped.push(kind + ': ' + rq.error); continue }
-        jobs.push({ kind, rq, done: false })
-      }
-      if (!jobs.length) return NextResponse.json({ status: 'error', message: skipped.join(' / ') })
-      // 동시에 요청 (각 57초 제한)
-      for (const j of jobs) j.p = codefPost(j.rq.path, j.rq.body, 57_000).then(r => { j.res = r; j.done = true }, e => { j.err = e; j.done = true })
-      // 첫 응답들이 모일 때까지 잠깐 기다린다 (승인 대기로 들어간 조회가 먼저 돌아온다)
-      const t0 = Date.now()
-      // 상품(국세청 메뉴)마다 인증 세션이 달라 승인 요청이 둘 이상 올 수 있다 — 승인 요청이 온 조회를 모두 모은다
-      const is2way = (j: Job) => j.res?.code === 'CF-03002' || !!j.res?.data?.continue2Way
-      while (Date.now() - t0 < 12_000 && jobs.some(j => !j.done && !is2way(j))) await new Promise(r => setTimeout(r, 300))
-      const leaders = jobs.filter(is2way)
-      const leader = leaders[0]
-      const failed = jobs.filter(j => j.done && !is2way(j) && (j.err || j.res?.code !== 'CF-00000')).map(j => ({ kind: j.kind, code: j.res?.code || '', message: j.err ? (j.err.name === 'TimeoutError' ? timeoutMsg : j.err.message) : [j.res?.message, j.res?.extraMessage].filter(Boolean).join(' ') }))
-      const pendingKinds = jobs.filter(j => !j.done).map(j => j.kind)
-
-      // 승인 없이 바로 끝난 조회(이미 세션이 열려 있는 경우)와, 승인 뒤 대기가 풀려 끝나는 조회를 저장한다
-      after(async () => {
-        await Promise.all(jobs.map(j => j.p))
-        for (const j of jobs) { if (!leaders.includes(j) && j.res?.code === 'CF-00000') await finish(j.kind, j.res.data, j.rq.range).catch(() => {}) }
-      })
-
-      if (leader) {
-        const d = leader.res!.data || {}
-        const tw = (x: Job) => { const y = x.res!.data || {}; return { jobIndex: y.jobIndex, threadIndex: y.threadIndex, jti: y.jti, twoWayTimestamp: y.twoWayTimestamp } }
-        return NextResponse.json({ status: 'need-auth', sid, leader: leader.kind, leaders: leaders.map(x => ({ kind: x.kind, twoWay: tw(x) })), kinds: jobs.map(j => j.kind), pending: pendingKinds, failed, skipped, method: d.method || '', twoWay: tw(leader), startedAt: new Date().toISOString() })
-      }
-      // 승인 요청이 없고 모두 끝났거나 실패한 경우
-      const ok = jobs.filter(j => j.res?.code === 'CF-00000').map(j => j.kind)
-      if (ok.length) return NextResponse.json({ status: 'collecting', kinds: jobs.map(j => j.kind), pending: pendingKinds, failed, skipped, startedAt: new Date().toISOString() })
-      const first = jobs[0]
-      return NextResponse.json({ status: 'error', code: first.res?.code, message: first.err ? (first.err.name === 'TimeoutError' ? timeoutMsg : first.err.message) : first.res?.message, extra: first.res?.extraMessage, failed: jobs.map(j => ({ kind: j.kind, code: j.res?.code || '', message: j.err ? j.err.message : [j.res?.message, j.res?.extraMessage].filter(Boolean).join(' ') })) })
+      const sid = body.action === 'next' && body.sid ? String(body.sid) : 'crm-' + randomUUID()
+      return NextResponse.json(await advance(profile, sid, wanted, secret7))
     }
 
-    // ── 확정: 승인 뒤 첫 조회를 마친다 (대기 중이던 나머지는 시작 요청 쪽에서 이어서 끝나 저장됨) ──
+    // ── 확정: 승인한 항목 하나를 마치고, 남은 항목 목록(queue)을 돌려준다 ──
     if (body.action === 'confirm') {
       const kind = body.kind as Kind
       if (!KINDS.includes(kind)) return NextResponse.json({ status: 'error', message: '불러올 항목을 골라 주세요.' })
       if (!body.twoWay || !body.sid) return NextResponse.json({ status: 'error', message: '인증 정보가 없습니다. 처음부터 다시 시도해 주세요.' })
+      const queue = pick(body.queue)
       const rq = buildRequest(kind, profile, String(body.sid), secret7)
-      if ('error' in rq) return NextResponse.json({ status: 'error', message: rq.error })
+      if ('error' in rq) return NextResponse.json({ status: 'next', sid: body.sid, queue, done: [], failed: [{ kind, message: rq.error }] })
       const r = await codefPost(rq.path, { ...rq.body, simpleAuth: '1', is2Way: true, twoWayInfo: body.twoWay }, 55_000)
-      if (r.code === 'CF-03002' || r.data?.continue2Way) return NextResponse.json({ status: 'need-auth', retry: true, kind, sid: body.sid, twoWay: body.twoWay, message: '아직 승인되지 않았습니다. 카카오톡에서 승인한 뒤 다시 눌러 주세요.' })
-      if (r.code !== 'CF-00000') return NextResponse.json({ status: 'error', code: r.code, message: r.message, extra: r.extraMessage })
+      if (is2way(r)) return NextResponse.json({ status: 'need-auth', retry: true, sid: body.sid, kind, twoWay: body.twoWay, queue, done: [], failed: [], message: '아직 승인되지 않았습니다. 승인한 뒤 다시 눌러 주세요. (홈택스 응답: ' + (failText(r) || '없음') + ')' })
+      if (r.code !== 'CF-00000') return NextResponse.json({ status: 'next', sid: body.sid, queue, done: [], failed: [{ kind, message: failText(r) }] })
       await finish(kind, r.data, rq.range)
-      return NextResponse.json({ status: 'confirmed', kind })
+      return NextResponse.json({ status: 'next', sid: body.sid, queue, done: [kind], failed: [] })
     }
     return NextResponse.json({ status: 'error', message: '알 수 없는 요청입니다.' })
   } catch (e: any) {
-    return NextResponse.json({ status: 'error', message: e?.name === 'TimeoutError' ? timeoutMsg : (e?.message || '홈택스 불러오기에 실패했습니다.') })
+    return NextResponse.json({ status: 'error', message: errText(e) })
   }
 }
 
