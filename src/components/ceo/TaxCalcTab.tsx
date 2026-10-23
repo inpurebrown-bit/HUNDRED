@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import HometaxPanel from './HometaxPanel'
-import { DEFAULT_TAX_2026, computeTax, cellAmt, type TaxData, type TaxCell, type TaxQuarter } from '@/lib/taxCalc'
+import { DEFAULT_TAX_2026, computeTax, type TaxData, type TaxCell, type TaxQuarter } from '@/lib/taxCalc'
+import type { HometaxData } from '@/lib/hometaxData'
 
 const won = (n: number) => Math.round(n || 0).toLocaleString('ko-KR')
 const man = (n: number) => {
@@ -50,6 +51,7 @@ function Row3({ label, a, bold }: { label: string; a: { total: number; supply: n
 
 export default function TaxCalcTab() {
   const [data, setData] = useState<TaxData>(DEFAULT_TAX_2026)
+  const [hd, setHd] = useState<HometaxData | null>(null)   // 홈택스에서 읽은 월별 원자료 — 분기 칸은 이 값으로 자동 계산
   const [loaded, setLoaded] = useState(false)
   const [status, setStatus] = useState('불러오는 중…')
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -60,7 +62,8 @@ export default function TaxCalcTab() {
   useEffect(() => {
     fetch('/api/tax-calc', { cache: 'no-store' }).then(r => r.json()).then(j => {
       if (j.data) setData(j.data)
-      setStatus(j.saved ? '저장된 값' : '엑셀 값으로 시작 (수정하면 저장됩니다)')
+      if (j.hd) setHd(j.hd)
+      setStatus(j.saved ? '저장된 값' : '홈택스 값 기준 (직접 적은 값은 저장됩니다)')
       setLoaded(true)
     }).catch(() => { setStatus('불러오지 못했습니다'); setLoaded(true) })
   }, [])
@@ -92,14 +95,14 @@ export default function TaxCalcTab() {
   const setCell = (qi: number, key: CellKey, patch: Partial<TaxCell>) =>
     edit(d => ({ ...d, quarters: d.quarters.map((q, i) => i === qi ? { ...q, [key]: { ...(q[key] as TaxCell), ...patch } } : q) as TaxQuarter[] }))
 
-  const s = computeTax(data)
+  const s = computeTax(data, undefined, hd)
 
   return (
     <div className="space-y-5 pb-10 max-w-[1500px] mx-auto">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-[26px] font-black text-[#0b2140] leading-tight">세금 계산 <span className="text-[16px] text-gray-400 font-bold">{data.year}년 부가세·종소세</span></h2>
-          <p className="text-[13.5px] text-gray-500 mt-0.5">홈택스에 신고된 매출·매입 기준입니다. 숫자를 고치면 자동 저장되고, 다른 화면의 세금 숫자도 이 값을 따라갑니다.</p>
+          <p className="text-[13.5px] text-gray-500 mt-0.5">홈택스에서 읽은 값으로 자동 계산합니다. 홈택스에 없는 값(이번 달 카드 등)만 직접 적으면 자동 저장되고, 다른 화면의 세금 숫자도 이 값을 따라갑니다.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <label className="flex items-center gap-2 text-[13px] font-semibold text-gray-500">기준일
@@ -113,8 +116,7 @@ export default function TaxCalcTab() {
 
       {/* 홈택스 불러오기 (CODEF 간편인증) */}
       <HometaxPanel data={data}
-        onFetched={() => { fetch('/api/tax-calc', { cache: 'no-store' }).then(r => r.json()).then(j => { if (j.data) setData(j.data) }).catch(() => {}) }}
-        onApply={patch => edit(d => ({ ...d, quarters: d.quarters.map(q => (patch[q.key] ? { ...q, ...patch[q.key] } : q)) as TaxQuarter[], source: '홈택스' }))} />
+        onFetched={() => { fetch('/api/tax-calc', { cache: 'no-store' }).then(r => r.json()).then(j => { if (j.data) setData(j.data); if (j.hd) setHd(j.hd) }).catch(() => {}) }} />
 
       {/* 정산 결과 — 20일 정산용 */}
       <div className="rounded-3xl bg-gradient-to-br from-[#10203a] to-[#0a1424] text-white p-5">
@@ -124,7 +126,7 @@ export default function TaxCalcTab() {
           <div><p className="text-[12.5px] text-white/55">세금 통장 (종소세)</p><p className="text-[32px] font-black text-[#E8D080] tabular-nums leading-tight">{won(s.incomeTax)}원</p><p className="text-[12px] text-white/40">올해 매출 공급가 {won(s.year.sales.supply)}원 × {Math.round((data.incomeTaxRate ?? 0.1) * 100)}% · 내년 5/31 납부</p></div>
           <div><p className="text-[12.5px] text-white/55">합계</p><p className="text-[32px] font-black text-white tabular-nums leading-tight">{won(s.parking)}원</p><p className="text-[12px] text-white/40">종소세는 매입(경비) 계산 없이 매출 기준으로 넉넉하게 잡았습니다</p></div>
         </div>
-        <p className="text-[12.5px] text-white/50 mt-3">반영 범위 · 홈택스 자료: {data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' 에 읽은 분까지' : '아직 안 읽음(엑셀 입력값)'} · 카드 매출: {data.cardThrough ? data.cardThrough.slice(5).replace('-', '/') + ' 까지 입력' : '아래에서 입력'}</p>
+        <p className="text-[12.5px] text-white/50 mt-3">반영 범위 · 홈택스 자료: {data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' 에 읽은 분까지' : '아직 안 읽음'} · 카드 매출: {data.cardThrough ? data.cardThrough.slice(5).replace('-', '/') + ' 까지 입력' : '아래에서 입력'}</p>
       </div>
 
       {/* 카드 매출 직접 입력 */}
@@ -136,7 +138,7 @@ export default function TaxCalcTab() {
               className="border-[1.5px] border-gray-200 rounded-xl px-3 py-1.5 text-[13.5px] font-bold text-[#0b2140] bg-white outline-none focus:border-[#b8995a]" />
           </label>
         </div>
-        <p className="text-[12.5px] text-gray-500 mb-3">홈택스로 못 읽는 카드 매출은 달별 총액(부가세 포함)만 적으세요. 부가세는 자동으로 빼고 계산합니다. 정산일이 20일이면 이번 달 칸에는 1~20일 카드 합계를 적으면 됩니다. 칸이 비어 있으면 아래 분기별 카드 칸의 값을 씁니다.</p>
+        <p className="text-[12.5px] text-gray-500 mb-3">홈택스에서 자동으로 못 읽는 카드 매출(이번 달처럼 아직 정산 전인 달)은 달별 총액(부가세 포함)만 적으세요. 부가세는 자동으로 빼고 계산합니다. 정산일이 20일이면 이번 달 칸에는 1~20일 카드 합계를 적으면 됩니다. 칸이 비어 있으면 홈택스에서 읽은 카드 매출을 씁니다.</p>
         <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
           {Array.from({ length: 12 }, (_, i) => {
             const ym = `${data.year}${String(i + 1).padStart(2, '0')}`
@@ -169,7 +171,7 @@ export default function TaxCalcTab() {
               onBlur={e => { const n = parseFloat(e.target.value); if (!isNaN(n)) edit(d => ({ ...d, incomeTaxRate: n / 100 })) }}
               className="w-full text-right tabular-nums text-[14px] font-bold text-[#0b2140] bg-white border-[1.5px] border-gray-200 focus:border-[#b8995a] rounded-xl px-2.5 py-2 outline-none" /></label>
         </div>
-        <p className="text-[12.5px] text-gray-500 mt-2">아래 분기별 칸에 홈택스 총액을 적으면 공급가액과 세액은 자동 계산됩니다(총액 ÷ 1.1). 홈택스 공급가액이 다르면 공급가액 칸에 직접 적으세요.</p>
+        <p className="text-[12.5px] text-gray-500 mt-2">분기별 칸의 회색 숫자는 홈택스에서 읽은 값입니다. 홈택스와 다를 때만 칸에 직접 적으세요(적은 값이 우선). 총액만 적으면 공급가액은 총액 ÷ 1.1로 계산됩니다.</p>
       </div>
 
       {/* 분기별 */}
@@ -183,13 +185,13 @@ export default function TaxCalcTab() {
                 <span /><span className="text-center font-bold text-gray-400">총액(부가세 포함)</span><span className="text-center font-bold text-gray-400">공급가액</span><span className="text-center font-bold text-gray-400">세액</span>
                 {ROWS.map(r => {
                   const cell = q[r.key]
-                  const a = cellAmt(cell)
+                  const a = qs[r.key]   // 홈택스 값 + 직접 적은 값으로 계산된 금액
                   return (
                     <div key={r.key} className="contents">
                       <span className="text-[13px] font-bold text-[#0b2140]"><span className={r.group === '매출' ? 'text-sky-600' : 'text-violet-600'}>{r.group}</span> {r.label}</span>
-                      <NumIn value={cell.total} onChange={v => setCell(qi, r.key, { total: v })} placeholder="-" />
-                      <NumIn value={cell.supply} onChange={v => setCell(qi, r.key, { supply: v })} placeholder={cell.total ? won(a.supply) : '자동'} />
-                      <span className="text-right tabular-nums font-semibold text-gray-600 pr-1">{cell.total ? won(a.tax) : '-'}</span>
+                      <NumIn value={cell.total} onChange={v => setCell(qi, r.key, { total: v })} placeholder={a.total ? won(a.total) : '-'} />
+                      <NumIn value={cell.supply} onChange={v => setCell(qi, r.key, { supply: v })} placeholder={a.total ? won(a.supply) : '자동'} />
+                      <span className="text-right tabular-nums font-semibold text-gray-600 pr-1">{a.total ? won(a.tax) : '-'}</span>
                     </div>
                   )
                 })}

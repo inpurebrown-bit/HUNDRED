@@ -1,3 +1,5 @@
+import type { HometaxData, MonthAmt } from './hometaxData'
+
 // 세금 계산(홈택스 신고 기준) — 대표가 엑셀로 관리하던 "26년 부가세" 시트를 CRM으로 옮긴 것
 // 금액 단위: 원. 총액은 부가세 포함, 공급가액은 총액 ÷ 1.1 (입력하면 입력값 사용), 세액 = 총액 − 공급가액
 // 엑셀과 같이 중간 계산은 소수 그대로 두고 표시·최종 합계에서만 반올림한다
@@ -19,6 +21,7 @@ export interface TaxData {
   paid: { q1: number | null; q3: number | null; h1Final?: number | null; interim?: number | null }
   incomeTaxRate: number            // 종소세 적립률 (기본 10%, 1년 매출 공급가 기준)
   source: '수동' | '홈택스'
+  v?: number                        // 2: 엑셀 입력값을 비우고 홈택스 값 기준으로 바꾼 버전
   syncedAt?: string
   // 카드 매출은 홈택스로 못 읽어서 월별 총액(부가세 포함)을 직접 입력한다. 입력한 달이 있으면 그 분기의 카드 매출은 월별 합계를 쓴다.
   cardMonthly?: Record<string, number | null>   // 'YYYYMM' → 총액
@@ -30,18 +33,19 @@ export interface ReportedHalf { supply: number; tax: number; issuedAt?: string; 
 
 const c = (total: number | null, supply: number | null = null): TaxCell => ({ total, supply })
 
-// 2026-10-14 대표가 관리하던 엑셀 값 (홈택스 신고 매출 기준)
+// 분기 칸은 비워 둔다 — 홈택스에서 읽은 값(HometaxData)이 자동으로 채우고, 칸에 직접 적으면 그 값이 우선한다
 export const DEFAULT_TAX_2026: TaxData = {
   year: 2026,
-  asOf: '2026-10-14',
+  asOf: '',
   incomeTaxRate: 0.1,
   paid: { q1: null, q3: null },
-  source: '수동',
+  source: '홈택스',
+  v: 2,
   quarters: [
-    { key: 'q1', label: '1기', months: '1~3월',  note: '1기 예정', salesCash: c(28600000), salesCard: c(null), buyCash: c(4018340),  buyCard: c(null) },
-    { key: 'q2', label: '2기', months: '4~6월',  note: '1기 확정', salesCash: c(4950000),  salesCard: c(5780100), buyCash: c(12518112), buyCard: c(null) },
-    { key: 'q3', label: '3기', months: '7~9월',  note: '2기 예정', salesCash: c(13860000), salesCard: c(20840110), buyCash: c(15246948), buyCard: c(null) },
-    { key: 'q4', label: '4기', months: '10~12월', note: '2기 확정', salesCash: c(7205000), salesCard: c(3520000), buyCash: c(1913600),  buyCard: c(null) },
+    { key: 'q1', label: '1기', months: '1~3월',  note: '1기 예정', salesCash: c(null), salesCard: c(null), buyCash: c(null), buyCard: c(null) },
+    { key: 'q2', label: '2기', months: '4~6월',  note: '1기 확정', salesCash: c(null), salesCard: c(null), buyCash: c(null), buyCard: c(null) },
+    { key: 'q3', label: '3기', months: '7~9월',  note: '2기 예정', salesCash: c(null), salesCard: c(null), buyCash: c(null), buyCard: c(null) },
+    { key: 'q4', label: '4기', months: '10~12월', note: '2기 확정', salesCash: c(null), salesCard: c(null), buyCash: c(null), buyCard: c(null) },
   ],
 }
 
@@ -79,12 +83,23 @@ export interface TaxSummary {
 
 const kstToday = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
 
-export function computeTax(d: TaxData, now?: string): TaxSummary {
+// 홈택스에서 읽은 월별 합계를 분기 칸 값으로. 읽힌 달이 하나도 없으면 null
+const sumHd = (maps: (Record<string, MonthAmt> | undefined)[], yms: string[]): TaxCell | null => {
+  let any = false, total = 0, supply = 0
+  for (const m of maps) for (const ym of yms) { const x = m?.[ym]; if (x) { any = true; total += x.total; supply += x.supply } }
+  return any ? { total, supply } : null
+}
+// 칸에 직접 적은 값이 있으면 그 값, 없으면 홈택스 값
+const pick = (manual: TaxCell, auto: TaxCell | null): TaxCell => (manual?.total != null || manual?.supply != null ? manual : auto || manual)
+
+export function computeTax(d: TaxData, now?: string, hd?: HometaxData | null): TaxSummary {
   const qs = d.quarters.map((q, qi) => {
     const ms = [0, 1, 2].map(i => `${d.year}${String(qi * 3 + 1 + i).padStart(2, '0')}`)
-    const monthly = ms.filter(m => d.cardMonthly?.[m] != null && d.cardMonthly[m] !== ('' as any))
-    const cardCell: TaxCell = monthly.length ? { total: monthly.reduce((s, m) => s + (Number(d.cardMonthly![m]) || 0), 0), supply: null } : q.salesCard
-    const salesCash = cellAmt(q.salesCash), salesCard = cellAmt(cardCell), buyCash = cellAmt(q.buyCash), buyCard = cellAmt(q.buyCard)
+    // 카드 매출은 홈택스로 못 읽어서 월별로 직접 적은 값을 쓴다 (없으면 분기 칸)
+    const cardMonths = ms.map(m => (d.cardMonthly?.[m] != null && d.cardMonthly[m] !== ('' as any) ? Number(d.cardMonthly[m]) || 0 : null))
+    const cardCell: TaxCell = cardMonths.some(v => v != null) ? { total: cardMonths.reduce((s: number, v) => s + (v || 0), 0), supply: null } : q.salesCard
+    const salesCash = cellAmt(pick(q.salesCash, sumHd([hd?.taxInvoiceSales, hd?.cashSales], ms))), salesCard = cellAmt(cardCell)
+    const buyCash = cellAmt(pick(q.buyCash, sumHd([hd?.taxInvoiceBuy, hd?.cashBuy], ms))), buyCard = cellAmt(q.buyCard)
     return { key: q.key, sales: addAmt(salesCash, salesCard), buy: addAmt(buyCash, buyCard), salesCash, salesCard, buyCash, buyCard }
   })
   const half = (a: typeof qs[number], b: typeof qs[number]) => {

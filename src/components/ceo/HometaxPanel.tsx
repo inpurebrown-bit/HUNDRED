@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { computeTax, type TaxData, type TaxCell } from '@/lib/taxCalc'
+import type { TaxData } from '@/lib/taxCalc'
 import { quarterMonths, sumMonths, hasMonths, type HometaxData } from '@/lib/hometaxData'
 
 interface Profile { userName: string; birth: string; phoneNo: string; telecom: string; authLevel: string; bizNo: string }
@@ -18,7 +18,7 @@ type Phase = 'idle' | 'requesting' | 'waiting' | 'loading' | 'error'
 const won = (v: any) => { const n = typeof v === 'number' ? Math.round(v) : parseInt(String(v ?? '').replace(/[^0-9-]/g, ''), 10); return isNaN(n) ? String(v ?? '') : n.toLocaleString('ko-KR') }
 const fmtT = (s?: string) => (s ? new Date(s).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '아직 안 불러옴')
 
-export default function HometaxPanel({ data, onApply, onFetched }: { data?: TaxData; onApply?: (patch: Record<string, { salesCash?: TaxCell; salesCard?: TaxCell; buyCash?: TaxCell }>) => void; onFetched?: () => void }) {
+export default function HometaxPanel({ data, onFetched }: { data?: TaxData; onFetched?: () => void }) {
   const [info, setInfo] = useState<{ configured: boolean; env: string } | null>(null)
   const [profile, setProfile] = useState<Profile>(EMPTY)
   const [profileMsg, setProfileMsg] = useState('')
@@ -28,7 +28,6 @@ export default function HometaxPanel({ data, onApply, onFetched }: { data?: TaxD
   const [msg, setMsg] = useState('')
   const [left, setLeft] = useState(0)
   const [secret7, setSecret7] = useState('')
-  const [applyMsg, setApplyMsg] = useState('')
   const ctx = useRef<{ sid: string; kind: Kind; twoWay: any; queue: Kind[] } | null>(null)
   const tally = useRef<{ done: Kind[]; failed: string[] }>({ done: [], failed: [] })
   const [authNo, setAuthNo] = useState(0)
@@ -123,33 +122,15 @@ export default function HometaxPanel({ data, onApply, onFetched }: { data?: TaxD
     const tis = sumMonths(hd.taxInvoiceSales, ms), tib = sumMonths(hd.taxInvoiceBuy, ms), cs = sumMonths(hd.cashSales, ms), cb = sumMonths(hd.cashBuy, ms)
     return { q, ms, have, tis, tib, cs, cb, sales: { supply: tis.supply + cs.supply, tax: tis.tax + cs.tax, total: tis.total + cs.total }, buy: { supply: tib.supply + cb.supply, tax: tib.tax + cb.tax, total: tib.total + cb.total } }
   })
-  const sheet = data ? computeTax({ ...data, reported: undefined }) : null
   const halfRows = [1, 2].map(h => {
     const a = qs[(h - 1) * 2], b = qs[(h - 1) * 2 + 1]
     const cert = (hd.halves || []).find(x => x.start === `${year}${h === 1 ? '01' : '07'}01`)
     const have = a.have.tis && a.have.cs && b.have.tis && b.have.cs
     const cashSupply = a.sales.supply + b.sales.supply
     const card = cert && have ? cert.total - cashSupply : null
-    const sheetCard = sheet ? (h === 1 ? sheet.quarters[0].salesCard.supply + sheet.quarters[1].salesCard.supply : sheet.quarters[2].salesCard.supply + sheet.quarters[3].salesCard.supply) : null
-    return { h, cert, have, cashSupply, card, sheetCard }
+    return { h, cert, have, cashSupply, card }
   })
   const monthsShown = Array.from(new Set([...Object.keys(hd.taxInvoiceSales || {}), ...Object.keys(hd.taxInvoiceBuy || {}), ...Object.keys(hd.cashSales || {}), ...Object.keys(hd.cashBuy || {})])).sort()
-
-  function apply() {
-    const patch: Record<string, { salesCash?: TaxCell; salesCard?: TaxCell; buyCash?: TaxCell }> = {}
-    const done: string[] = []
-    for (const q of qs) {
-      const p: { salesCash?: TaxCell; salesCard?: TaxCell; buyCash?: TaxCell } = {}
-      // 세금계산서와 현금영수증이 둘 다 읽힌 달만 합산한다 (이번 달처럼 일부만 읽힌 분기도 읽힌 달까지 반영)
-      const both = (a?: Record<string, any>, b?: Record<string, any>) => q.ms.filter(m => a?.[m] !== undefined && b?.[m] !== undefined)
-      const sm = both(hd.taxInvoiceSales, hd.cashSales), bm = both(hd.taxInvoiceBuy, hd.cashBuy)
-      if (sm.length) { const a = sumMonths(hd.taxInvoiceSales, sm), b = sumMonths(hd.cashSales, sm); p.salesCash = { total: a.total + b.total, supply: a.supply + b.supply } }
-      if (bm.length) { const a = sumMonths(hd.taxInvoiceBuy, bm), b = sumMonths(hd.cashBuy, bm); p.buyCash = { total: a.total + b.total, supply: a.supply + b.supply } }
-      if (p.salesCash || p.salesCard || p.buyCash) { patch['q' + q.q] = p; done.push(`${q.q}기${p.salesCash ? ` 매출(${sm.length}개월)` : ''}${p.buyCash ? ` 매입(${bm.length}개월)` : ''}`) }
-    }
-    if (!done.length) { setApplyMsg('세금계산서와 현금영수증이 함께 읽힌 달이 아직 없습니다. 먼저 불러오세요.'); return }
-    onApply?.(patch); setApplyMsg('표에 반영했습니다: ' + done.join(', '))
-  }
 
   const Cell = ({ v }: { v?: { supply: number; tax: number } }) => <td className="text-right tabular-nums px-2">{v ? won(v.supply) : <span className="text-gray-300">-</span>}</td>
 
@@ -238,49 +219,23 @@ export default function HometaxPanel({ data, onApply, onFetched }: { data?: TaxD
             </table>
           </div>
 
-          {/* 분기 합계 */}
-          <p className="text-[14px] font-black text-[#0b2140] mt-4 mb-1">분기별 합계 <span className="text-[12px] text-gray-400 font-bold">세 달이 모두 읽힌 분기만 계산</span></p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
-              <thead><tr className="text-gray-400 text-[12px]"><th className="text-left font-semibold py-1">분기</th><th className="text-right font-semibold px-2">현금 매출 공급가</th><th className="text-right font-semibold px-2">엑셀 현금 매출</th><th className="text-right font-semibold px-2">현금 매입 공급가</th><th className="text-right font-semibold px-2">엑셀 현금 매입</th></tr></thead>
-              <tbody>{qs.map(q => {
-                const sq = sheet?.quarters[q.q - 1]
-                const okS = q.have.tis && q.have.cs, okB = q.have.tib && q.have.cb
-                return (
-                  <tr key={q.q} className="border-t border-gray-100">
-                    <td className="py-1.5 font-bold text-[#0b2140]">{q.q}기 <span className="text-gray-400 font-normal">{(q.q - 1) * 3 + 1}~{q.q * 3}월</span></td>
-                    <td className="text-right tabular-nums px-2">{okS ? won(q.sales.supply) : <span className="text-gray-300">-</span>}</td>
-                    <td className={'text-right tabular-nums px-2 ' + (okS && sq && Math.abs(q.sales.supply - sq.salesCash.supply) > 1000 ? 'text-[#b3261e] font-bold' : 'text-gray-500')}>{sq ? won(sq.salesCash.supply) : '-'}</td>
-                    <td className="text-right tabular-nums px-2">{okB ? won(q.buy.supply) : <span className="text-gray-300">-</span>}</td>
-                    <td className={'text-right tabular-nums px-2 ' + (okB && sq && Math.abs(q.buy.supply - sq.buyCash.supply) > 1000 ? 'text-[#b3261e] font-bold' : 'text-gray-500')}>{sq ? won(sq.buyCash.supply) : '-'}</td>
-                  </tr>
-                )
-              })}</tbody>
-            </table>
-          </div>
-
           {/* 반기 대조 + 카드 */}
           <p className="text-[14px] font-black text-[#0b2140] mt-4 mb-1">반기별 신고 매출과 카드 매출 <span className="text-[12px] text-gray-400 font-bold">카드 = 신고 과세표준 − 세금계산서·현금영수증 매출</span></p>
           <div className="overflow-x-auto">
             <table className="w-full text-[13px]">
-              <thead><tr className="text-gray-400 text-[12px]"><th className="text-left font-semibold py-1">반기</th><th className="text-right font-semibold px-2">신고 과세표준</th><th className="text-right font-semibold px-2">계산서+현금영수증</th><th className="text-right font-semibold px-2">카드·기타(계산)</th><th className="text-right font-semibold px-2">엑셀 카드</th></tr></thead>
+              <thead><tr className="text-gray-400 text-[12px]"><th className="text-left font-semibold py-1">반기</th><th className="text-right font-semibold px-2">신고 과세표준</th><th className="text-right font-semibold px-2">계산서+현금영수증</th><th className="text-right font-semibold px-2">카드·기타(계산)</th></tr></thead>
               <tbody>{halfRows.map(r => (
                 <tr key={r.h} className="border-t border-gray-100">
                   <td className="py-1.5 font-bold text-[#0b2140]">{r.h === 1 ? '1기 (1~6월)' : '2기 (7~12월)'}</td>
                   <td className="text-right tabular-nums px-2">{r.cert ? won(r.cert.total) : <span className="text-gray-300">신고 전</span>}</td>
                   <td className="text-right tabular-nums px-2">{r.have ? won(r.cashSupply) : <span className="text-gray-300">-</span>}</td>
                   <td className="text-right tabular-nums px-2 font-bold">{r.card != null ? won(r.card) : <span className="text-gray-300 font-normal">-</span>}</td>
-                  <td className="text-right tabular-nums px-2 text-gray-500">{r.sheetCard != null ? won(r.sheetCard) : '-'}</td>
                 </tr>
               ))}</tbody>
             </table>
           </div>
-          <p className="text-[12px] text-gray-500 mt-2">카드 매출은 홈택스 간편인증으로 조회할 수 없어 <b>엑셀 표에 총액을 직접 입력</b>합니다(부가세는 자동으로 뺍니다). 위 "카드·기타(계산)"는 신고가 끝난 반기의 참고 값입니다.</p>
+          <p className="text-[12px] text-gray-500 mt-2">신용카드 매출은 아직 자동으로 읽지 못해, 위 "카드·기타(계산)"는 신고가 끝난 반기의 참고 값입니다. 카드 매출은 세금 계산 탭의 <b>카드 매출 직접 입력</b> 칸에 달별 총액을 적으세요.</p>
 
-          <div className="flex flex-wrap items-center gap-3 mt-3">
-            <button onClick={apply} className="px-5 py-2 rounded-full text-[13.5px] font-bold text-white bg-[#0b2140]">홈택스 값으로 엑셀 표 채우기</button>
-            {applyMsg && <span className="text-[13px] font-semibold text-emerald-700">{applyMsg}</span>}
-          </div>
         </div>
       )}
     </div>

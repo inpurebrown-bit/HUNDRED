@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { CODEF_PATHS, asArray, codefConfigured, codefPost, simpleAuthBase, type CodefProfile, type CodefResult } from '@/lib/codef'
 import { DEFAULT_TAX_2026, type TaxData } from '@/lib/taxCalc'
+import { readHometax, hometaxPartKey } from '@/lib/hometaxStore'
 import { aggregateCash, aggregateTaxInvoice, type HometaxData } from '@/lib/hometaxData'
 
 // 홈택스(CODEF) 불러오기 — 대표 전용.
@@ -31,21 +32,9 @@ async function readSetting(key: string) {
 }
 const envName = () => (process.env.CODEF_ENV === 'prod' ? 'prod' : process.env.CODEF_ENV === 'sandbox' ? 'sandbox' : 'demo')
 
-// 항목별로 따로 저장해 두고(동시에 끝나도 서로 덮어쓰지 않게) 조회할 때 합친다
-const partKey = (k: Kind) => `hometax_${k}`
-async function readMerged(): Promise<HometaxData> {
-  const parts = await Promise.all([...KINDS.map(k => readSetting(partKey(k))), readSetting('hometax_data')])
-  const out: HometaxData = { fetched: {}, ranges: {} }
-  for (const p of parts as (HometaxData | null)[]) {
-    if (!p) continue
-    Object.assign(out, { ...p, fetched: { ...out.fetched, ...(p.fetched || {}) }, ranges: { ...out.ranges, ...(p.ranges || {}) } })
-  }
-  return out
-}
-
 export async function GET() {
   const deny = await ceoOnly(); if (deny) return deny
-  const [profile, data] = await Promise.all([readSetting('codef_profile'), readMerged()])
+  const [profile, data] = await Promise.all([readSetting('codef_profile'), readHometax()])
   return NextResponse.json({ configured: codefConfigured(), env: envName(), profile, data })
 }
 
@@ -192,5 +181,5 @@ async function finish(kind: Kind, data: any, range: { start: string; end: string
     }
     if (changed) await supabaseAdmin.from('settings').upsert({ key: 'tax_calc', value: { ...t, reported, source: '홈택스', syncedAt: new Date().toISOString() } }, { onConflict: 'key' })
   }
-  await supabaseAdmin.from('settings').upsert({ key: partKey(kind), value: part }, { onConflict: 'key' })
+  await supabaseAdmin.from('settings').upsert({ key: hometaxPartKey(kind), value: part }, { onConflict: 'key' })
 }

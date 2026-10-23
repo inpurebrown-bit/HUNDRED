@@ -110,12 +110,12 @@ function TrendChart({ months, selected, currentYm, onSelect }: { months: MonthPn
 }
 
 // ── 돈의 흐름 (매출 → 순이익 → 실수령) ──
-function Flow({ m }: { m: MonthPnl }) {
+function Flow({ m, taxLabel, taxNote }: { m: MonthPnl; taxLabel: string; taxNote: string }) {
   const rev = Math.max(1, m.totalRev)
   type Row = { label: string; v: number; kind: 'total' | 'minus'; color: string; note?: string }
   const rows: Row[] = [
     { label: '매출', v: m.totalRev, kind: 'total', color: NAVY, note: `영업 ${man(m.salesRev)} + 관리 ${man(m.opsRev)}` },
-    { label: '세금 적립 (매출의 10%)', v: m.tax, kind: 'minus', color: '#d97706', note: '종소세·부가세 대비 보유 권장액' },
+    { label: taxLabel, v: m.tax, kind: 'minus', color: '#d97706', note: taxNote },
     { label: '영업팀 인건비', v: m.labor.sales, kind: 'minus', color: '#3b5b9a' },
     { label: '관리팀 인건비', v: m.labor.ops, kind: 'minus', color: '#7a6a3a' },
     { label: '발굴팀 인건비', v: m.labor.dig, kind: 'minus', color: '#6b7a99' },
@@ -201,7 +201,7 @@ function TeamCard({ title, color, t, push, unit }: { title: string; color: strin
 }
 
 export default function RevenueAnalytics({ data }: { data: any }) {
-  const [months, setMonths] = useState<MonthPnl[]>([])
+  const [rawMonths, setMonths] = useState<MonthPnl[]>([])
   const [currentYm, setCurrentYm] = useState('')
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
@@ -221,6 +221,17 @@ export default function RevenueAnalytics({ data }: { data: any }) {
   }, [])
   const saveTarget = (v: number) => { setTarget(v); try { localStorage.setItem('hc_target_profit', String(v)) } catch { /* 저장 불가 */ } }
 
+  // 세금 적립: 세금계산 탭(홈택스 기준)의 올해 세금 ÷ 올해 매출 공급가 비율을 매달 매출에 적용한다 (없으면 기존 매출의 10%)
+  const taxRate = useMemo(() => {
+    const t = tax?.summary
+    const base = t?.year?.sales?.supply
+    if (!(base > 0)) return null
+    return (t.incomeTaxGross + Math.max(0, t.h1.vatDue) + Math.max(0, t.h2.vatDue)) / base
+  }, [tax])
+  const months = useMemo(() => (taxRate == null ? rawMonths : rawMonths.map(m => {
+    const t = Math.round(m.totalRev * taxRate), net = m.net + m.tax - t
+    return { ...m, tax: t, net, takeHome: m.takeHome + m.tax - t, margin: m.totalRev > 0 ? net / m.totalRev : null }
+  })), [rawMonths, taxRate])
   const a = useMemo(() => analyze(months, currentYm), [months, currentYm])
 
   if (loading) return <div className="text-center py-16 text-gray-400 text-sm">불러오는 중...</div>
@@ -311,7 +322,7 @@ export default function RevenueAnalytics({ data }: { data: any }) {
           {months.slice().reverse().map(m => (
             <button key={m.ym} onClick={() => setSelected(m.ym)}
               className={`px-3.5 py-1.5 rounded-full text-[12.5px] font-bold border transition-all ${m.ym === sel.ym ? 'bg-[#C5A258] text-[#0b1220] border-[#C5A258]' : 'bg-white/5 text-white/70 border-white/15 hover:bg-white/10'}`}>
-              {monthLabel(m.ym)}{m.ym === currentYm ? ' (진행중)' : m.quality === 'partial' ? ' *' : ''}
+              {monthLabel(m.ym)}{m.ym === currentYm ? ' (진행중)' : m.quality === 'partial' ? ' *' : ''} <span className="opacity-70 font-semibold">{pct(m.margin, 0)}</span>
             </button>
           ))}
         </div>
@@ -327,6 +338,11 @@ export default function RevenueAnalytics({ data }: { data: any }) {
               </div>
             )
           })}
+        </div>
+        <div className="mt-3 rounded-2xl bg-white/[.10] border border-white/20 px-4 py-3.5 flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
+          <p className="text-[13px] text-white/75 font-semibold">{monthLabel(sel.ym)} 마진율 <span className="text-white/50 font-normal">· 매출 100원 중 남는 돈</span></p>
+          <p className="text-[28px] leading-tight font-black tabular-nums" style={{ color: (sel.margin ?? 0) >= 0 ? '#7ee0b5' : '#ff9b9b' }}>{pct(sel.margin, 1)}{sel.margin != null && prev?.margin != null && <span className="ml-2 text-[13px] font-bold text-white/60">지난달 {pct(prev.margin, 1)} 대비 {(sel.margin - prev.margin) >= 0 ? '▲' : '▼'}{Math.abs((sel.margin - prev.margin) * 100).toFixed(1)}%p</span>}</p>
+          {cur && cur.ym !== sel.ym && <p className="w-full text-[12.5px] text-white/60">이번 달({monthLabel(cur.ym)}, 진행중) 지금까지 마진율 <b className="text-white">{pct(cur.margin, 1)}</b></p>}
         </div>
         {(sel.ym === currentYm || sel.quality === 'partial') && (
           <p className="text-[12px] text-white/50 mt-3">{sel.ym === currentYm ? '이번 달은 아직 진행 중이라 급여·비용이 덜 들어와 있어요.' : `이 달은 ${sel.partialReason}`}</p>
@@ -403,7 +419,7 @@ export default function RevenueAnalytics({ data }: { data: any }) {
         <div className="px-5 pb-6 space-y-8">
           <div>
             <p className="text-[14px] font-black text-[#0b2140] mb-3">{monthLabel(sel.ym)} 돈이 어디로 나갔나</p>
-            <Flow m={sel} />
+            <Flow m={sel} taxLabel={taxRate == null ? '세금 적립 (매출의 10%)' : `세금 적립 (매출의 ${(taxRate * 100).toFixed(1)}%)`} taxNote={taxRate == null ? '종소세·부가세 대비 보유 권장액' : '세금계산 탭 기준 종소세+부가세'} />
           </div>
 
           <div>
@@ -499,7 +515,7 @@ export default function RevenueAnalytics({ data }: { data: any }) {
               <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
                 <p className="text-[12.5px] font-bold text-gray-600">{monthLabel(sel.ym)} 세금 적립</p>
                 <p className="text-2xl font-black text-[#0b2140] tabular-nums mt-1">{man(sel.tax)}</p>
-                <p className="text-[12px] text-gray-500 mt-1">매출의 10% · 남은 돈 계산에 이미 뺐어요</p>
+                <p className="text-[12px] text-gray-500 mt-1">{taxRate == null ? '매출의 10%' : `세금계산 탭 기준 매출의 ${(taxRate * 100).toFixed(1)}%`} · 남은 돈 계산에 이미 뺐어요</p>
               </div>
             </div>
           </div>

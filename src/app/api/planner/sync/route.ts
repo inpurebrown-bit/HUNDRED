@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { buildSalesContractMap, calcRefundDeductions, calcSalesStructure, getPromo } from '@/lib/payrollCalc'
 import { GET as revenueGET } from '@/app/api/revenue/route'
+import { readHometax } from '@/lib/hometaxStore'
 import { DEFAULT_TAX_2026, computeTax, type TaxData } from '@/lib/taxCalc'
 
 // 대표 플래너가 쓰는 CRM 실적 묶음 (단위: 원 → 화면에서 만원으로 변환)
@@ -94,7 +95,7 @@ export async function GET(req: NextRequest) {
   try {
     const { data: trow } = await supabaseAdmin.from('settings').select('value').eq('key', 'tax_calc').single()
     const td = ((trow?.value as TaxData) && Array.isArray((trow?.value as any).quarters) ? trow?.value : DEFAULT_TAX_2026) as TaxData
-    const ts = computeTax(td)
+    const ts = computeTax(td, undefined, await readHometax())
     tax = { asOf: td.asOf, incomeTax: ts.incomeTax, vat: ts.vat, parking: ts.parking, actual: ts.actual, h1Due: ts.h1Info.settled ? 0 : Math.max(0, ts.h1Info.net), h2Due: ts.h2Settled ? 0 : Math.max(0, ts.h2Net) }
   } catch { /* 세금 요약 실패해도 나머지는 반환 */ }
 
