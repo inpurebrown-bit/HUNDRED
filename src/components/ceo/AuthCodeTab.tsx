@@ -23,7 +23,7 @@ export default function AuthCodeTab() {
 
   useEffect(() => {
     load()
-    const t = setInterval(() => { load(); setNow(Date.now()) }, 15000)
+    const t = setInterval(() => { if (document.hidden) return; load(); setNow(Date.now()) }, 30_000)
     return () => clearInterval(t)
   }, [load])
 

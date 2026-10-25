@@ -548,14 +548,17 @@ function PayRateSubView() {
       } catch {}
     }
     load()
-    const timer = setInterval(load, 30000)
-    function onVisible() { if (document.visibilityState === 'visible') load() }
+    // 자동 새로고침: 2분마다, 탭이 숨겨져 있으면 쉬고, 창 전환 때도 마지막 조회 후 1분이 안 지났으면 건너뛴다 (조회가 무거워 데이터 전송량이 커진다)
+    let lastAt = Date.now()
+    const refresh = () => { if (document.hidden || Date.now() - lastAt < 60_000) return; lastAt = Date.now(); load() }
+    const timer = setInterval(refresh, 120_000)
+    const onVisible = refresh
     document.addEventListener('visibilitychange', onVisible)
-    window.addEventListener('focus', load)
+    window.addEventListener('focus', refresh)
     return () => {
       clearInterval(timer)
       document.removeEventListener('visibilitychange', onVisible)
-      window.removeEventListener('focus', load)
+      window.removeEventListener('focus', refresh)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

@@ -291,7 +291,7 @@ export default function CeoDashboard() {
     const f = () => fetch('/api/auth-help', { cache: 'no-store' }).then(r => r.json())
       .then(j => setAuthCodeCount((j.items || []).filter((i: any) => !i.used && !i.expired && i.tries < 5).length)).catch(() => {})
     f()
-    const t = setInterval(f, 30000)
+    const t = setInterval(() => { if (!document.hidden) f() }, 120_000)
     return () => clearInterval(t)
   }, [])
 
