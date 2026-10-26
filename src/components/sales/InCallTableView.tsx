@@ -1656,7 +1656,7 @@ function CustomerCard({
           {/* 배경 오버레이 */}
           <div className="fixed inset-0 bg-black/40 z-[199]" onClick={() => onExpand(null)} />
           {/* 우측 슬라이딩 패널 */}
-          <div ref={expandedRef} className="fixed top-0 right-0 bottom-0 w-full md:w-[620px] bg-[#FAFAF8] z-[200] flex flex-col overflow-y-auto md:overflow-hidden shadow-2xl">
+          <div ref={expandedRef} className="fixed top-0 right-0 bottom-0 w-full md:w-[34vw] md:min-w-[620px] md:max-w-[960px] bg-[#FAFAF8] z-[200] flex flex-col overflow-y-auto md:overflow-hidden shadow-2xl">
 
           {/* 상단 액션 바 */}
           <div className="sticky md:static top-0 shrink-0 flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b border-gray-100 bg-white z-10">
