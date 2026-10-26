@@ -1656,7 +1656,7 @@ function CustomerCard({
           {/* 배경 오버레이 */}
           <div className="fixed inset-0 bg-black/40 z-[199]" onClick={() => onExpand(null)} />
           {/* 우측 슬라이딩 패널 */}
-          <div ref={expandedRef} className="fixed top-0 right-0 bottom-0 w-full md:w-[560px] bg-[#FAFAF8] z-[200] flex flex-col overflow-y-auto md:overflow-hidden shadow-2xl">
+          <div ref={expandedRef} className="fixed top-0 right-0 bottom-0 w-full md:w-[620px] bg-[#FAFAF8] z-[200] flex flex-col overflow-y-auto md:overflow-hidden shadow-2xl">
 
           {/* 상단 액션 바 */}
           <div className="sticky md:static top-0 shrink-0 flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b border-gray-100 bg-white z-10">
@@ -1772,7 +1772,7 @@ function CustomerCard({
           </div>
 
           {/* 좌/우 2단 패널 */}
-          <div className={`grid grid-cols-1 md:grid-cols-2 md:grid-rows-1 md:flex-1 md:min-h-0 gap-0 divide-y md:divide-y-0 md:divide-x divide-gray-200 transition-opacity duration-300 ${!leadType && !isTransferred ? 'opacity-40 pointer-events-none select-none' : ''}`}>
+          <div className={`grid grid-cols-1 md:grid-cols-2 md:grid-rows-1 md:flex-1 md:min-h-0 [&>*]:min-w-0 gap-0 divide-y md:divide-y-0 md:divide-x divide-gray-200 transition-opacity duration-300 ${!leadType && !isTransferred ? 'opacity-40 pointer-events-none select-none' : ''}`}>
 
             {/* ── 좌측: 인콜일지 ── */}
             <div className="p-4 flex flex-col md:h-full md:min-h-0">
@@ -2138,13 +2138,13 @@ function CustomerCard({
                         type="date"
                         value={c.details?.follow_up_date || ''}
                         onChange={e => onUpdate(c.id, { details: { follow_up_date: e.target.value } })}
-                        className="flex-1 border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50 text-gray-800"
+                        className="flex-1 min-w-0 border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50 text-gray-800"
                       />
                       <input
                         type="time"
                         value={c.details?.follow_up_time || ''}
                         onChange={e => onUpdate(c.id, { details: { follow_up_time: e.target.value } })}
-                        className="w-28 border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50 text-gray-800"
+                        className="w-24 shrink-0 border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50 text-gray-800"
                       />
                     </div>
                     <p className="text-[9px] text-gray-400 mt-1.5 leading-snug">🔔 날짜와 시간을 모두 입력하면 설정한 시각 5분 전에 알림이 옵니다.</p>
@@ -2158,13 +2158,13 @@ function CustomerCard({
                         type="date"
                         value={c.details?.meeting_date || ''}
                         onChange={e => onUpdate(c.id, { details: { meeting_date: e.target.value } })}
-                        className="flex-1 border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400/50 text-gray-800"
+                        className="flex-1 min-w-0 border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400/50 text-gray-800"
                       />
                       <input
                         type="time"
                         value={c.details?.meeting_time || ''}
                         onChange={e => onUpdate(c.id, { details: { meeting_time: e.target.value } })}
-                        className="w-28 border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400/50 text-gray-800"
+                        className="w-24 shrink-0 border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400/50 text-gray-800"
                       />
                     </div>
                     <input
@@ -2243,7 +2243,7 @@ function CustomerCard({
                         onChange={e => { setTlText(e.target.value); setTlError('') }}
                         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTimelineEntry() } }}
                         placeholder="기록 입력 후 Enter…"
-                        className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50"
+                        className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50"
                         disabled={tlSaving}
                       />
                       <button
