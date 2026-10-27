@@ -256,7 +256,18 @@ async function prepare(inp: ContractInput, forPdf = false) {
     }
   }
 
-  // 5) 개인정보 동의서: 정보주체 성명 (이름 칸은 비워 둔다 — 본인이 작성)
+  // 5) 개인정보 동의서: 날짜(계약일)와 정보주체(대표자) 성명
+  {
+    const d2 = inp.contractDate ? new Date(inp.contractDate + 'T00:00:00') : new Date(Date.now() + 9 * 3600 * 1000)
+    s2 = s2.replace(/<hp:tbl [^>]*colCnt="6"[\s\S]*?<\/hp:tbl>/, tbl => {
+      if (!tbl.includes('<hp:t>2026</hp:t>')) return tbl
+      let x = mapCell(tbl, 0, 0, tc => cellText(tc, String(d2.getFullYear())))
+      x = mapCell(x, 0, 2, tc => cellText(tc, String(d2.getMonth() + 1)))
+      return mapCell(x, 0, 4, tc => cellText(tc, String(d2.getDate())))
+    })
+    const who = (inp.client.ceo || '').trim()
+    if (who) s2 = s2.replace(/<hp:tbl [^>]*colCnt="3"[\s\S]*?<\/hp:tbl>/, tbl => (tbl.includes('정보주체') ? mapCell(tbl, 0, 1, tc => cellText(tc, who.split('').join(' '))) : tbl))
+  }
 
   // 6) 용지: 하단 파도 무늬를 피하도록 아래 여백을 늘린다
   const margin = (x: string) => x.replace(/(<hp:margin [^>]*?)bottom="4252"/g, '$1bottom="7600"')

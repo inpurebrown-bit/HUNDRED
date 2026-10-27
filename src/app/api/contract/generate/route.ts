@@ -22,6 +22,18 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null) as Body | null
   if (!body?.client?.company?.trim()) return NextResponse.json({ error: '업체명을 입력해 주세요' }, { status: 400 })
   if (body.type !== 'fee' && body.type !== 'nofee') return NextResponse.json({ error: '계약 유형을 선택해 주세요' }, { status: 400 })
+  // 계약서에 들어가는 값은 모두 있어야 만든다
+  const c = body.client
+  const digits = (v?: string) => (v || '').replace(/[^0-9]/g, '')
+  const lacking: string[] = []
+  if (!c.ceo?.trim()) lacking.push('대표자명')
+  if (digits(c.bizNo).length !== 10) lacking.push('사업자등록번호')
+  if (!c.address?.trim()) lacking.push('사업장 주소')
+  if (!c.managerName?.trim()) lacking.push('우리 담당자')
+  if (digits(c.managerPhone).length < 9) lacking.push('담당자 연락처')
+  if (!body.contractDate) lacking.push('계약일')
+  if (body.type === 'fee' && !String(body.feePercent || '').trim()) lacking.push('성과 수수료율')
+  if (lacking.length) return NextResponse.json({ error: '입력이 안 된 항목이 있습니다: ' + lacking.join(', ') }, { status: 400 })
   const format = body.format === 'hwpx' && user.role === 'ceo' ? 'hwpx' : 'pdf'   // 한글 파일은 대표만
 
   const { data: sv } = await supabaseAdmin.from('settings').select('value').eq('key', 'contract_settings').single()
