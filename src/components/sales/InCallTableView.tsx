@@ -475,13 +475,15 @@ interface ContractModalProps {
   cumulativeBase: number
   initialMemo?: string     // 통화내용/메모 미러링용 초기값
   initialNoRefund?: boolean
+  heading?: string         // 관리팀(뿌토) 계약에서 재사용할 때 제목·버튼 문구를 바꾼다
+  submitLabel?: string
   onClose: () => void
   onConfirm: (data: Record<string, any>) => Promise<void>
 }
 
 const INP = 'w-full border-[1.5px] border-[#e4e7ee] rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-[#b8995a] focus:ring-4 focus:ring-[#b8995a]/15 transition-all'
 
-function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRefund = false, onClose, onConfirm }: ContractModalProps) {
+export function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRefund = false, heading, submitLabel, onClose, onConfirm }: ContractModalProps) {
   const [contractFee, setContractFee] = useState('')
   const [paidAmount,  setPaidAmount]  = useState('')
   const [vatIncluded, setVatIncluded] = useState(false)
@@ -556,7 +558,7 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
         <div className="px-6 py-5 flex items-center justify-between bg-gradient-to-br from-[#0e2446] to-[#0a1b36] rounded-t-3xl sticky top-0 z-10">
           <div>
             <p className="text-[10px] tracking-[0.25em] text-[#C5A258] font-semibold mb-1">CONTRACT</p>
-            <h2 className="font-bold text-white text-base">계약완료 · 자금팀 전송</h2>
+            <h2 className="font-bold text-white text-base">{heading || '계약완료 · 자금팀 전송'}</h2>
             <p className="text-[11px] text-white/60 mt-0.5">{company}</p>
           </div>
           <button onClick={onClose} className="text-white/60 hover:text-white text-lg leading-none">✕</button>
@@ -737,7 +739,7 @@ function ContractModal({ company, cumulativeBase, initialMemo = '', initialNoRef
           </button>
           <button onClick={handleConfirm} disabled={saving}
             className="flex-[1.6] bg-gradient-to-r from-[#0b2140] to-[#4a5a9a] hover:-translate-y-0.5 disabled:opacity-60 text-white py-3 rounded-xl text-sm font-bold transition-all shadow-[0_10px_22px_-10px_rgba(11,33,64,.7)]">
-            {saving ? '전송중...' : '입력 완료 · 자금팀으로 보내기'}
+            {saving ? '처리중...' : (submitLabel || '입력 완료 · 자금팀으로 보내기')}
           </button>
         </div>
       </div>

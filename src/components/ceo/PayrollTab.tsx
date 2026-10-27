@@ -1188,7 +1188,7 @@ export default function PayrollTab() {
       </div>
 
       {/* ── 핵심 요약 ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <div className="rounded-3xl p-5 bg-white border border-gray-100 shadow-sm">
           <p className="text-[14px] text-gray-500 font-semibold">총 매출</p>
           <p className="text-[28px] leading-tight font-black text-[#0b2140] tabular-nums mt-1">{totalRevenue > 0 ? fmtM2(totalRevenue) : '—'}</p>
@@ -1198,6 +1198,11 @@ export default function PayrollTab() {
           <p className="text-[14px] text-gray-500 font-semibold">총 비용 <span className="font-normal text-gray-400">(세금적립·인건비·운영비)</span></p>
           <p className="text-[28px] leading-tight font-black text-red-500 tabular-nums mt-1">{totalRevenue > 0 ? fmtM2(tax + laborCost + otherTotal) : '—'}</p>
           <p className="text-[12.5px] text-gray-400 tabular-nums">{totalRevenue > 0 ? (tax + laborCost + otherTotal).toLocaleString('ko-KR') + '원' : ''}</p>
+        </div>
+        <div className="rounded-3xl p-5 bg-white border border-gray-100 shadow-sm">
+          <p className="text-[14px] text-gray-500 font-semibold">직원 인건비 <span className="font-normal text-gray-400">(총)</span></p>
+          <p className="text-[28px] leading-tight font-black text-orange-600 tabular-nums mt-1">{laborCost > 0 ? fmtM2(laborCost) : '—'}</p>
+          <p className="text-[12.5px] text-gray-400 tabular-nums">{laborCost > 0 ? laborCost.toLocaleString('ko-KR') + '원' + (totalRevenue > 0 ? ` · 매출의 ${((laborCost / totalRevenue) * 100).toFixed(1)}%` : '') : ''}</p>
         </div>
         <div className={`rounded-3xl p-5 border shadow-sm ${netProfit >= 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
           <p className={`text-[14px] font-semibold ${netProfit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>순이익</p>

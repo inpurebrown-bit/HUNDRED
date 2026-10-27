@@ -11,6 +11,7 @@ import SplitView from '@/components/shared/SplitView'
 import { contractWeight } from '@/lib/supplyRules'
 import { printIncall, buildCustomerSections } from '@/lib/printIncall'
 import ConsultingReportTab from './ConsultingReportTab'
+import { ContractModal } from '@/components/sales/InCallTableView'
 // ── KST Utils ──────────────────────────────────────────────────────────
 function nowKST() {
   return new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(' ', 'T') + '+09:00'
@@ -3287,6 +3288,8 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
   onAdded?: () => void
 }) {
   const [contractingCase, setContractingCase] = useState<OpsCase | null>(null)
+  // 2단계: 영업팀과 같은 계약 입력(계약금·입금·수수료율·결제방식·세금계산서 등)
+  const [contractStep2, setContractStep2] = useState(false)
   const [form, setForm] = useState({ institution: '', contract_amount: '', stage: '서류받는중', memo: '', manager: '' })
   const [saving, setSaving] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
@@ -3374,11 +3377,28 @@ ${err.error || caseRes.status}
     setForm({ institution: c.institution || '', contract_amount: '', stage: '서류받는중', memo: '', manager: userName })
   }
 
+  // 1단계(기관·단계·담당자) 확인 후 2단계(계약 정보 입력)로 넘어간다
   function handleContract() {
+    if (!contractingCase) return
+    setContractStep2(true)
+  }
+
+  // 2단계 완료: 영업팀이 계약을 넘길 때와 똑같은 항목으로 관리팀 케이스에 저장한다
+  async function finishContract(data: Record<string, any>) {
     if (!contractingCase) return
     setSaving(true)
     const managerName = form.manager || userName
+    const company = contractingCase.customers?.details?.company || (contractingCase as any).customer_name || ''
+    const isMonthly = data.contract_type === '월정기권'
+    const sci = {
+      ...((contractingCase.details as any)?.sales_customer_info || {}),
+      company, representative: contractingCase.customers?.name || '', phone: contractingCase.customers?.phone || (contractingCase as any).phone || '',
+      sales_user_name: managerName,
+      contract_fee: data.contract_fee, commission_rate: data.commission_rate, payment_amount: data.payment_amount,
+      unpaid_amount: data.unpaid_amount, tax_invoice: data.tax_invoice, no_refund: data.no_refund, vat_included: data.vat_included,
+    }
     const patch: Record<string, any> = {
+      ...(parseInt(String(data.my_revenue || '0').replace(/[^0-9]/g, ''), 10) ? { revenue: parseInt(String(data.my_revenue).replace(/[^0-9]/g, ''), 10) } : {}),
       progress_stage: form.stage,
       institution: form.institution || contractingCase.institution,
       ops_user_name: managerName,
@@ -3388,6 +3408,22 @@ ${err.error || caseRes.status}
         puto_contract_date: nowKST().slice(0, 10),
         puto_contract_memo: form.memo,
         ops_user_name: managerName,
+        // ── 영업팀 계약 전달과 같은 항목 ──
+        contract_type: data.contract_type || '일반',
+        ...(isMonthly ? { monthly_fee: 100000, monthly_months: 12, monthly_total: 1200000 } : {}),
+        tax_invoice: data.tax_invoice === '발급' ? '희망' : data.tax_invoice === '미발급' ? '미희망' : undefined,
+        has_cash: data.payment_method === '현금',
+        has_card: data.payment_method === '카드',
+        ...(data.payment_method === '카드' ? { tax_invoice_completed: true } : {}),
+        contract_date: data.contract_date || nowKST().slice(0, 10),
+        contract_amount_vat: data.contract_fee,
+        deposit_amount_vat: data.payment_amount,
+        unpaid_amount: data.unpaid_amount,
+        commission_rate: data.commission_rate,
+        vat_included: data.vat_included,
+        no_refund: data.no_refund,
+        handover_memo: data.result_memo || form.memo,
+        sales_customer_info: sci,
       },
       timeline: [
         ...(contractingCase.timeline || []),
@@ -3400,6 +3436,7 @@ ${err.error || caseRes.status}
     }
     onSave(contractingCase.id, patch)
     setSaving(false)
+    setContractStep2(false)
     setContractingCase(null)
   }
 
@@ -3407,7 +3444,18 @@ ${err.error || caseRes.status}
     <div className="space-y-4">
 
       {/* 계약 모달 */}
-      {contractingCase && (
+      {contractingCase && contractStep2 && (
+        <ContractModal
+          company={contractingCase.customers?.details?.company || (contractingCase as any).customer_name || ''}
+          cumulativeBase={0}
+          initialMemo={form.memo}
+          heading="뿌토DB 계약 정보"
+          submitLabel="입력 완료 · 진행중으로 보내기"
+          onClose={() => setContractStep2(false)}
+          onConfirm={finishContract}
+        />
+      )}
+      {contractingCase && !contractStep2 && (
         <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4"
           onClick={e => { if (e.target === e.currentTarget) setContractingCase(null) }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
@@ -3520,7 +3568,7 @@ ${err.error || caseRes.status}
               </button>
               <button onClick={handleContract} disabled={saving || !form.institution}
                 className="flex-1 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
-                {saving ? '처리중...' : '계약 시작 → 진행중'}
+                {saving ? '처리중...' : '다음 · 계약 정보 입력'}
               </button>
             </div>
           </div>
@@ -3773,7 +3821,7 @@ ${err.error || caseRes.status}
             const revenueLatest = d.revenue_2025 || d.revenue_2024 || ''
             const { date } = formatKST(c.created_at || '')
             const isSelected = openId === c.id
-            const isSelfAdded = c.details?.ops_user_name === userName && !c.details?.sales_customer_info
+            const isSelfAdded = c.details?.ops_user_name === userName && (!c.details?.sales_customer_info || !!c.details?.puto_contract_date)
             const isMonthly = c.details?.contract_type === '월정기권'
 
             return (

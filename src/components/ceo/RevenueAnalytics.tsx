@@ -216,7 +216,9 @@ export default function RevenueAnalytics({ data }: { data: any }) {
       if (d.error) { setErr(d.error); return }
       setMonths(d.months || []); setCurrentYm(d.currentMonth || '')
       const done = (d.months || []).filter((m: MonthPnl) => m.quality === 'ok' && m.ym !== d.currentMonth)
-      setSelected((done[done.length - 1] || (d.months || [])[(d.months || []).length - 1] || {}).ym || '')
+      // 기본 선택은 이번 달 (진행 중인 달). 이번 달 기록이 없으면 가장 최근 완료된 달
+      const hasCur = (d.months || []).some((m: MonthPnl) => m.ym === d.currentMonth)
+      setSelected(hasCur ? d.currentMonth : (done[done.length - 1] || (d.months || [])[(d.months || []).length - 1] || {}).ym || '')
     }).catch(() => setErr('데이터를 불러오지 못했습니다.')).finally(() => setLoading(false))
   }, [])
   const saveTarget = (v: number) => { setTarget(v); try { localStorage.setItem('hc_target_profit', String(v)) } catch { /* 저장 불가 */ } }

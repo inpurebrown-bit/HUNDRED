@@ -40,7 +40,13 @@ function normalize(c: any, customerMap: Record<string, any> = {}, customerIdMap:
     return ''
   }
 
+  // 관리팀이 직접 추가한(뿌토) DB는 인콜일지 항목이 ops_case.details에 그대로 저장돼 있다 — 고객 테이블 행이 없어도 보이도록 가장 낮은 우선순위로 깔아 둔다
+  const FLAT_KEYS = ['company','name','phone','region','reception_date','business_type','real_work','years_in_business','employee_count','patent','revenue_2026','revenue_2025','revenue_2024','revenue_2023','loan_kibo','loan_shinbo','loan_jaedan','loan_jinjong','loan_sojin','loan_other','loan_total','credit_kcb','credit_nice','tax_status','assets','required_funds','solution','memo','innovation','call_result','closing_result']
+  const flat: Record<string, any> = {}
+  for (const k of FLAT_KEYS) { const v = c.details?.[k]; if (v !== undefined && v !== null && String(v).trim() !== '') flat[k] = v }
+
   const mergedDetails: Record<string, any> = {
+    ...flat,
     ...(sci         || {}),
     ...custDetails,
     ...(ij          || {}),   // ij로 최종 덮어씌움 (관리팀 수정값 우선)
@@ -85,7 +91,7 @@ function normalize(c: any, customerMap: Record<string, any> = {}, customerIdMap:
   }
 
   // 대표자 이름: ij > customers 테이블 > sci > customer_name(업체명 가능성 있어 최후)
-  const representativeName = pick(ij?.representative, cust?.name, custDetails.representative, sci?.representative)
+  const representativeName = pick(ij?.representative, cust?.name, custDetails.representative, sci?.representative, flat.name)
 
   return {
     ...c,
