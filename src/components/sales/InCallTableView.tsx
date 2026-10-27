@@ -1,5 +1,6 @@
 'use client'
 import ActivityStamps, { type StampEntry } from '@/components/shared/ActivityStamps'
+import ContractWizard from '@/components/shared/ContractWizard'
 
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
@@ -843,6 +844,7 @@ function CustomerCard({
     }
   }
   const [contractModalOpen, setContractModalOpen] = useState(false)
+  const [contractDocOpen, setContractDocOpen] = useState(false)   // 계약서(한글) 만들기
   const [quickTransferOpen, setQuickTransferOpen] = useState(false)
   const [qtCheckedGroup, setQtCheckedGroup] = useState(false)
   const [qtCheckedCoop,  setQtCheckedCoop]  = useState(false)
@@ -1323,6 +1325,22 @@ function CustomerCard({
         </div>
       )}
 
+      {/* 계약서 만들기 */}
+      {contractDocOpen && (() => {
+        const d = (c.details || {}) as Record<string, any>
+        return (
+          <ContractWizard
+            onClose={() => setContractDocOpen(false)}
+            prefill={{
+              company: d.company || (c as any).company || c.name || '', ceo: c.name || '', address: d.address || d.region || '',
+              bizNo: d.business_reg_no || d.biz_reg_number || '', managerName: d.sales_user_name || userName,
+              type: d.contract_type === '월정기권' ? 'nofee' : (d.commission_rate ? 'fee' : undefined), feePercent: d.commission_rate || '',
+              customerId: c.id,
+            }}
+          />
+        )
+      })()}
+
       {/* 미팅일지 모달 */}
       {meetingJournalOpen && (
         <MeetingJournal
@@ -1747,6 +1765,14 @@ function CustomerCard({
               className="px-2.5 py-1 rounded text-[11px] font-semibold bg-[#C5A258] hover:bg-[#b8923f] text-white flex items-center gap-1"
             >
               미팅일지
+            </button>
+            {/* 계약서(한글 파일) 만들기 */}
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); setContractDocOpen(true) }}
+              className="px-2.5 py-1 rounded text-[11px] font-semibold bg-[#0b2140] hover:bg-[#143063] text-white flex items-center gap-1"
+            >
+              계약서
             </button>
             <button type="button" onClick={() => onExpand(null)}
               className="text-gray-400 hover:text-gray-600 text-sm font-bold px-1">✕</button>

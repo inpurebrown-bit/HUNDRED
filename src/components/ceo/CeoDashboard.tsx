@@ -1,6 +1,7 @@
 'use client'
 
 import DbHandoverTab from './DbHandoverTab'
+import ContractSettingsTab from './ContractSettingsTab'
 import { useState, useRef, useEffect, FormEvent, ReactNode, Fragment } from 'react'
 import { signOut, useSession } from 'next-auth/react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
@@ -97,7 +98,7 @@ function PlannerTab() {
 
 // 도구 통합 탭 — 코드 요청 · DB 쓰레기통 · AI 로그 (가끔 쓰는 관리 기능)
 function ToolsTab({ codeCount, delCount }: { codeCount: number; delCount: number }) {
-  const [sub, setSub] = useState<'authcode' | 'trash' | 'ailogs'>(codeCount > 0 ? 'authcode' : delCount > 0 ? 'trash' : 'authcode')
+  const [sub, setSub] = useState<'authcode' | 'trash' | 'ailogs' | 'contract'>(codeCount > 0 ? 'authcode' : delCount > 0 ? 'trash' : 'authcode')
   return (
     <div>
       <SubTabBar
@@ -105,12 +106,14 @@ function ToolsTab({ codeCount, delCount }: { codeCount: number; delCount: number
           { key: 'authcode' as const, label: codeCount > 0 ? `코드 요청 (${codeCount})` : '코드 요청' },
           { key: 'trash' as const, label: delCount > 0 ? `DB 쓰레기통 (${delCount})` : 'DB 쓰레기통' },
           { key: 'ailogs' as const, label: 'AI 로그' },
+          { key: 'contract' as const, label: '계약서 설정' },
         ]}
         active={sub} onChange={setSub}
       />
       {sub === 'authcode' && <AuthCodeTab />}
       {sub === 'trash' && <TrashOnlyTab />}
       {sub === 'ailogs' && <AiLogsTab />}
+      {sub === 'contract' && <ContractSettingsTab />}
     </div>
   )
 }

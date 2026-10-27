@@ -3,15 +3,25 @@
 import { useEffect, useState } from 'react'
 import { COMPANY } from '@/lib/companyInfo'
 
-// 홈페이지 첫 화면 안내 팝업 2개 — 각각 "1일 동안 보지 않기" 가능
+// 홈페이지 첫 화면 안내 팝업 2개 — 한 번에 닫기 / 하루 동안 보지 않기
+// 닫으면 그 브라우저를 닫을 때까지는 다시 뜨지 않는다 (들어올 때마다 뜨는 불편 방지)
 const DAY = 24 * 60 * 60 * 1000
 const KEYS = { scam: 'hc_notice_scam_until', broker: 'hc_notice_broker_until' }
+const SESSION_KEY = 'hc_notice_closed_session'
+// 소상공인시장진흥공단 안내문 원본 이미지 — public/images/ 에 이 이름으로 넣으면 그대로 보여준다
+const BROKER_IMAGE = '/images/semas-broker-notice.png'
 
 function hiddenNow(key: string): boolean {
   try { return Number(localStorage.getItem(key) || 0) > Date.now() } catch { return false }
 }
 function hideOneDay(key: string) {
   try { localStorage.setItem(key, String(Date.now() + DAY)) } catch { /* 저장 불가 시 이번만 닫힘 */ }
+}
+function closedThisSession(): boolean {
+  try { return sessionStorage.getItem(SESSION_KEY) === '1' } catch { return false }
+}
+function markClosedThisSession() {
+  try { sessionStorage.setItem(SESSION_KEY, '1') } catch { /* 저장 불가 */ }
 }
 
 const BROKER_TYPES: { no: string; tag: string; text: string; law: string }[] = [
@@ -27,9 +37,11 @@ export default function NoticePopups() {
   const [ready, setReady] = useState(false)
   const [openScam, setOpenScam] = useState(false)
   const [openBroker, setOpenBroker] = useState(false)
+  const [imgOk, setImgOk] = useState(true)   // 원본 이미지가 없으면 아래 문구판으로 대신 보여 준다
 
   // 저장된 "1일 보지 않기" 확인 후, 화면이 자리 잡은 뒤 부드럽게 표시
   useEffect(() => {
+    if (closedThisSession()) return
     const s = !hiddenNow(KEYS.scam)
     const b = !hiddenNow(KEYS.broker)
     if (!s && !b) return
@@ -39,16 +51,9 @@ export default function NoticePopups() {
 
   if (!(ready && (openScam || openBroker))) return null
 
-  const closeAll = () => { setOpenScam(false); setOpenBroker(false) }
-
-  const footer = (key: string, close: () => void) => (
-    <div className="grid grid-cols-2 border-t border-[#e4e7ee] text-[12.5px] shrink-0 bg-white">
-      <button type="button" onClick={() => { hideOneDay(key); close() }}
-        className="py-3 text-[#0b2140]/55 hover:bg-[#f4f5f8] transition-colors border-r border-[#e4e7ee]">1일 동안 보지 않기</button>
-      <button type="button" onClick={close}
-        className="py-3 font-bold text-[#0b2140] hover:bg-[#f4f5f8] transition-colors">닫기</button>
-    </div>
-  )
+  // 둘 다 한 번에 닫는다 (이번 접속 동안 다시 뜨지 않음)
+  const closeAll = () => { markClosedThisSession(); setOpenScam(false); setOpenBroker(false) }
+  const hideAllOneDay = () => { hideOneDay(KEYS.scam); hideOneDay(KEYS.broker); closeAll() }
 
   const header = (eyebrow: string, title: React.ReactNode, onClose: () => void, sub?: React.ReactNode) => (
     <div className="relative px-5 pt-5 pb-4 text-center bg-gradient-to-br from-[#10203a] to-[#0a1424] shrink-0">
@@ -61,9 +66,10 @@ export default function NoticePopups() {
   )
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center gap-3 p-4 bg-[#0b1220]/45 backdrop-blur-[3px]"
+    <div className="fixed inset-0 z-[80] flex flex-col items-center justify-center gap-3 p-4 bg-[#0b1220]/45 backdrop-blur-[3px]"
       style={{ animation: 'hcNoticeFade .5s ease both' }}
       onClick={e => { if (e.target === e.currentTarget) closeAll() }}>
+      <div className="flex items-stretch justify-center gap-3 w-full max-h-[78vh]">
       <style>{`
         @keyframes hcNoticeFade { from { opacity: 0 } to { opacity: 1 } }
         @keyframes hcNoticeRise { from { opacity: 0; transform: translateY(16px) scale(.98) } to { opacity: 1; transform: none } }
@@ -73,7 +79,7 @@ export default function NoticePopups() {
       {openScam && (
         <div className="w-full max-w-[320px] rounded-2xl overflow-hidden bg-white shadow-[0_30px_70px_-25px_rgba(11,18,32,.6)] flex flex-col max-h-[78vh]"
           style={{ animation: 'hcNoticeRise .7s cubic-bezier(.16,1,.3,1) both' }}>
-          {header('고객 보호 안내', <><span className="mr-1">📢</span>헌드레드컨설팅 <span className="text-[#E8D080]">사칭에 유의</span>하세요</>, () => setOpenScam(false))}
+          {header('고객 보호 안내', <><span className="mr-1">📢</span>헌드레드컨설팅 <span className="text-[#E8D080]">사칭에 유의</span>하세요</>, closeAll)}
           <div className="px-5 py-4 overflow-y-auto">
             <p className="text-[12px] text-[#0b2140]/65 leading-relaxed text-center">
               최근 당사를 사칭한 연락이 늘고 있어 안내드립니다.<br />
@@ -102,7 +108,6 @@ export default function NoticePopups() {
               <span className="block text-[17px] font-black text-[#E8D080] mt-0.5 tracking-wide">대표번호 {COMPANY.phone}</span>
             </a>
           </div>
-          {footer(KEYS.scam, () => setOpenScam(false))}
         </div>
       )}
 
@@ -110,8 +115,14 @@ export default function NoticePopups() {
       {openBroker && (
         <div className={`w-full max-w-[360px] rounded-2xl overflow-hidden bg-white shadow-[0_30px_70px_-25px_rgba(11,18,32,.6)] flex-col max-h-[78vh] ${openScam ? 'hidden md:flex' : 'flex'}`}
           style={{ animation: 'hcNoticeRise .8s .1s cubic-bezier(.16,1,.3,1) both' }}>
-          {header('공공기관 안내', <>정책자금 <span className="text-[#E8D080]">불법 브로커</span>, 꼭 확인하세요</>, () => setOpenBroker(false), '소상공인시장진흥공단 안내 내용을 그대로 옮겼습니다.')}
+          {header('공공기관 안내', <>정책자금 <span className="text-[#E8D080]">불법 브로커</span>, 꼭 확인하세요</>, closeAll)}
 
+          {imgOk ? (
+            <div className="overflow-y-auto bg-white">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={BROKER_IMAGE} alt="소상공인 정책자금 불법 브로커 신고센터 안내" className="w-full h-auto block" onError={() => setImgOk(false)} />
+            </div>
+          ) : (
           <div className="px-4 py-3.5 overflow-y-auto space-y-3">
             <p className="text-[11.5px] text-center font-black text-[#0b2140]">소상공인 정책자금 불법 브로커 신고센터</p>
 
@@ -162,9 +173,16 @@ export default function NoticePopups() {
               궁금한 점은 대표번호 <a href={COMPANY.phoneHref} className="text-[#a8873f] font-bold">{COMPANY.phone}</a>로 문의해 주세요.
             </p>
           </div>
-          {footer(KEYS.broker, () => setOpenBroker(false))}
+          )}
         </div>
       )}
+      </div>
+
+      {/* 한 번에 닫기 */}
+      <div className="flex gap-2 shrink-0 w-full max-w-[420px]" onClick={e => e.stopPropagation()}>
+        <button type="button" onClick={hideAllOneDay} className="flex-1 py-3 rounded-xl bg-white/15 text-white/85 text-[13px] font-semibold hover:bg-white/25 border border-white/25">오늘 하루 둘 다 안 보기</button>
+        <button type="button" onClick={closeAll} className="flex-1 py-3 rounded-xl bg-white text-[#0b2140] text-[13px] font-black hover:bg-[#f4f5f8]">둘 다 닫기</button>
+      </div>
     </div>
   )
 }

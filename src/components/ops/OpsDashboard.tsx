@@ -1,5 +1,6 @@
 'use client'
 import ActivityStamps from '@/components/shared/ActivityStamps'
+import ContractWizard from '@/components/shared/ContractWizard'
 
 import { useState, useEffect, useRef, useCallback, FormEvent, ReactNode } from 'react'
 import { signOut, useSession } from 'next-auth/react'
@@ -3290,6 +3291,7 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
   const [contractingCase, setContractingCase] = useState<OpsCase | null>(null)
   // 2단계: 영업팀과 같은 계약 입력(계약금·입금·수수료율·결제방식·세금계산서 등)
   const [contractStep2, setContractStep2] = useState(false)
+  const [docCase, setDocCase] = useState<OpsCase | null>(null)   // 계약서(한글) 만들기
   const [form, setForm] = useState({ institution: '', contract_amount: '', stage: '서류받는중', memo: '', manager: '' })
   const [saving, setSaving] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
@@ -3936,6 +3938,22 @@ ${err.error || caseRes.status}
         </div>
       )}
 
+      {docCase && (() => {
+        const d: any = docCase.details || {}, cd: any = docCase.customers?.details || {}
+        return (
+          <ContractWizard
+            onClose={() => setDocCase(null)}
+            prefill={{
+              company: cd.company || (docCase as any).customer_name || '', ceo: docCase.customers?.name || '',
+              address: cd.address || cd.region || '', bizNo: d.biz_reg_number || cd.business_reg_no || '',
+              managerName: (docCase as any).ops_user_name || d.ops_user_name || userName,
+              type: d.contract_type === '월정기권' ? 'nofee' : (d.commission_rate ? 'fee' : undefined), feePercent: d.commission_rate || '',
+              opsCaseId: docCase.id, customerId: (docCase as any).customer_id || undefined,
+            }}
+          />
+        )
+      })()}
+
       {/* 상세 드로어 */}
       {openId && (() => {
         const c = cases.find(x => x.id === openId)
@@ -3953,6 +3971,10 @@ ${err.error || caseRes.status}
                 )}
               </div>
               <div className="flex gap-2">
+                <button onClick={() => setDocCase(c)}
+                  className="text-xs bg-[#0b2140] text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-[#143063]">
+                  계약서
+                </button>
                 <button onClick={() => openContractModal(c)}
                   className="text-xs bg-sky-500 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-sky-600">
                   계약하기
@@ -4822,6 +4844,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
   const [searchQuery, setSearchQuery] = useState('')
   const [splitActive, setSplitActive] = useState(false)
   const saveChain = useRef<Record<string, Promise<void>>>({})
+  const [contractDocCase, setContractDocCase] = useState<OpsCase | null>(null)   // 계약서 만들기 대상
   const [openPanelIds, setOpenPanelIds] = useState<string[]>([])
   const [closingPanelIds, setClosingPanelIds] = useState<string[]>([])
   const [installPrompt, setInstallPrompt] = useState<any>(null)
@@ -5552,6 +5575,24 @@ export default function OpsDashboard({ userId, userName }: Props) {
         </div>
       )}
 
+      {/* ── 계약서(한글 파일) 만들기 ── */}
+      {contractDocCase && (() => {
+        const d: any = contractDocCase.details || {}
+        const cd: any = contractDocCase.customers?.details || {}
+        return (
+          <ContractWizard
+            onClose={() => setContractDocCase(null)}
+            prefill={{
+              company: cd.company || (contractDocCase as any).customer_name || '', ceo: contractDocCase.customers?.name || '',
+              address: cd.address || cd.region || '', bizNo: d.biz_reg_number || cd.business_reg_no || '',
+              managerName: (contractDocCase as any).ops_user_name || d.ops_user_name || userName,
+              type: d.contract_type === '월정기권' ? 'nofee' : (d.commission_rate ? 'fee' : undefined), feePercent: d.commission_rate || '',
+              opsCaseId: contractDocCase.id, customerId: (contractDocCase as any).customer_id || undefined,
+            }}
+          />
+        )
+      })()}
+
       {/* ── 배경 오버레이 (패널 열릴 때) ── */}
       {openPanelIds.length > 0 && (
         <div
@@ -5590,7 +5631,10 @@ export default function OpsDashboard({ userId, userName }: Props) {
                   <p className="text-[10px] text-purple-200 mt-0.5">월 10만원 × 12개월 = 120만원 선결제 · 수수료 없음</p>
                 )}
               </div>
-              <button onClick={() => closePanel(id)} className="text-gray-400 hover:text-gray-600 text-xl leading-none px-1">✕</button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setContractDocCase(c)} className={`px-3 py-1 rounded text-[11px] font-semibold ${c.details?.contract_type === '월정기권' ? 'bg-white text-purple-700' : 'bg-[#0b2140] text-white hover:bg-[#143063]'}`}>계약서</button>
+                <button onClick={() => closePanel(id)} className="text-gray-400 hover:text-gray-600 text-xl leading-none px-1">✕</button>
+              </div>
             </div>
             <div className="p-4">
               <OpsDetailPanel c={c} onSave={handleSave} userRole={userRole} userName={userName} />

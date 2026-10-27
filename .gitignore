@@ -43,3 +43,4 @@ ndev-err.txt
 package-lock.json
 
 *.mjs
+.hwtest/

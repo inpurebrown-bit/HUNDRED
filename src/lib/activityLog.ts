@@ -184,6 +184,8 @@ export function mergeLogs(existing: ActLog[] | undefined, added: ActLog[]): ActL
 /** details에 기록을 적용한다. 클라이언트가 보낸 activity_log는 무시하고 서버의 것을 유지한다. */
 export function withLog(details: any, existingDetails: any, added: ActLog[]) {
   const base = { ...(details || {}) }
+  // 서버가 따로 저장하는 값(계약서 입력 내용)은 클라이언트가 보낸 오래된 값으로 덮이지 않게 유지
+  if (existingDetails && existingDetails.contract_draft !== undefined) base.contract_draft = existingDetails.contract_draft
   const merged = mergeLogs(existingDetails?.activity_log, added)
   if (merged.length) base.activity_log = merged
   else delete base.activity_log
