@@ -41,7 +41,7 @@ export async function buildDocParts(doc: DocContent): Promise<Built> {
   const table = (rows: string[][]) => {
     const nC = Math.max(...rows.map(r => r.length)), nR = rows.length
     // 열 너비: 글자 수에 비례 (최소 비율 보장)
-    const len = Array.from({ length: nC }, (_, c) => Math.max(4, ...rows.map(r => Math.min(40, (r[c] || '').length))))
+    const len = Array.from({ length: nC }, (_, c) => Math.max(8, ...rows.map(r => Math.min(40, (r[c] || '').length))))
     const sum = len.reduce((a, v) => a + v, 0)
     let widths = len.map(l => Math.max(3000, Math.round((l / sum) * W_TOTAL)))
     const over = widths.reduce((a, v) => a + v, 0) - W_TOTAL
