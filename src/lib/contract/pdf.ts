@@ -6,8 +6,8 @@ import fs from 'fs'
 import path from 'path'
 
 // ── 아주 작은 XML 트리 파서 (한글 문서의 규칙적인 XML 용) ──
-interface XNode { tag: string; attrs: Record<string, string>; children: XNode[]; text?: string }
-function parseXml(src: string): XNode {
+export interface XNode { tag: string; attrs: Record<string, string>; children: XNode[]; text?: string }
+export function parseXml(src: string): XNode {
   const root: XNode = { tag: '#root', attrs: {}, children: [] }
   const stack: XNode[] = [root]
   const re = /<(\/?)([A-Za-z0-9_:.-]+)((?:\s+[^\s=\/>]+="[^"]*")*)\s*(\/?)>|([^<]+)/g
@@ -24,8 +24,8 @@ function parseXml(src: string): XNode {
   }
   return root
 }
-const kids = (n: XNode, tag: string) => n.children.filter(c => c.tag === tag)
-const kid = (n: XNode, tag: string) => n.children.find(c => c.tag === tag)
+export const kids = (n: XNode, tag: string) => n.children.filter(c => c.tag === tag)
+export const kid = (n: XNode, tag: string) => n.children.find(c => c.tag === tag)
 const unesc = (s: string) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')
 
 // ── 모양 정보 ──
@@ -429,7 +429,7 @@ export async function renderPdf(opt: { header: string; sections: string[]; bg: B
     return out
   }
 
-  const isArticle = (p: Para) => p.runs.length > 0 && p.runs.every(r => r.st.bold) && /^제\s*\d+\s*조/.test(ptext(p).trim())
+  const isArticle = (p: Para) => p.runs.length > 0 && p.runs.every(r => r.st.bold) && (/^제\s*\d+\s*조/.test(ptext(p).trim()) || (p.baseSize >= 10.2 && p.baseSize < 19 && ptext(p).trim().length < 90 && p.align !== "CENTER"))
   const isTitle = (p: Para) => p.align === 'CENTER' && p.baseSize >= 20 && p.runs.some(r => r.st.bold)
   const isSubHead = (p: Para) => /^■/.test(ptext(p).trim())
   const isSepHead = (p: Para) => p.runs.length === 1 && p.runs[0].st.size >= 13 && p.runs[0].st.bold && /^\[별지/.test(ptext(p).trim())

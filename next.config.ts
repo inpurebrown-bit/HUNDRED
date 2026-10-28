@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['subset-font', 'harfbuzzjs'],
   outputFileTracingIncludes: {
     '/api/contract/generate': ['./src/lib/contract/fonts/**/*'],
+    '/api/company-rules/export': ['./src/lib/contract/fonts/**/*'],
   },
 };
 

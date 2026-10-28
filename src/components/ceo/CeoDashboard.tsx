@@ -2,6 +2,7 @@
 
 import DbHandoverTab from './DbHandoverTab'
 import ContractSettingsTab from './ContractSettingsTab'
+import CompanyRulesTab from './CompanyRulesTab'
 import { useState, useRef, useEffect, FormEvent, ReactNode, Fragment } from 'react'
 import { signOut, useSession } from 'next-auth/react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
@@ -185,7 +186,7 @@ export default function CeoDashboard() {
   const { data: session } = useSession()
   const ceoName = session?.user?.name ?? '대표'
   const ceoId = (session?.user as any)?.id ?? ''
-  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'staffmanage' | 'minutesreports' | 'calendar' | 'ailogs' | 'trash' | 'authcode' | 'tools' | 'dbmanage' | 'profile' | 'dig' | 'authcode'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'staffmanage' | 'minutesreports' | 'calendar' | 'ailogs' | 'trash' | 'authcode' | 'tools' | 'rules' | 'dbmanage' | 'profile' | 'dig' | 'authcode'>('overview')
   const [menuOpen, setMenuOpen] = useState(false)
   const [salesInitialView, setSalesInitialView] = useState<'customers' | 'inspection' | 'as' | 'transfer' | 'diary' | undefined>(undefined)
   const [salesInitialStatusTab, setSalesInitialStatusTab] = useState<'all' | 'lead' | 'db010' | 'contracted' | 'emotional' | 'trash' | undefined>(undefined)
@@ -311,6 +312,7 @@ export default function CeoDashboard() {
     { key: 'calendar',       label: '일정관리' },
     { key: 'staffmanage',    label: '직원관리' },
     { key: 'tools',          label: (authCodeCount + deleteReqCount) > 0 ? `도구 (${authCodeCount + deleteReqCount})` : '도구' },
+    { key: 'rules',          label: '규정·서식' },
   ]
 
   return (
@@ -491,6 +493,7 @@ export default function CeoDashboard() {
         {activeTab === 'minutesreports' && <MinutesReportsTab />}
         {activeTab === 'calendar'       && <CalendarTab />}
         {activeTab === 'tools'          && <ToolsTab codeCount={authCodeCount} delCount={deleteReqCount} />}
+        {activeTab === 'rules'          && <CompanyRulesTab />}
         {activeTab === 'dbmanage'       && <DuplicateOnlyTab />}
       </div>
 
