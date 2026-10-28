@@ -3,21 +3,22 @@
 import JSZip from 'jszip'
 import tplFee from '../contract/tplFee'
 import bgImage from '../contract/bgImage'
+import coverImage from './coverImage'
 
 export type DocBlock =
   | { t: 'h1' | 'h2' | 'h3' | 'p' | 'li' | 'note'; text: string }
   | { t: 'table'; rows: string[][] }
 export interface DocContent { title: string; subtitle?: string; blocks: DocBlock[] }
 // 표지·목차를 붙일 때 쓰는 정보 (정관 내려받기용)
-export interface CoverOpts { org: string; meta: string }
+export interface CoverOpts { org: string; version: string; date: string; eyebrow?: string }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 const W_TOTAL = 42520
 
-interface Built { header: string; section: string; zip: JSZip }
+interface Built { header: string; sections: string[]; zip: JSZip; coverBgId?: string }
 
 // 문서 내용 → 한글 문서의 XML 조각 (header 글자모양 추가 포함)
-export async function buildDocParts(doc: DocContent, cover?: CoverOpts): Promise<Built> {
+export async function buildDocParts(doc: DocContent, cover?: CoverOpts, mode: 'hwpx' | 'pdf' = 'hwpx'): Promise<Built> {
   const zip = await JSZip.loadAsync(Buffer.from(tplFee, 'base64'))
   let header = await zip.file('Contents/header.xml')!.async('string')
   const base = await zip.file('Contents/section0.xml')!.async('string')
@@ -31,6 +32,13 @@ export async function buildDocParts(doc: DocContent, cover?: CoverOpts): Promise
     clones.push(m[0].replace(`id="${srcId}"`, `id="${id}"`).replace(/height="\d+"/, `height="${height}"`))
     return id
   }
+  const withColor = (srcId: string, height: number, color: string) => {
+    const m = header.match(new RegExp(`<hh:charPr id="${srcId}"[\\s\\S]*?</hh:charPr>`))!
+    const id = String(nextId++)
+    clones.push(m[0].replace(`id="${srcId}"`, `id="${id}"`).replace(/height="\d+"/, `height="${height}"`).replace(/textColor="#[0-9A-Fa-f]{6}"/, `textColor="${color}"`))
+    return id
+  }
+  const CV = cover ? { eyebrow: withColor('18', 1100, '#C5A258'), title: withColor('18', 3800, '#FFFFFF'), bar: withColor('18', 1400, '#C5A258'), sub: withColor('19', 1300, '#DCE3EF'), meta: withColor('18', 1200, '#FFFFFF'), conf: withColor('19', 900, '#AEB9CE') } : null
   const CP = { title: '26', h1: withHeight('18', 1500), h2: withHeight('18', 1150), h3: withHeight('18', 1020), p: '19', li: '19', note: '12', cell: '29', cellHead: '8' }
   header = header.replace('</hh:charProperties>', clones.join('') + '</hh:charProperties>')
   header = header.replace(/(<hh:charProperties itemCnt=")(\d+)(")/, (_m, a, n, c) => a + (Number(n) + clones.length) + c)
@@ -58,55 +66,86 @@ export async function buildDocParts(doc: DocContent, cover?: CoverOpts): Promise
   }
 
   // 첫 문단: 쪽 설정(용지·배경)이 들어 있는 원본의 첫 문단을 그대로 쓰고 제목 글만 바꾼다
-  const first = base.match(/<hp:p [\s\S]*?<\/hp:p>/)![0]
-  const titlePara = first.replace(/<hp:t>[^<]*<\/hp:t>/, `<hp:t>${esc(doc.title)}</hp:t>`).replace(/<hp:linesegarray>[\s\S]*?<\/hp:linesegarray>/g, '')
+  const first = base.match(/<hp:p [\s\S]*?<\/hp:p>/)![0].replace(/<hp:linesegarray>[\s\S]*?<\/hp:linesegarray>/g, '')
   const open = base.slice(0, base.indexOf('<hp:p '))
-  let body = titlePara
-  if (doc.subtitle) body += para(doc.subtitle, CP.note, '25')
-  body += empty()
-  if (cover) {
-    // 표지: 제목·부제 아래 회사명과 버전, 그다음 쪽에 목차
-    for (let i = 0; i < 9; i++) body += empty()
-    body += para(cover.org, CP.h2, '25')
-    body += para(cover.meta, CP.note, '25')
-    body += para('목  차', CP.h1, '25', true) + empty()
+  const setText = (x: string, t: string) => x.replace(/<hp:t>[^<]*<\/hp:t>/, t ? `<hp:t>${esc(t)}</hp:t>` : '<hp:t></hp:t>')
+
+  // 표지 구역 배경(네이비) — 한글 파일에서만 따로 쓴다. 새 배경 그림을 가리키는 채우기 모양을 하나 더 만든다
+  let coverBgId: string | undefined
+  if (cover && mode === 'hwpx') {
+    const ids = [...header.matchAll(/<hh:borderFill id="(\d+)"/g)].map(m => +m[1])
+    coverBgId = String(Math.max(...ids) + 1)
+    const bf6 = header.match(/<hh:borderFill id="6"[\s\S]*?<\/hh:borderFill>/)![0]
+    header = header.replace('</hh:borderFills>', bf6.replace('id="6"', `id="${coverBgId}"`).replace('binaryItemIDRef="image1"', 'binaryItemIDRef="image2"') + '</hh:borderFills>')
+    header = header.replace(/(<hh:borderFills itemCnt=")(\d+)(")/, (_m, x, n, c) => x + (Number(n) + 1) + c)
+  }
+
+  const sections: string[] = []
+  if (cover && CV) {
+    if (mode === 'hwpx') {
+      // ── 표지 구역: 네이비 배경 위에 흰 글씨 ──
+      const coverFirst = setText(first, '').replace(/(<hp:pageBorderFill type="BOTH" borderFillIDRef=")6"/, `$1${coverBgId}"`)
+      let c = coverFirst
+      for (let i = 0; i < 8; i++) c += empty()
+      c += para((cover.eyebrow || 'COMPANY REGULATIONS').split('').join(' '), CV.eyebrow, '12')
+      c += para('', CP.p, '12')
+      c += para(doc.title, CV.title, '12')
+      c += para('━━━━━', CV.bar, '12')
+      if (doc.subtitle) c += para(doc.subtitle, CV.sub, '12')
+      for (let i = 0; i < 8; i++) c += empty()
+      c += para(`${cover.version}    |    ${cover.date}    |    구성원 전용`, CV.meta, '12')
+      c += para(`${cover.org} · 무단 복제·유출 금지`, CV.conf, '12')
+      sections.push(open + c + '</hs:sec>')
+    }
+  }
+
+  // ── 본문 구역 (표지가 있으면 목차부터) ──
+  let body = cover ? setText(first, '') : setText(first, doc.title)
+  if (!cover) {
+    if (doc.subtitle) body += para(doc.subtitle, CP.note, '25')
+    body += empty()
+  } else {
+    body += para('목  차', CP.h1, '25') + empty()
     let firstEntry = true
-    for (const b of doc.blocks) {
-      if (b.t === 'h1') { if (!firstEntry) body += para('', CP.note, '36'); body += para(b.text, CP.h3, '36'); firstEntry = false }
-      else if (b.t === 'h2') body += para('      ' + b.text, CP.p, '36')
+    for (const bl of doc.blocks) {
+      if (bl.t === 'h1') { if (!firstEntry) body += para('', CP.note, '36'); body += para(bl.text, CP.h3, '36'); firstEntry = false }
+      else if (bl.t === 'h2') body += para('      ' + bl.text, CP.p, '36')
     }
   }
 
   let firstH1 = !cover
-  for (const b of doc.blocks) {
-    if (b.t === 'table') { body += table(b.rows); body += para('', CP.note); continue }
-    const text = b.text || ''
-    if (b.t === 'h1') { body += para(text, CP.h1, '12', !firstH1); firstH1 = false; body += empty(); continue }
-    if (b.t === 'h2') { body += empty() + para(text, CP.h2, '12'); continue }
-    if (b.t === 'h3') { body += para(text, CP.h3, '12'); continue }
-    if (b.t === 'li') { body += para(text, CP.li, '12'); continue }
-    if (b.t === 'note') { body += para(text, CP.note, '12'); continue }
+  for (const bl of doc.blocks) {
+    if (bl.t === 'table') { body += table(bl.rows); body += para('', CP.note); continue }
+    const text = bl.text || ''
+    if (bl.t === 'h1') { body += para(text, CP.h1, '12', !firstH1); firstH1 = false; body += empty(); continue }
+    if (bl.t === 'h2') { body += empty() + para(text, CP.h2, '12'); continue }
+    if (bl.t === 'h3') { body += para(text, CP.h3, '12'); continue }
+    if (bl.t === 'li') { body += para(text, CP.li, '12'); continue }
+    if (bl.t === 'note') { body += para(text, CP.note, '12'); continue }
     body += para(text, CP.p, '0')
   }
-  const section = open + body + '</hs:sec>'
-  return { header, section, zip }
+  sections.push(open + body + '</hs:sec>')
+  return { header, sections, zip, coverBgId }
 }
 
 // 편집 가능한 한글 파일 (.hwpx)
 export async function docToHwpx(doc: DocContent, cover?: CoverOpts): Promise<Buffer> {
-  const { section, zip, header: header0 } = await buildDocParts(doc, cover)
+  const { sections, zip, header: header0 } = await buildDocParts(doc, cover, 'hwpx')
   let header = header0
-  header = header.replace(/secCnt="\d+"/, 'secCnt="1"')
+  header = header.replace(/secCnt="\d+"/, `secCnt="${sections.length}"`)
   zip.file('Contents/header.xml', header)
-  zip.file('Contents/section0.xml', section)
-  // 이 문서는 구역이 하나 — 나머지 구역 파일은 비운다
-  for (const n of ['section1', 'section2']) { zip.remove(`Contents/${n}.xml`) }
+  sections.forEach((sec, i) => zip.file(`Contents/section${i}.xml`, sec))
+  // 쓰지 않는 구역 파일은 비운다
+  const gone = ['section0', 'section1', 'section2'].filter((_n, i) => i >= sections.length)
+  for (const n of gone) { zip.remove(`Contents/${n}.xml`) }
   let hpf = await zip.file('Contents/content.hpf')!.async('string')
-  hpf = hpf.replace(/<opf:item id="section[12]"[^>]*\/>/g, '').replace(/<opf:itemref idref="section[12]"[^>]*\/>/g, '')
+  for (const n of gone) hpf = hpf.replace(new RegExp(`<opf:item id="${n}"[^>]*/>`), '').replace(new RegExp(`<opf:itemref idref="${n}"[^>]*/>`), '')
+  if (sections.length > 1) hpf = hpf.replace('<opf:item id="header"', '<opf:item id="image2" href="BinData/image2.jpg" media-type="image/jpg" isEmbeded="1"/><opf:item id="header"')
   hpf = hpf.replace(/<opf:item id="image1"[^>]*\/>/, '<opf:item id="image1" href="BinData/image1.jpg" media-type="image/jpg" isEmbeded="1"/>')
   hpf = hpf.replace(/<opf:title>[^<]*<\/opf:title>/, `<opf:title>${esc(doc.title)}</opf:title>`)
   zip.file('Contents/content.hpf', hpf)
   zip.file('BinData/image1.jpg', Buffer.from(bgImage, 'base64'))
+  if (sections.length > 1) zip.file('BinData/image2.jpg', Buffer.from(coverImage, 'base64'))
   zip.remove('Preview/PrvImage.png')
   zip.file('Preview/PrvText.txt', doc.title)
   const mime = await zip.file('mimetype')!.async('string')
@@ -117,9 +156,59 @@ export async function docToHwpx(doc: DocContent, cover?: CoverOpts): Promise<Buf
   return out.generateAsync({ type: 'nodebuffer' })
 }
 
-// 수정할 수 없는 PDF (같은 용지·글꼴)
+// 수정할 수 없는 PDF (같은 용지·글꼴). 표지는 따로 그려 맨 앞에 붙인다
 export async function docToPdf(doc: DocContent, cover?: CoverOpts): Promise<Buffer> {
-  const { header, section } = await buildDocParts(doc, cover)
+  const { header, sections } = await buildDocParts(doc, cover, 'pdf')
   const { renderPdf } = await import('../contract/pdf')
-  return renderPdf({ header, sections: [section], bg: Buffer.from(bgImage, 'base64') })
+  const body = await renderPdf({ header, sections, bg: Buffer.from(bgImage, 'base64') })
+  if (!cover) return body
+  return addPdfCover(body, doc, cover)
+}
+
+async function addPdfCover(body: Buffer, doc: DocContent, cover: CoverOpts): Promise<Buffer> {
+  const { PDFDocument, rgb } = await import('pdf-lib')
+  const fontkit = (await import('@pdf-lib/fontkit')).default
+  const subsetFont = (await import('subset-font')).default
+  const fs = await import('fs'), path = await import('path')
+  const dir = path.join(process.cwd(), 'src', 'lib', 'contract', 'fonts')
+  const eyebrow = (cover.eyebrow || 'COMPANY REGULATIONS').split('').join(' ')
+  const meta = [['VERSION', cover.version], ['DATE', cover.date], ['CLASS', '구성원 전용']]
+  const conf = `${cover.org} · 무단 복제·유출 금지`
+  const all = [eyebrow, doc.title, doc.subtitle || '', conf, ...meta.flat(), '0123456789.,·&()-:/ '].join('')
+  const text = [...new Set(all)].join('')
+  const sub = async (f: string) => Buffer.from(await subsetFont(fs.readFileSync(path.join(dir, f)), text, { targetFormat: 'truetype' }))
+  const pdf = await PDFDocument.load(body)
+  pdf.registerFontkit(fontkit)
+  const bold = await pdf.embedFont(await sub('NotoSerifKR-Bold.ttf'), { subset: false })
+  const reg = await pdf.embedFont(await sub('NotoSerifKR-Regular.ttf'), { subset: false })
+  const W = 595.28, H = 841.89, X = 85, CW = W - X * 2
+  const page = pdf.insertPage(0, [W, H])
+  page.drawImage(await pdf.embedJpg(Buffer.from(coverImage, 'base64')), { x: 0, y: 0, width: W, height: H })
+  const GOLD = rgb(0.773, 0.635, 0.345), WHITE = rgb(1, 1, 1), SOFT = rgb(0.863, 0.89, 0.937), MUTE = rgb(0.682, 0.725, 0.804)
+  // 글줄 나누기 (글자 단위)
+  // 이 글꼴의 띄어쓰기 칸은 너무 넓어서, 낱말 사이는 글자 크기의 0.31배로 직접 둔다
+  const SP = 0.31
+  const tw = (t: string, font: typeof bold, size: number) => t.split(' ').reduce((a, w, i) => a + font.widthOfTextAtSize(w, size) + (i ? SP * size : 0), 0)
+  const wrap = (t: string, font: typeof bold, size: number, w: number) => {
+    const lines: string[] = []; let cur = ''
+    for (const ch of t) { if (tw(cur + ch, font, size) > w && cur) { lines.push(cur.trimEnd()); cur = ch === ' ' ? '' : ch } else cur += ch }
+    if (cur.trim()) lines.push(cur.trim()); return lines
+  }
+  const put = (t: string, x: number, y: number, size: number, font: typeof bold, color: ReturnType<typeof rgb>) => {
+    let cx = x
+    for (const w of t.split(' ')) { if (w) { try { page.drawText(w, { x: cx, y, size, font, color }) } catch { /* 없는 글자 */ } cx += font.widthOfTextAtSize(w, size) } cx += SP * size }
+  }
+  // 위쪽 이미지의 로고 아래(약 70mm)부터 글을 놓는다
+  let y = H - 215
+  put(eyebrow, X, y, 10, bold, GOLD); y -= 46
+  for (const l of wrap(doc.title, bold, 34, CW)) { put(l, X, y, 34, bold, WHITE); y -= 46 }
+  page.drawRectangle({ x: X, y: y + 2, width: 62, height: 3, color: GOLD }); y -= 28
+  if (doc.subtitle) for (const l of wrap(doc.subtitle, reg, 12, CW)) { put(l, X, y, 12, reg, SOFT); y -= 19 }
+  // 아래쪽: 금색 선 아래에 버전·날짜·구분
+  const yMeta = 142
+  let mx = X
+  const colW = [92, 150, 183]
+  meta.forEach(([k, v], i) => { put(k, mx, yMeta + 15, 7.5, bold, GOLD); put(v, mx, yMeta, 11.5, bold, WHITE); mx += colW[i] })
+  put(conf, X, 112, 8.5, reg, MUTE)
+  return Buffer.from(await pdf.save())
 }
