@@ -8,6 +8,8 @@ export type DocBlock =
   | { t: 'h1' | 'h2' | 'h3' | 'p' | 'li' | 'note'; text: string }
   | { t: 'table'; rows: string[][] }
 export interface DocContent { title: string; subtitle?: string; blocks: DocBlock[] }
+// 표지·목차를 붙일 때 쓰는 정보 (정관 내려받기용)
+export interface CoverOpts { org: string; meta: string }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 const W_TOTAL = 42520
@@ -15,7 +17,7 @@ const W_TOTAL = 42520
 interface Built { header: string; section: string; zip: JSZip }
 
 // 문서 내용 → 한글 문서의 XML 조각 (header 글자모양 추가 포함)
-export async function buildDocParts(doc: DocContent): Promise<Built> {
+export async function buildDocParts(doc: DocContent, cover?: CoverOpts): Promise<Built> {
   const zip = await JSZip.loadAsync(Buffer.from(tplFee, 'base64'))
   let header = await zip.file('Contents/header.xml')!.async('string')
   const base = await zip.file('Contents/section0.xml')!.async('string')
@@ -62,8 +64,20 @@ export async function buildDocParts(doc: DocContent): Promise<Built> {
   let body = titlePara
   if (doc.subtitle) body += para(doc.subtitle, CP.note, '25')
   body += empty()
+  if (cover) {
+    // 표지: 제목·부제 아래 회사명과 버전, 그다음 쪽에 목차
+    for (let i = 0; i < 9; i++) body += empty()
+    body += para(cover.org, CP.h2, '25')
+    body += para(cover.meta, CP.note, '25')
+    body += para('목  차', CP.h1, '25', true) + empty()
+    let firstEntry = true
+    for (const b of doc.blocks) {
+      if (b.t === 'h1') { if (!firstEntry) body += para('', CP.note, '36'); body += para(b.text, CP.h3, '36'); firstEntry = false }
+      else if (b.t === 'h2') body += para('      ' + b.text, CP.p, '36')
+    }
+  }
 
-  let firstH1 = true
+  let firstH1 = !cover
   for (const b of doc.blocks) {
     if (b.t === 'table') { body += table(b.rows); body += para('', CP.note); continue }
     const text = b.text || ''
@@ -79,8 +93,8 @@ export async function buildDocParts(doc: DocContent): Promise<Built> {
 }
 
 // 편집 가능한 한글 파일 (.hwpx)
-export async function docToHwpx(doc: DocContent): Promise<Buffer> {
-  const { section, zip, header: header0 } = await buildDocParts(doc)
+export async function docToHwpx(doc: DocContent, cover?: CoverOpts): Promise<Buffer> {
+  const { section, zip, header: header0 } = await buildDocParts(doc, cover)
   let header = header0
   header = header.replace(/secCnt="\d+"/, 'secCnt="1"')
   zip.file('Contents/header.xml', header)
@@ -104,8 +118,8 @@ export async function docToHwpx(doc: DocContent): Promise<Buffer> {
 }
 
 // 수정할 수 없는 PDF (같은 용지·글꼴)
-export async function docToPdf(doc: DocContent): Promise<Buffer> {
-  const { header, section } = await buildDocParts(doc)
+export async function docToPdf(doc: DocContent, cover?: CoverOpts): Promise<Buffer> {
+  const { header, section } = await buildDocParts(doc, cover)
   const { renderPdf } = await import('../contract/pdf')
   return renderPdf({ header, sections: [section], bg: Buffer.from(bgImage, 'base64') })
 }

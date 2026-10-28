@@ -15,8 +15,9 @@ export async function GET(req: NextRequest) {
   const rules = await readSetting<DocContent & { version: number }>('company_rules')
   if (!rules) return NextResponse.json({ error: '저장된 정관이 없습니다' }, { status: 404 })
   const format = req.nextUrl.searchParams.get('format') === 'hwpx' ? 'hwpx' : 'pdf'
-  const buf = format === 'hwpx' ? await docToHwpx(rules) : await docToPdf(rules)
   const date = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
+  const cover = { org: '헌드레드컨설팅', meta: `v${rules.version} · ${date.replace(/-/g, '. ')}` }
+  const buf = format === 'hwpx' ? await docToHwpx(rules, cover) : await docToPdf(rules, cover)
   const fname = `헌드레드컨설팅_정관·규정_v${rules.version}_${date}.${format}`
   return new NextResponse(new Uint8Array(buf), {
     headers: {

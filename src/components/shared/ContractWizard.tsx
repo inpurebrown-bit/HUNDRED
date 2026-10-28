@@ -47,6 +47,7 @@ export default function ContractWizard({ prefill, onClose, onDone }: { prefill: 
   const [postPct, setPostPct] = useState('')
   const [pLine, setPLine] = useState(false)
   const [clauses, setClauses] = useState('')
+  const [blankMode, setBlankMode] = useState(false)   // 공계약서: 입력 없이 월정기/수수료 서식만 PDF 로 (미팅용)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [err, setErr] = useState('')
@@ -139,7 +140,30 @@ export default function ContractWizard({ prefill, onClose, onDone }: { prefill: 
     <span className="text-[11.5px] text-gray-500 font-semibold">{t} {ok ? <span className="text-emerald-600">✓</span> : <span className="text-red-500">필수</span>}{hint ? <span className="font-normal text-gray-400"> {hint}</span> : null}</span>
   )
 
+  // 공계약서 — 업체·금액·날짜를 모두 비운 서식. 미팅에서 손으로 쓰며 설명할 때 쓴다
+  async function makeBlank() {
+    setErr(''); setMsg('')
+    if (!type) { setErr('월정기인지 수수료 있는 일반 계약인지 먼저 골라 주세요.'); return }
+    setBusy(true)
+    try {
+      const r = await fetch('/api/contract/generate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, blank: true, format: 'pdf', customerId: prefill.customerId, opsCaseId: prefill.opsCaseId }),
+      })
+      if (!r.ok) { const j = await r.json().catch(() => ({})); setErr(j.error || '공계약서를 만들지 못했습니다.'); return }
+      const blob = await r.blob()
+      const m = (r.headers.get('Content-Disposition') || '').match(/filename\*=UTF-8''([^;]+)/)
+      const name = m ? decodeURIComponent(m[1]) : '공계약서.pdf'
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove()
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000)
+      setMsg(`"${name}" 파일이 내려받아졌습니다. 출력해서 미팅에 쓰세요.`)
+      onDone?.()
+    } catch { setErr('네트워크 오류로 공계약서를 만들지 못했습니다.') }
+    finally { setBusy(false) }
+  }
+
   async function make(format: 'pdf' | 'hwpx' = 'pdf') {
+    if (blankMode) return makeBlank()
     setErr(''); setMsg('')
     if (!type) { setErr('계약 유형(수수료 없음 / 수수료 있음)을 먼저 골라 주세요.'); return }
     if (type === 'fee' && !feePercent.trim()) { setErr('수수료가 있는 계약은 몇 %인지 입력해 주세요.'); return }
@@ -192,14 +216,20 @@ export default function ContractWizard({ prefill, onClose, onDone }: { prefill: 
         </div>
 
         <div className="p-5 space-y-5 overflow-y-auto">
+          <div className="flex gap-2 rounded-2xl bg-gray-100 p-1">
+            <button type="button" onClick={() => setBlankMode(false)} className={`flex-1 py-2 rounded-xl text-[13px] font-bold transition-colors ${!blankMode ? 'bg-white text-[#0b2140] shadow' : 'text-gray-500'}`}>업체 정보 넣어서 만들기</button>
+            <button type="button" onClick={() => setBlankMode(true)} className={`flex-1 py-2 rounded-xl text-[13px] font-bold transition-colors ${blankMode ? 'bg-white text-[#0b2140] shadow' : 'text-gray-500'}`}>공계약서 (빈 서식 · 미팅용)</button>
+          </div>
+          {blankMode && <p className="text-[12.5px] text-gray-500 -mt-2">업체명·금액·날짜가 모두 빈칸인 계약서입니다. 아래에서 종류만 고르면 바로 PDF로 받아집니다.</p>}
           <div>
             <p className={sec}>{step(1)} 계약 유형</p>
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" className={chip(type === 'nofee')} onClick={() => pickType('nofee')}>월정기 (수수료 없음)</button>
-              <button type="button" className={chip(type === 'fee')} onClick={() => pickType('fee')}>수수료 있음</button>
+              <button type="button" className={chip(type === 'fee')} onClick={() => pickType('fee')}>{blankMode ? '일반 (수수료 있음)' : '수수료 있음'}</button>
             </div>
           </div>
 
+          {!blankMode && <>
           <div>
             <p className={sec}>{step(2)} 업체 정보 <span className="font-normal text-gray-400">(인콜카드에서 가져온 값은 확인만 하세요)</span></p>
             <div className="grid grid-cols-2 gap-2">
@@ -254,17 +284,18 @@ export default function ContractWizard({ prefill, onClose, onDone }: { prefill: 
             <p className={sec}>{step(4)} 추가 특약 <span className="font-normal text-gray-400">(없으면 비워 두세요 · 한 줄에 하나)</span></p>
             <textarea value={clauses} onChange={e => setClauses(e.target.value)} rows={3} placeholder="예) 착수금은 계약일로부터 3일 이내에 입금한다." className="w-full border-[1.5px] border-gray-200 rounded-xl px-3 py-2 text-[13.5px] outline-none focus:border-[#b8995a] resize-none" />
           </div>
+          </>}
 
           {draftNote && <p className="text-[12.5px] font-semibold text-sky-700 bg-sky-50 rounded-xl px-3 py-2">{draftNote}</p>}
           {err && <p className="text-[13px] font-bold text-[#b3261e] bg-[#fde7e3] rounded-xl px-3 py-2">{err}</p>}
           {msg && <p className="text-[13px] font-bold text-emerald-700 bg-emerald-50 rounded-xl px-3 py-2">{msg}</p>}
         </div>
 
-        {missing.length > 0 && <p className="px-5 pt-3 text-[12.5px] font-bold text-[#b3261e] shrink-0">입력이 안 된 항목 {missing.length}개: {missing.join(' · ')}</p>}
+        {!blankMode && missing.length > 0 && <p className="px-5 pt-3 text-[12.5px] font-bold text-[#b3261e] shrink-0">입력이 안 된 항목 {missing.length}개: {missing.join(' · ')}</p>}
         <div className="px-5 py-4 border-t border-gray-100 flex gap-2 shrink-0">
           <button onClick={onClose} className="flex-1 border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-semibold hover:bg-gray-50">닫기</button>
-          {isCeo && <button onClick={() => make('hwpx')} disabled={busy || missing.length > 0} className="px-3 border border-gray-200 text-gray-500 py-3 rounded-xl text-[12px] font-semibold hover:bg-gray-50 disabled:opacity-50">한글 파일(대표)</button>}
-          <button onClick={() => make('pdf')} disabled={busy || missing.length > 0} className="flex-[2] bg-gradient-to-r from-[#0b2140] to-[#4a5a9a] text-white py-3 rounded-xl text-sm font-bold disabled:opacity-50">{busy ? '만드는 중…' : missing.length ? '입력을 모두 채우면 생성할 수 있어요' : '계약서 생성 (PDF 다운로드)'}</button>
+          {isCeo && !blankMode && <button onClick={() => make('hwpx')} disabled={busy || missing.length > 0} className="px-3 border border-gray-200 text-gray-500 py-3 rounded-xl text-[12px] font-semibold hover:bg-gray-50 disabled:opacity-50">한글 파일(대표)</button>}
+          <button onClick={() => make('pdf')} disabled={busy || (blankMode ? !type : missing.length > 0)} className="flex-[2] bg-gradient-to-r from-[#0b2140] to-[#4a5a9a] text-white py-3 rounded-xl text-sm font-bold disabled:opacity-50">{busy ? '만드는 중…' : blankMode ? (type ? '공계약서 PDF 받기' : '위에서 종류를 먼저 고르세요') : missing.length ? '입력을 모두 채우면 생성할 수 있어요' : '계약서 생성 (PDF 다운로드)'}</button>
         </div>
       </div>
     </div>

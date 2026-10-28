@@ -15,10 +15,11 @@ interface MeetingJournalProps {
 }
 
 /* ── 섹션 색상 ── */
-const G  = '#d4e8b8'; const GB = '#4a7a30'  // 녹색
-const O  = '#fde4b8'; const OB = '#b86a10'  // 주황 (제조)
-const B  = '#c8dff7'; const BB = '#2a5faa'  // 파랑 (정보통신)
-const P  = '#e2d4f8'; const PB = '#6030b8'  // 보라 (법인)
+const NAVY = '#0b2140'; const GOLD = '#b8995a'
+const G  = '#edf0f5'; const GB = '#9aa6bc'  // 기본 (네이비 회청)
+const O  = '#f6efde'; const OB = '#b8995a'  // 제조 (골드)
+const B  = '#e7edf6'; const BB = '#6d83a8'  // 정보통신 (스틸블루)
+const P  = '#eeeaf3'; const PB = '#8a7fa3'  // 법인 (연한 모브)
 
 type CS = React.CSSProperties
 
@@ -27,8 +28,8 @@ function Opt({ label, checked }: { label: string; checked?: boolean }) {
   return (
     <span style={{
       display: 'inline-block',
-      border: `1px solid ${checked ? '#1a2a40' : '#bbb'}`,
-      background: checked ? '#1a2a40' : '#fff',
+      border: `1px solid ${checked ? '#0b2140' : '#b9bfcc'}`,
+      background: checked ? '#0b2140' : '#fff',
       color: checked ? '#fff' : '#444',
       borderRadius: 2, padding: '0 3px', fontSize: '0.82em',
       fontWeight: checked ? 700 : 400, marginRight: 2,
@@ -40,7 +41,7 @@ function Opt({ label, checked }: { label: string; checked?: boolean }) {
 
 /* 빈 밑줄 */
 function Blank({ w = 50 }: { w?: number }) {
-  return <span style={{ display: 'inline-block', borderBottom: '1.5px solid #bbb', minWidth: w, height: 12, marginBottom: -2 }} />
+  return <span style={{ display: 'inline-block', borderBottom: '1px solid #aeb5c4', minWidth: w, height: 12, marginBottom: -2 }} />
 }
 
 /* 작은 레이블 */
@@ -51,7 +52,7 @@ function L({ children }: { children: React.ReactNode }) {
 /* 인콜에서 채워진 값 */
 function Val({ v }: { v?: string | null }) {
   return v && String(v).trim()
-    ? <span style={{ color: '#1a2a40', fontWeight: 700, display: 'block', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{v}</span>
+    ? <span style={{ color: '#0b2140', fontWeight: 700, display: 'block', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{v}</span>
     : <span style={{ color: '#ccc', fontSize: '0.8em' }}>—</span>
 }
 
@@ -59,7 +60,7 @@ function Val({ v }: { v?: string | null }) {
 function TH(bg: string, bc: string, p: string, extra: CS = {}): CS {
   return {
     background: bg, border: `1px solid ${bc}`, padding: p,
-    fontSize: 'inherit', fontWeight: 700, color: '#1a2a40',
+    fontSize: 'inherit', fontWeight: 700, color: '#0b2140',
     textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap',
     overflow: 'hidden',
     WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' as any,
@@ -83,7 +84,7 @@ function SectBanner({ bg, bc, color, children, isPrint = false }: { bg: string; 
       <td colSpan={13} style={{
         background: bg, border: `1px solid ${bc}`, color,
         fontWeight: 700, fontSize: '0.88em', padding: isPrint ? '1px 5px' : '3px 7px',
-        letterSpacing: '0.3px',
+        letterSpacing: '1px',
         WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' as any,
       }}>{children}</td>
     </tr>
@@ -163,7 +164,7 @@ export default function MeetingJournal({ customer, onClose }: MeetingJournalProp
             <span style={{ fontWeight: 700, fontSize: 13, color: '#1a2a40' }}>미팅일지 미리보기 — {company}</span>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => window.print()}
-                style={{ padding: '6px 16px', borderRadius: 8, background: '#1a2a40', color: '#fff', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
+                style={{ padding: '6px 16px', borderRadius: 8, background: '#0b2140', color: '#fff', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
                 출력 / PDF 저장
               </button>
               <button onClick={onClose}
@@ -214,41 +215,46 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, isPrint }: Bo
 
   return (
     <div style={{
-      fontFamily: 'inherit',
+      fontFamily: 'inherit', position: 'relative',
+      border: `${isPrint ? 1.2 : 2}px solid ${NAVY}`, outline: `1px solid ${GOLD}`, outlineOffset: isPrint ? 1 : 2,
+      padding: isPrint ? 3 : 8, background: '#fff',
       ...(isPrint ? {
         display: 'block',
         width: '100%',
       } : {}),
     }}>
+      {/* 워터마크 — 계약서 용지와 같은 분위기 */}
+      <img src="/images/logo.png" alt="" aria-hidden style={{ position: 'absolute', left: '50%', top: '52%', width: '46%', transform: 'translate(-50%,-50%)', opacity: 0.045, filter: 'grayscale(1)', pointerEvents: 'none', zIndex: 0 }} />
 
       {/* ══ 헤더 ══ */}
       <div style={{
-        background: '#1a2a40',
-        borderRadius: isPrint ? 0 : 8,
-        padding: isPrint ? '3pt 6pt' : '12px 16px 14px',
-        marginBottom: isPrint ? 4 : 8,
+        background: 'linear-gradient(135deg, #0e2446 0%, #0a1b36 100%)',
+        borderBottom: `${isPrint ? 1.5 : 3}px solid ${GOLD}`,
+        padding: isPrint ? '3pt 7pt' : '12px 18px 14px',
+        marginBottom: isPrint ? 4 : 8, position: 'relative', zIndex: 1,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' as any,
       }}>
         {/* 로고 */}
         <img src="/images/logo.png" alt="HUNDRED"
-          style={{ height: isPrint ? 20 : 36, objectFit: 'contain', filter: 'brightness(0) invert(1)', opacity: 0.9 }} />
+          style={{ height: isPrint ? 20 : 36, objectFit: 'contain', filter: 'brightness(0) invert(1)', opacity: 0.92 }} />
 
         {/* 업체명 */}
         <div style={{ flex: 1, textAlign: 'center', padding: '0 8px' }}>
-          <div style={{ fontSize: isPrint ? '1.6em' : '2em', fontWeight: 900, color: '#ffffff', letterSpacing: 2, textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
+          <div style={{ fontSize: '0.7em', color: GOLD, letterSpacing: 5, fontWeight: 700, marginBottom: 1 }}>MEETING JOURNAL</div>
+          <div style={{ fontSize: isPrint ? '1.55em' : '1.9em', fontWeight: 800, color: '#ffffff', letterSpacing: 2, fontFamily: '"Noto Serif KR","Batang","Apple Myungjo",serif' }}>
             {company || <span style={{ opacity: 0.4 }}>업체명</span>}
           </div>
-          <div style={{ fontSize: '0.75em', color: 'rgba(255,255,255,0.55)', marginTop: 1, letterSpacing: 1 }}>MEETING JOURNAL</div>
+          <div style={{ width: isPrint ? 60 : 90, height: 1, background: GOLD, margin: '3px auto 0', opacity: 0.8 }} />
         </div>
 
         {/* 일시 / 대표자 / 연락처 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: isPrint ? 2 : 4, minWidth: isPrint ? 130 : 160 }}>
           {[['일시', dateStr], ['대표자', name], ['연락처', phone]].map(([lb, val]) => (
             <div key={lb} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.8em', fontWeight: 700, width: 38, flexShrink: 0 }}>{lb}</span>
+              <span style={{ color: GOLD, fontSize: '0.78em', fontWeight: 700, width: 38, flexShrink: 0, letterSpacing: 1 }}>{lb}</span>
               <span style={{
-                flex: 1, borderBottom: '1px solid rgba(255,255,255,0.35)',
+                flex: 1, borderBottom: '1px solid rgba(197,162,88,0.5)',
                 color: '#fff', fontSize: '0.85em', fontWeight: 600,
                 paddingLeft: 3, paddingBottom: 1,
               }}>{val || ' '}</span>
@@ -258,7 +264,7 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, isPrint }: Bo
       </div>
 
       {/* ══ 메인 테이블 ══ */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 'inherit' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 'inherit', position: 'relative', zIndex: 1 }}>
         <colgroup>
           <col style={{ width: '5%' }} />
           <col style={{ width: '9%' }} />
@@ -418,7 +424,7 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, isPrint }: Bo
           </tr>
 
           {/* ━━ 제조 (주황) ━━ */}
-          <SectBanner bg="#fff3e0" bc={OB} color="#7a3000" isPrint={isPrint}>▶ 제조업 해당 시 작성</SectBanner>
+          <SectBanner bg="#faf3e3" bc={OB} color="#6b5420" isPrint={isPrint}>▶ 제조업 해당 시 작성</SectBanner>
           <tr>
             <td rowSpan={3} style={th(O, OB, { fontSize: '0.9em' })}>제조</td>
             <td style={th(O, OB)}>제작 방식</td>
@@ -447,7 +453,7 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, isPrint }: Bo
           </tr>
 
           {/* ━━ 정보통신 (파랑) ━━ */}
-          <SectBanner bg="#e8f2ff" bc={BB} color="#0a2a5a" isPrint={isPrint}>▶ 정보통신업 해당 시 작성</SectBanner>
+          <SectBanner bg="#eaf0f8" bc={BB} color="#1f3558" isPrint={isPrint}>▶ 정보통신업 해당 시 작성</SectBanner>
           <tr>
             <td rowSpan={2} style={th(B, BB, { fontSize: '0.9em' })}>정보<br />통신</td>
             <td style={th(B, BB)}>개발 단계</td>
@@ -470,7 +476,7 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, isPrint }: Bo
           </tr>
 
           {/* ━━ 법인 (보라) ━━ */}
-          <SectBanner bg="#f3eeff" bc={PB} color="#2e0870" isPrint={isPrint}>▶ 법인 해당 시 작성</SectBanner>
+          <SectBanner bg="#f0ecf5" bc={PB} color="#463a63" isPrint={isPrint}>▶ 법인 해당 시 작성</SectBanner>
           <tr>
             <td rowSpan={5} style={th(P, PB, { fontSize: '0.9em' })}>법인</td>
             <td style={th(P, PB)}>실제경영자</td>
@@ -519,16 +525,16 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, isPrint }: Bo
 
       {/* ━━ 미팅 메모 (빈 필기란) ━━ */}
       <div style={{
-        minHeight: isPrint ? 0 : 80,
+        minHeight: isPrint ? 0 : 80, position: 'relative', zIndex: 1,
         border: `1px solid ${GB}`, marginTop: -1, padding: '5px 8px',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-          <span style={{ fontWeight: 700, fontSize: '1.05em', color: '#1a2a40', letterSpacing: 0.5 }}>미팅 메모</span>
+          <span style={{ fontWeight: 800, fontSize: '1.05em', color: NAVY, letterSpacing: 2, borderBottom: `2px solid ${GOLD}`, paddingBottom: 1, fontFamily: '"Noto Serif KR","Batang",serif' }}>미팅 메모</span>
           <div style={{ display: 'flex', gap: 20 }}>
             {['작성자', '확인자'].map(label => (
               <div key={label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                <span style={{ fontSize: '0.85em', color: '#666', fontWeight: 700 }}>{label}</span>
-                <div style={{ border: '1px solid #aaa', width: 58, height: 30, borderRadius: 3 }} />
+                <span style={{ fontSize: '0.85em', color: GOLD, fontWeight: 700, letterSpacing: 1 }}>{label}</span>
+                <div style={{ border: `1px solid ${GB}`, width: 58, height: 30, borderRadius: 2 }} />
               </div>
             ))}
           </div>
@@ -536,13 +542,14 @@ function JournalBody({ d, company, name, phone, dateStr, corpType, isPrint }: Bo
         <div>
           {Array.from({ length: isPrint ? 7 : 5 }).map((_, i) => (
             <div key={i} style={{
-              borderBottom: '1px solid #ddd',
+              borderBottom: '1px solid #dcd8cb',
               height: isPrint ? '6mm' : 18,
               marginBottom: isPrint ? 0 : 4,
             }} />
           ))}
         </div>
       </div>
+      <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', marginTop: isPrint ? 2 : 6, fontSize: '0.72em', letterSpacing: 4, color: GOLD, fontWeight: 700 }}>HUNDRED CONSULTING</div>
 
     </div>
   )

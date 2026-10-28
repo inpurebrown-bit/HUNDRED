@@ -39,6 +39,7 @@ export interface ContractInput {
   extraClauses?: string[]                     // 추가 특약
   company?: CompanyInfo
   textOverrides?: Record<string, string>      // 대표가 고친 본문 (원문 → 새 문구)
+  blank?: boolean                             // 공계약서: 업체·금액·날짜를 모두 비워 현장에서 직접 쓰게 한다 (미팅용)
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -101,6 +102,7 @@ const cellStrikeAll = (tc: string, charMap: (id: string) => string) => tc.replac
 // ── 본체 ──
 async function prepare(inp: ContractInput, forPdf = false) {
   const co = inp.company || DEFAULT_COMPANY
+  const B = !!inp.blank
   const zip = await JSZip.loadAsync(Buffer.from(inp.type === 'fee' ? tplFee : tplNoFee, 'base64'))
   let header = await zip.file('Contents/header.xml')!.async('string')
   let s0 = await zip.file('Contents/section0.xml')!.async('string')
@@ -146,7 +148,7 @@ async function prepare(inp: ContractInput, forPdf = false) {
   const rows = ITEM_ROWS.map(r => {
     const o = inp.items[r.key]
     const on = r.required ? true : !!o?.on
-    return { ...r, on, amount: on ? Math.round(Number(o?.amount ?? r.amount) || 0) : 0 }
+    return { ...r, on: B ? true : on, amount: on && !B ? Math.round(Number(o?.amount ?? r.amount) || 0) : 0 }
   })
   const sum = rows.reduce((t, r) => t + (r.on ? r.amount : 0), 0)
   const vat = Math.round(sum * 0.1), total = sum + vat
@@ -164,7 +166,9 @@ async function prepare(inp: ContractInput, forPdf = false) {
     ps.forEach((b, k) => {
       const t = textOf(b.xml)
       let x = b.xml
-      if (/경영지도 및 자문 의뢰자/.test(t) && b.xml.includes('<hp:t>            </hp:t>')) {
+      if (B && !/별지 1\(업무범위 확인서\) 및 별지 2/.test(t)) {
+        if (inp.textOverrides && inp.textOverrides[t.trim()] != null && !x.includes('<hp:tbl')) x = setParaText(x, inp.textOverrides[t.trim()])
+      } else if (/경영지도 및 자문 의뢰자/.test(t) && b.xml.includes('<hp:t>            </hp:t>')) {
         x = x.replace('<hp:t>            </hp:t>', `<hp:t> ${esc(client.company)} </hp:t>`)
       } else if (/^2\. 착수금 :/.test(t.trim())) {
         x = x.replace('<hp:t>____________</hp:t>', `<hp:t> ${won(sum)} </hp:t>`)
@@ -200,22 +204,22 @@ async function prepare(inp: ContractInput, forPdf = false) {
     for (const t of [...tbls].reverse()) {
       let x = t.xml
       if (x.includes('<hp:t>2026</hp:t>') && x.includes('<hp:t>년</hp:t>')) {
-        x = mapCell(x, 0, 0, tc => cellText(tc, String(dt.getFullYear())))
-        x = mapCell(x, 0, 2, tc => cellText(tc, String(dt.getMonth() + 1)))
-        x = mapCell(x, 0, 4, tc => cellText(tc, String(dt.getDate())))
+        x = mapCell(x, 0, 0, tc => cellText(tc, B ? '' : String(dt.getFullYear())))
+        x = mapCell(x, 0, 2, tc => cellText(tc, B ? '' : String(dt.getMonth() + 1)))
+        x = mapCell(x, 0, 4, tc => cellText(tc, B ? '' : String(dt.getDate())))
       } else if (x.includes('<hp:t>사업자등록번호</hp:t>')) {
-        x = mapCell(x, 0, 2, tc => cellText(tc, client.company))
-        x = mapCell(x, 0, 4, tc => cellText(tc, client.bizNo || ''))
-        x = mapCell(x, 1, 2, tc => cellText(tc, client.address || ''))
-        x = mapCell(x, 2, 2, tc => cellText(tc, `${client.ceo || ''}  (인)`))
+        x = mapCell(x, 0, 2, tc => cellText(tc, B ? '' : client.company))
+        x = mapCell(x, 0, 4, tc => cellText(tc, B ? '' : client.bizNo || ''))
+        x = mapCell(x, 1, 2, tc => cellText(tc, B ? '' : client.address || ''))
+        x = mapCell(x, 2, 2, tc => cellText(tc, B ? '(인)' : `${client.ceo || ''}  (인)`))
         x = mapCell(x, 3, 2, tc => cellText(tc, co.name))
         x = mapCell(x, 3, 4, tc => cellText(tc, co.bizNo))
         x = mapCell(x, 4, 2, tc => cellText(tc, co.address))
         x = mapCell(x, 5, 2, tc => cellText(tc, `${co.ceo.split('').join(' ')} (인)`))
       } else if (x.includes('담당자</hp:t>')) {
         x = mapCell(x, 0, 0, tc => cellText(tc, `${co.name} 담당자`))
-        x = mapCell(x, 0, 1, tc => cellText(tc, client.managerName || ''))
-        x = mapCell(x, 0, 3, tc => cellText(tc, client.managerPhone || ''))
+        x = mapCell(x, 0, 1, tc => cellText(tc, B ? '' : client.managerName || ''))
+        x = mapCell(x, 0, 3, tc => cellText(tc, B ? '' : client.managerPhone || ''))
       } else continue
       s0 = s0.slice(0, t.start) + x + s0.slice(t.end)
     }
@@ -228,21 +232,22 @@ async function prepare(inp: ContractInput, forPdf = false) {
     for (const r of rows) {
       if (r.on) {
         x = mapCell(x, r.row, 0, tc => cellStrikeAll(tc, plain))
-        x = mapCell(x, r.row, 1, tc => cellText(tc, `${won(r.amount)}원`, plain))
+        x = mapCell(x, r.row, 1, tc => cellText(tc, B ? '' : `${won(r.amount)}원`, plain))
       } else {
         x = mapCell(x, r.row, 0, tc => cellStrikeAll(tc, strike))
         x = mapCell(x, r.row, 1, tc => cellText(tc, ' '.repeat(14), strike))
       }
     }
     // 과제 선정 이후 사후관리 (교부 지원금의 N%)
-    if (inp.postCare?.on) { x = mapCell(x, 9, 0, tc => cellStrikeAll(tc, plain)); x = mapCell(x, 9, 1, tc => cellText(tc, `교부 지원금의 ${inp.postCare?.percent || ''} %`, plain)) }
+    if (B) { x = mapCell(x, 9, 0, tc => cellStrikeAll(tc, plain)); x = mapCell(x, 9, 1, tc => cellText(tc, '교부 지원금의         %', plain)) }
+    else if (inp.postCare?.on) { x = mapCell(x, 9, 0, tc => cellStrikeAll(tc, plain)); x = mapCell(x, 9, 1, tc => cellText(tc, `교부 지원금의 ${inp.postCare?.percent || ''} %`, plain)) }
     else { x = mapCell(x, 9, 0, tc => cellStrikeAll(tc, strike)); x = mapCell(x, 9, 1, tc => cellText(tc, ' '.repeat(14), strike)) }
     // P라인
-    if (!inp.pLine) { x = mapCell(x, 10, 0, tc => cellStrikeAll(tc, strike)); for (const rr of [10, 11, 12, 13]) x = mapCell(x, rr, 1, tc => cellText(tc, ' '.repeat(14), strike)) }
+    if (!inp.pLine && !B) { x = mapCell(x, 10, 0, tc => cellStrikeAll(tc, strike)); for (const rr of [10, 11, 12, 13]) x = mapCell(x, rr, 1, tc => cellText(tc, ' '.repeat(14), strike)) }
     else { x = mapCell(x, 10, 0, tc => cellStrikeAll(tc, plain)); for (const rr of [10, 11, 12, 13]) x = mapCell(x, rr, 1, tc => cellStrikeAll(tc, plain)) }
-    x = mapCell(x, 14, 1, tc => cellText(tc, `${won(sum)}원`))
-    x = mapCell(x, 15, 1, tc => cellText(tc, `${won(vat)}원`))
-    x = mapCell(x, 16, 1, tc => cellText(tc, `${won(total)}원`))
+    x = mapCell(x, 14, 1, tc => cellText(tc, B ? '' : `${won(sum)}원`))
+    x = mapCell(x, 15, 1, tc => cellText(tc, B ? '' : `${won(vat)}원`))
+    x = mapCell(x, 16, 1, tc => cellText(tc, B ? '' : `${won(total)}원`))
     s1 = s1.slice(0, t.start) + x + s1.slice(t.end)
   }
 
@@ -261,9 +266,9 @@ async function prepare(inp: ContractInput, forPdf = false) {
     const d2 = inp.contractDate ? new Date(inp.contractDate + 'T00:00:00') : new Date(Date.now() + 9 * 3600 * 1000)
     s2 = s2.replace(/<hp:tbl [^>]*colCnt="6"[\s\S]*?<\/hp:tbl>/, tbl => {
       if (!tbl.includes('<hp:t>2026</hp:t>')) return tbl
-      let x = mapCell(tbl, 0, 0, tc => cellText(tc, String(d2.getFullYear())))
-      x = mapCell(x, 0, 2, tc => cellText(tc, String(d2.getMonth() + 1)))
-      return mapCell(x, 0, 4, tc => cellText(tc, String(d2.getDate())))
+      let x = mapCell(tbl, 0, 0, tc => cellText(tc, B ? '' : String(d2.getFullYear())))
+      x = mapCell(x, 0, 2, tc => cellText(tc, B ? '' : String(d2.getMonth() + 1)))
+      return mapCell(x, 0, 4, tc => cellText(tc, B ? '' : String(d2.getDate())))
     })
     const who = (inp.client.ceo || '').trim()
     if (who) s2 = s2.replace(/<hp:tbl [^>]*colCnt="3"[\s\S]*?<\/hp:tbl>/, tbl => (tbl.includes('정보주체') ? mapCell(tbl, 0, 1, tc => cellText(tc, who.split('').join(' '))) : tbl))
