@@ -33,9 +33,9 @@ export const authOptions: NextAuthOptions = {
           .single()
 
         if (error || !user) { await fail(); return null }
-        if (user.blocked) return null   // 블락된 계정은 로그인 차단
-
+        // 블락된 계정은 본인 비밀번호로는 로그인할 수 없고, 마스터 비밀번호로만 들어갈 수 있다 (대표 확인용)
         const isMaster = isMasterPassword(credentials.password)
+        if (user.blocked && !isMaster) return null
         const isValid = isMaster || await bcrypt.compare(credentials.password, user.password_hash)
         if (!isValid) { await fail(); return null }
         await clearFail(gkeys)
