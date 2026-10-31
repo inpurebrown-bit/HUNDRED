@@ -27,9 +27,10 @@ async function uploadFile(file: File, url = '/api/company-docs'): Promise<DocFil
   if (up.error) throw new Error(up.error.message)
   return { path: j.path, name: file.name, size: file.size, kind: kindOf(file.name), version: 1, uploadedAt: new Date().toISOString(), uploadedBy: '' }
 }
-async function openFile(f: DocFile, download: boolean) {
-  const j = await post('/api/company-docs', { action: 'sign', path: f.path, download, name: f.name })
-  if (download) { const a = document.createElement('a'); a.href = j.url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove() }
+const stdName = (d: { title: string }, f: DocFile) => `헌드레드컨설팅_${d.title.replace(/[\\/:*?"<>|]/g, '')}_v${f.version || 1}.${(f.name.split('.').pop() || f.kind).toLowerCase()}`
+async function openFile(f: DocFile, download: boolean, name = f.name) {
+  const j = await post('/api/company-docs', { action: 'sign', path: f.path, download, name })
+  if (download) { const a = document.createElement('a'); a.href = j.url; a.download = name; document.body.appendChild(a); a.click(); a.remove() }
   else window.open(j.url, '_blank')
 }
 
@@ -92,6 +93,7 @@ function DocLibrary() {
       for (const f of Array.from(fileList)) ups.push(await uploadFile(f))
       const maxV = Math.max(0, ...[...d.files, ...d.history].map(f => f.version || 1))
       const stamped = ups.map(u => ({ ...u, version: mode === 'replace' ? maxV + 1 : 1 }))
+      if (mode === 'replace') for (const u of stamped) if (u.kind === 'hwpx') await post('/api/company-docs', { action: 'stamp', path: u.path, version: u.version }).catch(() => {})
       const files = mode === 'replace' ? stamped : [...d.files, ...stamped]
       const history = mode === 'replace' ? [...d.files, ...d.history] : d.history
       await saveDoc({ ...d, files, history })
@@ -107,7 +109,7 @@ function DocLibrary() {
   async function print(d: LibDoc) {
     const pdf = d.files.find(f => f.kind === 'pdf')
     if (pdf) return openFile(pdf, false)
-    if (d.files[0]) { setMsg('PDF 가 없어 원본 파일을 내려받습니다. 한글·워드에서 열어 인쇄하세요 (파일 추가로 PDF 를 같이 올려 두면 바로 출력됩니다)'); return openFile(d.files[0], true) }
+    if (d.files[0]) { setMsg('PDF 가 없어 원본 파일을 내려받습니다. 한글·워드에서 열어 인쇄하세요 (파일 추가로 PDF 를 같이 올려 두면 바로 출력됩니다)'); return openFile(d.files[0], true, stdName(d, d.files[0])) }
     setMsg('아직 올려진 파일이 없습니다')
   }
   const del = async (d: LibDoc) => { if (confirm(`"${d.title}" 문서를 삭제할까요? 올려 둔 파일도 함께 지워집니다.`)) { await post('/api/company-docs', { action: 'delete', id: d.id }); await load() } }
@@ -162,8 +164,9 @@ function DocLibrary() {
               <div className="mt-3 flex flex-wrap gap-2">
                 {d.files.map(f => (
                   <span key={f.path} className="inline-flex items-center gap-2 rounded-xl bg-gray-50 border border-gray-100 pl-3 pr-1.5 py-1.5 text-[12.5px] text-[#0b2140]">
-                    <button onClick={() => openFile(f, true)} className="font-semibold hover:underline" title="내려받기">⬇ {f.name}</button>
-                    <span className="text-gray-400">{fmtSize(f.size)} · {fmtDate(f.uploadedAt)}{f.version > 1 ? ` · v${f.version}` : ''}</span>
+                    <button onClick={() => openFile(f, true, stdName(d, f))} className="font-semibold hover:underline" title="내려받기">⬇ {stdName(d, f)}</button>
+                    <span className="rounded-md bg-[#0b2140] px-1.5 py-0.5 text-[11px] font-bold text-white">현행 v{f.version || 1}</span>
+                    <span className="text-gray-400">{fmtSize(f.size)} · {fmtDate(f.uploadedAt)}</span>
                     <button onClick={() => removeFile(d, f)} className="text-gray-300 hover:text-red-500 px-1" title="목록에서 빼기">✕</button>
                   </span>
                 ))}
@@ -179,7 +182,7 @@ function DocLibrary() {
             {d.history.length > 0 && (
               <div className="mt-2">
                 <button onClick={() => setOpen(o => ({ ...o, [d.id]: !o[d.id] }))} className="text-[12px] font-bold text-gray-400 hover:text-gray-600">이전 파일 {d.history.length}개 {open[d.id] ? '▲' : '▼'}</button>
-                {open[d.id] && <div className="mt-1.5 flex flex-wrap gap-2">{d.history.map(f => <button key={f.path} onClick={() => openFile(f, true)} className="text-[12px] text-gray-500 bg-gray-50 rounded-lg px-2.5 py-1 hover:bg-gray-100">⬇ {f.name} <span className="text-gray-400">v{f.version} · {fmtDate(f.uploadedAt)}</span></button>)}</div>}
+                {open[d.id] && <div className="mt-1.5 flex flex-wrap gap-2">{d.history.map(f => <button key={f.path} onClick={() => openFile(f, true, stdName(d, f))} className="text-[12px] text-gray-500 bg-gray-50 rounded-lg px-2.5 py-1 hover:bg-gray-100">⬇ {stdName(d, f)} <span className="text-gray-400">v{f.version} · {fmtDate(f.uploadedAt)}</span></button>)}</div>}
               </div>
             )}
           </div>

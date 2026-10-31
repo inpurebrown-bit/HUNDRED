@@ -38,6 +38,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url: data.signedUrl })
   }
 
+  // 한글(.hwpx) 파일 안의 "현행 v○" 를 지금 번호로 바꿔 준다 (표시된 번호와 보관함 번호가 달라지지 않게)
+  if (body.action === 'stamp') {
+    const path = String(body.path || ''), ver = Number(body.version) || 1
+    const { data: blob, error } = await supabaseAdmin.storage.from(BUCKET).download(path)
+    if (error || !blob) return NextResponse.json({ ok: false })
+    const JSZip = (await import('jszip')).default
+    const zip = await JSZip.loadAsync(Buffer.from(await blob.arrayBuffer()))
+    let changed = false
+    for (const name of Object.keys(zip.files).filter(n => /^Contents\/section\d+\.xml$/.test(n))) {
+      const x = await zip.file(name)!.async('string')
+      const y = x.replace(/현행 v\d+/g, '현행 v' + ver)
+      if (y !== x) { zip.file(name, y); changed = true }
+    }
+    if (!changed) return NextResponse.json({ ok: true, changed: false })
+    const mime = await zip.file('mimetype')?.async('string')
+    const out = new JSZip()
+    if (mime) out.file('mimetype', mime, { compression: 'STORE' })
+    for (const n of Object.keys(zip.files)) { const f = zip.files[n]; if (!f.dir && n !== 'mimetype') out.file(n, await f.async('nodebuffer'), { compression: 'DEFLATE' }) }
+    const buf = await out.generateAsync({ type: 'nodebuffer' })
+    await supabaseAdmin.storage.from(BUCKET).upload(path, buf, { contentType: 'application/octet-stream', upsert: true })
+    return NextResponse.json({ ok: true, changed: true })
+  }
+
   const lib = await readLib()
 
   // 문서 저장 (추가·수정·파일 교체 모두 이 한 곳)

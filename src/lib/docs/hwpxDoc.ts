@@ -6,8 +6,10 @@ import bgImage from '../contract/bgImage'
 import coverImage from './coverImage'
 
 export type DocBlock =
-  | { t: 'h1' | 'h2' | 'h3' | 'p' | 'li' | 'note'; text: string }
-  | { t: 'table'; rows: string[][] }
+  | { t: 'h1' | 'h2' | 'h3' | 'p' | 'li' | 'note'; text: string; align?: 'center' | 'right' }
+  | { t: 'table'; rows: string[][]; form?: boolean; labelCols?: number[]; widths?: number[]; heights?: number[] }
+  | { t: 'approval'; leader?: string; ceo?: string }          // 상단 결재란 (팀장·대표)
+  | { t: 'title'; text: string; pb?: boolean }                 // 가운데 큰 제목 (묶음 서식에서 서식마다 새 쪽)
 export interface DocContent { title: string; subtitle?: string; blocks: DocBlock[] }
 // 표지·목차를 붙일 때 쓰는 정보 (정관 내려받기용)
 export interface CoverOpts { org: string; version: string; date: string; eyebrow?: string }
@@ -48,21 +50,24 @@ export async function buildDocParts(doc: DocContent, cover?: CoverOpts, mode: 'h
   const empty = () => para('', CP.p)
 
   let tblId = 1226400000
-  const table = (rows: string[][]) => {
+  const table = (rows: string[][], o: { form?: boolean; labelCols?: number[]; widths?: number[]; heights?: number[]; total?: number; right?: boolean; center?: boolean } = {}) => {
+    const total = o.total ?? W_TOTAL
     const nC = Math.max(...rows.map(r => r.length)), nR = rows.length
     // 열 너비: 글자 수에 비례 (최소 비율 보장)
     const len = Array.from({ length: nC }, (_, c) => Math.max(8, ...rows.map(r => Math.min(40, (r[c] || '').length))))
     const sum = len.reduce((a, v) => a + v, 0)
-    let widths = len.map(l => Math.max(3000, Math.round((l / sum) * W_TOTAL)))
-    const over = widths.reduce((a, v) => a + v, 0) - W_TOTAL
+    let widths = len.map(l => Math.max(3000, Math.round((l / sum) * total)))
+    if (o.widths) { const ws = o.widths.reduce((a, v) => a + v, 0); widths = o.widths.map(v => Math.round((v / ws) * total)) }
+    const over = widths.reduce((a, v) => a + v, 0) - total
     widths[widths.indexOf(Math.max(...widths))] -= over
     const cell = (txt: string, r: number, c: number, head: boolean) => {
       const bf = head ? 9 : 5
-      const ps = String(txt ?? '').split('\n').map(line => para(line, head ? CP.cellHead : CP.cell, head ? '21' : '22')).join('')
-      return `<hp:tc name="" header="${head ? 1 : 0}" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="${bf}"><hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">${ps}</hp:subList><hp:cellAddr colAddr="${c}" rowAddr="${r}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="${widths[c]}" height="1700"/><hp:cellMargin left="510" right="510" top="141" bottom="141"/></hp:tc>`
+      const mid = !!o.center
+      const ps = String(txt ?? '').split('\n').map(line => para(line, head ? CP.cellHead : CP.cell, head ? '21' : mid ? '21' : '22')).join('')
+      return `<hp:tc name="" header="${head ? 1 : 0}" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="${bf}"><hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">${ps}</hp:subList><hp:cellAddr colAddr="${c}" rowAddr="${r}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="${widths[c]}" height="${o.heights?.[r] ?? 1700}"/><hp:cellMargin left="510" right="510" top="141" bottom="141"/></hp:tc>`
     }
-    const trs = rows.map((row, r) => `<hp:tr>${Array.from({ length: nC }, (_, c) => cell(row[c] ?? '', r, c, r === 0)).join('')}</hp:tr>`).join('')
-    return `<hp:p id="0" paraPrIDRef="25" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="${CP.cell}"><hp:tbl id="${tblId++}" zOrder="0" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="CELL" repeatHeader="1" rowCnt="${nR}" colCnt="${nC}" cellSpacing="0" borderFillIDRef="5" noAdjust="0"><hp:sz width="${W_TOTAL}" widthRelTo="ABSOLUTE" height="${nR * 1700}" heightRelTo="ABSOLUTE" protect="0"/><hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/><hp:outMargin left="0" right="0" top="283" bottom="283"/><hp:inMargin left="510" right="510" top="141" bottom="141"/>${trs}</hp:tbl><hp:t/></hp:run></hp:p>`
+    const trs = rows.map((row, r) => `<hp:tr>${Array.from({ length: nC }, (_, c) => cell(row[c] ?? '', r, c, o.form ? !!o.labelCols?.includes(c) : r === 0)).join('')}</hp:tr>`).join('')
+    return `<hp:p id="0" paraPrIDRef="${o.right ? 24 : 25}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="${CP.cell}"><hp:tbl id="${tblId++}" zOrder="0" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="CELL" repeatHeader="1" rowCnt="${nR}" colCnt="${nC}" cellSpacing="0" borderFillIDRef="5" noAdjust="0"><hp:sz width="${total}" widthRelTo="ABSOLUTE" height="${Array.from({ length: nR }, (_, r) => o.heights?.[r] ?? 1700).reduce((a, v) => a + v, 0)}" heightRelTo="ABSOLUTE" protect="0"/><hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/><hp:outMargin left="0" right="0" top="283" bottom="283"/><hp:inMargin left="510" right="510" top="141" bottom="141"/>${trs}</hp:tbl><hp:t/></hp:run></hp:p>`
   }
 
   // 첫 문단: 쪽 설정(용지·배경)이 들어 있는 원본의 첫 문단을 그대로 쓰고 제목 글만 바꾼다
@@ -115,14 +120,21 @@ export async function buildDocParts(doc: DocContent, cover?: CoverOpts, mode: 'h
 
   let firstH1 = !cover
   for (const bl of doc.blocks) {
-    if (bl.t === 'table') { body += table(bl.rows); body += para('', CP.note); continue }
+    if (bl.t === 'table') { body += table(bl.rows, bl); body += para('', CP.note); continue }
+    if (bl.t === 'approval') {
+      // 팀장·대표 결재란: 오른쪽 위. 대표 이름은 미리 찍어 두어 서명만 하면 된다
+      body += table([['팀  장', '대  표'], [bl.leader ? '\n\n' + bl.leader : '', '\n\n' + (bl.ceo ?? '백승협')]], { widths: [1, 1], heights: [1500, 2600], total: 15000, right: true, center: true })
+      body += para('', CP.note); continue
+    }
+    if (bl.t === 'title') { body += para(bl.text, CP.h1, '25', !!bl.pb) + empty(); continue }
     const text = bl.text || ''
+    const al = bl.align === 'center' ? '25' : bl.align === 'right' ? '24' : ''
     if (bl.t === 'h1') { body += para(text, CP.h1, '12', !firstH1); firstH1 = false; body += empty(); continue }
     if (bl.t === 'h2') { body += empty() + para(text, CP.h2, '12'); continue }
     if (bl.t === 'h3') { body += para(text, CP.h3, '12'); continue }
-    if (bl.t === 'li') { body += para(text, CP.li, '12'); continue }
-    if (bl.t === 'note') { body += para(text, CP.note, '12'); continue }
-    body += para(text, CP.p, '0')
+    if (bl.t === 'li') { body += para(text, CP.li, al || '12'); continue }
+    if (bl.t === 'note') { body += para(text, CP.note, al || '12'); continue }
+    body += para(text, CP.p, al || '0')
   }
   sections.push(open + body + '</hs:sec>')
   return { header, sections, zip, coverBgId }

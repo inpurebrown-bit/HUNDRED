@@ -31,6 +31,7 @@ interface SalesEmployee {
   base_pay?: number         // 기본급(기본 160만원)
   work_days?: number        // 일할 근무일수(1~30, 비우면 30일)
   resign_date?: string      // 퇴사일 — 입력하면 퇴사월 기본급을 영업일 기준으로 일할
+  join_date?: string        // 계약 시작일 — 기본제(160만+7%)를 고를 수 있는 2달 기간 계산
   memo?: string             // 비고(계산 사유)
 }
 
@@ -67,13 +68,22 @@ function calcOps(e: OpsEmployee) {
   return { feeInc, putoInc, subBonus, awardsSum, before, after }
 }
 
+// 기본제(160만+7%)는 계약 시작 후 2달까지만 고를 수 있고, 그 뒤에는 인센제(올인센)로 고정된다
+function payWindow(joinDate: string | undefined, ym: string) {
+  if (!joinDate) return null
+  const end = new Date(joinDate + 'T00:00:00'); end.setMonth(end.getMonth() + 2)   // 이 날부터 인센제
+  const locked = new Date(ym + '-01T00:00:00').getTime() >= end.getTime()
+  const left = Math.ceil((end.getTime() - Date.now()) / 86400000)
+  return { end, locked, left }
+}
+
 function calcSales(e: SalesEmployee, ym: string) {
   const perfBonus    = Number(e.performance_bonus)
   const promo        = getPromo(e.contract_count)
   const awardsSum    = (e.awards || []).reduce((s, a) => s + Number(a.amount || 0), 0)
   const st = calcSalesStructure({
     revenue: Number(e.contract_revenue), perfBonus, promo,
-    payMode: e.pay_mode, basePay: e.base_pay, workDays: e.work_days, yearMonth: ym, resignDate: e.resign_date,
+    payMode: e.pay_mode, joinDate: e.join_date, basePay: e.base_pay, workDays: e.work_days, yearMonth: ym, resignDate: e.resign_date,
   })
   const before       = st.main + awardsSum
   const after        = calcWithholding(before).after
@@ -283,10 +293,11 @@ function SalesCard({
   const prorated = c.days < c.totalDays
   const man = (n: number) => n.toLocaleString('ko-KR')
 
-  const modeBtn = (mode: SalesPayMode, label: string, amount: number, active: boolean) => (
-    <button key={mode} onClick={() => onPatch(idx, { pay_mode: mode })}
+  const win = payWindow(emp.join_date, yearMonth)
+  const modeBtn = (mode: SalesPayMode, label: string, amount: number, active: boolean, disabled = false) => (
+    <button key={mode} disabled={disabled} onClick={() => onPatch(idx, { pay_mode: mode })}
       title={label + ' 방식으로 이번 달 지급'}
-      className={`flex-1 rounded-lg px-2 py-1.5 text-left transition-colors border ${active ? 'bg-white text-[#8a6d2b] border-white shadow' : 'bg-white/10 text-white/80 border-white/20 hover:bg-white/20'}`}>
+      className={`flex-1 rounded-lg px-2 py-1.5 text-left transition-colors border ${disabled ? 'opacity-40 cursor-not-allowed ' : ''}${active ? 'bg-white text-[#8a6d2b] border-white shadow' : 'bg-white/10 text-white/80 border-white/20 hover:bg-white/20'}`}>
       <span className="block text-[10px] font-semibold leading-tight">{label}{active ? ' ✓' : ''}</span>
       <span className="block text-[11px] font-black leading-tight">{amount > 0 ? man(amount) + '원' : '-'}</span>
     </button>
@@ -313,10 +324,15 @@ function SalesCard({
         </div>
         {/* 지급 방식: 160+7% / 올인센 / 자동(높은 쪽) — 각각 지급 시 금액 바로 비교 */}
         <div className="flex gap-1.5 mt-2">
-          {modeBtn('base7', '160만+7%', c.baseTotal, c.selected && c.chosen === 'base7')}
+          {modeBtn('base7', '160만+7%', c.baseTotal, c.selected && c.chosen === 'base7', !!win?.locked)}
           {modeBtn('all', '올인센', c.allTotal, c.selected && c.chosen === 'all')}
         </div>
-        {!c.selected && <p className="text-[10px] text-white/80 mt-1">방식 미선택 · 올인센 기준 표시 중</p>}
+        {win?.locked
+          ? <p className="text-[10px] text-white/90 mt-1 font-semibold">계약 시작 2달 경과 · 인센제(올인센) 고정</p>
+          : win
+            ? <p className="text-[10px] text-white/90 mt-1 font-semibold">기본제 선택 가능 · {win.end.getMonth() + 1}/{win.end.getDate()}까지 ({win.left > 0 ? `D-${win.left}` : '오늘 마감'})</p>
+            : <p className="text-[10px] text-white/70 mt-1">계약 시작일을 넣으면 선택 가능 기간(2달)이 표시됩니다</p>}
+        {!c.selected && !win?.locked && <p className="text-[10px] text-white/80 mt-1">방식 미선택 · 올인센 기준 표시 중</p>}
       </div>
       {/* 항목 */}
       <div className="px-4 py-3 space-y-0">
@@ -347,6 +363,13 @@ function SalesCard({
           </>
         )}
 
+        {/* 계약 시작일 — 기본제 선택 가능 기간(2달) 계산 */}
+        <div className="flex items-center justify-between py-1.5 border-b border-gray-50">
+          <span className="text-xs text-gray-400">계약 시작일 <span className="text-[9px] text-gray-300">(기본제 선택 2달)</span></span>
+          <input type="date" value={emp.join_date || ''}
+            onChange={e => onPatch(idx, { join_date: e.target.value || undefined })}
+            className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-amber-300 text-gray-700" />
+        </div>
         {/* 퇴사일 (퇴사월 기본급은 영업일 기준으로 일할) */}
         <div className="flex items-center justify-between py-1.5 border-b border-gray-50">
           <span className="text-xs text-gray-400">퇴사일 <span className="text-[9px] text-gray-300">(영업일 기준 일할)</span></span>
@@ -497,9 +520,7 @@ export default function PayrollTab() {
   const [opsEmps, setOpsEmps] = useState<OpsEmployee[]>([
     { ...defaultOps(), name: '김윤지', base_salary: 2_000_000 },
   ])
-  const [salesEmps, setSalesEmps] = useState<SalesEmployee[]>([
-    { ...defaultSales(), name: '손제후' },
-  ])
+  const [salesEmps, setSalesEmps] = useState<SalesEmployee[]>([])
   const [digEmps, setDigEmps] = useState<DigEmployee[]>([])
   const [costs, setCosts]     = useState<OtherCosts>(defaultCosts())
   const [revTotals, setRevTotals] = useState<{ sales: number; ops: number; opsContract: number } | null>(null)

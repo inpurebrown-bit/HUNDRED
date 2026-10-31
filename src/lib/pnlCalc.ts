@@ -49,7 +49,7 @@ export function calcMonthPnl(ym: string, employees: any | null): MonthPnl {
     }
     const st = calcSalesStructure({
       revenue: n(s.contract_revenue), perfBonus: n(s.performance_bonus), promo: getPromo(n(s.contract_count)),
-      payMode: s.pay_mode, basePay: s.base_pay, workDays: s.work_days, yearMonth: ym, resignDate: s.resign_date,
+      payMode: s.pay_mode, joinDate: (s as any).join_date, basePay: s.base_pay, workDays: s.work_days, yearMonth: ym, resignDate: s.resign_date,
     })
     salesLabor += st.main + sumAwards(s.awards)
     if (st.chosen === 'base7') salesFixed += st.baseProrated

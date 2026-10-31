@@ -35,7 +35,7 @@ type Tone = 'header' | 'label' | 'sub' | 'banner' | 'off' | null
 interface Cell { r: number; c: number; rs: number; cs: number; w: number; h: number; blocks: Block[]; fill: string | null; border: boolean; tone: Tone }
 interface Table { cells: Cell[]; width: number; align: 'LEFT' | 'CENTER' | 'RIGHT' }
 interface AmtRow { label: string; value: string; note: string }
-type Block = { kind: 'p'; p: Para } | { kind: 'table'; t: Table } | { kind: 'amt'; rows: AmtRow[] } | { kind: 'sp'; h: number }
+type Block = { kind: 'p'; p: Para } | { kind: 'table'; t: Table } | { kind: 'amt'; rows: AmtRow[] } | { kind: 'sp'; h: number; pb?: boolean }
 
 function parseHeader(h: string) {
   const chars: Record<string, CharStyle> = {}
@@ -85,6 +85,7 @@ function blocksFrom(parent: XNode, H: Hdr): Block[] {
   const out: Block[] = []
   for (const p of kids(parent, 'hp:p')) {
     const { para, tables } = paraFrom(p, H)
+    if (p.attrs.pageBreak === '1') out.push({ kind: 'sp', h: 0, pb: true })   // 문단 앞에서 새 쪽
     if (tables.length) {
       const al = para.align === 'CENTER' ? 'CENTER' : para.align === 'RIGHT' ? 'RIGHT' : 'LEFT'
       for (const t of tables) out.push({ kind: 'table', t: tableFrom(t, H, al) })
@@ -282,7 +283,7 @@ export async function renderPdf(opt: { header: string; sections: string[]; bg: B
     | { kind: 'p'; p: Para; lines: Line[]; hs: number[]; h: number; lf: number }
     | { kind: 'table'; t: Table; colX: number[]; colW: number[]; rowH: number[]; rowTop: number[]; cells: MCell[]; x0: number; tw: number; h: number }
     | { kind: 'amt'; rows: AmtRow[]; h: number }
-    | { kind: 'sp'; h: number }
+    | { kind: 'sp'; h: number; pb?: boolean }
 
   const padY = () => (scale < 1 ? 1.4 : 3.2)
   const padX = (w: number) => Math.min(5, Math.max(1.6, w * 0.1))
@@ -291,7 +292,7 @@ export async function renderPdf(opt: { header: string; sections: string[]; bg: B
   function measure(blocks: Block[], width: number, lf = LINE): Meas[] {
     const out: Meas[] = []
     for (const b of blocks) {
-      if (b.kind === 'sp') { out.push({ kind: 'sp', h: b.h * scale }); continue }
+      if (b.kind === 'sp') { out.push({ kind: 'sp', h: b.h * scale, pb: b.pb }); continue }
       if (b.kind === 'amt') { out.push({ kind: 'amt', rows: b.rows, h: b.rows.length * AMT_ROW * scale + 6 }); continue }
       if (b.kind === 'p') {
         const lines = layout(b.p, width), hs = lineHs(b.p, lines, lf)
@@ -467,7 +468,7 @@ export async function renderPdf(opt: { header: string; sections: string[]; bg: B
         const need = rest.reduce((a, m) => a + m.h, 0) + 24
         if (need > y - M.bottom && y < top - 1) newPage()
       }
-      if (b.kind === 'sp') { y -= b.h; continue }
+      if (b.kind === 'sp') { if (b.pb) { if (y < top - 1) newPage() } else y -= b.h; continue }
       if (b.kind === 'amt') {
         const [m] = measure([b], CW) as Extract<Meas, { kind: 'amt' }>[]
         if (y - m.h < M.bottom) newPage()

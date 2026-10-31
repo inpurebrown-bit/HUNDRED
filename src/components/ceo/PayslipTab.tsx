@@ -29,6 +29,7 @@ interface EmpFinancial {
   awards: AwardItem[]
   // 영업팀 급여 방식
   sales_pay_mode?: SalesPayMode
+  sales_join_date?: string
   sales_base_pay?: number
   work_days?: number
   resign_date?: string
@@ -110,7 +111,7 @@ function PayslipDocument({ emp, financial, yearMonth }: {
     const allowSum    = (financial.allowance_details || []).reduce((s, a) => s + Number(a.amount || 0), 0)
     const st = calcSalesStructure({
       revenue: financial.contract_revenue, perfBonus, promo,
-      payMode: financial.sales_pay_mode, basePay: financial.sales_base_pay, workDays: financial.work_days, yearMonth, resignDate: financial.resign_date,
+      payMode: financial.sales_pay_mode, joinDate: financial.sales_join_date, basePay: financial.sales_base_pay, workDays: financial.work_days, yearMonth, resignDate: financial.resign_date,
     })
     const contractInc = st.allInc
     const subtotal    = st.main + awardsSum + allowSum
@@ -624,6 +625,7 @@ export default function PayslipTab() {
               promo: getPromo(count),
               awards: savedMatch.awards || [],
               sales_pay_mode: savedMatch?.pay_mode,
+              sales_join_date: (savedMatch as any)?.join_date,
               sales_base_pay: savedMatch?.base_pay,
               work_days:      savedMatch?.work_days,
               resign_date:    savedMatch?.resign_date,
@@ -642,6 +644,7 @@ export default function PayslipTab() {
               promo:  getPromo(count),
               awards: savedMatch?.awards || [],
               sales_pay_mode: savedMatch?.pay_mode,
+              sales_join_date: (savedMatch as any)?.join_date,
               sales_base_pay: savedMatch?.base_pay,
               resign_date:    savedMatch?.resign_date,
               work_days:      savedMatch?.work_days,
@@ -657,6 +660,7 @@ export default function PayslipTab() {
               promo: getPromo(count),
               awards: savedMatch.awards || [],
               sales_pay_mode: savedMatch?.pay_mode,
+              sales_join_date: (savedMatch as any)?.join_date,
               sales_base_pay: savedMatch?.base_pay,
               resign_date:    savedMatch?.resign_date,
               work_days:      savedMatch?.work_days,
@@ -992,7 +996,7 @@ export default function PayslipTab() {
                     {selectedEmp.team !== 'ops' && selectedEmp.team !== 'dig' && (() => {
                       const st = calcSalesStructure({
                         revenue: currentFin.contract_revenue, perfBonus: currentFin.performance_bonus, promo: currentFin.promo,
-                        payMode: currentFin.sales_pay_mode, basePay: currentFin.sales_base_pay, workDays: currentFin.work_days, yearMonth, resignDate: currentFin.resign_date,
+                        payMode: currentFin.sales_pay_mode, joinDate: currentFin.sales_join_date, basePay: currentFin.sales_base_pay, workDays: currentFin.work_days, yearMonth, resignDate: currentFin.resign_date,
                       })
                       const btn = (mode: SalesPayMode, label: string, amount: number) => {
                         const on = st.selected && st.chosen === mode

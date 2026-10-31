@@ -248,6 +248,7 @@ export type SalesPayMode = 'base7' | 'all'
 export function calcSalesStructure(p: {
   revenue: number; perfBonus: number; promo: number
   payMode?: SalesPayMode; basePay?: number; workDays?: number | null; yearMonth?: string; resignDate?: string | null
+  joinDate?: string | null   // 계약 시작일 — 기본제는 시작 후 2달까지만 선택 가능, 그 뒤는 인센제(올인센) 고정
 }) {
   const revenue   = Number(p.revenue) || 0
   const allInc    = Math.round(revenue * SALES_ALLIN_RATE)
@@ -260,8 +261,14 @@ export function calcSalesStructure(p: {
   const baseProrated = Math.round(basePay * days / totalDays)
   const revInc    = Math.round(revenue * SALES_BASE_RATE)
   const baseTotal = baseProrated + revInc
-  const selected = p.payMode === 'base7' || p.payMode === 'all'
-  const chosen: SalesPayMode = p.payMode === 'base7' ? 'base7' : 'all'
+  const lockedAll = (() => {
+    if (!p.joinDate || !p.yearMonth) return false
+    const end = new Date(p.joinDate + 'T00:00:00'); end.setMonth(end.getMonth() + 2)
+    return new Date(p.yearMonth + '-01T00:00:00').getTime() >= end.getTime()
+  })()
+  const mode: SalesPayMode | undefined = lockedAll ? 'all' : p.payMode
+  const selected = mode === 'base7' || mode === 'all'
+  const chosen: SalesPayMode = mode === 'base7' ? 'base7' : 'all'
   return {
     allInc, allTotal, basePay, days, totalDays, resignBiz: !!resign, baseProrated, revInc, baseTotal,
     selected, configured: chosen, chosen, main: chosen === 'base7' ? baseTotal : allTotal,
