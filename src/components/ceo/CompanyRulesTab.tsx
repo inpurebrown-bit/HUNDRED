@@ -27,10 +27,15 @@ async function uploadFile(file: File, url = '/api/company-docs'): Promise<DocFil
   if (up.error) throw new Error(up.error.message)
   return { path: j.path, name: file.name, size: file.size, kind: kindOf(file.name), version: 1, uploadedAt: new Date().toISOString(), uploadedBy: '' }
 }
-const stdName = (d: { title: string }, f: DocFile) => `헌드레드컨설팅_${d.title.replace(/[\\/:*?"<>|]/g, '')}_v${f.version || 1}.${(f.name.split('.').pop() || f.kind).toLowerCase()}`
+const stdName = (d: { title: string }, f: DocFile) => `헌드레드컨설팅_${d.title.replace(/[\\/:*?"<>|—·&%()]/g, ' ').replace(/\s+/g, ' ').trim()}_v${f.version || 1}.${(f.name.split('.').pop() || f.kind).toLowerCase()}`
+// 내려받기: 저장소가 한글 파일명을 이중 인코딩해(%ED%97%8C…) 이름이 깨지므로, 파일을 받아 우리가 이름을 붙여 저장한다
 async function openFile(f: DocFile, download: boolean, name = f.name) {
-  const j = await post('/api/company-docs', { action: 'sign', path: f.path, download, name })
-  if (download) { const a = document.createElement('a'); a.href = j.url; a.download = name; document.body.appendChild(a); a.click(); a.remove() }
+  const j = await post('/api/company-docs', { action: 'sign', path: f.path, download: false, name })
+  if (download) {
+    const blob = await (await fetch(j.url)).blob()
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove()
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000)
+  }
   else window.open(j.url, '_blank')
 }
 

@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   const date = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
   const cover = { org: '헌드레드컨설팅', version: `v${rules.version}`, date: date.replace(/-/g, '. ') + '.' }
   const buf = format === 'hwpx' ? await docToHwpx(rules, cover) : await docToPdf(rules, cover)
-  const fname = `헌드레드컨설팅_정관·규정_v${rules.version}_${date}.${format}`
+  const fname = `헌드레드컨설팅_정관_v${rules.version}.${format}`
   return new NextResponse(new Uint8Array(buf), {
     headers: {
       'Content-Type': format === 'pdf' ? 'application/pdf' : 'application/octet-stream',
