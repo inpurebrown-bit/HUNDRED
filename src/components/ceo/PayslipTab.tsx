@@ -797,7 +797,7 @@ export default function PayslipTab() {
     const res = await fetch('/api/users')
     const data = await res.json()
     const allUsers: { id: string; name: string; role: string }[] = (data.users || [])
-      .filter((u: any) => u.role !== 'ceo')
+      .filter((u: any) => u.role !== 'ceo' && !/tester|테스터/i.test(`${u.username || ''} ${u.name || ''}`))
     setPickerQuery('')
     setUserPicker(allUsers)
   }

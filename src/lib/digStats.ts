@@ -1,4 +1,5 @@
 import { contractWeight } from '@/lib/supplyRules'
+import { isTester } from '@/lib/tester'
 import { DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
 
 /** 한경연 DB 기본 단가 (대표 화면에서 바꿀 수 있음) */
@@ -39,7 +40,7 @@ export function selfSupplyStats(customers: any[], ym: string): Record<string, Se
   for (const c of customers || []) {
     if (!isSelf(c)) continue
     const name = ownerName(c)
-    if (!name) continue
+    if (!name || isTester(name)) continue
     const s = (out[name] ||= { supplied: 0, paid: 0, revenue: 0 })
     if (String(c.details?.reception_date || c.created_at || '').slice(0, 7) === ym) s.supplied += 1
     if (c.status === 'contracted' && String(c.details?.contract_date || c.created_at || '').slice(0, 7) === ym) {
@@ -65,9 +66,10 @@ export function digPersonStats(prospects: any[], ym: string, names: string[]): D
   const today = todayKST()
   const map: Record<string, DigPerson> = {}
   const get = (n: string) => (map[n] ||= { name: n, approvedMonth: 0, approvedToday: 0, pending: 0, rejected: 0, assigned: 0 })
-  names.forEach(get)
+  names.filter(n => !isTester(n)).forEach(get)
   for (const p of prospects || []) {
     const n = p.dig_user_name || '(미상)'
+    if (isTester(n, p.dig_user_username)) continue
     const inMonth = String(p.call_date || p.created_at || '').slice(0, 7) === ym
     if (!inMonth) continue
     const s = get(n)

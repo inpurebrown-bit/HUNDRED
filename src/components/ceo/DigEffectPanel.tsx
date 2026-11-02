@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { contractWeight } from '@/lib/supplyRules'
+import { isTester } from '@/lib/tester'
 import { bizDays, digPersonStats, digPay, selfSupplyStats, stripTitle, todayKST, DB_UNIT_DEFAULT, REVENUE_PER_COUNT, DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/digStats'
 
 const NAVY = '#0b2140'
@@ -58,8 +59,8 @@ export default function DigEffectPanel() {
     ]).then(([p, d, s, c, pr, pay]) => {
       if (!live) return
       setProspects(p.prospects || [])
-      setDigNames((d.users || []).filter((x: any) => x.name).map((x: any) => x.name))
-      setSalesNames((s.users || []).filter((x: any) => x.name && x.name !== 'TESTER').map((x: any) => x.name))
+      setDigNames((d.users || []).filter((x: any) => x.name && !isTester(x.name, x.username)).map((x: any) => x.name))
+      setSalesNames((s.users || []).filter((x: any) => x.name && !isTester(x.name, x.username)).map((x: any) => x.name))
       setCustomers(c.customers || [])
       setPayrate(pr.record?.employee_details || [])
       const u = Number(pay.record?.employees?.other_costs?.db_unit_price)

@@ -8,7 +8,7 @@ import coverImage from './coverImage'
 export type DocBlock =
   | { t: 'h1' | 'h2' | 'h3' | 'p' | 'li' | 'note'; text: string; align?: 'center' | 'right' }
   | { t: 'table'; rows: string[][]; form?: boolean; labelCols?: number[]; widths?: number[]; heights?: number[] }
-  | { t: 'approval'; leader?: string; ceo?: string }          // 상단 결재란 (팀장·대표)
+  | { t: 'approval'; leader?: string; ceo?: string }          // 상단 결재란 (팀장·실장·대표)
   | { t: 'title'; text: string; pb?: boolean }                 // 가운데 큰 제목 (묶음 서식에서 서식마다 새 쪽)
 export interface DocContent { title: string; subtitle?: string; blocks: DocBlock[] }
 // 표지·목차를 붙일 때 쓰는 정보 (정관 내려받기용)
@@ -122,8 +122,8 @@ export async function buildDocParts(doc: DocContent, cover?: CoverOpts, mode: 'h
   for (const bl of doc.blocks) {
     if (bl.t === 'table') { body += table(bl.rows, bl); body += para('', CP.note); continue }
     if (bl.t === 'approval') {
-      // 팀장·대표 결재란: 오른쪽 위. 대표 이름은 미리 찍어 두어 서명만 하면 된다
-      body += table([['팀  장', '대  표'], [bl.leader ? '\n\n' + bl.leader : '', '\n\n' + (bl.ceo ?? '백승협')]], { widths: [1, 1], heights: [1500, 2600], total: 15000, right: true, center: true })
+      // 팀장·실장·대표 결재란: 오른쪽 위. 이름은 찍지 않고 각자 서명한다
+      body += table([['팀  장', '실  장', '대  표'], ['\n\n', '\n\n', '\n\n']], { widths: [1, 1, 1], heights: [1500, 2600], total: 18000, right: true, center: true })
       body += para('', CP.note); continue
     }
     if (bl.t === 'title') { body += para(bl.text, CP.h1, '25', !!bl.pb) + empty(); continue }

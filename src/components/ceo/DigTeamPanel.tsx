@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { isTester } from '@/lib/tester'
 import { bizDays, digPersonStats, digPay, selfSupplyStats, DIG_DAILY_GOAL, type DigPerson, type SelfStat } from '@/lib/digStats'
 
 const NAVY = '#0b2140'
@@ -20,7 +21,7 @@ export default function DigTeamPanel({ month, customers }: { month: string; cust
       fetch('/api/users?role=dig').then(r => r.json()).catch(() => ({})),
     ]).then(([p, u]) => {
       if (!live) return
-      const names: string[] = (u.users || []).filter((x: any) => x.name).map((x: any) => x.name)
+      const names: string[] = (u.users || []).filter((x: any) => x.name && !isTester(x.name, x.username)).map((x: any) => x.name)
       setPeople(digPersonStats(p.prospects || [], month, names))
     })
     return () => { live = false }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { isTester } from '@/lib/tester'
 import { calcWithholding, calcSalesStructure, resignBizProration, SALES_BASE_PAY, SALES_BASE_RATE, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, calcMonthlySubBonus, calcRefundDeductions, calcDigSalary, DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
 import { contractWeight } from '@/lib/supplyRules'
 
@@ -750,7 +751,7 @@ export default function PayrollTab() {
         if (prData.record?.employee_details) {
           const details = prData.record.employee_details as any[]
           const perPerson = details
-            .filter((e: any) => e.name && e.name !== 'sales-tester')
+            .filter((e: any) => e.name && !isTester(e.name))
             .map((e: any) => {
               const fromDaily = e.daily_supplies
                 ? Object.values(e.daily_supplies).reduce((ss: number, v: any) => ss + Number(v || 0), 0)
@@ -924,7 +925,7 @@ export default function PayrollTab() {
         if (prData.record?.employee_details) {
           const details = prData.record.employee_details as any[]
           const perPerson = details
-            .filter((e: any) => e.name && e.name !== 'sales-tester')
+            .filter((e: any) => e.name && !isTester(e.name))
             .map((e: any) => {
               const fromDaily = e.daily_supplies
                 ? Object.values(e.daily_supplies).reduce((ss: number, v: any) => ss + Number(v || 0), 0)
@@ -998,7 +999,7 @@ export default function PayrollTab() {
       if (prData.record?.employee_details) {
         const details = prData.record.employee_details as any[]
         const perPerson = details
-          .filter((e: any) => e.name && e.name !== 'sales-tester')
+          .filter((e: any) => e.name && !isTester(e.name))
           .map((e: any) => {
             const fromDaily = e.daily_supplies
               ? Object.values(e.daily_supplies).reduce((ss: number, v: any) => ss + Number(v || 0), 0)

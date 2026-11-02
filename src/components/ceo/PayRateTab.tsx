@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { contractWeight, calcRecommendedSupply } from '@/lib/supplyRules'
 import { selfSupplyStats } from '@/lib/digStats'
+import { isTester } from '@/lib/tester'
 import DigTeamPanel from './DigTeamPanel'
 
 // ── 타입 ──────────────────────────────────────────────────────────────────────
@@ -412,7 +413,7 @@ function PayRateSubView() {
 
         // 영업팀 사람 (TESTER 제외) — role=sales API 기준으로만 카운팅
         const people: string[] = (userJson.users || [])
-          .filter((u: any) => u.name && u.name !== TESTER)
+          .filter((u: any) => u.name && !isTester(u.name))
           .map((u: any) => u.name as string)
         const salesNameSet = new Set(people.map(cleanName))
         setEmployeeCount(people.length)
@@ -429,7 +430,7 @@ function PayRateSubView() {
         ;(custJson.customers || [])
           .forEach((c: any) => {
             const name  = (c.details?.sales_user_name || c.sales_user_name || '').trim()
-            if (!name || name === TESTER) return
+            if (!name || isTester(name)) return
             const contractMonth  = (c.details?.contract_date || c.created_at || '').slice(0, 7)
             // 직가 등록월: db010_month 우선, 없으면 접수일, 없으면 created_at
             // ⚡ reception_date는 통화접수일(지난달 가능)이므로 폴백에서 제외 → created_at 기준으로만 판단
@@ -506,7 +507,7 @@ function PayRateSubView() {
         if (payJson.record) {
           const r = payJson.record
           setTargetCount(r.target_count ?? 0)
-          const saved = (r.employee_details || []).filter((e: EmployeeRow) => e.name !== TESTER)
+          const saved = (r.employee_details || []).filter((e: EmployeeRow) => !isTester(e.name))
           const baseRows = saved.length > 0 ? saved : people.map(mkRow)
           // ★ auto-sync: supply_payment/direct_payment/direct_count 모두 항상 DB 실시간값 사용
           //   (Math.max 제거 — 직가↔공가 전환, 계약취소 등 상태변경이 즉시 반영되어야 함)
@@ -537,7 +538,7 @@ function PayRateSubView() {
             if (draft) {
               const d = JSON.parse(draft)
               if (d.target_count !== undefined) setTargetCount(d.target_count)
-              const lsSaved = (d.employee_details || []).filter((e: EmployeeRow) => e.name !== TESTER)
+              const lsSaved = (d.employee_details || []).filter((e: EmployeeRow) => !isTester(e.name))
               const baseRows = lsSaved.length > 0 ? lsSaved : people.map(mkRow)
               const synced = baseRows
                 .filter((row: EmployeeRow) => !row.name || salesNameSet.has(cleanName(row.name)))
@@ -762,7 +763,7 @@ function PayRateSubView() {
       ])
 
       const people: string[] = (userJson.users || [])
-        .filter((u: any) => u.name && u.name !== TESTER)
+        .filter((u: any) => u.name && !isTester(u.name))
         .map((u: any) => u.name as string)
       const salesNameSet = new Set(people.map(cleanName))
 
@@ -773,7 +774,7 @@ function PayRateSubView() {
 
       ;(custJson.customers || []).forEach((c: any) => {
         const name = (c.details?.sales_user_name || c.sales_user_name || '').trim()
-        if (!name || name === TESTER) return
+        if (!name || isTester(name)) return
         const contractMonth  = (c.details?.contract_date || c.created_at || '').slice(0, 7)
         const receptionMonth = (c.details?.db010_month || c.created_at || '').slice(0, 7)
         const isDirectType   = c.status === 'db010' || !!c.details?.db010_month || !!c.details?.is_direct
@@ -848,11 +849,11 @@ function PayRateSubView() {
 
   const totTarget   = employees.reduce((s, r) => s + Number(r.target), 0)
   // 직원 카드 표시값 기준 합산 (auto-sync 이미 반영된 row 값 직접 사용)
-  const totSupply    = employees.filter(r => r.name !== TESTER)
+  const totSupply    = employees.filter(r => !isTester(r.name))
     .reduce((s, r) => s + Object.values(r.daily_supplies || {}).reduce((a, v) => a + Number(v || 0), 0), 0)
-  const totSupplyPay = employees.filter(r => r.name !== TESTER)
+  const totSupplyPay = employees.filter(r => !isTester(r.name))
     .reduce((s, r) => s + Number(r.supply_payment), 0)
-  const totDirectPay = employees.filter(r => r.name !== TESTER)
+  const totDirectPay = employees.filter(r => !isTester(r.name))
     .reduce((s, r) => s + Number(r.direct_payment), 0)
   const totPayment   = totSupplyPay + totDirectPay
   const totSelf      = Object.values(selfSuppliedMap).reduce((s, v) => s + v, 0)
@@ -923,7 +924,7 @@ function PayRateSubView() {
         )}
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {employees.filter(r => r.name !== TESTER).map((row, i) => (
+          {employees.filter(r => !isTester(r.name)).map((row, i) => (
             <EmpCard
               key={i} row={row} idx={i} we={we} tw={tw}
               onChange={updateEmp} onRemove={removeEmp}

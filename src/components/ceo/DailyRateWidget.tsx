@@ -10,6 +10,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { getElapsedBusinessDays } from '@/lib/businessDays'
 
+import { isTester } from '@/lib/tester'
 const TESTER = 'sales-tester'
 
 function todayStr() { return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10) }
@@ -63,7 +64,7 @@ export default function DailyRateWidget() {
 
       // 영업팀 사람 목록 (TESTER 제외)
       const people: string[] = (userJson.users || [])
-        .filter((u: any) => u.name && u.name !== TESTER)
+        .filter((u: any) => u.name && !isTester(u.name))
         .map((u: any) => u.name as string)
 
       // 이번달 계약 수 자동집계 (TESTER 제외)
@@ -71,7 +72,7 @@ export default function DailyRateWidget() {
       const total = (custJson.customers || []).filter((c: any) =>
         c.status === 'contracted' &&
         (c.details?.contract_date || c.created_at || '').startsWith(month) &&
-        (c.details?.sales_user_name || '').trim() !== TESTER
+        !isTester((c.details?.sales_user_name || '').trim())
       ).length
       setPaymentCount(total)
 
@@ -79,7 +80,7 @@ export default function DailyRateWidget() {
       if (payJson.record) {
         const r = payJson.record
         setTargetCount(r.target_count ?? 0)
-        const saved = (r.employee_details || []).filter((e: EmpRow) => e.name !== TESTER)
+        const saved = (r.employee_details || []).filter((e: EmpRow) => !isTester(e.name))
         setEmployees(saved.length > 0 ? saved : people.map(mkRow))
       } else {
         setEmployees(people.map(mkRow))
@@ -237,7 +238,7 @@ export default function DailyRateWidget() {
               <span className="text-center text-blue-500">공급율</span>
             </div>
 
-            {employees.filter(r => r.name !== TESTER).map((row, i) => {
+            {employees.filter(r => !isTester(r.name)).map((row, i) => {
               const total      = Number(row.supply_payment) + Number(row.direct_payment)
               const supplyRate = Number(row.supply_count) > 0
                 ? (total / Number(row.supply_count) * 100).toFixed(1) + '%' : '—'

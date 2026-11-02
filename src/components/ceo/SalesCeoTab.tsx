@@ -543,6 +543,7 @@ type SupplyConfig = Record<string, PersonSupply>
 
 // ════════════════════════════════════════════════════════════════════════════════
 const DIARY_TESTER = 'sales-tester'
+const isDiaryTester = (n: any) => /tester|테스터/i.test(String(n || ''))
 
 // 고객 배열에서 월별 인별 계약수 실시간 계산
 function buildLivePayMap(customers: Customer[], ym: string): Record<string, { supply: number; direct: number }> {
@@ -552,7 +553,7 @@ function buildLivePayMap(customers: Customer[], ym: string): Record<string, { su
     const contractMonth = ((c as any).details?.contract_date || (c as any).created_at || '').slice(0, 7)
     if (contractMonth !== ym) continue
     const name = ((c as any).details?.sales_user_name || '').trim()
-    if (!name || name === DIARY_TESTER) continue
+    if (!name || isDiaryTester(name)) continue
     const w = contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included)
     const isDirectType = (c as any).status === 'db010' || !!(c as any).details?.db010_month || !!(c as any).details?.is_direct
     if (!map[name]) map[name] = { supply: 0, direct: 0 }
@@ -561,7 +562,7 @@ function buildLivePayMap(customers: Customer[], ym: string): Record<string, { su
   }
   // 잔금 등 추가 입금 갯수
   for (const ex of calcExtraCounts(customers as any[], ym)) {
-    if (!ex.name || ex.name === DIARY_TESTER) continue
+    if (!ex.name || isDiaryTester(ex.name)) continue
     if (!map[ex.name]) map[ex.name] = { supply: 0, direct: 0 }
     map[ex.name].supply += ex.weight
   }
@@ -634,7 +635,7 @@ function SalesDiaryView({ customers }: { customers: Customer[] }) {
             {isOpen && emps.length > 0 && (
               <div className="border-t border-gray-100 px-5 py-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {emps.filter((e: any) => e.name && e.name !== DIARY_TESTER).map((e: any, ei: number) => {
+                  {emps.filter((e: any) => e.name && !isDiaryTester(e.name)).map((e: any, ei: number) => {
                     const ds = e.daily_supplies || {}
                     const supplyCount = Object.values(ds).reduce((s: number, v: any) => s + Number(v || 0), 0)
                     // 이번달: 실시간 contractWeight 값 우선, 과거달: 저장값
@@ -795,14 +796,14 @@ export default function SalesCeoTab({ initialView, initialStatusTab, initialSear
   const salesPeople = useMemo(() => {
     if (officialSalesUsers.length > 0) {
       // 실제 users 테이블에 있는 영업팀 이름만 표시 (TESTER 제외, 가나다순)
-      return [...officialSalesUsers].filter(n => n !== DIARY_TESTER).sort()
+      return [...officialSalesUsers].filter(n => !isDiaryTester(n)).sort()
     }
     // fallback: 고객 데이터에서 유니코드 정규화 후 추출 (TESTER 제외)
     const names = Array.from(
       new Set(
         customers
           .map((c: any) => (c.details?.sales_user_name || c.sales_user_name || '').normalize('NFC').trim())
-          .filter(n => Boolean(n) && n !== DIARY_TESTER)
+          .filter(n => Boolean(n) && !isDiaryTester(n))
       )
     ).sort() as string[]
     return names
@@ -1605,7 +1606,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab, initialSear
         ) : (
           <>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-            {personThisMonth.filter(p => p.name !== DIARY_TESTER).map(p => (
+            {personThisMonth.filter(p => !isDiaryTester(p.name)).map(p => (
               <div key={p.name} className="bg-white/10 rounded-xl px-3 py-2.5">
                 <div className="flex items-center gap-1.5 mb-1">
                   <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-bold">{p.name.charAt(0)}</div>
@@ -1624,17 +1625,6 @@ export default function SalesCeoTab({ initialView, initialStatusTab, initialSear
               </div>
             ))}
           </div>
-          {/* TESTER 계정 — 테스트용, 별도 표시 */}
-          {personThisMonth.some(p => p.name === DIARY_TESTER) && (
-            <div className="flex items-center gap-2 mt-1 opacity-40">
-              <span className="text-[9px] text-white/50 border border-white/20 rounded px-1.5 py-0.5">테스트 계정</span>
-              {personThisMonth.filter(p => p.name === DIARY_TESTER).map(p => (
-                <span key={p.name} className="text-[9px] text-white/40">
-                  TESTER · 매출 {p.revenue > 0 ? fmtWon(p.revenue) : '—'} · 계약 {p.count % 1 === 0 ? p.count : p.count.toFixed(1)}건
-                </span>
-              ))}
-            </div>
-          )}
           </>
         )}
 
@@ -1667,7 +1657,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab, initialSear
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {supplyStats.filter(s => s.name !== DIARY_TESTER).map(s => (
+                {supplyStats.filter(s => !isDiaryTester(s.name)).map(s => (
                   <tr key={s.name} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
