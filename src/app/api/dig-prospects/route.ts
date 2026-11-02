@@ -57,8 +57,12 @@ export async function POST(req: NextRequest) {
     has_delinquency, credit_score, required_fund, preferred_call_time,
     urgent_assign,
     checklist, memo,
-    recording_url, recording_filename, recording_analysis,
+    recording_url, recording_filename, recording_analysis: rawAnalysis, recordings,
   } = body
+  // 통화가 2~3번 나뉜 경우: 첫 녹취는 기존 칸에, 전체 목록은 분석 결과 안에 함께 보관
+  const recording_analysis = Array.isArray(recordings) && recordings.length > 1
+    ? { ...(rawAnalysis || {}), recordings: recordings.map((r: any) => ({ url: r.url, name: r.name })) }
+    : rawAnalysis
 
   if (!phone_010) {
     return NextResponse.json({ error: '010 번호는 필수입니다' }, { status: 400 })

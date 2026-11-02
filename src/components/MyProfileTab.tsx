@@ -48,11 +48,17 @@ function Field({ label, value, onChange, placeholder, type = 'text', readOnly }:
           value={value}
           onChange={e => onChange?.(e.target.value)}
           placeholder={placeholder}
+          autoComplete="off"
           className="w-full px-3 py-2.5 bg-[#F5F3EE] border border-[#E8E2D4] rounded-xl text-sm text-[#1B2A45] focus:outline-none focus:border-[#1B2A45]/40 focus:ring-1 focus:ring-[#1B2A45]/10 transition-colors"
         />
       )}
     </div>
   )
+}
+
+function formatResidentId(v: string) {
+  const d = v.replace(/\D/g, '').slice(0, 13)
+  return d.length > 6 ? d.slice(0, 6) + '-' + d.slice(6) : d
 }
 
 const BANKS = ['카카오뱅크', '토스뱅크', '국민은행', '신한은행', '하나은행', '우리은행', '농협', '기업은행', '케이뱅크', '씨티은행', '기타']
@@ -66,7 +72,7 @@ export default function MyProfileTab() {
   // 프로필 데이터
   const [profile, setProfile] = useState({
     name: '', username: '', role: '',
-    phone: '', address: '', bank_account: '', bank_name: '카카오뱅크', join_date: '',
+    phone: '', resident_id: '', address: '', bank_account: '', bank_name: '카카오뱅크', join_date: '',
     info_locked: false,
   })
   const [loadingProfile, setLoadingProfile] = useState(true)
@@ -106,6 +112,10 @@ export default function MyProfileTab() {
 
   // ── 기본정보 저장 ──────────────────────────────────────────────────
   const saveInfo = useCallback(async () => {
+    if (profile.role !== 'ceo' && infoForm.resident_id.replace(/\D/g, '').length !== 13) {
+      setInfoMsg({ type: 'err', text: '주민등록번호 13자리를 입력하세요 (용역비 신고에 필요합니다)' })
+      return
+    }
     setInfoSaving(true)
     setInfoMsg(null)
     try {
@@ -115,6 +125,7 @@ export default function MyProfileTab() {
         body: JSON.stringify({
           name: infoForm.name,
           phone: infoForm.phone,
+          resident_id: infoForm.resident_id,
           address: infoForm.address,
           bank_account: infoForm.bank_account,
           bank_name: infoForm.bank_name,
@@ -135,7 +146,7 @@ export default function MyProfileTab() {
     } finally {
       setInfoSaving(false)
     }
-  }, [infoForm])
+  }, [infoForm, profile.role])
 
   // ── 비밀번호 변경 ──────────────────────────────────────────────────
   const savePassword = useCallback(async () => {
@@ -244,6 +255,7 @@ export default function MyProfileTab() {
           <div className="space-y-3">
             <Field label="이름 (실명)" value={infoForm.name} onChange={v => setInfoForm(f => ({ ...f, name: v }))} placeholder="홍길동" />
             <Field label="연락처" value={infoForm.phone} onChange={v => setInfoForm(f => ({ ...f, phone: v }))} placeholder="010-0000-0000" />
+            <Field label="주민등록번호" value={infoForm.resident_id} onChange={v => setInfoForm(f => ({ ...f, resident_id: formatResidentId(v) }))} placeholder="000000-0000000" />
             <Field label="주소" value={infoForm.address} onChange={v => setInfoForm(f => ({ ...f, address: v }))} placeholder="서울시 ..." />
             <div>
               <label className="block text-xs font-semibold text-[#1B2A45]/60 mb-1.5">은행</label>
@@ -286,6 +298,7 @@ export default function MyProfileTab() {
             {[
               { label: '이름', value: profile.name },
               { label: '연락처', value: profile.phone },
+              { label: '주민번호', value: profile.resident_id ? profile.resident_id.replace(/^(\d{6})-?(\d)\d{6}$/, '$1-$2******') : '' },
               { label: '주소', value: profile.address },
               { label: '은행', value: profile.bank_name },
               { label: '계좌번호', value: profile.bank_account },

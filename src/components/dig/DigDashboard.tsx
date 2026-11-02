@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { signOut } from 'next-auth/react'
@@ -16,6 +16,7 @@ type Tab = 'dig' | 'profile'
 
 const DAILY_GOAL        = 8
 const BONUS_PER_EXTRA   = 10000
+const MAX_RECS          = 5
 
 // 통화 전 체크리스트 (9항목 전부 필수)
 const CHECKLIST_ITEMS = [
@@ -51,6 +52,41 @@ interface Prospect {
   assigned_to_name: string
   created_at: string
   call_date: string
+}
+
+interface RecItem { id: string; file: File; url: string; analysis: any; status: 'working' | 'done' | 'fail' }
+
+interface Draft {
+  id: string; kind: 'save' | 'callback'; note: string
+  form: Record<string, string>; checklist: Record<string, boolean>
+  urgent: boolean; phoneSearch: string; updatedAt: string
+}
+
+const EMPTY_FORM = {
+  company: '', ceo_name: '', phone: '', phone_010: '',
+  business_age: '', annual_revenue: '', industry: '',
+  delinquency_detail: '', credit_score: '', required_fund: '',
+  preferred_call_time: '',
+}
+const EMPTY_CHECKLIST: Record<string, boolean> = {
+  identity_disclosed: false, purpose_disclosed: false, source_disclosed: false,
+  needs_check: false, basic_info: false, cancel_checked: false,
+  check_requirements: false, closing_done: false, phone_secured: false,
+}
+
+// 여러 통화의 분석을 하나로: 체크리스트·고객정보는 합치고, 위험 구간은 모두 남긴다
+function mergeAnalyses(list: any[]) {
+  const ok = list.filter(a => a && !a.parse_error)
+  if (ok.length === 0) return null
+  if (ok.length === 1) return ok[0]
+  const base = [...ok].sort((a, b) => (b.overall_score ?? 0) - (a.overall_score ?? 0))[0]
+  const checklist: Record<string, boolean> = {}
+  const info: Record<string, any> = {}
+  for (const a of ok) {
+    for (const [k, v] of Object.entries(a.checklist || {})) checklist[k] = checklist[k] || !!v
+    for (const [k, v] of Object.entries(a.customer_info || {})) if (v != null && v !== '' && info[k] == null) info[k] = v
+  }
+  return { ...base, checklist, customer_info: info, timeline: ok.flatMap(a => a.timeline || []) }
 }
 
 const SCRIPT_SECTIONS = [
@@ -147,11 +183,19 @@ export default function DigDashboard({ userId, userName, username }: Props) {
   const [toast, setToast]           = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [showRecordingModal, setShowRecordingModal] = useState(false)
   const [openScriptIdx, setOpenScriptIdx]           = useState<number | null>(null)
-  const [recordingFile, setRecordingFile]           = useState<File | null>(null)
-  const [analyzing, setAnalyzing]         = useState(false)
-  const [analysis, setAnalysis]           = useState<any>(null)
-  const [uploadedRecordingUrl, setUploadedRecordingUrl] = useState('')
+  // 통화가 2~3번 나뉜 경우를 위해 녹취는 여러 개 첨부
+  const [recs, setRecs] = useState<RecItem[]>([])
+  const analyzing = recs.some(r => r.status === 'working')
   const [urgentAssign, setUrgentAssign] = useState(false)
+
+  // 저장함 (저장하기 / 나중에 통화로 저장)
+  const [drafts, setDrafts]               = useState<Draft[]>([])
+  const [activeDraft, setActiveDraft]     = useState<Draft | null>(null)
+  const [draftModal, setDraftModal]       = useState<'save' | 'callback' | null>(null)
+  const [draftNote, setDraftNote]         = useState('')
+  const [draftSaving, setDraftSaving]     = useState(false)
+  const [draftQuery, setDraftQuery]       = useState('')
+  const [draftFilter, setDraftFilter]     = useState<'all' | 'save' | 'callback'>('all')
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [resubmitProspect, setResubmitProspect] = useState<Prospect | null>(null)
@@ -173,17 +217,8 @@ export default function DigDashboard({ userId, userName, username }: Props) {
   const [pwGateError, setPwGateError]         = useState('')
   const [pwGateLoading, setPwGateLoading]     = useState(false)
 
-  const [form, setForm] = useState({
-    company: '', ceo_name: '', phone: '', phone_010: '',
-    business_age: '', annual_revenue: '', industry: '',
-    delinquency_detail: '', credit_score: '', required_fund: '',
-    preferred_call_time: '',
-  })
-  const [checklist, setChecklist] = useState<Record<string, boolean>>({
-    identity_disclosed: false, purpose_disclosed: false, source_disclosed: false,
-    needs_check: false, basic_info: false, cancel_checked: false,
-    check_requirements: false, closing_done: false, phone_secured: false,
-  })
+  const [form, setForm] = useState({ ...EMPTY_FORM })
+  const [checklist, setChecklist] = useState<Record<string, boolean>>({ ...EMPTY_CHECKLIST })
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -198,11 +233,73 @@ export default function DigDashboard({ userId, userName, username }: Props) {
     } catch {}
   }, [])
 
-  useEffect(() => { loadProspects() }, [loadProspects])
+  const loadDrafts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/dig-drafts')
+      const data = await res.json()
+      setDrafts(data.drafts || [])
+    } catch {}
+  }, [])
+
+  useEffect(() => { loadProspects(); loadDrafts() }, [loadProspects, loadDrafts])
+
+  // 저장함에 담기 (이미 불러온 저장건이면 같은 건을 덮어씀)
+  async function saveDraft(kind: 'save' | 'callback') {
+    if (!form.phone_010.trim() && !phoneSearch.trim() && !form.company.trim() && !form.ceo_name.trim()) {
+      showToast('번호·업체명·대표 성함 중 하나는 입력해야 저장할 수 있습니다', 'error'); return
+    }
+    setDraftSaving(true)
+    try {
+      const res = await fetch('/api/dig-drafts', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: activeDraft?.id, kind, note: draftNote, form, checklist, urgent: urgentAssign, phoneSearch }),
+      })
+      const data = await res.json()
+      if (!res.ok) { showToast(data.error || '저장 실패', 'error'); setDraftSaving(false); return }
+      showToast(kind === 'callback' ? '📞 나중에 통화 건으로 저장했습니다' : '💾 저장했습니다')
+      setDraftModal(null); setDraftNote('')
+      resetForm()
+      loadDrafts()
+    } catch { showToast('저장 중 오류', 'error') }
+    setDraftSaving(false)
+  }
+
+  function openDraft(d: Draft) {
+    setForm({ ...EMPTY_FORM, ...d.form })
+    setChecklist({ ...EMPTY_CHECKLIST, ...d.checklist })
+    setUrgentAssign(d.urgent)
+    setPhoneSearch(d.phoneSearch || d.form.phone_010 || '')
+    setPhoneResults(null)
+    setPhoneVerified(!!d.form.phone_010)
+    setActiveDraft(d)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  async function removeDraft(id: string) {
+    await fetch(`/api/dig-drafts?id=${id}`, { method: 'DELETE' })
+    if (activeDraft?.id === id) setActiveDraft(null)
+    loadDrafts()
+  }
+
+  function resetForm() {
+    setForm({ ...EMPTY_FORM })
+    setChecklist({ ...EMPTY_CHECKLIST })
+    setUrgentAssign(false)
+    setActiveDraft(null)
+    setPhoneSearch(''); setPhoneResults(null); setPhoneVerified(false)
+  }
 
   const today        = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
   const currentMonth = new Date().toISOString().slice(0, 7)
   const dateLabel    = new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })
+
+  // 저장함: 최근 순 · 종류 필터 · 검색 (날짜는 한국시간 기준)
+  const ymd = (iso: string) => new Date(new Date(iso).getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10)
+  const dq = draftQuery.trim().replace(/[-\s]/g, '').toLowerCase()
+  const shownDrafts = [...drafts]
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .filter(d => draftFilter === 'all' || d.kind === draftFilter)
+    .filter(d => !dq || [d.form.company, d.form.ceo_name, d.form.phone_010, d.phoneSearch, d.note].join(' ').replace(/[-\s]/g, '').toLowerCase().includes(dq))
 
   const pendingList   = prospects.filter(p => p.status === 'pending')
   const approvedList  = prospects.filter(p => p.status === 'approved' || p.status === 'assigned')
@@ -268,64 +365,69 @@ export default function DigDashboard({ userId, userName, username }: Props) {
     setPhoneSearching(false)
   }
 
-  async function processRecordingFile(file: File) {
-    setRecordingFile(file)
-    setAnalysis(null)
-    setUploadedRecordingUrl('')
-    if (file.size > 50 * 1024 * 1024) { showToast('파일이 너무 큽니다 (최대 50MB)', 'error'); return }
-    setAnalyzing(true)
-    try {
-      // 1단계: Supabase에 직접 업로드 (Vercel 크기 제한 우회)
-      const signRes = await fetch('/api/storage-sign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: file.name }),
-      })
-      const signData = await signRes.json()
-      if (!signData.signedUrl) throw new Error(signData.error || '업로드 URL 발급 실패')
-
-      const ext = (file.name.split('.').pop() || 'mp3').toLowerCase()
-      const mimeMap: Record<string, string> = { m4a: 'audio/mp4', mp3: 'audio/mpeg', wav: 'audio/wav', aac: 'audio/aac', ogg: 'audio/ogg', mp4: 'audio/mp4' }
-      const contentType = (file.type && file.type !== 'audio/x-m4a') ? file.type : (mimeMap[ext] || 'audio/mpeg')
-      const putRes = await fetch(signData.signedUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: file })
-      if (!putRes.ok) throw new Error(`스토리지 업로드 실패 (${putRes.status})`)
-      setUploadedRecordingUrl(signData.publicUrl)
-
-      // 2단계: URL로 AI 분석 요청 (파일 본문 없이 소형 JSON 요청)
-      const res = await fetch('/api/analyze-recording', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileUrl: signData.publicUrl, filename: file.name }),
-      })
-      const data = await res.json()
-      if (data.analysis) {
-        setAnalysis(data.analysis)
-        showToast('녹취 처리 완료')
-      }
-    } catch (err: any) {
-      console.error('processRecordingFile error:', err)
-      showToast('녹취 업로드 완료 (분석 실패 — 직접 입력)')
+  // 녹취 여러 개 한 번에: 하나씩 순서대로 올리고 분석한다
+  async function processRecordingFiles(files: File[]) {
+    const room = MAX_RECS - recs.length
+    if (room <= 0) { showToast(`녹취는 최대 ${MAX_RECS}개까지 첨부할 수 있습니다`, 'error'); return }
+    if (files.length > room) showToast(`최대 ${MAX_RECS}개까지만 첨부됩니다 — 앞의 ${room}개만 올립니다`, 'error')
+    const items: RecItem[] = []
+    for (const file of files.slice(0, room)) {
+      if (file.size > 50 * 1024 * 1024) { showToast(`${file.name}: 파일이 너무 큽니다 (최대 50MB)`, 'error'); continue }
+      items.push({ id: Math.random().toString(36).slice(2), file, url: '', analysis: null, status: 'working' })
     }
-    setAnalyzing(false)
+    if (items.length === 0) return
+    setRecs(prev => [...prev, ...items])
+    const patch = (id: string, v: Partial<RecItem>) => setRecs(prev => prev.map(r => (r.id === id ? { ...r, ...v } : r)))
+    for (const it of items) {
+      try {
+        // 1단계: Supabase에 직접 업로드 (Vercel 크기 제한 우회)
+        const signRes = await fetch('/api/storage-sign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: it.file.name }),
+        })
+        const signData = await signRes.json()
+        if (!signData.signedUrl) throw new Error(signData.error || '업로드 URL 발급 실패')
+        const ext = (it.file.name.split('.').pop() || 'mp3').toLowerCase()
+        const mimeMap: Record<string, string> = { m4a: 'audio/mp4', mp3: 'audio/mpeg', wav: 'audio/wav', aac: 'audio/aac', ogg: 'audio/ogg', mp4: 'audio/mp4' }
+        const contentType = (it.file.type && it.file.type !== 'audio/x-m4a') ? it.file.type : (mimeMap[ext] || 'audio/mpeg')
+        const putRes = await fetch(signData.signedUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: it.file })
+        if (!putRes.ok) throw new Error(`스토리지 업로드 실패 (${putRes.status})`)
+        patch(it.id, { url: signData.publicUrl })
+
+        // 2단계: URL로 AI 분석 요청 (파일 본문 없이 소형 JSON 요청)
+        let analysis: any = null
+        try {
+          const res = await fetch('/api/analyze-recording', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileUrl: signData.publicUrl, filename: it.file.name }),
+          })
+          const data = await res.json()
+          if (data.analysis) analysis = data.analysis
+        } catch {}
+        patch(it.id, { analysis, status: 'done' })
+      } catch (err: any) {
+        console.error('processRecordingFiles error:', err)
+        patch(it.id, { status: 'fail' })
+        showToast(`${it.file.name}: 업로드 실패 — 다시 시도하세요`, 'error')
+      }
+    }
   }
 
   function handleRecordingChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    processRecordingFile(file)
+    const files = Array.from(e.target.files || [])
+    e.target.value = ''
+    if (files.length) processRecordingFiles(files)
   }
 
   function handleRecordingDrop(e: React.DragEvent) {
     e.preventDefault()
     e.stopPropagation()
-    const file = e.dataTransfer.files?.[0]
-    if (!file) return
-    // 오디오 파일이 아닌 경우 거부
-    if (!file.type.startsWith('audio/') && !/\.(mp3|m4a|wav|aac|ogg|mp4|wma)$/i.test(file.name)) {
-      showToast('오디오 파일만 업로드 가능합니다 (mp3, m4a, wav 등)', 'error')
-      return
-    }
-    processRecordingFile(file)
+    const all = Array.from(e.dataTransfer.files || [])
+    const files = all.filter(f => f.type.startsWith('audio/') || /\.(mp3|m4a|wav|aac|ogg|mp4|wma)$/i.test(f.name))
+    if (all.length && files.length < all.length) showToast('오디오 파일만 업로드 가능합니다 (mp3, m4a, wav 등)', 'error')
+    if (files.length) processRecordingFiles(files)
   }
 
   async function handleResubmitFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -398,46 +500,22 @@ export default function DigDashboard({ userId, userName, username }: Props) {
   function handleSubmitClick(e: React.FormEvent) {
     e.preventDefault()
     if (!form.phone_010.trim()) { showToast('010 번호는 필수입니다', 'error'); return }
-    setRecordingFile(null); setAnalysis(null)
+    setRecs([])
     if (fileRef.current) fileRef.current.value = ''
     setShowRecordingModal(true)
   }
 
   async function handleFinalSubmit() {
-    if (!recordingFile) {
+    const ready = recs.filter(r => r.status === 'done' && r.url)
+    if (ready.length === 0) {
       showToast('녹취 파일을 반드시 첨부해주세요', 'error')
       return
     }
     setSubmitting(true)
-    let recording_url = ''
-    let recording_filename = ''
-    if (recordingFile) {
-      if (uploadedRecordingUrl) {
-        // 파일 선택 시 이미 업로드됨 — 재사용
-        recording_url = uploadedRecordingUrl
-        recording_filename = recordingFile.name
-      } else {
-        // 혹시 업로드 안 됐으면 다시 시도
-        setUploading(true)
-        try {
-          const signRes = await fetch('/api/storage-sign', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filename: recordingFile.name }),
-          })
-          const signData = await signRes.json()
-          if (!signData.signedUrl) { showToast(signData.error || '업로드 준비 실패', 'error'); setSubmitting(false); setUploading(false); return }
-          const ext = (recordingFile.name.split('.').pop() || 'mp3').toLowerCase()
-          const mimeMap: Record<string, string> = { m4a: 'audio/mp4', mp3: 'audio/mpeg', wav: 'audio/wav', aac: 'audio/aac', ogg: 'audio/ogg', mp4: 'audio/mp4' }
-          const contentType = (recordingFile.type && recordingFile.type !== 'audio/x-m4a') ? recordingFile.type : (mimeMap[ext] || 'audio/mpeg')
-          const putRes = await fetch(signData.signedUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: recordingFile })
-          if (!putRes.ok) { showToast(`업로드 실패 (${putRes.status})`, 'error'); setSubmitting(false); setUploading(false); return }
-          recording_url = signData.publicUrl
-          recording_filename = recordingFile.name
-        } catch (e: any) { showToast('업로드 오류: ' + (e?.message || '알 수 없음'), 'error'); setSubmitting(false); setUploading(false); return }
-        setUploading(false)
-      }
-    }
+    const recordings = ready.map(r => ({ url: r.url, name: r.file.name }))
+    const recording_url = recordings[0].url
+    const recording_filename = recordings.map(r => r.name).join(' / ')
+    const analysis = mergeAnalyses(ready.map(r => r.analysis))
     try {
       const res  = await fetch('/api/dig-prospects', {
         method: 'POST',
@@ -449,17 +527,16 @@ export default function DigDashboard({ userId, userName, username }: Props) {
           required_fund: form.required_fund, preferred_call_time: form.preferred_call_time,
           urgent_assign: urgentAssign,
           memo: form.delinquency_detail.trim(), checklist,
-          recording_url, recording_filename, recording_analysis: analysis || null,
+          recording_url, recording_filename, recording_analysis: analysis || null, recordings,
         }),
       })
       const data = await res.json()
       if (res.ok) {
         const autoApproved = data.auto_approved
         showToast(autoApproved ? '✅ 승인 처리됐습니다!' : '가망 등록 완료! 대표님 심사를 기다려주세요')
-        setForm({ company: '', ceo_name: '', phone: '', phone_010: '', business_age: '', annual_revenue: '', industry: '', delinquency_detail: '', credit_score: '', required_fund: '', preferred_call_time: '' })
-        setChecklist({ identity_disclosed: false, purpose_disclosed: false, source_disclosed: false, needs_check: false, basic_info: false, cancel_checked: false, check_requirements: false, closing_done: false, phone_secured: false })
-        setRecordingFile(null); setAnalysis(null)
-        setUrgentAssign(false)
+        if (activeDraft) { await fetch(`/api/dig-drafts?id=${activeDraft.id}`, { method: 'DELETE' }); loadDrafts() }
+        resetForm()
+        setRecs([])
         if (fileRef.current) fileRef.current.value = ''
         setShowRecordingModal(false)
         loadProspects()
@@ -498,35 +575,73 @@ export default function DigDashboard({ userId, userName, username }: Props) {
               </div>
               <button onClick={() => setShowRecordingModal(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none p-1">✕</button>
             </div>
-            <input ref={fileRef} type="file" accept=".mp3,.m4a,.wav,.aac,.ogg,.mp4,.wma,audio/*" onChange={handleRecordingChange} className="hidden" />
+            <input ref={fileRef} type="file" multiple accept=".mp3,.m4a,.wav,.aac,.ogg,.mp4,.wma,audio/*" onChange={handleRecordingChange} className="hidden" />
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
               onDragOver={e => e.preventDefault()}
               onDrop={handleRecordingDrop}
-              className={`w-full border-2 border-dashed rounded-xl py-6 text-center transition-colors ${
-                recordingFile ? 'border-emerald-400 bg-emerald-50' : 'border-gray-300 hover:border-[#1B2A45]/40'
+              className={`w-full border-2 border-dashed rounded-xl py-5 text-center transition-colors ${
+                recs.length ? 'border-emerald-400 bg-emerald-50' : 'border-gray-300 hover:border-[#1B2A45]/40'
               }`}>
-              {recordingFile
-                ? <><p className="text-sm text-emerald-700 font-bold">{recordingFile.name}</p><p className="text-xs text-emerald-500 mt-0.5">✓ 파일 선택됨 — 다시 클릭하면 교체</p></>
-                : <><p className="text-sm text-gray-500 font-medium">+ 녹취 파일 선택 또는 여기에 드래그</p><p className="text-xs text-gray-300 mt-1">mp3, m4a, wav, aac 지원 · 최대 50MB</p></>}
+              <p className="text-sm text-gray-600 font-medium">+ 녹취 파일 선택 또는 여기에 드래그</p>
+              <p className="text-xs text-gray-400 mt-1">통화가 2~3번 나뉘었으면 한 번에 여러 개 선택 · 최대 {MAX_RECS}개 · 개당 50MB</p>
             </button>
+            {recs.length > 0 && (
+              <div className="space-y-1.5">
+                {recs.map((r, i) => (
+                  <div key={r.id} className={`flex items-center gap-2 border rounded-lg px-3 py-2 text-xs ${r.status === 'fail' ? 'border-red-300 bg-red-50' : r.status === 'done' ? 'border-emerald-300 bg-emerald-50' : 'border-blue-200 bg-blue-50'}`}>
+                    <span className="font-black text-gray-500">{i + 1}</span>
+                    <span className="flex-1 truncate font-semibold text-gray-700">{r.file.name}</span>
+                    <span className={r.status === 'fail' ? 'text-red-600' : r.status === 'done' ? 'text-emerald-600' : 'text-blue-600'}>
+                      {r.status === 'working' ? '올리는 중…' : r.status === 'done' ? '✓ 완료' : '실패'}
+                    </span>
+                    <button type="button" onClick={() => setRecs(prev => prev.filter(x => x.id !== r.id))} className="text-gray-400 hover:text-red-500 px-1">✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
             {analyzing && (
               <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center gap-2">
                 <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
                 <p className="text-sm text-blue-700">처리 중... 잠시 기다려주세요</p>
               </div>
             )}
-            {analysis && !analyzing && (
+            {!analyzing && recs.some(r => r.status === 'done') && (
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-xs text-emerald-700 font-semibold">
-                ✅ 녹취 업로드 완료 — 제출하면 대표님이 확인합니다
+                ✅ 녹취 {recs.filter(r => r.status === 'done').length}개 업로드 완료 — 제출하면 대표님이 확인합니다
               </div>
             )}
-            <button type="button" onClick={handleFinalSubmit} disabled={submitting || analyzing || !recordingFile}
+            <button type="button" onClick={handleFinalSubmit} disabled={submitting || analyzing || !recs.some(r => r.status === 'done')}
               className={`w-full py-4 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50 ${
-                recordingFile ? 'bg-[#1B2A45] hover:bg-[#1B2A45]/90' : 'bg-gray-300 cursor-not-allowed'
+                recs.some(r => r.status === 'done') ? 'bg-[#1B2A45] hover:bg-[#1B2A45]/90' : 'bg-gray-300 cursor-not-allowed'
               }`}>
-              {uploading ? '📤 업로드 중...' : submitting ? '제출 중...' : analyzing ? '처리 중 — 잠시 후 제출 가능' : !recordingFile ? '녹취 파일을 먼저 첨부해주세요' : '제출 →'}
+              {submitting ? '제출 중...' : analyzing ? '처리 중 — 잠시 후 제출 가능' : !recs.some(r => r.status === 'done') ? '녹취 파일을 먼저 첨부해주세요' : '제출 →'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 저장 메모 모달 */}
+      {draftModal && (
+        <div className="fixed inset-0 z-[9998] flex items-end sm:items-center justify-center bg-black/60 px-0 sm:px-4"
+          onClick={e => { if (e.target === e.currentTarget) setDraftModal(null) }}>
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-md px-5 pt-5 pb-6 space-y-3">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-base font-bold text-[#1B2A45]">{draftModal === 'callback' ? '📞 나중에 통화로 저장' : '💾 저장하기'}</h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {draftModal === 'callback' ? '언제 다시 통화할지 등 통화 메모를 적어 두세요' : '언제 통화할지 등 간단한 메모를 적어 두세요 (선택)'} — 입력한 내용은 저장함에서 바로 불러옵니다
+                </p>
+              </div>
+              <button type="button" onClick={() => setDraftModal(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none p-1">✕</button>
+            </div>
+            <textarea value={draftNote} onChange={e => setDraftNote(e.target.value)} rows={3} maxLength={300} autoFocus
+              placeholder={draftModal === 'callback' ? '예) 내일 오후 3시 이후 재통화, 대표 외출 중' : '예) 오후 2시에 다시 통화하기로 함'}
+              className={inputCls} />
+            <button type="button" disabled={draftSaving} onClick={() => saveDraft(draftModal)}
+              className="w-full py-3.5 bg-[#1B2A45] text-white text-sm font-bold rounded-xl disabled:opacity-50">
+              {draftSaving ? '저장 중...' : '저장'}
             </button>
           </div>
         </div>
@@ -763,11 +878,65 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                 onItemClick={p => setResubmitProspect(p as Prospect)}
               />
 
+              {/* 저장함 — 통화 중간에 저장한 건 / 나중에 통화할 건 */}
+              <div className="border-2 rounded-2xl overflow-hidden bg-sky-50 border-sky-200">
+                <div className="px-4 py-3 bg-sky-100/60">
+                  <p className="text-xs font-bold uppercase tracking-wide text-sky-700">💾 저장함</p>
+                  <p className="text-3xl font-black leading-none mt-0.5 text-sky-700">{drafts.length}<span className="text-sm font-bold ml-1">건</span></p>
+                </div>
+                {drafts.length > 4 && (
+                  <div className="px-3 pt-2 space-y-1.5">
+                    <input value={draftQuery} onChange={e => setDraftQuery(e.target.value)} placeholder="업체·번호·메모 검색"
+                      className="w-full border border-sky-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:border-sky-400" />
+                    <div className="flex gap-1">
+                      {([['all', '전체'], ['save', '💾 저장'], ['callback', '📞 통화']] as const).map(([k, l]) => (
+                        <button key={k} type="button" onClick={() => setDraftFilter(k)}
+                          className={`flex-1 text-[11px] font-bold py-1 rounded-lg border ${draftFilter === k ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-sky-700 border-sky-200'}`}>{l}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="px-3 py-2 space-y-1.5 min-h-[52px] max-h-[420px] overflow-y-auto">
+                  {drafts.length === 0
+                    ? <p className="text-xs py-1 opacity-50 text-sky-700">없음</p>
+                    : shownDrafts.length === 0
+                    ? <p className="text-xs py-1 opacity-60 text-sky-700">해당하는 건이 없습니다</p>
+                    : shownDrafts.map((d, i) => (<Fragment key={d.id}>
+                      {(i === 0 || ymd(shownDrafts[i - 1].updatedAt) !== ymd(d.updatedAt)) && (
+                        <p className="text-[10px] font-black text-sky-600 pt-1">{ymd(d.updatedAt) === today ? '오늘' : ymd(d.updatedAt).slice(5).replace('-', '/')}</p>
+                      )}
+                      <div key={d.id} className={`flex items-start gap-1.5 rounded-lg border px-2 py-1.5 bg-white cursor-pointer hover:border-sky-400 ${activeDraft?.id === d.id ? 'border-sky-500' : 'border-sky-100'}`}
+                        onClick={() => openDraft(d)}>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold text-gray-700 truncate">
+                            {d.kind === 'callback' ? '📞 ' : '💾 '}{d.form.company || d.form.ceo_name || d.form.phone_010 || d.phoneSearch || '(이름 없음)'}
+                          </p>
+                          <p className="text-[10px] text-gray-400 truncate">{d.form.phone_010 || d.phoneSearch}</p>
+                          {d.note && <p className="text-[11px] text-sky-800 mt-0.5 break-words">📝 {d.note}</p>}
+                          <p className="text-[10px] text-sky-600 font-semibold">눌러서 불러오기 →</p>
+                        </div>
+                        <button type="button" title="삭제" className="text-gray-300 hover:text-red-500 text-xs px-1"
+                          onClick={e => { e.stopPropagation(); if (confirm('이 저장건을 삭제할까요?')) removeDraft(d.id) }}>✕</button>
+                      </div>
+                    </Fragment>))
+                  }
+                </div>
+              </div>
+
             </div>
 
             {/* ━━ 중앙 : 등록 폼 ━━ */}
             <div className="bg-white border border-gray-100 rounded-2xl p-4">
               <h3 className="text-sm font-black text-[#1B2A45] mb-3">📝 가망 등록</h3>
+              {activeDraft && (
+                <div className="mb-3 bg-sky-50 border border-sky-300 rounded-xl px-3 py-2 flex items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-sky-800">{activeDraft.kind === 'callback' ? '📞 나중에 통화 건' : '💾 저장한 건'}을 불러왔습니다</p>
+                    {activeDraft.note && <p className="text-xs text-sky-700 mt-0.5 break-words">📝 {activeDraft.note}</p>}
+                  </div>
+                  <button type="button" onClick={resetForm} className="text-[11px] text-sky-600 font-semibold shrink-0">새로 쓰기</button>
+                </div>
+              )}
               <form onSubmit={handleSubmitClick} className="space-y-3">
 
                 <div>
@@ -884,8 +1053,19 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                       ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                       : 'bg-[#1B2A45] text-white hover:bg-[#1B2A45]/90'
                   }`}>
-                  {!phoneVerified ? '🔒 번호 중복검색 먼저' : !checklistAllDone ? `🔒 체크리스트 ${checkDoneCount}/${CHECKLIST_ITEMS.length} 미완료` : '전송 →'}
+                  {!phoneVerified ? '🔒 번호 중복검색 먼저' : !checklistAllDone ? `🔒 체크리스트 ${checkDoneCount}/${CHECKLIST_ITEMS.length} 미완료` : '제출하기 →'}
                 </button>
+                {/* 체크리스트·번호검색과 상관없이 누를 수 있는 임시 저장 */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => { setDraftNote(activeDraft?.kind === 'save' ? activeDraft.note : ''); setDraftModal('save') }}
+                    className="py-3 rounded-xl border-2 border-sky-300 bg-sky-50 text-sky-800 text-sm font-bold hover:bg-sky-100">
+                    💾 저장하기
+                  </button>
+                  <button type="button" onClick={() => { setDraftNote(activeDraft?.kind === 'callback' ? activeDraft.note : ''); setDraftModal('callback') }}
+                    className="py-3 rounded-xl border-2 border-amber-300 bg-amber-50 text-amber-800 text-sm font-bold hover:bg-amber-100">
+                    📞 나중에 통화로 저장
+                  </button>
+                </div>
               </form>
             </div>
 

@@ -348,9 +348,16 @@ export default function DigManageTab() {
 
             {/* 녹취 플레이어 */}
             {p.recording_url && (
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                <p className="text-[11px] text-slate-600 font-semibold mb-2">녹취 파일 — {p.recording_filename}</p>
-                <audio controls src={p.recording_url} className="w-full" />
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-3">
+                {(Array.isArray(p.recording_analysis?.recordings) && p.recording_analysis.recordings.length > 1
+                  ? p.recording_analysis.recordings as { url: string; name: string }[]
+                  : [{ url: p.recording_url, name: p.recording_filename }]
+                ).map((r, i, arr) => (
+                  <div key={r.url}>
+                    <p className="text-[11px] text-slate-600 font-semibold mb-2">녹취 파일{arr.length > 1 ? ` ${i + 1}/${arr.length}` : ''} — {r.name}</p>
+                    <audio controls src={r.url} className="w-full" />
+                  </div>
+                ))}
               </div>
             )}
 

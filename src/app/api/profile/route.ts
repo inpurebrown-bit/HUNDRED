@@ -38,6 +38,7 @@ export async function GET() {
       username: dbUser.username || '',
       role: dbUser.role || '',
       phone: entry.phone || '',
+      resident_id: entry.resident_id || '',
       address: entry.address || '',
       bank_account: entry.bank_account || '',
       bank_name: entry.bank_name || '카카오뱅크',
@@ -53,7 +54,7 @@ export async function PATCH(req: NextRequest) {
 
   const userId = (session.user as any).id
   const body = await req.json()
-  const { name, currentPassword, newPassword, phone, address, bank_account, bank_name, join_date } = body
+  const { name, currentPassword, newPassword, phone, resident_id, address, bank_account, bank_name, join_date } = body
 
   const { data: dbUser } = await supabaseAdmin
     .from('users')
@@ -103,7 +104,7 @@ export async function PATCH(req: NextRequest) {
     : undefined
 
   // 기본정보 저장 후 잠금 (비밀번호/PIN 변경은 이 경로를 타지 않으므로 영향 없음)
-  const isBasicInfoSave = !!(name !== undefined || phone !== undefined || address !== undefined || bank_account !== undefined)
+  const isBasicInfoSave = !!(name !== undefined || phone !== undefined || resident_id !== undefined || address !== undefined || bank_account !== undefined)
   const shouldLock = isBasicInfoSave && !existing.info_locked
 
   const merged = {
@@ -111,6 +112,7 @@ export async function PATCH(req: NextRequest) {
     user_id: userId,
     name: finalName,
     phone: phone !== undefined ? phone : (existing.phone || ''),
+    resident_id: resident_id !== undefined ? String(resident_id).replace(/[^0-9]/g, '').replace(/^(\d{6})(\d+)$/, '$1-$2') : (existing.resident_id || ''),
     address: address !== undefined ? address : (existing.address || ''),
     bank_account: bank_account !== undefined ? bank_account : (existing.bank_account || ''),
     bank_name: bank_name !== undefined ? bank_name : (existing.bank_name || '카카오뱅크'),
