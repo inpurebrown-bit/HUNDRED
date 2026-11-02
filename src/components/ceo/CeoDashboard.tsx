@@ -30,6 +30,7 @@ import TabErrorBoundary from '@/components/shared/TabErrorBoundary'
 import DigManageTab from './DigManageTab'
 import AuthCodeTab from './AuthCodeTab'
 import RevenueAnalytics from './RevenueAnalytics'
+import DigEffectPanel from './DigEffectPanel'
 
 // ── 공통 서브탭 바 컴포넌트 ────────────────────────────────────
 function SubTabBar<T extends string>({ tabs, active, onChange }: {
@@ -1410,6 +1411,9 @@ function RevenueTab() {
     <div className="space-y-6 pb-8">
       {/* ── 경영 분석: 매출·비용·순이익 추이, 성장 여부, 팀별 본전, 목표 시뮬레이션, 세금 ── */}
       <RevenueAnalytics data={data} />
+
+      {/* ── 발굴팀: DB 절감 이득 · 데드라인 · 영업팀장 목표 시뮬레이터 ── */}
+      <DigEffectPanel />
 
       {/* ── 상세 내역 (이달 계약·수수료 목록, 직원별 실적) ── */}
       <details className="group bg-white rounded-2xl border border-gray-100 shadow-sm">

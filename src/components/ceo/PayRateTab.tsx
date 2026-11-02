@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { contractWeight, calcRecommendedSupply } from '@/lib/supplyRules'
+import { selfSupplyStats } from '@/lib/digStats'
+import DigTeamPanel from './DigTeamPanel'
 
 // ── 타입 ──────────────────────────────────────────────────────────────────────
 interface EmployeeRow {
@@ -163,13 +165,14 @@ function AutoField({ label, field, value, autoVal, idx, onChange }: {
 }
 
 function EmpCard({
-  row, idx, we, tw, onChange, onRemove, autoData, selfSupplied = 0,
+  row, idx, we, tw, onChange, onRemove, autoData, selfSupplied = 0, selfPaid = 0,
 }: {
   row: EmployeeRow; idx: number; we: number; tw: number
   onChange: (i: number, f: string, v: number | string | Record<string, number>) => void
   onRemove: (i: number) => void
   autoData: AutoEmpData
   selfSupplied?: number
+  selfPaid?: number
   // target은 supply-config에서 읽어온 값이 row.target에 반영되어 있음 (읽기전용)
 }) {
   const [showDaily, setShowDaily] = useState(false)
@@ -186,10 +189,15 @@ function EmpCard({
   const directPayment    = Math.max(Number(row.direct_payment),  autoData.direct_payment)
 
   const total       = supplyPayment + directPayment
-  const supplyRate  = supplyCount > 0 ? (supplyPayment / supplyCount * 100) : null
-  const directRate  = directCount > 0 ? (directPayment / directCount * 100) : null
-  // 총결제율 = 총계약수(공가+직가) / 공급갯수 × 100
-  const totalRate   = supplyCount > 0 ? ((supplyPayment + directPayment) / supplyCount * 100) : null
+  // 공가 결제 중 자체공급(발굴팀) 몫을 따로 떼어 한경연 공급 결제율과 자체공급 결제율을 분리
+  const selfPaidN    = Math.min(selfPaid, supplyPayment)
+  const hkPayment    = Math.max(0, supplyPayment - selfPaidN)
+  const supplyRate   = supplyCount > 0 ? (hkPayment / supplyCount * 100) : null
+  const selfRate     = selfSupplied > 0 ? (selfPaidN / selfSupplied * 100) : null
+  const directRate   = directCount > 0 ? (directPayment / directCount * 100) : null
+  // 총결제율 = 총계약수(공가+직가) / (한경연 공급 + 자체공급) × 100
+  const allSupply    = supplyCount + selfSupplied
+  const totalRate    = allSupply > 0 ? ((supplyPayment + directPayment) / allSupply * 100) : null
   const needed      = Number(row.target) - total
   // 공급예정: 총결제율 기준 권장 공급 수
   const dailyRec    = totalRate !== null ? calcRecommendedSupply(totalRate, we) : 0
@@ -250,16 +258,21 @@ function EmpCard({
       </div>
 
       {/* ── 결제율 ── */}
-      <div className="grid grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         <div className="rounded-2xl bg-[#0b2140]/[.06] px-3 py-3 text-center">
           <p className="text-[13px] text-gray-500 font-semibold">총결제율</p>
           <p className="text-[26px] leading-tight font-black text-[#0b2140] tabular-nums">{fmtPct(totalRate)}</p>
           {totalRate !== null && <p className={`text-[12.5px] ${rateGrade(totalRate, 30).cls}`}>{rateGrade(totalRate, 30).label}</p>}
         </div>
         <div className="rounded-2xl bg-sky-50 px-3 py-3 text-center">
-          <p className="text-[13px] text-sky-700 font-semibold">공급 결제율</p>
+          <p className="text-[13px] text-sky-700 font-semibold">한경연 결제율</p>
           <p className="text-[26px] leading-tight font-black text-sky-800 tabular-nums">{fmtPct(supplyRate)}</p>
           {supplyRate !== null && <p className={`text-[12.5px] ${rateGrade(supplyRate, 40).cls}`}>{rateGrade(supplyRate, 40).label}</p>}
+        </div>
+        <div className="rounded-2xl bg-emerald-50 px-3 py-3 text-center">
+          <p className="text-[13px] text-emerald-700 font-semibold">자체공급 결제율</p>
+          <p className="text-[26px] leading-tight font-black text-emerald-800 tabular-nums">{fmtPct(selfRate)}</p>
+          <p className="text-[12.5px] text-emerald-700/70">{selfSupplied > 0 ? `${fmtVal(selfPaidN)} / ${selfSupplied}개` : '받은 건 없음'}</p>
         </div>
         <div className="rounded-2xl bg-violet-50 px-3 py-3 text-center">
           <p className="text-[13px] text-violet-700 font-semibold">직접 결제율</p>
@@ -270,9 +283,9 @@ function EmpCard({
       {/* ── 갯수 ── */}
       <div className="grid grid-cols-4 gap-2.5">
         <div className="text-center">
-          <p className="text-[12.5px] text-gray-500 font-semibold mb-1">공급수</p>
+          <p className="text-[12.5px] text-gray-500 font-semibold mb-1">공급수 (한경연)</p>
           <div className="rounded-xl bg-gray-50 border border-gray-100 py-2.5 text-[17px] font-black text-[#0b2140] tabular-nums">{supplyCount}</div>
-          {selfSupplied > 0 && <p className="text-[11px] text-emerald-600 font-bold mt-1">자체 {selfSupplied}건</p>}
+          <p className="text-[11px] text-emerald-600 font-bold mt-1">+ 자체 {selfSupplied}개 = 총 {allSupply}개</p>
         </div>
         <AutoField label="공급 결제" field="supply_payment" value={supplyPayment} autoVal={autoData.supply_payment} idx={idx} onChange={onChange} />
         <div className="text-center">
@@ -350,6 +363,8 @@ function PayRateSubView() {
   // 인별 자동집계: 공급결제(공가) / 직접수(직가DB) / 직접결제(직가계약)
   const [autoByPerson,  setAutoByPerson] = useState<Record<string, AutoEmpData>>({})
   const [selfSuppliedMap, setSelfSuppliedMap] = useState<Record<string, number>>({})
+  const [selfPaidMap, setSelfPaidMap] = useState<Record<string, number>>({})
+  const [allCust, setAllCust] = useState<any[]>([])
 
   const mkRow = (name = ''): EmployeeRow => ({ name, target: 0, supply_count: 0, supply_payment: 0, direct_count: 0, direct_payment: 0 })
   const [employees, setEmployees] = useState<EmployeeRow[]>([])
@@ -375,12 +390,16 @@ function PayRateSubView() {
         // 직원별 목표 (supply-config.people[이름].goal)
         const goalMap: Record<string, number> = {}
         const scPeople = scJson?.config?.people || {}
-        const selfMap: Record<string, number> = {}
         Object.entries(scPeople).forEach(([name, cfg]: [string, any]) => {
           goalMap[cleanName(name)] = Number(cfg.goal) || 0
-          if ((cfg as any).self_supplied > 0) selfMap[cleanName(name)] = Number((cfg as any).self_supplied)
         })
-        setSelfSuppliedMap(selfMap)
+        {
+          const ss = selfSupplyStats(custJson.customers || [], month)
+          const sm: Record<string, number> = {}, pm: Record<string, number> = {}
+          Object.entries(ss).forEach(([n, v]) => { sm[cleanName(n)] = (sm[cleanName(n)] || 0) + v.supplied; pm[cleanName(n)] = (pm[cleanName(n)] || 0) + v.paid })
+          setSelfSuppliedMap(sm); setSelfPaidMap(pm)
+          setAllCust(custJson.customers || [])
+        }
         setOpsCases(casesJson.cases || [])
 
         // 관리팀 이번달 매출 집계
@@ -836,8 +855,10 @@ function PayRateSubView() {
   const totDirectPay = employees.filter(r => r.name !== TESTER)
     .reduce((s, r) => s + Number(r.direct_payment), 0)
   const totPayment   = totSupplyPay + totDirectPay
-  // 총결제율 = (공가+직가) / 공급갯수 × 100
-  const totTotalRate = totSupply > 0 ? (totPayment / totSupply * 100) : null
+  const totSelf      = Object.values(selfSuppliedMap).reduce((s, v) => s + v, 0)
+  const totSelfPaid  = Object.values(selfPaidMap).reduce((s, v) => s + v, 0)
+  // 총결제율 = (공가+직가) / (한경연 공급 + 자체공급) × 100
+  const totTotalRate = (totSupply + totSelf) > 0 ? (totPayment / (totSupply + totSelf) * 100) : null
 
   const man = (v: number) => (v >= 100000000 ? parseFloat((v / 100000000).toFixed(2)) + '억' : Math.round(v / 10000).toLocaleString('ko-KR') + '만')
 
@@ -893,9 +914,10 @@ function PayRateSubView() {
         </div>
 
         {employees.length >= 2 && (
-          <div className="rounded-3xl p-5 mb-4 text-white bg-gradient-to-br from-[#10203a] to-[#0a1424] grid grid-cols-3 gap-3 text-center shadow-[0_18px_40px_-26px_rgba(11,33,64,.8)]">
+          <div className="rounded-3xl p-5 mb-4 text-white bg-gradient-to-br from-[#10203a] to-[#0a1424] grid grid-cols-2 md:grid-cols-4 gap-3 text-center shadow-[0_18px_40px_-26px_rgba(11,33,64,.8)]">
             <div><p className="text-[13px] text-white/60 font-semibold">팀 목표</p><p className="text-[28px] font-black tabular-nums">{totTarget}<span className="text-[14px] text-white/50"> 건</span></p></div>
             <div><p className="text-[13px] text-white/60 font-semibold">팀 총결제</p><p className="text-[28px] font-black tabular-nums text-[#7ee0b5]">{totPayment % 1 === 0 ? totPayment : totPayment.toFixed(1)}<span className="text-[14px] text-white/50"> 건</span></p></div>
+            <div><p className="text-[13px] text-white/60 font-semibold">공급 (한경연 + 자체)</p><p className="text-[28px] font-black tabular-nums">{totSupply}<span className="text-[14px] text-white/50"> + </span><span className="text-[#7ee0b5]">{totSelf}</span></p><p className="text-[12px] text-white/50">자체 결제 {totSelfPaid % 1 === 0 ? totSelfPaid : totSelfPaid.toFixed(1)}건</p></div>
             <div><p className="text-[13px] text-white/60 font-semibold">팀 총결제율</p><p className="text-[28px] font-black tabular-nums text-[#E8D080]">{totTotalRate !== null ? totTotalRate.toFixed(1) + '%' : '—'}</p></div>
           </div>
         )}
@@ -907,6 +929,7 @@ function PayRateSubView() {
               onChange={updateEmp} onRemove={removeEmp}
               autoData={autoByPerson[cleanName(row.name)] || autoByPerson[row.name] || { supply_payment: 0, direct_count: 0, direct_payment: 0 }}
               selfSupplied={selfSuppliedMap[cleanName(row.name)] || 0}
+              selfPaid={selfPaidMap[cleanName(row.name)] || 0}
             />
           ))}
         </div>
@@ -982,6 +1005,9 @@ function PayRateSubView() {
           )}
         </section>
       )}
+
+      {/* ═════════ 발굴팀 ═════════ */}
+      <DigTeamPanel month={month} customers={allCust} />
 
       {/* ─── 저장 · 불러오기 ─── */}
       <div className="flex flex-wrap items-center justify-end gap-3 pt-1">

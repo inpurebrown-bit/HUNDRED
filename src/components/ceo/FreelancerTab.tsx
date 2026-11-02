@@ -10,7 +10,7 @@ interface Freelancer {
   phone: string
   bank_account: string
   bank_name: string
-  team: 'ops' | 'sales'
+  team: 'ops' | 'sales' | 'dig'
   join_date: string
   note: string
   resign_date?: string
@@ -50,7 +50,7 @@ export default function FreelancerTab() {
   const [msg, setMsg] = useState('')
   const [showMasked, setShowMasked] = useState(true)
   // 팀 탭 필터
-  const [teamTab, setTeamTab] = useState<'all' | 'sales' | 'ops' | 'resigned'>('all')
+  const [teamTab, setTeamTab] = useState<'all' | 'sales' | 'ops' | 'dig' | 'resigned'>('all')
   // 계좌번호 복사 피드백
   const [copiedId, setCopiedId] = useState<string | null>(null)
   // 급여명세 설정에는 이 화면에 없는 항목도 들어 있어, 저장할 때 원본을 그대로 보존한다
@@ -217,8 +217,9 @@ export default function FreelancerTab() {
           ['all', '재직 전체', activeList.length],
           ['sales', '영업팀', activeList.filter(e => e.team === 'sales').length],
           ['ops', '관리팀', activeList.filter(e => e.team === 'ops').length],
+          ['dig', '발굴팀', activeList.filter(e => e.team === 'dig').length],
           ['resigned', '퇴사', resignedList.length],
-        ] as ['all' | 'sales' | 'ops' | 'resigned', string, number][]).map(([key, label, count]) => (
+        ] as ['all' | 'sales' | 'ops' | 'dig' | 'resigned', string, number][]).map(([key, label, count]) => (
           <button
             key={key}
             onClick={() => setTeamTab(key)}
@@ -228,6 +229,7 @@ export default function FreelancerTab() {
                   ? 'bg-blue-600 text-white'
                   : key === 'ops'
                     ? 'bg-violet-600 text-white'
+                    : key === 'dig' ? 'bg-orange-500 text-white'
                     : key === 'resigned' ? 'bg-gray-500 text-white' : 'bg-[#1B2A45] text-white'
                 : 'bg-white border border-[#E8E2D4] text-gray-600 hover:bg-gray-50'
             }`}
@@ -285,9 +287,9 @@ export default function FreelancerTab() {
                   </td>
                   <td className="px-4 py-2.5">
                     <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
-                      emp.team === 'ops' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'
+                      emp.team === 'ops' ? 'bg-violet-100 text-violet-700' : emp.team === 'dig' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
                     }`}>
-                      {emp.team === 'ops' ? '관리팀' : '영업팀'}
+                      {emp.team === 'ops' ? '관리팀' : emp.team === 'dig' ? '발굴팀' : '영업팀'}
                     </span>
                   </td>
                   <td className="px-4 py-2.5 text-xs text-gray-600 font-mono">
@@ -455,10 +457,11 @@ export default function FreelancerTab() {
                   <label className="text-xs text-gray-500 block mb-1">팀</label>
                   <select
                     value={editData.team}
-                    onChange={e => setEditData(prev => prev ? { ...prev, team: e.target.value as 'ops' | 'sales' } : null)}
+                    onChange={e => setEditData(prev => prev ? { ...prev, team: e.target.value as 'ops' | 'sales' | 'dig' } : null)}
                     className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400">
                     <option value="sales">영업팀</option>
                     <option value="ops">관리팀</option>
+                    <option value="dig">발굴팀</option>
                   </select>
                 </div>
 
@@ -503,9 +506,9 @@ export default function FreelancerTab() {
                   </div>
                   <p className="font-bold text-gray-900 text-base">{selected.name}</p>
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                    selected.team === 'ops' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'
+                    selected.team === 'ops' ? 'bg-violet-100 text-violet-700' : selected.team === 'dig' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
                   }`}>
-                    {selected.team === 'ops' ? '관리팀' : '영업팀'}
+                    {selected.team === 'ops' ? '관리팀' : selected.team === 'dig' ? '발굴팀' : '영업팀'}
                   </span>
                 </div>
                 <div className="space-y-2 text-sm border-t border-gray-100 pt-3">
@@ -561,7 +564,7 @@ export default function FreelancerTab() {
       </div>
 
       {/* 요약 통계 */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-white rounded-xl border border-[#E8E2D4] p-4 text-center">
           <p className="text-2xl font-black text-gray-900">{activeList.length}</p>
           <p className="text-xs text-gray-500 mt-1">재직 프리랜서 <span className="text-gray-300">(퇴사 {resignedList.length})</span></p>
@@ -573,6 +576,10 @@ export default function FreelancerTab() {
         <div className="bg-white rounded-xl border border-[#E8E2D4] p-4 text-center">
           <p className="text-2xl font-black text-violet-600">{activeList.filter(e => e.team === 'ops').length}</p>
           <p className="text-xs text-gray-500 mt-1">관리팀 (재직)</p>
+        </div>
+        <div className="bg-white rounded-xl border border-[#E8E2D4] p-4 text-center">
+          <p className="text-2xl font-black text-orange-600">{activeList.filter(e => e.team === 'dig').length}</p>
+          <p className="text-xs text-gray-500 mt-1">발굴팀 (재직)</p>
         </div>
       </div>
     </div>
