@@ -2178,17 +2178,21 @@ function CustomerCard({
                         className="w-24 shrink-0 border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50 text-gray-800"
                       />
                     </div>
-                    <p className="text-[9px] text-gray-400 mt-1.5 leading-snug">🔔 날짜와 시간을 모두 입력하면 설정한 시각 5분 전에 알림이 옵니다.</p>
                     {(() => {
                       const hist = (((c.details as any)?.activity_log || []) as any[]).filter(e => String(e.action).startsWith('재통화')).slice(-3).reverse()
-                      return hist.length > 0 ? (
+                      const fd = (c.details as any)?.follow_up_date || (c.details as any)?.callback_date
+                      const ft = (c.details as any)?.follow_up_time || (c.details as any)?.callback_time
+                      // 기록이 없어도 설정된 일정이 있으면 한 줄은 항상 보여준다
+                      const lines = hist.length > 0
+                        ? hist.map(e => { const t = formatKST(e.at || ''); return `${t.date} ${t.time} · ${e.by} · ${e.action}${e.detail ? ' ' + e.detail : ''}` })
+                        : (fd ? [`📌 ${fd}${ft ? ' ' + ft : ''} 재통화 예정`] : [])
+                      return lines.length > 0 ? (
                         <div className="mt-1.5 space-y-0.5">
-                          {hist.map((e, i) => { const t = formatKST(e.at || ''); return (
-                            <p key={i} className="text-[9px] text-red-500 leading-snug">{t.date} {t.time} · {e.by} · {e.action}{e.detail ? ` ${e.detail}` : ''}</p>
-                          ) })}
+                          {lines.map((t, i) => <p key={i} className="text-[10px] font-semibold text-red-500 leading-snug">{t}</p>)}
                         </div>
                       ) : null
                     })()}
+                    <p className="text-[9px] text-gray-400 mt-1.5 leading-snug">🔔 날짜와 시간을 모두 입력하면 설정한 시각 5분 전에 알림이 옵니다.</p>
                   </div>
 
                   {/* 미팅 일정 */}

@@ -174,6 +174,12 @@ const SCRIPT_COLOR: Record<string, { header: string; border: string }> = {
   warning: { header: 'bg-orange-50 text-orange-800',    border: 'border-orange-300' },
 }
 
+const pad2 = (n: number) => String(n).padStart(2, '0')
+const localDate = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+const tomorrowDate = () => { const d = new Date(); d.setDate(d.getDate() + 1); return localDate(d) }
+const nowLocalMin = () => { const d = new Date(); return `${localDate(d)}T${pad2(d.getHours())}:${pad2(d.getMinutes())}` }
+const callTimeInPast = (v: string) => { const t = new Date(v).getTime(); return !isNaN(t) && t < Date.now() }
+
 export default function DigDashboard({ userId, userName, username }: Props) {
   const [activeTab, setActiveTab]   = useState<Tab>('dig')
   const [menuOpen, setMenuOpen]     = useState(false)
@@ -187,6 +193,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
   const [recs, setRecs] = useState<RecItem[]>([])
   const analyzing = recs.some(r => r.status === 'working')
   const [urgentAssign, setUrgentAssign] = useState(false)
+  const [callTomorrow, setCallTomorrow] = useState(false)
 
   // 저장함 (저장하기 / 나중에 통화로 저장)
   const [drafts, setDrafts]               = useState<Draft[]>([])
@@ -285,6 +292,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
     setForm({ ...EMPTY_FORM })
     setChecklist({ ...EMPTY_CHECKLIST })
     setUrgentAssign(false)
+    setCallTomorrow(false)
     setActiveDraft(null)
     setPhoneSearch(''); setPhoneResults(null); setPhoneVerified(false)
   }
@@ -500,6 +508,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
   function handleSubmitClick(e: React.FormEvent) {
     e.preventDefault()
     if (!form.phone_010.trim()) { showToast('010 번호는 필수입니다', 'error'); return }
+    if (form.preferred_call_time && callTimeInPast(form.preferred_call_time)) { showToast('통화 희망시간이 지금보다 이전이에요. 다시 선택해주세요', 'error'); return }
     setRecs([])
     if (fileRef.current) fileRef.current.value = ''
     setShowRecordingModal(true)
@@ -989,12 +998,34 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                 <div className="col-span-2 space-y-2">
                   <div>
                     <label className={lblCls}>통화 희망시간 <span className="text-amber-500 ml-1">★ 영업팀 일정에 표시됨</span></label>
-                    <input
-                      type="datetime-local"
-                      value={form.preferred_call_time}
-                      onChange={e => setForm(p => ({ ...p, preferred_call_time: e.target.value }))}
-                      className={inputCls}
-                    />
+                    <div className="flex gap-1.5 mb-1.5">
+                      <button type="button" onClick={() => { setCallTomorrow(false) }}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold border ${!callTomorrow ? 'bg-[#1B2A45] text-white border-[#1B2A45]' : 'bg-white text-gray-500 border-gray-200'}`}>날짜 선택</button>
+                      <button type="button" onClick={() => { setCallTomorrow(true); setForm(p => ({ ...p, preferred_call_time: `${tomorrowDate()}T${p.preferred_call_time.slice(11, 16) || '10:00'}` })) }}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold border ${callTomorrow ? 'bg-[#1B2A45] text-white border-[#1B2A45]' : 'bg-white text-gray-500 border-gray-200'}`}>내일</button>
+                    </div>
+                    {callTomorrow ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-[#1B2A45] shrink-0">내일 ({tomorrowDate().slice(5).replace('-', '/')})</span>
+                        <input
+                          type="time"
+                          value={form.preferred_call_time.slice(11, 16)}
+                          onChange={e => setForm(p => ({ ...p, preferred_call_time: e.target.value ? `${tomorrowDate()}T${e.target.value}` : '' }))}
+                          className={inputCls}
+                        />
+                      </div>
+                    ) : (
+                      <input
+                        type="datetime-local"
+                        min={nowLocalMin()}
+                        value={form.preferred_call_time}
+                        onChange={e => setForm(p => ({ ...p, preferred_call_time: e.target.value }))}
+                        className={inputCls}
+                      />
+                    )}
+                    {form.preferred_call_time && callTimeInPast(form.preferred_call_time) && (
+                      <p className="text-xs text-red-500 font-semibold mt-1">⚠️ 지금보다 이전 시간이에요. 다시 선택해주세요.</p>
+                    )}
                   </div>
                   <label className={`flex items-center gap-2 cursor-pointer select-none ${urgentAssign ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
                     <input type="checkbox" checked={urgentAssign} onChange={e => setUrgentAssign(e.target.checked)} className="w-4 h-4 accent-red-500" />
