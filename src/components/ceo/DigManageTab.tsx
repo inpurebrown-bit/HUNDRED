@@ -156,6 +156,11 @@ export default function DigManageTab() {
   const monthTotal = monthApproved.length
   const monthPct   = Math.min(100, Math.round((monthTotal / MONTHLY_GOAL) * 100))
 
+  async function clearUrgent(id: string) {
+    const res = await fetch(`/api/dig-prospects/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'clear_urgent' }) })
+    if (res.ok) { showToast('긴급 표시를 뺐어요'); await load() } else showToast('오류', 'error')
+  }
+
   async function approve(id: string) {
     setProcessing(id)
     const res = await fetch(`/api/dig-prospects/${id}`, {
@@ -250,12 +255,14 @@ export default function DigManageTab() {
         p.urgent_assign && p.status === 'approved' ? 'border-red-400 ring-2 ring-red-300' : 'border-gray-100'
       }`}>
         {/* 긴급배정 배너 */}
-        {p.urgent_assign && p.status === 'approved' && (
+        {p.urgent_assign && (
           <div className="bg-red-500 text-white px-4 py-1.5 text-xs font-black flex items-center gap-2">
-            🚨 긴급 배정 요청
+            🚨 {p.status === 'approved' ? '긴급 배정 요청' : '긴급 (영업팀 확인 전)'}
             {p.preferred_call_time && (
               <span className="font-normal opacity-90">— 통화 희망: {p.preferred_call_time}</span>
             )}
+            <button type="button" onClick={() => { if (confirm('긴급 표시를 뺄까요? (직원이 실수로 누른 경우)')) clearUrgent(p.id) }}
+              className="ml-auto bg-white/90 text-red-600 text-[11px] font-bold px-2.5 py-0.5 rounded-full hover:bg-white">긴급 빼기</button>
           </div>
         )}
 

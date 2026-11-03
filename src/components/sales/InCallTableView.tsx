@@ -1366,7 +1366,10 @@ function CustomerCard({
         className={`bg-white border rounded-xl p-2.5 cursor-pointer hover:shadow-md transition-all relative text-center ${
           expanded ? 'ring-2 ring-blue-400 border-blue-300' : 'border-gray-200 hover:border-blue-300'
         }`}
-        onClick={() => onExpand(expanded ? null : c.id)}
+        onClick={() => {
+          if (!expanded && (c.details as any)?.urgent_assign) onUpdate(c.id, { details: { urgent_assign: false } })
+          onExpand(expanded ? null : c.id)
+        }}
       >
         {/* 관리팀 담당자 배지 — 전송 완료 후 우측 상단 */}
         {isTransferred && opsUserName && (
@@ -1499,14 +1502,14 @@ function CustomerCard({
             trash:      { label: '자체거절', cls: 'bg-gray-100 text-gray-500' },
           }
           const badge = STATUS_BADGE[c.status]
-          const isSelfSupply = (c as any).details?.supply_source === 'self_supply'
+          const isSelfSupply = !!(c as any).details?.urgent_assign   // 긴급배정 표시 (자체공급 여부는 영업팀에 노출하지 않음)
           return badge ? (
             <div className="mb-1 flex justify-center gap-1 flex-wrap">
               <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${badge.cls}`}>
                 {badge.label}
               </span>
               {isSelfSupply && (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">자체공급</span>
+                <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-red-500 text-white">🚨 긴급배정</span>
               )}
               {leadType && (
                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${leadType === '직가' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
@@ -1517,7 +1520,7 @@ function CustomerCard({
           ) : leadType ? (
             <div className="mb-1 flex justify-center gap-1 flex-wrap">
               {isSelfSupply && (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">자체공급</span>
+                <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-red-500 text-white">🚨 긴급배정</span>
               )}
               <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${leadType === '직가' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
                 {leadType}
@@ -1525,7 +1528,7 @@ function CustomerCard({
             </div>
           ) : isSelfSupply ? (
             <div className="mb-1 flex justify-center">
-              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">자체공급</span>
+              <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-red-500 text-white">🚨 긴급배정</span>
             </div>
           ) : null
         })()}

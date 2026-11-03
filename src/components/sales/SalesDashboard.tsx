@@ -1095,7 +1095,9 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
             {(() => {
               const pr = myPayrateRow
               const ds = pr?.daily_supplies || {}
-              const supCnt    = Object.values(ds).reduce((s: number, v: any) => s + Number(v || 0), 0)
+              // 한경연 공급 + 자체공급(이번 달 접수)을 영업팀에는 그냥 '공급'으로 합쳐 보여준다
+              const selfCntMonth = customers.filter(c => (c as any).details?.supply_source === 'self_supply' && String((c as any).details?.reception_date || (c as any).created_at || '').slice(0, 7) === thisMonth).length
+              const supCnt    = Object.values(ds).reduce((s: number, v: any) => s + Number(v || 0), 0) + selfCntMonth
               // 공급결제: 공가 출신 계약 완료 건 실시간 집계 (dirPayAuto 방식 동일)
               // 직가 여부 판단 (db010 상태 OR db010_month 기록 OR is_direct 플래그)
               const isDirectFn = (c: any) =>
@@ -1207,13 +1209,13 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                       </details>
                     )}
                     <div className="flex flex-col gap-3">
-                    {/* 공급 채널 (한경연 + 자체공급 묶음) */}
+                    {/* 공급 채널 */}
                     <div className="border border-sky-100 rounded-2xl overflow-hidden">
                       <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest px-3 pt-2.5 pb-1.5 bg-sky-50/60">공급 채널</p>
 
                       {/* 한경연 공급 */}
                       <div className="px-3 pb-1.5 pt-1">
-                        <p className="text-[8px] font-semibold text-sky-400 mb-1.5">한경연 공급</p>
+                        <p className="text-[8px] font-semibold text-sky-400 mb-1.5">공가 공급</p>
                         <div className="grid grid-cols-3 gap-2">
                           <div className="rounded-lg bg-sky-50 px-2 py-1.5 text-center">
                             <p className="text-[9px] text-sky-400 font-semibold mb-0">공급수</p>
@@ -1233,43 +1235,6 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
                         </div>
                       </div>
 
-                      {/* 구분선 */}
-                      <div className="mx-3 border-t border-sky-100" />
-
-                      {/* 자체공급 */}
-                      {(() => {
-                        const selfSupplied = Number((displayCfg as any).self_supplied || 0)
-                        const selfContracted = thisMonthContracted.filter(
-                          c => (c as any).details?.supply_source === 'self_supply'
-                        )
-                        const selfPay = selfContracted.reduce(
-                          (sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included),
-                          0
-                        )
-                        const selfRate = selfSupplied > 0 ? (selfPay / selfSupplied * 100) : null
-                        return (
-                          <div className="px-3 pb-2 pt-1">
-                            <p className="text-[8px] font-semibold text-emerald-500 mb-1.5">자체공급</p>
-                            <div className="grid grid-cols-3 gap-2">
-                              <div className="rounded-lg bg-emerald-50 px-2 py-1.5 text-center">
-                                <p className="text-[9px] text-emerald-500 font-semibold mb-0">자체공급수</p>
-                                <p className="text-xl font-black text-emerald-700 leading-none">{selfSupplied}</p>
-                                <p className="text-[8px] text-emerald-400 mt-0 leading-tight">발굴팀 배정</p>
-                              </div>
-                              <div className="rounded-lg bg-teal-50 px-2 py-1.5 text-center">
-                                <p className="text-[9px] text-teal-500 font-semibold mb-0">자체공급결제</p>
-                                <p className="text-xl font-black text-teal-700 leading-none">{fmtV(selfPay)}</p>
-                                <p className="text-[8px] text-teal-400 mt-0 leading-tight">자체공급 계약</p>
-                              </div>
-                              <div className="rounded-lg bg-green-50 px-2 py-1.5 text-center">
-                                <p className="text-[9px] text-green-500 font-semibold mb-0">자체공급결제율</p>
-                                <p className={`text-lg font-black leading-none ${rateGrade(selfRate, 40).numCls}`}>{fmtP(selfRate)}</p>
-                                <p className="text-[8px] mt-0">{rateGrade(selfRate, 40).label ?? <span className="text-green-400">—</span>}</p>
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })()}
                     </div>
 
                     {/* 직접 채널 */}

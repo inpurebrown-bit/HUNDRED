@@ -13,6 +13,16 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   const body = await req.json()
   const { action } = body
 
+  if (action === 'clear_urgent') {
+    if (user.role !== 'ceo') return NextResponse.json({ error: '권한 없음' }, { status: 403 })
+    const { data: pr } = await supabaseAdmin.from('dig_prospects').update({ urgent_assign: false }).eq('id', id).select('customer_id').single()
+    if (pr?.customer_id) {
+      const { data: cu } = await supabaseAdmin.from('customers').select('details').eq('id', pr.customer_id).single()
+      if (cu) await supabaseAdmin.from('customers').update({ details: { ...(cu.details || {}), urgent_assign: false } }).eq('id', pr.customer_id)
+    }
+    return NextResponse.json({ ok: true })
+  }
+
   if (action === 'approve' || action === 'reject' || action === 'assign') {
     if (user.role !== 'ceo') return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
@@ -61,18 +71,13 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
         cbDate = kst.slice(0, 10); cbTime = kst.slice(11, 16)
       }
     }
-    const lines: string[] = []
-    if (cbDate) lines.push(`📞 통화 희망시간: ${cbDate} ${cbTime}`)
-    if (ra.dig_note) lines.push(`📝 통화메모: ${ra.dig_note}`)
-    if (prospect.memo) lines.push(`세금체납/특이사항: ${prospect.memo}`)
-    if (prospect.required_fund) lines.push(`필요자금: ${prospect.required_fund}`)
-    if (ra.summary) lines.push(`🎧 녹취 요약: ${ra.summary}`)
-    else if (ra.ceo_comment) lines.push(`🎧 녹취 요약: ${ra.ceo_comment}`)
-    const digTimeline = lines.length ? [{
-      id: `dig-${prospect.id}`,
-      time: new Date().toISOString(),
-      author: `발굴팀 ${prospect.dig_user_name || ''}`.trim(),
-      content: lines.join('\n'),
+    // 타임라인: 발굴팀 직원이 적은 메모만. 없으면 AI 요약을 짧게. 영업팀 일반 기록과 같은 형식(user/created_at)
+    const aiShort = String(ra.summary || ra.ceo_comment || '').replace(/s+/g, ' ').trim()
+    const memoText = String(ra.dig_note || '').trim() || (aiShort.length > 90 ? aiShort.slice(0, 90) + '…' : aiShort)
+    const digTimeline = memoText ? [{
+      user: prospect.dig_user_name || '발굴',
+      content: memoText,
+      created_at: new Date(Date.now() + 9 * 3600 * 1000).toISOString().replace('Z', '+09:00'),
     }] : []
 
     const { data: newCustomer, error: custErr } = await supabaseAdmin
@@ -87,6 +92,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
         details: {
           sub_status: 'lead',    // 공가DB 상태 (프론트 상태)
           ...(cbDate ? { callback_date: cbDate, callback_time: cbTime } : {}),
+          ...(prospect.urgent_assign ? { urgent_assign: true } : {}),
           supply_source: 'self_supply',  // 자체공급 식별자
           reception_date: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10),  // 공급일 자동 설정
           company: prospect.company,
@@ -108,7 +114,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
           dig_prospect_id: prospect.id,
           dig_user_name: prospect.dig_user_name,
           dig_phone_010: prospect.phone_010,
-          activity_log: [{ at: new Date(Date.now() + 9 * 3600 * 1000).toISOString().replace('Z', '+09:00'), by: user.name || '대표', role: user.role, action: '자체공급 배정', detail: `발굴 ${prospect.dig_user_name || ''} → ${assigned_to_name}` }],
+          activity_log: [{ at: new Date(Date.now() + 9 * 3600 * 1000).toISOString().replace('Z', '+09:00'), by: user.name || '대표', role: user.role, action: 'DB 등록', detail: `담당 ${assigned_to_name}` }],
         },
       })
       .select()
