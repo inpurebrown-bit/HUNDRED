@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { assignProspect, queueAssign, cancelQueue } from '@/lib/digAssign'
 
 // PATCH: 상태 변경 (ceo: 승인/거절/배정, dig: 분석 결과 업데이트)
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -20,6 +21,12 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       const { data: cu } = await supabaseAdmin.from('customers').select('details').eq('id', pr.customer_id).single()
       if (cu) await supabaseAdmin.from('customers').update({ details: { ...(cu.details || {}), urgent_assign: false } }).eq('id', pr.customer_id)
     }
+    return NextResponse.json({ ok: true })
+  }
+
+  if (action === 'cancel_queue') {
+    if (user.role !== 'ceo') return NextResponse.json({ error: '권한 없음' }, { status: 403 })
+    await cancelQueue(id)
     return NextResponse.json({ ok: true })
   }
 
@@ -47,108 +54,17 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       ceo_comment: body.ceo_comment || null,
     }
   } else if (action === 'assign') {
-    const { assigned_to, assigned_to_name } = body
+    // 즉시 배정(now) 또는 다음 영업일 아침 자동 배정 예약(schedule)
+    const { assigned_to, assigned_to_name, mode } = body
     if (!assigned_to) return NextResponse.json({ error: '배정 대상 필요' }, { status: 400 })
-
-    const { data: prospect, error: fetchErr } = await supabaseAdmin
-      .from('dig_prospects')
-      .select('*')
-      .eq('id', id)
-      .single()
-
-    if (fetchErr || !prospect) return NextResponse.json({ error: '가망 없음' }, { status: 404 })
-
-    // 발굴팀 통화메모 → 영업 타임라인 / 통화 희망시간 → 영업사원 재통화 일정
-    const ra = (prospect.recording_analysis || {}) as any
-    const pct = String(prospect.preferred_call_time || '')
-    let cbDate = '', cbTime = ''
-    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(pct.slice(0, 16)) && !/(Z|[+-]\d{2}:?\d{2})$/.test(pct)) {
-      cbDate = pct.slice(0, 10); cbTime = pct.slice(11, 16)
-    } else if (pct) {
-      const d = new Date(pct)
-      if (!isNaN(d.getTime())) {
-        const kst = d.toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' })
-        cbDate = kst.slice(0, 10); cbTime = kst.slice(11, 16)
-      }
+    if (mode === 'schedule') {
+      const at = await queueAssign([id], assigned_to, assigned_to_name || '', { name: user.name, role: user.role })
+      return NextResponse.json({ queued: true, release_at: at })
     }
-    // 타임라인: 발굴팀 직원이 적은 메모만. 없으면 AI 요약을 짧게. 영업팀 일반 기록과 같은 형식(user/created_at)
-    const aiShort = String(ra.summary || ra.ceo_comment || '').replace(/s+/g, ' ').trim()
-    const memoText = String(ra.dig_note || '').trim() || (aiShort.length > 90 ? aiShort.slice(0, 90) + '…' : aiShort)
-    const digTimeline = memoText ? [{
-      user: prospect.dig_user_name || '발굴',
-      content: memoText,
-      created_at: new Date(Date.now() + 9 * 3600 * 1000).toISOString().replace('Z', '+09:00'),
-    }] : []
-
-    const { data: newCustomer, error: custErr } = await supabaseAdmin
-      .from('customers')
-      .insert({
-        name: prospect.ceo_name || '(미입력)',
-        phone: prospect.phone_010 || prospect.phone,
-        source: 'lead',          // DB CHECK: 'self'|'lead' — 자체공급도 공급파이프라인(공가) 경로
-        status: 'active',        // DB CHECK: 'active'|'contracted'
-        owner_id: assigned_to,
-        call_timeline: digTimeline,
-        details: {
-          sub_status: 'lead',    // 공가DB 상태 (프론트 상태)
-          ...(cbDate ? { callback_date: cbDate, callback_time: cbTime } : {}),
-          ...(prospect.urgent_assign ? { urgent_assign: true } : {}),
-          supply_source: 'self_supply',  // 자체공급 식별자
-          reception_date: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10),  // 공급일 자동 설정
-          company: prospect.company,
-          sales_user_name: assigned_to_name,
-          // 영업팀 InCallCard 필드명으로 매핑
-          years_in_business: prospect.business_age,
-          business_type: prospect.industry,
-          revenue_2026: prospect.annual_revenue,
-          credit_score: prospect.credit_score,
-          tax_delinquency: prospect.memo || (prospect.has_delinquency ? '있음' : '없음'),
-          required_funds: prospect.required_fund,
-          // 원본 보존
-          business_age: prospect.business_age,
-          annual_revenue: prospect.annual_revenue,
-          industry: prospect.industry,
-          has_delinquency: prospect.has_delinquency,
-          required_fund: prospect.required_fund,
-          // 출처 정보
-          dig_prospect_id: prospect.id,
-          dig_user_name: prospect.dig_user_name,
-          dig_phone_010: prospect.phone_010,
-          activity_log: [{ at: new Date(Date.now() + 9 * 3600 * 1000).toISOString().replace('Z', '+09:00'), by: user.name || '대표', role: user.role, action: 'DB 등록', detail: `담당 ${assigned_to_name}` }],
-        },
-      })
-      .select()
-      .single()
-
-    if (custErr) return NextResponse.json({ error: custErr.message }, { status: 500 })
-
-    // 자체공급 카운트 자동 증가 (supply-config self_supplied)
-    const { data: cfgRow } = await supabaseAdmin
-      .from('notices')
-      .select('id, content')
-      .eq('notice_type', 'supply_config')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    if (cfgRow) {
-      try {
-        const cfg = JSON.parse(cfgRow.content || '{}')
-        const people = cfg.people || {}
-        const emp = people[assigned_to_name] || { supplied: 0, goal: 30, base: 0, self_supplied: 0 }
-        emp.self_supplied = (emp.self_supplied || 0) + 1
-        people[assigned_to_name] = emp
-        cfg.people = people
-        await supabaseAdmin.from('notices').update({ content: JSON.stringify(cfg) }).eq('id', cfgRow.id)
-      } catch {}
-    }
-
-    updateData = {
-      status: 'assigned',
-      assigned_to,
-      assigned_to_name,
-      customer_id: newCustomer.id,
-      assigned_at: new Date().toISOString(),
-    }
+    const r = await assignProspect(id, assigned_to, assigned_to_name || '', { name: user.name, role: user.role })
+    if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 })
+    await cancelQueue(id)
+    return NextResponse.json({ ok: true })
   } else if (action === 'set_analysis') {
     updateData = {
       recording_analysis: body.analysis,

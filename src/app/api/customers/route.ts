@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { normalizeCustomers, toDbRow } from '@/lib/customerUtils'
 import { nowKstIso } from '@/lib/activityLog'
+import { releaseDue } from '@/lib/digAssign'
 
 // GET: 내 고객 목록 조회
 export async function GET(req: NextRequest) {
@@ -14,6 +15,9 @@ export async function GET(req: NextRequest) {
   if (user.role !== 'sales' && user.role !== 'ceo') {
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
+
+  // 대표가 예약해 둔 발굴팀 배정이 시각이 되었으면 먼저 공급DB에 넣는다
+  try { await releaseDue() } catch {}
 
   // Supabase 기본 응답 제한(1,000행)을 넘는 고객도 모두 가져오도록 페이지 단위로 반복 조회
   // scope=payroll: 급여·정산에 쓰이는 고객만 (계약/환불 + 환수차감·잔금 추가입금 보유)

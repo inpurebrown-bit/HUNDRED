@@ -2167,18 +2167,28 @@ function CustomerCard({
                     <div className="flex gap-2">
                       <input
                         type="date"
-                        value={c.details?.follow_up_date || ''}
+                        value={c.details?.follow_up_date || c.details?.callback_date || ''}
                         onChange={e => onUpdate(c.id, { details: { follow_up_date: e.target.value } })}
                         className="flex-1 min-w-0 border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50 text-gray-800"
                       />
                       <input
                         type="time"
-                        value={c.details?.follow_up_time || ''}
+                        value={c.details?.follow_up_time || c.details?.callback_time || ''}
                         onChange={e => onUpdate(c.id, { details: { follow_up_time: e.target.value } })}
                         className="w-24 shrink-0 border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50 text-gray-800"
                       />
                     </div>
                     <p className="text-[9px] text-gray-400 mt-1.5 leading-snug">🔔 날짜와 시간을 모두 입력하면 설정한 시각 5분 전에 알림이 옵니다.</p>
+                    {(() => {
+                      const hist = (((c.details as any)?.activity_log || []) as any[]).filter(e => String(e.action).startsWith('재통화')).slice(-3).reverse()
+                      return hist.length > 0 ? (
+                        <div className="mt-1.5 space-y-0.5">
+                          {hist.map((e, i) => { const t = formatKST(e.at || ''); return (
+                            <p key={i} className="text-[9px] text-red-500 leading-snug">{t.date} {t.time} · {e.by} · {e.action}{e.detail ? ` ${e.detail}` : ''}</p>
+                          ) })}
+                        </div>
+                      ) : null
+                    })()}
                   </div>
 
                   {/* 미팅 일정 */}

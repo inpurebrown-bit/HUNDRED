@@ -17,7 +17,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
 
   const { data: existing } = await supabaseAdmin
     .from('customers')
-    .select('owner_id, status, name, details, call_timeline')
+    .select('owner_id, status, name, phone, memo, details, call_timeline')
     .eq('id', id)
     .single()
 
@@ -75,6 +75,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       existing as any,
       { status: updateBody.status ?? existing.status, details: updateBody.details ?? existing.details, call_timeline: updateBody.call_timeline },
       { name: user.name, role: user.role },
+      { name: updateBody.name, phone: updateBody.phone, memo: updateBody.memo },
     )
     if (updateBody.details || logs.length) updateBody.details = withLog(updateBody.details ?? existing.details, existing.details, logs)
   }

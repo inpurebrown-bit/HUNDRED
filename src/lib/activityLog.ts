@@ -24,6 +24,7 @@ const CUSTOMER_RULES: Record<string, Rule> = {
   follow_up_date:   { label: '재통화 일정', kind: 'value' },
   callback_date:    { label: '재통화 일정', kind: 'value' },
   callback_time:    { label: '재통화 시간', kind: 'value' },
+  follow_up_time:   { label: '재통화 시간', kind: 'value' },
   meeting_date:     { label: '미팅 일정', kind: 'value' },
   meeting_time:     { label: '미팅 시간', kind: 'value' },
   subcall_date:     { label: '재통화 일정', kind: 'value' },
@@ -119,23 +120,28 @@ const INFO_LABEL: Record<string, string> = {
   loan_total: '대출', loan_kibo: '대출', loan_shinbo: '대출', loan_jaedan: '대출', loan_jinjong: '대출', loan_sojin: '대출', loan_other: '대출',
   asset_biz_type: '자산', asset_biz_value: '자산', asset_home_type: '자산', asset_home_value: '자산', asset_other: '자산',
   company: '업체명', ceo_name: '대표자', phone: '연락처',
+  loan_history: '대출이력', employee_name: '직원', as_request: 'A/S 내용', loan_policy: '대출(정책)', assets: '자산', industry: '업종',
 }
+const SKIP_KEYS = new Set(['activity_log', 'incall_journal', 'sales_customer_info', 'contract_draft', 'transfer_history', 'db010_month'])
 function diffInfo(prev: any, next: any, known: Set<string>, a: Actor, out: ActLog[]) {
   const labels = new Set<string>()
   for (const k of Object.keys(next || {})) {
-    if (known.has(k) || !INFO_LABEL[k]) continue
+    if (known.has(k) || SKIP_KEYS.has(k)) continue
+    if (!INFO_LABEL[k] && /(_date|_stage|_status|_type|_mood|_result)$/.test(k)) continue   // 값이 보이는 항목은 아래 diffGeneric이 기록
+    if (typeof next[k] === 'boolean' || typeof prev?.[k] === 'boolean') continue
     if (same(prev?.[k], next[k])) continue
     if (str(prev?.[k]) === '' && str(next[k]) === '') continue
-    labels.add(INFO_LABEL[k])
+    labels.add(INFO_LABEL[k] || '기타')
   }
   if (labels.size) push(out, a, '업체정보 수정', [...labels].slice(0, 4).join('·'))
 }
 
 /** 영업팀 고객 카드 변경 내역 */
 export function diffCustomer(
-  existing: { status?: string; owner_id?: string | null; details?: any; call_timeline?: any[] },
+  existing: { status?: string; owner_id?: string | null; name?: string; details?: any; call_timeline?: any[] },
   next: { status?: string; owner_id?: string | null; details?: any; call_timeline?: any[] },
   a: Actor,
+  top?: { name?: any; phone?: any; memo?: any },
 ): ActLog[] {
   const out: ActLog[] = []
   const pd = existing.details || {}, nd = next.details || pd
@@ -149,6 +155,13 @@ export function diffCustomer(
   const known = new Set([...Object.keys(CUSTOMER_RULES), 'sub_status', 'transfer_history', 'db010_month', 'sales_user_name'])
   diffInfo(pd, nd, known, a, out)
   diffGeneric(pd, nd, new Set([...known, ...Object.keys(INFO_LABEL)]), a, out)
+  if (top) {
+    const lb: string[] = []
+    if (top.name !== undefined && str(top.name) !== str(existing.name)) lb.push('대표자')
+    if (top.phone !== undefined && str(top.phone) !== str((existing as any).phone)) lb.push('연락처')
+    if (top.memo !== undefined && str(top.memo) !== str((existing as any).memo)) lb.push('메모')
+    if (lb.length) push(out, a, '업체정보 수정', lb.join('·'))
+  }
   return out
 }
 
@@ -202,7 +215,8 @@ export function mergeLogs(existing: ActLog[] | undefined, added: ActLog[]): ActL
     const last = log[log.length - 1]
     const mergeable = /(등록|수정)$/.test(e.action) || e.action === '인콜일지 수정'
     if (mergeable && last && last.action === e.action && last.by === e.by && Date.parse(e.at) - Date.parse(last.at) < COALESCE_MS) {
-      log[log.length - 1] = { ...last, at: e.at, n: (last.n || 1) + 1 }
+      const u = e.action === '업체정보 수정' ? [...new Set([...(last.detail || '').split('·'), ...(e.detail || '').split('·')].filter(Boolean))].join('·') : last.detail
+      log[log.length - 1] = { ...last, at: e.at, n: (last.n || 1) + 1, ...(u ? { detail: u } : {}) }
     } else log.push(e)
   }
   return log.slice(-MAX_LOGS)

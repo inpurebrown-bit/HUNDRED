@@ -55,6 +55,10 @@ export default function DigManageTab() {
   const [viewTab, setViewTab] = useState<ViewTab>('pending')
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [salesUsers, setSalesUsers] = useState<SalesUser[]>([])
+  const [queue, setQueue] = useState<{ prospect_id: string; assigned_to_name: string; release_at: string }[]>([])
+  const [checked, setChecked] = useState<Set<string>>(new Set())
+  const [bulkTarget, setBulkTarget] = useState('')
+  const [bulkBusy, setBulkBusy] = useState(false)
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -80,6 +84,7 @@ export default function DigManageTab() {
     const usersData = await usersRes.json()
     setProspects(prosData.prospects || [])
     setSalesUsers(usersData.users || [])
+    setQueue(prosData.queue || [])
     setLoading(false)
   }, [])
 
@@ -216,7 +221,35 @@ export default function DigManageTab() {
     setProcessing(null)
   }
 
-  async function assign(id: string) {
+  const releaseLabel = (iso: string) => {
+    const d = new Date(iso)
+    const k = new Date(d.getTime() + 9 * 3600 * 1000)
+    const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
+    const day = k.toISOString().slice(0, 10)
+    return `${day === today ? '오늘' : day.slice(5).replace('-', '/')} ${String(k.getUTCHours()).padStart(2, '0')}:00`
+  }
+
+  async function cancelQueued(id: string) {
+    const res = await fetch(`/api/dig-prospects/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cancel_queue' }) })
+    if (res.ok) { showToast('예약을 취소했어요'); await load() } else showToast('오류', 'error')
+  }
+
+  async function bulkAssign(mode: 'schedule' | 'now') {
+    if (checked.size === 0) { showToast('배정할 건을 체크해주세요', 'error'); return }
+    if (!bulkTarget) { showToast('배정할 영업팀 직원을 선택해주세요', 'error'); return }
+    const su = salesUsers.find(u => u.id === bulkTarget)
+    setBulkBusy(true)
+    const res = await fetch('/api/dig-prospects/bulk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: [...checked], assigned_to: bulkTarget, assigned_to_name: su?.name || '', mode }) })
+    const d = await res.json().catch(() => ({}))
+    if (res.ok) {
+      showToast(mode === 'now' ? `${su?.name}에게 ${d.ok}건 즉시 배정했어요` : `${su?.name}에게 ${d.ok}건 예약 — ${releaseLabel(d.release_at)}에 공급DB로 들어가요`)
+      setChecked(new Set())
+      await load()
+    } else showToast(d.error || '오류', 'error')
+    setBulkBusy(false)
+  }
+
+  async function assign(id: string, mode: 'schedule' | 'now' = 'schedule') {
     const salesId = assignTarget[id]
     if (!salesId) {
       showToast('배정할 영업팀 직원을 선택해주세요', 'error')
@@ -231,10 +264,12 @@ export default function DigManageTab() {
         action: 'assign',
         assigned_to: salesId,
         assigned_to_name: salesUser?.name || '',
+        mode,
       }),
     })
     if (res.ok) {
-      showToast(`${salesUser?.name}에게 배정 완료 — 공급DB로 이동됩니다`)
+      const d = await res.json().catch(() => ({}))
+      showToast(d.queued ? `${salesUser?.name}에게 예약 — ${releaseLabel(d.release_at)}에 공급DB로 들어가요` : `${salesUser?.name}에게 즉시 배정 완료 — 공급DB로 이동됐어요`)
       setExpanded(null)
       await load()
     } else {
@@ -265,6 +300,21 @@ export default function DigManageTab() {
               className="ml-auto bg-white/90 text-red-600 text-[11px] font-bold px-2.5 py-0.5 rounded-full hover:bg-white">긴급 빼기</button>
           </div>
         )}
+
+        {p.status === 'approved' && (() => {
+          const q = queue.find(x => x.prospect_id === p.id)
+          return q ? (
+            <div className="bg-sky-50 border-b border-sky-100 px-4 py-1.5 text-[11px] text-sky-800 flex items-center gap-2">
+              ⏰ <b>{q.assigned_to_name}</b> 예약 · {releaseLabel(q.release_at)} 공급DB 자동 입고
+              <button type="button" onClick={() => cancelQueued(p.id)} className="ml-auto text-sky-600 underline">예약 취소</button>
+            </div>
+          ) : (
+            <label className="flex items-center gap-2 px-4 pt-2 text-[11px] text-gray-400 cursor-pointer select-none">
+              <input type="checkbox" checked={checked.has(p.id)} onChange={e => setChecked(prev => { const n = new Set(prev); if (e.target.checked) n.add(p.id); else n.delete(p.id); return n })} className="w-3.5 h-3.5 accent-[#1B2A45]" />
+              일괄 배정에 선택
+            </label>
+          )
+        })()}
 
         {/* 카드 헤더 */}
         <button
@@ -556,14 +606,20 @@ export default function DigManageTab() {
                     <option key={u.id} value={u.id}>{u.name}</option>
                   ))}
                 </select>
-                <button
-                  onClick={() => assign(p.id)}
-                  disabled={processing === p.id || !assignTarget[p.id]}
-                  className={`w-full py-2.5 text-white text-sm font-bold rounded-xl disabled:opacity-50 transition-colors ${
-                    p.urgent_assign ? 'bg-red-500 hover:bg-red-600' : 'bg-[#1B2A45] hover:bg-[#1B2A45]/90'
-                  }`}>
-                  {processing === p.id ? '배정 중...' : '배정 확정 → 영업팀 공급DB 이동'}
-                </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    onClick={() => assign(p.id, 'schedule')}
+                    disabled={processing === p.id || !assignTarget[p.id]}
+                    className="py-2.5 bg-[#1B2A45] hover:bg-[#1B2A45]/90 text-white text-sm font-bold rounded-xl disabled:opacity-50 transition-colors">
+                    ⏰ 예약 배정 (다음 영업일 아침 자동 입고)
+                  </button>
+                  <button
+                    onClick={() => assign(p.id, 'now')}
+                    disabled={processing === p.id || !assignTarget[p.id]}
+                    className={`py-2.5 text-white text-sm font-bold rounded-xl disabled:opacity-50 transition-colors ${p.urgent_assign ? 'bg-red-500 hover:bg-red-600' : 'bg-red-400/90 hover:bg-red-500'}`}>
+                    {processing === p.id ? '배정 중...' : '🚨 즉시 배정'}
+                  </button>
+                </div>
               </div>
             )}
 
@@ -732,6 +788,23 @@ export default function DigManageTab() {
                 <span className="text-[10px] bg-red-500 text-white px-2 py-0.5 rounded-full font-black">🚨 긴급 {urgentCount}건</span>
               )}
             </div>
+            {approvedList.length > 0 && (
+              <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 mb-3 flex flex-wrap items-center gap-2">
+                <button type="button" className="text-[11px] px-2.5 py-1 rounded-lg bg-gray-100 text-gray-600 font-semibold"
+                  onClick={() => { const free = approvedList.filter(p => !queue.some(q => q.prospect_id === p.id)).map(p => p.id); setChecked(prev => prev.size >= free.length ? new Set() : new Set(free)) }}>
+                  전체 선택/해제
+                </button>
+                <span className="text-[11px] text-gray-500">선택 <b className="text-[#1B2A45]">{checked.size}</b>건</span>
+                <select value={bulkTarget} onChange={e => setBulkTarget(e.target.value)} className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs">
+                  <option value="">배정할 직원...</option>
+                  {salesUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+                <button type="button" disabled={bulkBusy || checked.size === 0 || !bulkTarget} onClick={() => bulkAssign('schedule')}
+                  className="text-xs font-bold px-3 py-1.5 rounded-lg bg-[#1B2A45] text-white disabled:opacity-40">⏰ 일괄 예약 배정</button>
+                <button type="button" disabled={bulkBusy || checked.size === 0 || !bulkTarget} onClick={() => bulkAssign('now')}
+                  className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-500 text-white disabled:opacity-40">🚨 일괄 즉시 배정</button>
+              </div>
+            )}
             {approvedList.length === 0 ? (
               <div className="bg-white rounded-xl border border-gray-100 px-4 py-6 text-center text-gray-400 text-sm">배정 대기 중인 가망이 없습니다</div>
             ) : (

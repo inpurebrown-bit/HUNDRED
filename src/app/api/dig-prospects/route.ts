@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { releaseDue, loadQueue } from '@/lib/digAssign'
 
 // GET: 목록 조회
 // - dig: 본인 것만
@@ -14,6 +15,8 @@ export async function GET(req: NextRequest) {
   if (user.role !== 'dig' && user.role !== 'ceo' && user.role !== 'sales') {
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
+
+  try { await releaseDue() } catch {}
 
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status') // pending | approved | rejected | assigned | all
@@ -37,7 +40,8 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ prospects: data || [] })
+  const queue = user.role === 'ceo' ? await loadQueue().catch(() => []) : []
+  return NextResponse.json({ prospects: data || [], queue })
 }
 
 // POST: 신규 가망 등록 (dig 팀만)
