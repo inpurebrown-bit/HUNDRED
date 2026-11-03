@@ -166,7 +166,7 @@ function AutoField({ label, field, value, autoVal, idx, onChange }: {
 }
 
 function EmpCard({
-  row, idx, we, tw, onChange, onRemove, autoData, selfSupplied = 0, selfPaid = 0,
+  row, idx, we, tw, onChange, onRemove, autoData, selfSupplied = 0, selfPaid = 0, selfToday = 0,
 }: {
   row: EmployeeRow; idx: number; we: number; tw: number
   onChange: (i: number, f: string, v: number | string | Record<string, number>) => void
@@ -174,6 +174,7 @@ function EmpCard({
   autoData: AutoEmpData
   selfSupplied?: number
   selfPaid?: number
+  selfToday?: number
   // target은 supply-config에서 읽어온 값이 row.target에 반영되어 있음 (읽기전용)
 }) {
   const [showDaily, setShowDaily] = useState(false)
@@ -262,13 +263,13 @@ function EmpCard({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         <div className="rounded-2xl bg-[#0b2140]/[.06] px-3 py-3 text-center">
           <p className="text-[13px] text-gray-500 font-semibold">총결제율</p>
-          <p className="text-[26px] leading-tight font-black text-[#0b2140] tabular-nums">{fmtPct(totalRate)}</p>
-          {totalRate !== null && <p className={`text-[12.5px] ${rateGrade(totalRate, 30).cls}`}>{rateGrade(totalRate, 30).label}</p>}
+          <p className={`text-[26px] leading-tight tabular-nums ${totalRate !== null ? rateGrade(totalRate, 30).cls : 'font-black text-[#0b2140]'}`}>{fmtPct(totalRate)}</p>
+          <p className="text-[12.5px] text-gray-500">{allSupply > 0 ? `${fmtVal(total)} / ${allSupply}개` : '공급 없음'}</p>
         </div>
         <div className="rounded-2xl bg-sky-50 px-3 py-3 text-center">
           <p className="text-[13px] text-sky-700 font-semibold">한경연 결제율</p>
-          <p className="text-[26px] leading-tight font-black text-sky-800 tabular-nums">{fmtPct(supplyRate)}</p>
-          {supplyRate !== null && <p className={`text-[12.5px] ${rateGrade(supplyRate, 40).cls}`}>{rateGrade(supplyRate, 40).label}</p>}
+          <p className={`text-[26px] leading-tight tabular-nums ${supplyRate !== null ? rateGrade(supplyRate, 40).cls : 'font-black text-sky-800'}`}>{fmtPct(supplyRate)}</p>
+          <p className="text-[12.5px] text-sky-700/70">{supplyCount > 0 ? `${fmtVal(hkPayment)} / ${supplyCount}개` : '공급 없음'}</p>
         </div>
         <div className="rounded-2xl bg-emerald-50 px-3 py-3 text-center">
           <p className="text-[13px] text-emerald-700 font-semibold">자체공급 결제율</p>
@@ -282,11 +283,15 @@ function EmpCard({
       </div>
 
       {/* ── 갯수 ── */}
-      <div className="grid grid-cols-4 gap-2.5">
+      <div className="grid grid-cols-5 gap-2.5">
         <div className="text-center">
           <p className="text-[12.5px] text-gray-500 font-semibold mb-1">공급수 (한경연)</p>
           <div className="rounded-xl bg-gray-50 border border-gray-100 py-2.5 text-[17px] font-black text-[#0b2140] tabular-nums">{supplyCount}</div>
-          <p className="text-[11px] text-emerald-600 font-bold mt-1">+ 자체 {selfSupplied}개 = 총 {allSupply}개</p>
+        </div>
+        <div className="text-center">
+          <p className="text-[12.5px] text-emerald-700 font-semibold mb-1">공급수 (자체)</p>
+          <div className="rounded-xl bg-emerald-50 border border-emerald-100 py-2.5 text-[17px] font-black text-emerald-800 tabular-nums">{selfSupplied}</div>
+          <p className="text-[11px] text-gray-400 font-semibold mt-1">합계 {allSupply}개</p>
         </div>
         <AutoField label="공급 결제" field="supply_payment" value={supplyPayment} autoVal={autoData.supply_payment} idx={idx} onChange={onChange} />
         <div className="text-center">
@@ -302,7 +307,7 @@ function EmpCard({
 
       {/* ── 오늘 DB 공급 갯수 (직접 입력) ── */}
       <div className="rounded-2xl border border-[#b8995a]/35 bg-[#b8995a]/[.08] p-4">
-        <p className="text-[13px] font-black text-[#0b2140] mb-2.5">오늘({now.getMonth() + 1}/{todayDay}) DB 공급 갯수 <span className="font-medium text-gray-500">— 직접 입력</span></p>
+        <p className="text-[13px] font-black text-[#0b2140] mb-2.5">오늘({now.getMonth() + 1}/{todayDay}) 한경연 DB 공급 갯수 <span className="font-medium text-gray-500">— 직접 입력</span></p>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <div className="flex items-baseline gap-1.5">
             <input
@@ -313,8 +318,12 @@ function EmpCard({
             <span className="text-[15px] font-bold text-gray-500">개</span>
           </div>
           <div className="text-[13.5px] text-gray-600 leading-relaxed">
-            이번 달 합계 <b className="text-[#0b2140] text-[16px]">{supplyCount}개</b>
+            이번 달 한경연 합계 <b className="text-[#0b2140] text-[16px]">{supplyCount}개</b>
             {supplyRate !== null && <><br />{dailyRec === 0 ? <b className="text-red-500">공급 중단 권장 구간</b> : <>내일 권장 <b className="text-[#a8873f]">{supplyNeeded}개</b></>}</>}
+          </div>
+          <div className="ml-auto rounded-2xl bg-emerald-50 border border-emerald-100 px-4 py-2 text-center">
+            <p className="text-[12px] text-emerald-700 font-semibold">금일 자체공급 배정</p>
+            <p className="text-[24px] leading-tight font-black text-emerald-800 tabular-nums">{selfToday}<span className="text-[13px] font-semibold text-emerald-600">개 · 자동</span></p>
           </div>
         </div>
         <button onClick={() => setShowDaily(v => !v)} className="mt-3 text-[12.5px] font-semibold text-[#a8873f] hover:underline">
@@ -365,6 +374,7 @@ function PayRateSubView() {
   const [autoByPerson,  setAutoByPerson] = useState<Record<string, AutoEmpData>>({})
   const [selfSuppliedMap, setSelfSuppliedMap] = useState<Record<string, number>>({})
   const [selfPaidMap, setSelfPaidMap] = useState<Record<string, number>>({})
+  const [selfTodayMap, setSelfTodayMap] = useState<Record<string, number>>({})
   const [allCust, setAllCust] = useState<any[]>([])
 
   const mkRow = (name = ''): EmployeeRow => ({ name, target: 0, supply_count: 0, supply_payment: 0, direct_count: 0, direct_payment: 0 })
@@ -399,6 +409,14 @@ function PayRateSubView() {
           const sm: Record<string, number> = {}, pm: Record<string, number> = {}
           Object.entries(ss).forEach(([n, v]) => { sm[cleanName(n)] = (sm[cleanName(n)] || 0) + v.supplied; pm[cleanName(n)] = (pm[cleanName(n)] || 0) + v.paid })
           setSelfSuppliedMap(sm); setSelfPaidMap(pm)
+          const tm: Record<string, number> = {}
+          for (const c of (custJson.customers || [])) {
+            const d = c?.details || {}
+            if (d.supply_source !== 'self_supply' || String(d.reception_date || '').slice(0, 10) !== todayStr()) continue
+            const n = cleanName(String(d.sales_user_name || c.sales_user_name || ''))
+            if (n && !isTester(n)) tm[n] = (tm[n] || 0) + 1
+          }
+          setSelfTodayMap(tm)
           setAllCust(custJson.customers || [])
         }
         setOpsCases(casesJson.cases || [])
@@ -931,6 +949,7 @@ function PayRateSubView() {
               autoData={autoByPerson[cleanName(row.name)] || autoByPerson[row.name] || { supply_payment: 0, direct_count: 0, direct_payment: 0 }}
               selfSupplied={selfSuppliedMap[cleanName(row.name)] || 0}
               selfPaid={selfPaidMap[cleanName(row.name)] || 0}
+              selfToday={selfTodayMap[cleanName(row.name)] || 0}
             />
           ))}
         </div>
