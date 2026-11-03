@@ -22,6 +22,10 @@ type Rule = { label: string; kind: 'value' | 'edit' | 'flag' }   // value: 값�
 // ── 영업팀(customers.details) ─────────────────────────────────────────
 const CUSTOMER_RULES: Record<string, Rule> = {
   follow_up_date:   { label: '재통화 일정', kind: 'value' },
+  callback_date:    { label: '재통화 일정', kind: 'value' },
+  callback_time:    { label: '재통화 시간', kind: 'value' },
+  meeting_date:     { label: '미팅 일정', kind: 'value' },
+  meeting_time:     { label: '미팅 시간', kind: 'value' },
   subcall_date:     { label: '재통화 일정', kind: 'value' },
   call_result:      { label: '결정전 결과', kind: 'value' },
   closing_result:   { label: '결정 결과', kind: 'value' },
@@ -106,6 +110,27 @@ function diffGeneric(prev: any, next: any, known: Set<string>, a: Actor, out: Ac
   }
 }
 
+// 업체 정보 입력칸(매출·대출·자산 등): 칸마다 남기면 너무 많아서 "업체정보 수정" 한 줄로 합쳐 남긴다
+const INFO_LABEL: Record<string, string> = {
+  business_reg_no: '사업자번호', business_type: '업종', years_in_business: '업력', employee_count: '직원수', region: '지역',
+  revenue_2023: '매출', revenue_2024: '매출', revenue_2025: '매출', revenue_2026: '매출',
+  credit_kcb: '신용점수', credit_nice: '신용점수', credit_score: '신용점수',
+  tax_status: '세금체납', tax_delinquency: '세금체납', patent: '특허', real_work: '실근무', db_source: 'DB출처',
+  loan_total: '대출', loan_kibo: '대출', loan_shinbo: '대출', loan_jaedan: '대출', loan_jinjong: '대출', loan_sojin: '대출', loan_other: '대출',
+  asset_biz_type: '자산', asset_biz_value: '자산', asset_home_type: '자산', asset_home_value: '자산', asset_other: '자산',
+  company: '업체명', ceo_name: '대표자', phone: '연락처',
+}
+function diffInfo(prev: any, next: any, known: Set<string>, a: Actor, out: ActLog[]) {
+  const labels = new Set<string>()
+  for (const k of Object.keys(next || {})) {
+    if (known.has(k) || !INFO_LABEL[k]) continue
+    if (same(prev?.[k], next[k])) continue
+    if (str(prev?.[k]) === '' && str(next[k]) === '') continue
+    labels.add(INFO_LABEL[k])
+  }
+  if (labels.size) push(out, a, '업체정보 수정', [...labels].slice(0, 4).join('·'))
+}
+
 /** 영업팀 고객 카드 변경 내역 */
 export function diffCustomer(
   existing: { status?: string; owner_id?: string | null; details?: any; call_timeline?: any[] },
@@ -121,7 +146,9 @@ export function diffCustomer(
   if (nt.length > pt.length) push(out, a, '타임라인 기록 추가', short(nt[nt.length - 1]?.content, 30))
   else if (nt.length < pt.length) push(out, a, '타임라인 기록 삭제')
   diffDetails(pd, nd, CUSTOMER_RULES, a, out)
-  diffGeneric(pd, nd, new Set([...Object.keys(CUSTOMER_RULES), 'sub_status', 'transfer_history', 'db010_month', 'sales_user_name']), a, out)
+  const known = new Set([...Object.keys(CUSTOMER_RULES), 'sub_status', 'transfer_history', 'db010_month', 'sales_user_name'])
+  diffInfo(pd, nd, known, a, out)
+  diffGeneric(pd, nd, new Set([...known, ...Object.keys(INFO_LABEL)]), a, out)
   return out
 }
 

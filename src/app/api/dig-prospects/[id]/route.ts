@@ -48,6 +48,33 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
 
     if (fetchErr || !prospect) return NextResponse.json({ error: '가망 없음' }, { status: 404 })
 
+    // 발굴팀 통화메모 → 영업 타임라인 / 통화 희망시간 → 영업사원 재통화 일정
+    const ra = (prospect.recording_analysis || {}) as any
+    const pct = String(prospect.preferred_call_time || '')
+    let cbDate = '', cbTime = ''
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(pct.slice(0, 16)) && !/(Z|[+-]\d{2}:?\d{2})$/.test(pct)) {
+      cbDate = pct.slice(0, 10); cbTime = pct.slice(11, 16)
+    } else if (pct) {
+      const d = new Date(pct)
+      if (!isNaN(d.getTime())) {
+        const kst = d.toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' })
+        cbDate = kst.slice(0, 10); cbTime = kst.slice(11, 16)
+      }
+    }
+    const lines: string[] = []
+    if (cbDate) lines.push(`📞 통화 희망시간: ${cbDate} ${cbTime}`)
+    if (ra.dig_note) lines.push(`📝 통화메모: ${ra.dig_note}`)
+    if (prospect.memo) lines.push(`세금체납/특이사항: ${prospect.memo}`)
+    if (prospect.required_fund) lines.push(`필요자금: ${prospect.required_fund}`)
+    if (ra.summary) lines.push(`🎧 녹취 요약: ${ra.summary}`)
+    else if (ra.ceo_comment) lines.push(`🎧 녹취 요약: ${ra.ceo_comment}`)
+    const digTimeline = lines.length ? [{
+      id: `dig-${prospect.id}`,
+      time: new Date().toISOString(),
+      author: `발굴팀 ${prospect.dig_user_name || ''}`.trim(),
+      content: lines.join('\n'),
+    }] : []
+
     const { data: newCustomer, error: custErr } = await supabaseAdmin
       .from('customers')
       .insert({
@@ -56,8 +83,10 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
         source: 'lead',          // DB CHECK: 'self'|'lead' — 자체공급도 공급파이프라인(공가) 경로
         status: 'active',        // DB CHECK: 'active'|'contracted'
         owner_id: assigned_to,
+        call_timeline: digTimeline,
         details: {
           sub_status: 'lead',    // 공가DB 상태 (프론트 상태)
+          ...(cbDate ? { callback_date: cbDate, callback_time: cbTime } : {}),
           supply_source: 'self_supply',  // 자체공급 식별자
           reception_date: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10),  // 공급일 자동 설정
           company: prospect.company,
@@ -79,6 +108,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
           dig_prospect_id: prospect.id,
           dig_user_name: prospect.dig_user_name,
           dig_phone_010: prospect.phone_010,
+          activity_log: [{ at: new Date(Date.now() + 9 * 3600 * 1000).toISOString().replace('Z', '+09:00'), by: user.name || '대표', role: user.role, action: '자체공급 배정', detail: `발굴 ${prospect.dig_user_name || ''} → ${assigned_to_name}` }],
         },
       })
       .select()

@@ -528,6 +528,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
           urgent_assign: urgentAssign,
           memo: form.delinquency_detail.trim(), checklist,
           recording_url, recording_filename, recording_analysis: analysis || null, recordings,
+          call_note: activeDraft?.note || '',
         }),
       })
       const data = await res.json()
