@@ -78,7 +78,7 @@ export default function LeadForm() {
         <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-left text-xs text-red-600 leading-relaxed">
           ⚠️ 정부·공공기관을 사칭하거나 승인을 보장한다며 선입금을 요구하는 연락에 주의하세요. 당사는 정부·공공기관이 아닌 민간 경영컨설팅 업체입니다.
         </div>
-        <p className="text-xs text-[#1B2A45]/40">급하신 분은 <a href={COMPANY.phoneHref} className="font-bold text-[#C5A258]">📞 {COMPANY.phone}</a></p>
+        <p className="text-xs text-[#1B2A45]/40">급하신 분은 <a href={COMPANY.phoneHref} className="font-bold text-[#C5A258]">📞 {COMPANY.phone}</a> · 팩스 {COMPANY.fax}</p>
       </div>
     )
   }

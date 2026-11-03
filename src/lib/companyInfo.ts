@@ -11,6 +11,7 @@ export const COMPANY = {
   address: '서울특별시 구로구 디지털로 243 지하이시티 911호',
   phone: '1844-2599',
   phoneHref: 'tel:18442599',
+  fax: '02-852-0926',
   email: '100-house@naver.com',
   hours: '평일 09:00 – 18:00 (토/일·공휴일 휴무)',
   privacyOfficer: '',        // 개인정보 보호책임자 성명/직책

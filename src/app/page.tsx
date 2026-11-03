@@ -128,6 +128,7 @@ export default function HomePage() {
     ['통신판매업 신고번호', COMPANY.commerceNo],
     ['주소', COMPANY.address],
     ['대표전화', COMPANY.phone],
+    ['팩스', COMPANY.fax],
     ['이메일', COMPANY.email],
     ['개인정보 보호책임자', COMPANY.privacyOfficer],
   ] as [string, string][]).filter(([, v]) => !!v)
@@ -421,6 +422,7 @@ export default function HomePage() {
             <p className="text-xs text-[#1B2A45]/45 mt-1.5">남겨주신 연락처로 담당 컨설턴트가 순차적으로 연락드립니다.</p>
             <p className="text-[11px] text-[#1B2A45]/45 mt-2">
               📞 <a href={COMPANY.phoneHref} className="font-bold text-[#C5A258]">{COMPANY.phone}</a>
+              <span className="mx-2 text-[#1B2A45]/20">|</span>팩스 {COMPANY.fax}
               <span className="mx-2 text-[#1B2A45]/20">|</span>{COMPANY.hours}
             </p>
           </Reveal>
