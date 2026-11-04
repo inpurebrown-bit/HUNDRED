@@ -35,6 +35,9 @@ export async function GET(req: NextRequest) {
 
   if (user.role !== 'sales' && status && status !== 'all') {
     query = query.eq('status', status)
+  } else if (!(user.role === 'dig' && searchParams.get('include_canceled') === '1')) {
+    // 대표가 삭제한 취소건은 발굴팀 화면에서만 따로 조회한다
+    query = query.neq('status', 'canceled')
   }
 
   const { data, error } = await query

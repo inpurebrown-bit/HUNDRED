@@ -47,7 +47,9 @@ interface Prospect {
   recording_url: string
   recording_filename: string
   recording_analysis: any
-  status: 'pending' | 'approved' | 'rejected' | 'assigned'
+  status: 'pending' | 'approved' | 'rejected' | 'assigned' | 'canceled'
+  phone?: string
+  preferred_call_time?: string
   ceo_comment: string
   assigned_to_name: string
   created_at: string
@@ -234,7 +236,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
 
   const loadProspects = useCallback(async () => {
     try {
-      const res  = await fetch('/api/dig-prospects')
+      const res  = await fetch('/api/dig-prospects?include_canceled=1')
       const data = await res.json()
       setProspects(data.prospects || [])
     } catch {}
@@ -288,7 +290,37 @@ export default function DigDashboard({ userId, userName, username }: Props) {
     loadDrafts()
   }
 
+  // 지난 접수 건 다시 읽어보기 (현황 박스·더보기 팝업에서 업체명 클릭)
+  const [viewing, setViewing] = useState<Prospect | null>(null)
+  const [listModal, setListModal] = useState<{ title: string; items: Prospect[]; dateKind: 'call' | 'cancel' } | null>(null)
+  const [mQuery, setMQuery] = useState('')
+  const [mDate, setMDate] = useState('')
+
+  function loadProspect(p: Prospect) {
+    setForm({
+      ...EMPTY_FORM,
+      company: p.company || '', ceo_name: p.ceo_name || '', phone: p.phone || '', phone_010: p.phone_010 || '',
+      business_age: p.business_age || '', annual_revenue: p.annual_revenue || '', industry: p.industry || '',
+      delinquency_detail: p.memo || '', credit_score: p.credit_score || '', required_fund: p.required_fund || '',
+      preferred_call_time: p.preferred_call_time || '',
+    })
+    setChecklist({ ...EMPTY_CHECKLIST, ...(p.checklist || {}) })
+    setActiveDraft(null)
+    setPhoneSearch(p.phone_010 || '')
+    setPhoneResults(null)
+    setPhoneVerified(false)
+    setViewing(p)
+    setListModal(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function openListModal(title: string, items: Prospect[], dateKind: 'call' | 'cancel') {
+    setMQuery(''); setMDate('')
+    setListModal({ title, items, dateKind })
+  }
+
   function resetForm() {
+    setViewing(null)
     setForm({ ...EMPTY_FORM })
     setChecklist({ ...EMPTY_CHECKLIST })
     setUrgentAssign(false)
@@ -312,6 +344,11 @@ export default function DigDashboard({ userId, userName, username }: Props) {
   const pendingList   = prospects.filter(p => p.status === 'pending')
   const approvedList  = prospects.filter(p => p.status === 'approved' || p.status === 'assigned')
   const rejectedList  = prospects.filter(p => p.status === 'rejected')
+  const canceledList  = prospects.filter(p => p.status === 'canceled')
+  const kstDay = (iso?: string) => (iso ? new Date(new Date(iso).getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10) : '')
+  const cancelDay = (p: Prospect) => kstDay(p.recording_analysis?.canceled_at)
+  const isToday = (p: Prospect) => p.call_date === today
+  const isMonth = (p: Prospect) => !!p.call_date?.startsWith(currentMonth)
   const todayApproved = prospects.filter(p => p.call_date === today && (p.status === 'approved' || p.status === 'assigned')).length
   const monthApproved = prospects.filter(p => p.call_date?.startsWith(currentMonth) && (p.status === 'approved' || p.status === 'assigned')).length
   const MONTHLY_GOAL  = 160
@@ -867,25 +904,31 @@ export default function DigDashboard({ userId, userName, username }: Props) {
               </div>
 
               {/* 승인요청중 */}
-              <StatusBox
-                icon="⏳" label="승인요청중" count={pendingList.length}
-                colorCls="bg-amber-50 border-amber-200" headerCls="bg-amber-100/60" textCls="text-amber-700"
-                dotCls="bg-amber-400" items={pendingList}
+              <SplitBox
+                icon="⏳" label="승인요청중"
+                colorCls="bg-amber-50 border-amber-200" headerCls="bg-amber-100/60" textCls="text-amber-700" dotCls="bg-amber-400"
+                left={{ label: '요청중', items: pendingList, dateKind: 'call' }}
+                right={{ label: '취소건', items: canceledList, dateKind: 'cancel' }}
+                onPick={loadProspect} onMore={openListModal}
               />
 
               {/* 승인완료 */}
-              <StatusBox
-                icon="✅" label="승인완료" count={approvedList.length}
-                colorCls="bg-emerald-50 border-emerald-200" headerCls="bg-emerald-100/60" textCls="text-emerald-700"
-                dotCls="bg-emerald-400" items={approvedList}
+              <SplitBox
+                icon="✅" label="승인완료"
+                colorCls="bg-emerald-50 border-emerald-200" headerCls="bg-emerald-100/60" textCls="text-emerald-700" dotCls="bg-emerald-400"
+                left={{ label: '금일', items: approvedList.filter(isToday), dateKind: 'call' }}
+                right={{ label: '월간', items: approvedList.filter(isMonth), dateKind: 'call' }}
+                onPick={loadProspect} onMore={openListModal}
               />
 
               {/* 승인부결 */}
-              <StatusBox
-                icon="❌" label="승인부결" count={rejectedList.length}
-                colorCls="bg-red-50 border-red-200" headerCls="bg-red-100/60" textCls="text-red-600"
-                dotCls="bg-red-400" items={rejectedList} showComment
-                onItemClick={p => setResubmitProspect(p as Prospect)}
+              <SplitBox
+                icon="❌" label="승인부결"
+                colorCls="bg-red-50 border-red-200" headerCls="bg-red-100/60" textCls="text-red-600" dotCls="bg-red-400"
+                left={{ label: '금일', items: rejectedList.filter(isToday), dateKind: 'call' }}
+                right={{ label: '월간', items: rejectedList.filter(isMonth), dateKind: 'call' }}
+                showComment onPick={loadProspect} onMore={openListModal}
+                onResubmit={p => setResubmitProspect(p)}
               />
 
               {/* 저장함 — 통화 중간에 저장한 건 / 나중에 통화할 건 */}
@@ -938,6 +981,18 @@ export default function DigDashboard({ userId, userName, username }: Props) {
             {/* ━━ 중앙 : 등록 폼 ━━ */}
             <div className="bg-white border border-gray-100 rounded-2xl p-4">
               <h3 className="text-sm font-black text-[#1B2A45] mb-3">📝 가망 등록</h3>
+              {viewing && (
+                <div className="mb-3 bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 flex items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-gray-700">
+                      📖 {viewing.company || viewing.ceo_name} — 지난 접수 내용 ({({ pending: '승인요청중', approved: '승인완료', assigned: '승인완료', rejected: '승인부결', canceled: '취소건' } as Record<string, string>)[viewing.status]})
+                    </p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">접수 {viewing.call_date}{viewing.status === 'canceled' && cancelDay(viewing) ? ` · 취소 ${cancelDay(viewing)}` : ''} · 읽기용입니다. 새로 등록하려면 번호 중복검색부터 다시 하세요.</p>
+                    {viewing.status === 'rejected' && viewing.ceo_comment && <p className="text-[11px] text-red-500 mt-0.5">부결 사유: {viewing.ceo_comment}</p>}
+                  </div>
+                  <button type="button" onClick={resetForm} className="text-[11px] text-gray-500 font-semibold shrink-0">닫기</button>
+                </div>
+              )}
               {activeDraft && (
                 <div className="mb-3 bg-sky-50 border border-sky-300 rounded-xl px-3 py-2 flex items-start gap-2">
                   <div className="flex-1 min-w-0">
@@ -1079,22 +1134,19 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                     ⚠ 체크리스트 {checkDoneCount}/{CHECKLIST_ITEMS.length} — 모두 완료해야 전송 가능합니다
                   </p>
                 )}
-                <button type="submit" disabled={!phoneVerified || !form.phone_010.trim() || !checklistAllDone}
-                  className={`w-full py-4 rounded-xl font-black text-sm transition-colors ${
-                    !phoneVerified || !form.phone_010.trim() || !checklistAllDone
-                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                      : 'bg-[#1B2A45] text-white hover:bg-[#1B2A45]/90'
-                  }`}>
-                  {!phoneVerified ? '🔒 번호 중복검색 먼저' : !checklistAllDone ? `🔒 체크리스트 ${checkDoneCount}/${CHECKLIST_ITEMS.length} 미완료` : '제출하기 →'}
-                </button>
-                {/* 체크리스트·번호검색과 상관없이 누를 수 있는 임시 저장 */}
-                <div className="grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => { setDraftNote(activeDraft?.kind === 'save' ? activeDraft.note : ''); setDraftModal('save') }}
-                    className="py-3 rounded-xl border-2 border-sky-300 bg-sky-50 text-sky-800 text-sm font-bold hover:bg-sky-100">
-                    💾 저장하기
+                {/* 좌: 제출하기(대표 심사 요청) / 우: 나중에 통화로 저장 — 색을 달리하고 좌우로 떨어뜨려 오클릭 방지 */}
+                <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-stretch">
+                  <button type="submit" disabled={!phoneVerified || !form.phone_010.trim() || !checklistAllDone}
+                    className={`py-4 rounded-xl font-black text-sm transition-colors ${
+                      !phoneVerified || !form.phone_010.trim() || !checklistAllDone
+                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        : 'bg-[#1B2A45] text-white hover:bg-[#1B2A45]/90'
+                    }`}>
+                    {!phoneVerified ? '🔒 번호 중복검색 먼저' : !checklistAllDone ? `🔒 체크리스트 ${checkDoneCount}/${CHECKLIST_ITEMS.length} 미완료` : '✅ 제출하기 →'}
                   </button>
+                  <div className="w-px bg-gray-200 my-1" />
                   <button type="button" onClick={() => { setDraftNote(activeDraft?.kind === 'callback' ? activeDraft.note : ''); setDraftModal('callback') }}
-                    className="py-3 rounded-xl border-2 border-amber-300 bg-amber-50 text-amber-800 text-sm font-bold hover:bg-amber-100">
+                    className="py-4 rounded-xl border-2 border-amber-400 bg-amber-50 text-amber-800 text-sm font-bold hover:bg-amber-100">
                     📞 나중에 통화로 저장
                   </button>
                 </div>
@@ -1192,49 +1244,97 @@ export default function DigDashboard({ userId, userName, username }: Props) {
           <div className="h-6" />
         </div>
       )}
+
+      {/* 더보기 팝업 — 날짜·업체명 검색, 업체 클릭 시 팝업 닫고 인콜 폼에 불러옴 */}
+      {listModal && (() => {
+        const q = mQuery.trim().replace(/[-\s]/g, '').toLowerCase()
+        const dayOf = (p: Prospect) => (listModal.dateKind === 'cancel' ? cancelDay(p) : p.call_date) || ''
+        const rows = listModal.items
+          .filter(p => !mDate || dayOf(p) === mDate)
+          .filter(p => !q || [p.company, p.ceo_name, p.phone_010].join(' ').replace(/[-\s]/g, '').toLowerCase().includes(q))
+          .sort((a, b) => dayOf(b).localeCompare(dayOf(a)))
+        return (
+          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setListModal(null)}>
+            <div className="bg-white rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                <h3 className="text-base font-bold text-[#1B2A45]">{listModal.title} <span className="text-gray-400 font-normal text-sm">{rows.length}/{listModal.items.length}건</span></h3>
+                <button onClick={() => setListModal(null)} className="text-gray-400 text-lg leading-none">✕</button>
+              </div>
+              <div className="px-4 py-3 flex gap-2 border-b border-gray-100">
+                <input type="date" value={mDate} onChange={e => setMDate(e.target.value)}
+                  className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
+                <input value={mQuery} onChange={e => setMQuery(e.target.value)} placeholder="업체명·대표·번호 검색"
+                  className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#1B2A45]" />
+                {(mDate || mQuery) && <button onClick={() => { setMDate(''); setMQuery('') }} className="text-[11px] text-gray-400 shrink-0">초기화</button>}
+              </div>
+              <div className="overflow-y-auto px-2 py-2">
+                {rows.length === 0 ? <p className="text-xs text-gray-400 text-center py-8">해당하는 건이 없습니다</p> : rows.map((p, i) => (
+                  <Fragment key={p.id}>
+                    {(i === 0 || dayOf(rows[i - 1]) !== dayOf(p)) && (
+                      <p className="text-[10px] font-black text-gray-400 px-2 pt-2">{dayOf(p) ? dayOf(p).slice(5).replace('-', '/') : '날짜 없음'}</p>
+                    )}
+                    <button type="button" onClick={() => loadProspect(p)}
+                      className="w-full text-left px-2 py-2 rounded-lg hover:bg-gray-50 flex items-baseline gap-2">
+                      <span className="text-sm font-semibold text-gray-800 truncate">{p.company || p.ceo_name || p.phone_010}</span>
+                      <span className="text-[11px] text-gray-400 truncate">{p.ceo_name} · {p.phone_010}</span>
+                    </button>
+                  </Fragment>
+                ))}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
 
-/* 현황 박스 컴포넌트 */
-function StatusBox({
-  icon, label, count, colorCls, headerCls, textCls, dotCls, items, showComment, onItemClick,
+/* 현황 박스 컴포넌트 — 좌/우 두 칸으로 나눠 보여준다. 업체명 클릭 = 지난 접수 내용 다시 보기 */
+function SplitBox({
+  icon, label, colorCls, headerCls, textCls, dotCls, left, right, showComment, onPick, onMore, onResubmit,
 }: {
-  icon: string; label: string; count: number
+  icon: string; label: string
   colorCls: string; headerCls: string; textCls: string; dotCls: string
-  items: { id: string; company: string; ceo_name: string; phone_010: string; ceo_comment?: string }[]
+  left: { label: string; items: Prospect[]; dateKind: 'call' | 'cancel' }
+  right: { label: string; items: Prospect[]; dateKind: 'call' | 'cancel' }
   showComment?: boolean
-  onItemClick?: (item: { id: string; company: string; ceo_name: string; phone_010: string; ceo_comment?: string }) => void
+  onPick: (p: Prospect) => void
+  onMore: (title: string, items: Prospect[], dateKind: 'call' | 'cancel') => void
+  onResubmit?: (p: Prospect) => void
 }) {
+  const col = (c: typeof left) => (
+    <div className="min-w-0 px-2.5 py-2">
+      <p className={`text-[11px] font-bold ${textCls}`}>{c.label} <span className="text-base font-black">{c.items.length}</span><span className="text-[10px]">건</span></p>
+      <div className="mt-1 space-y-1 min-h-[32px]">
+        {c.items.length === 0
+          ? <p className={`text-xs opacity-50 ${textCls}`}>없음</p>
+          : c.items.slice(0, 5).map(p => (
+            <div key={p.id} className="min-w-0">
+              <button type="button" onClick={() => onPick(p)} className="flex items-start gap-1 w-full text-left hover:underline">
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${dotCls}`} />
+                <span className="text-xs text-gray-700 truncate">{p.company || p.ceo_name || p.phone_010}</span>
+              </button>
+              {showComment && p.ceo_comment && <p className="text-[10px] text-red-400 truncate pl-2.5">{p.ceo_comment}</p>}
+              {onResubmit && p.status === 'rejected' && (
+                <button type="button" onClick={() => onResubmit(p)} className="text-[10px] text-red-500 font-semibold pl-2.5 hover:underline">재심사 제출 →</button>
+              )}
+            </div>
+          ))}
+      </div>
+      {c.items.length > 5 && (
+        <button type="button" onClick={() => onMore(`${label} · ${c.label}`, c.items, c.dateKind)}
+          className={`mt-1 text-[11px] font-bold ${textCls} underline`}>+{c.items.length - 5}건 더보기</button>
+      )}
+    </div>
+  )
   return (
     <div className={`border-2 rounded-2xl overflow-hidden ${colorCls}`}>
-      <div className={`px-4 py-3 ${headerCls}`}>
+      <div className={`px-4 py-2 ${headerCls}`}>
         <p className={`text-xs font-bold uppercase tracking-wide ${textCls}`}>{icon} {label}</p>
-        <p className={`text-3xl font-black leading-none mt-0.5 ${textCls}`}>
-          {count}<span className="text-sm font-bold ml-1">건</span>
-        </p>
       </div>
-      <div className="px-4 py-2 space-y-1.5 min-h-[52px]">
-        {items.length === 0
-          ? <p className={`text-xs py-1 opacity-50 ${textCls}`}>없음</p>
-          : items.slice(0, 5).map(p => (
-            <div key={p.id}
-              className={`flex items-start gap-1.5 ${onItemClick ? 'cursor-pointer group' : ''}`}
-              onClick={() => onItemClick?.(p)}>
-              <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${dotCls}`} />
-              <div className="min-w-0 flex-1">
-                <p className="text-xs text-gray-700 truncate">{p.company || p.ceo_name || p.phone_010}</p>
-                {showComment && p.ceo_comment && (
-                  <p className="text-[10px] text-red-400 truncate">{p.ceo_comment}</p>
-                )}
-                {onItemClick && (
-                  <p className="text-[10px] text-red-500 font-semibold group-hover:underline">재심사 제출 →</p>
-                )}
-              </div>
-            </div>
-          ))
-        }
-        {items.length > 5 && <p className={`text-xs opacity-50 ${textCls}`}>+{items.length - 5}건 더</p>}
+      <div className="grid grid-cols-2 divide-x divide-black/10">
+        {col(left)}
+        {col(right)}
       </div>
     </div>
   )

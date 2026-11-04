@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
     supabaseAdmin
       .from('dig_prospects')
       .select('id, company, ceo_name, phone_010, status, created_at')
+      .neq('status', 'canceled')
       .ilike('phone_010', `%${phone}%`),
   ])
 

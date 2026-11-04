@@ -118,6 +118,20 @@ export async function DELETE(req: NextRequest, context: { params: Promise<{ id: 
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
 
+  // 대표 삭제 = 취소건으로 남긴다 (고객이 상담 취소 요청한 경우 발굴팀이 다시 확인할 수 있게). 이미 취소건이면 완전 삭제.
+  if (user.role === 'ceo') {
+    const { data: cur } = await supabaseAdmin.from('dig_prospects').select('status, recording_analysis').eq('id', id).maybeSingle()
+    if (cur && cur.status !== 'canceled') {
+      const ra = cur.recording_analysis && typeof cur.recording_analysis === 'object' ? cur.recording_analysis : {}
+      const { error: ce } = await supabaseAdmin.from('dig_prospects')
+        .update({ status: 'canceled', recording_analysis: { ...ra, canceled_at: new Date().toISOString(), prev_status: cur.status } })
+        .eq('id', id)
+      if (ce) return NextResponse.json({ error: ce.message }, { status: 500 })
+      await cancelQueue(id).catch(() => {})
+      return NextResponse.json({ success: true, canceled: true })
+    }
+  }
+
   let query = supabaseAdmin.from('dig_prospects').delete().eq('id', id)
   if (user.role === 'dig') {
     query = query.eq('dig_user_id', user.id).eq('status', 'pending') as typeof query
