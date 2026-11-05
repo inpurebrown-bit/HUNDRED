@@ -272,14 +272,17 @@ type OpsTab = 'dashboard' | 'active' | 'expired' | 'refund' | 'completed' | 'new
 const opsTabs: { key: OpsTab; label: string }[] = [
   { key: 'dashboard',    label: '대시보드' },
   { key: 'active',       label: '진행중업체' },
-  { key: 'refund',       label: '환불업체' },
-  { key: 'completed',    label: '종료업체' },
   { key: 'newdb',        label: '신규DB' },
   { key: 'ops_contract', label: '관리팀계약' },
   { key: 'report',       label: '관리팀보고' },
   { key: 'revenue',      label: '매출 현황' },
   { key: 'profile',      label: '사원정보' },
-  { key: 'expired',      label: '계약기간만료' },
+]
+// 계약기간만료·환불·종료는 메인 탭과 분리한 '보관함'
+const archiveTabs: { key: OpsTab; label: string }[] = [
+  { key: 'expired',   label: '계약기간만료' },
+  { key: 'refund',    label: '환불' },
+  { key: 'completed', label: '종료' },
 ]
 
 // ── 인증사업 (연구소/벤처/무상지원금) — 정책자금 이후 추가로 진행하는 사업 ───────────
@@ -3325,7 +3328,7 @@ function OpsNewDbTab({ cases, userName, onSave, onAdded }: {
     if (!addForm.company.trim()) return
     setAddSaving(true)
     try {
-      const detailsPayload: Record<string, any> = { ops_user_name: userName }
+      const detailsPayload: Record<string, any> = { ops_user_name: userName, direct_add: true }
       const fieldKeys = Object.keys(EMPTY_ADD_FORM) as (keyof typeof EMPTY_ADD_FORM)[]
       fieldKeys.forEach(k => { if (addForm[k]) detailsPayload[k] = addForm[k] })
 
@@ -4838,6 +4841,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
   const { data: session } = useSession()
   const userRole = (session?.user as any)?.role || 'ops'
   const [activeTab, setActiveTab] = useState<OpsTab>('dashboard')
+  const [stageFilter, setStageFilter] = useState('')   // 진행중업체 소분류(실제 진행 상황)
   const [menuOpen, setMenuOpen] = useState(false)
   const [cases, setCases] = useState<OpsCase[]>([])
   const [loading, setLoading] = useState(true)
@@ -5059,6 +5063,13 @@ export default function OpsDashboard({ userId, userName }: Props) {
     )
   )
 
+  // 진행중업체 소분류 — 지금 실제로 있는 진행 단계만 건수와 함께
+  const stageCounts: Record<string, number> = {}
+  activeCases.forEach(c => { const st = c.progress_stage || '미선택'; stageCounts[st] = (stageCounts[st] || 0) + 1 })
+  const stageOrder = [...PIPELINE_STAGES.map(x => x.key), '미선택']
+  const stageChips = Object.keys(stageCounts).sort((a, b) => (stageOrder.indexOf(a) === -1 ? 99 : stageOrder.indexOf(a)) - (stageOrder.indexOf(b) === -1 ? 99 : stageOrder.indexOf(b)))
+  const shownActive = stageFilter ? activeCases.filter(c => (c.progress_stage || '미선택') === stageFilter) : activeCases
+
   const tabCounts: Record<OpsTab, number | null> = {
     dashboard:    null,
     active:       activeCases.length,
@@ -5206,6 +5217,15 @@ export default function OpsDashboard({ userId, userName }: Props) {
                     )}
                   </button>
                 ))}
+                <div className="border-t border-gray-100 mt-1 pt-1">
+                  <p className="px-4 pt-1 text-[10px] text-gray-400 font-bold">📁 보관함</p>
+                  {archiveTabs.map(tab => (
+                    <button key={tab.key} onClick={() => { setActiveTab(tab.key); setMenuOpen(false) }}
+                      className={`w-full text-left px-4 py-2 text-xs flex items-center justify-between ${activeTab === tab.key ? 'text-[#C5A258] font-semibold' : 'text-gray-400 hover:text-gray-600'}`}>
+                      {tab.label}<span className="text-[10px]">{tabCounts[tab.key]}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </>
           )}
@@ -5228,6 +5248,13 @@ export default function OpsDashboard({ userId, userName }: Props) {
             {activeTab === tab.key && (
               <span className="absolute bottom-0 left-2 right-2 h-[2px] bg-[#C5A258] rounded-full" />
             )}
+          </button>
+        ))}
+        <span className="self-center mx-2 h-4 w-px bg-gray-200 shrink-0" />
+        {archiveTabs.map(tab => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+            className={`px-3 py-3 text-xs whitespace-nowrap shrink-0 transition-colors ${activeTab === tab.key ? 'text-[#1B2A45] font-bold' : 'text-gray-300 hover:text-gray-500'}`}>
+            {tab.label} <span className="text-[10px]">{tabCounts[tab.key]}</span>
           </button>
         ))}
       </div>
@@ -5272,23 +5299,12 @@ export default function OpsDashboard({ userId, userName }: Props) {
                 </button>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
-                <button onClick={() => setActiveTab('expired')}
-                  className="bg-white rounded-xl border border-orange-200 hover:border-orange-400 py-3 px-2 text-center transition-colors active:scale-[0.97]">
-                  <p className="text-2xl font-black text-orange-500">{expiredCases.length}</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5 font-medium">계약만료</p>
-                </button>
-                <button onClick={() => setActiveTab('refund')}
-                  className="bg-white rounded-xl border border-rose-200 hover:border-rose-400 py-3 px-2 text-center transition-colors active:scale-[0.97]">
-                  <p className="text-2xl font-black text-rose-500">{refundCases.length}</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5 font-medium">환불</p>
-                </button>
-                <button onClick={() => setActiveTab('completed')}
-                  className="bg-white rounded-xl border border-emerald-200 hover:border-emerald-400 py-3 px-2 text-center transition-colors active:scale-[0.97]">
-                  <p className="text-2xl font-black text-emerald-600">{completedCases.length}</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5 font-medium">종료</p>
-                </button>
-              </div>
+              <p className="text-[11px] text-gray-400 px-1">
+                📁 보관함 —{' '}
+                <button onClick={() => setActiveTab('expired')} className="underline hover:text-gray-600">계약기간만료 {expiredCases.length}</button>{' · '}
+                <button onClick={() => setActiveTab('refund')} className="underline hover:text-gray-600">환불 {refundCases.length}</button>{' · '}
+                <button onClick={() => setActiveTab('completed')} className="underline hover:text-gray-600">종료 {completedCases.length}</button>
+              </p>
 
               {/* 기관별 현황 */}
               <DashboardOverview cases={cases} />
@@ -5339,11 +5355,27 @@ export default function OpsDashboard({ userId, userName }: Props) {
                 </button>
               </div>
             </div>
+            {/* 진행 상황 소분류 — 서류받는중 / 실사대기 / 입금전 … */}
+            {stageChips.length > 0 && (
+              <div className="flex gap-1.5 flex-wrap items-center">
+                <span className="text-[11px] text-gray-400 font-semibold mr-1">진행 상황</span>
+                <button onClick={() => setStageFilter('')}
+                  className={`text-xs px-3 py-1 rounded-full font-bold border transition-colors ${stageFilter === '' ? 'bg-[#1B2A45] text-white border-[#1B2A45]' : 'bg-white text-gray-600 border-gray-200 hover:border-[#C5A258]'}`}>
+                  전체 {activeCases.length}
+                </button>
+                {stageChips.map(st => (
+                  <button key={st} onClick={() => setStageFilter(f => (f === st ? '' : st))}
+                    className={`text-xs px-3 py-1 rounded-full font-bold border transition-colors ${stageFilter === st ? 'bg-[#C5A258] text-white border-[#C5A258]' : 'bg-white text-gray-600 border-gray-200 hover:border-[#C5A258]'}`}>
+                    {st} {stageCounts[st]}
+                  </button>
+                ))}
+              </div>
+            )}
             {loading ? (
               <div className="text-center py-16 text-[#1B2A45]/40 text-sm">불러오는 중...</div>
             ) : (
               <InstitutionGroupedView
-                cases={activeCases}
+                cases={shownActive}
                 openPanelIds={openPanelIds}
                 onToggle={togglePanel}
                 onScriptToggle={(id, val) =>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { bizDays } from '@/lib/digStats'
 
 interface Prospect {
   id: string
@@ -62,6 +63,10 @@ export default function DigManageTab() {
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
+  // 심사 화면에서 접수 내용 바로 수정 / AI 분석 다시 돌리기
+  const [editId, setEditId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState<Record<string, any>>({})
+  const [reanalyzing, setReanalyzing] = useState<string | null>(null)
   const [commentMap, setCommentMap] = useState<Record<string, string>>({})
   const [assignTarget, setAssignTarget] = useState<Record<string, string>>({})
   const [processing, setProcessing] = useState<string | null>(null)
@@ -131,8 +136,9 @@ export default function DigManageTab() {
   const urgentCount = approvedList.filter(p => p.urgent_assign).length
 
   const thisMonth = today.slice(0, 7) // "YYYY-MM"
-  const MONTHLY_GOAL = 160
   const DAILY_GOAL   = 8
+  const monthBiz     = bizDays(thisMonth).total
+  const MONTHLY_GOAL = monthBiz * DAILY_GOAL   // 1인당 월 목표 = 영업일 × 일 8건 (초과분부터 1건당 1만원)
 
   // 오늘 승인 건수 (dig 직원별)
   const todayApproved = prospects.filter(p =>
@@ -144,7 +150,6 @@ export default function DigManageTab() {
       byUser[p.dig_user_id] = { name: p.dig_user_name, count: 0, bonus: 0 }
     }
     byUser[p.dig_user_id].count++
-    byUser[p.dig_user_id].bonus = Math.max(0, byUser[p.dig_user_id].count - DAILY_GOAL) * 10000
   })
 
   // 이번달 승인 건수 (dig 직원별)
@@ -160,6 +165,30 @@ export default function DigManageTab() {
   })
   const monthTotal = monthApproved.length
   const monthPct   = Math.min(100, Math.round((monthTotal / MONTHLY_GOAL) * 100))
+
+  // 직원별 이번 달 통계 — 접수·승인·부결·대기, 목표 달성률, 니즈(상/중/하)·AI 점수
+  const monthAll = prospects.filter(p => p.call_date?.startsWith(thisMonth))
+  const statMap: Record<string, { name: string; submitted: number; approved: number; rejected: number; pending: number; needs: { 상: number; 중: number; 하: number }; scoreSum: number; scoreN: number }> = {}
+  monthAll.forEach(p => {
+    const k = p.dig_user_id
+    if (!statMap[k]) statMap[k] = { name: p.dig_user_name, submitted: 0, approved: 0, rejected: 0, pending: 0, needs: { 상: 0, 중: 0, 하: 0 }, scoreSum: 0, scoreN: 0 }
+    const s = statMap[k]
+    s.submitted++
+    if (p.status === 'approved' || p.status === 'assigned') s.approved++
+    else if (p.status === 'rejected') s.rejected++
+    else s.pending++
+    const lv = p.recording_analysis?.needs_level
+    if (lv === '상' || lv === '중' || lv === '하') s.needs[lv as '상' | '중' | '하']++
+    const sc = Number(p.recording_analysis?.overall_score)
+    if (!isNaN(sc) && p.recording_analysis?.overall_score != null) { s.scoreSum += sc; s.scoreN++ }
+  })
+  // 니즈 점수: 상 3 · 중 2 · 하 1 평균 (높을수록 좋은 가망을 따오는 사람)
+  const needsAvg = (s: { needs: { 상: number; 중: number; 하: number } }) => {
+    const n = s.needs.상 + s.needs.중 + s.needs.하
+    return n ? (s.needs.상 * 3 + s.needs.중 * 2 + s.needs.하) / n : 0
+  }
+  const statRows = Object.entries(statMap).map(([id, s]) => ({ id, ...s })).sort((a, b) => b.approved - a.approved)
+  const bestNeeds = [...statRows].filter(r => r.needs.상 + r.needs.중 + r.needs.하 >= 3).sort((a, b) => needsAvg(b) - needsAvg(a))[0]
 
   async function clearUrgent(id: string) {
     const res = await fetch(`/api/dig-prospects/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'clear_urgent' }) })
@@ -204,6 +233,32 @@ export default function DigManageTab() {
       showToast(d.error || '오류', 'error')
     }
     setProcessing(null)
+  }
+
+  function startEdit(p: Prospect) {
+    setEditId(p.id)
+    setEditForm({
+      company: p.company || '', ceo_name: p.ceo_name || '', phone_010: p.phone_010 || '',
+      business_age: p.business_age || '', annual_revenue: p.annual_revenue || '', industry: p.industry || '',
+      credit_score: p.credit_score || '', required_fund: p.required_fund || '',
+      has_delinquency: !!p.has_delinquency, memo: p.memo || '', preferred_call_time: p.preferred_call_time || '',
+    })
+  }
+
+  async function saveEdit(id: string) {
+    setProcessing(id)
+    const res = await fetch(`/api/dig-prospects/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'edit', fields: editForm }) })
+    if (res.ok) { showToast('수정했어요'); setEditId(null); await load() }
+    else { const d = await res.json().catch(() => ({})); showToast(d.error || '수정 실패', 'error') }
+    setProcessing(null)
+  }
+
+  async function reanalyze(id: string) {
+    setReanalyzing(id)
+    const res = await fetch(`/api/dig-prospects/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'reanalyze' }) })
+    if (res.ok) { showToast('AI 분석을 다시 했어요'); await load() }
+    else { const d = await res.json().catch(() => ({})); showToast(d.error || 'AI 재분석 실패', 'error') }
+    setReanalyzing(null)
   }
 
   async function deleteProspect(id: string) {
@@ -337,6 +392,9 @@ export default function DigManageTab() {
                 {p.recording_url && (
                   <span className="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">녹취 있음</span>
                 )}
+                {p.recording_url && !(p.recording_analysis?.needs_level && p.recording_analysis?.checklist && !p.recording_analysis?.parse_error) && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">AI 분석 없음</span>
+                )}
                 {p.recording_analysis?.needs_level && (
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                     p.recording_analysis.needs_level === '상' ? 'bg-red-100 text-red-700' :
@@ -372,6 +430,56 @@ export default function DigManageTab() {
 
         {isExpanded && (
           <div className="border-t border-gray-100 px-4 py-4 space-y-4">
+            {/* 접수 내용 간단 수정 (직원이 잘못 입력해서 수정 요청한 경우) */}
+            {editId === p.id ? (
+              <div className="border-2 border-[#C5A258]/50 bg-[#FAF8F3] rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-[#1B2A45]">✏️ 접수 내용 수정</p>
+                  <button type="button" onClick={() => setEditId(null)} className="text-[11px] text-gray-400">취소</button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    ['company', '업체명'], ['ceo_name', '대표자'], ['phone_010', '010 번호'], ['business_age', '업력'],
+                    ['annual_revenue', '연매출'], ['industry', '업종'], ['credit_score', '신용점수'], ['required_fund', '필요자금'],
+                  ] as const).map(([k, label]) => (
+                    <label key={k} className="block">
+                      <span className="text-[10px] text-gray-400">{label}</span>
+                      <input value={editForm[k] ?? ''} onChange={e => setEditForm(prev => ({ ...prev, [k]: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:border-[#1B2A45]" />
+                    </label>
+                  ))}
+                  <label className="block">
+                    <span className="text-[10px] text-gray-400">통화 희망시간</span>
+                    <input type="datetime-local" value={editForm.preferred_call_time ?? ''} onChange={e => setEditForm(prev => ({ ...prev, preferred_call_time: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:border-[#1B2A45]" />
+                  </label>
+                  <div>
+                    <span className="text-[10px] text-gray-400">연체·체납</span>
+                    <div className="grid grid-cols-2 gap-1 mt-0.5">
+                      {[false, true].map(v => (
+                        <button key={String(v)} type="button" onClick={() => setEditForm(prev => ({ ...prev, has_delinquency: v }))}
+                          className={`py-1.5 rounded-lg text-xs font-bold border ${editForm.has_delinquency === v ? (v ? 'bg-red-500 text-white border-red-500' : 'bg-emerald-500 text-white border-emerald-500') : 'bg-white text-gray-400 border-gray-200'}`}>
+                          {v ? '있음' : '없음'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <label className="block">
+                  <span className="text-[10px] text-gray-400">메모 (체납 내용 등)</span>
+                  <input value={editForm.memo ?? ''} onChange={e => setEditForm(prev => ({ ...prev, memo: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:border-[#1B2A45]" />
+                </label>
+                <button type="button" disabled={processing === p.id} onClick={() => saveEdit(p.id)}
+                  className="w-full bg-[#1B2A45] text-white text-xs font-bold py-2 rounded-lg disabled:opacity-50">{processing === p.id ? '저장 중…' : '저장'}</button>
+                {p.status === 'assigned' && <p className="text-[10px] text-gray-400">이미 영업팀에 배정된 건이라 고객 카드에도 같이 반영됩니다.</p>}
+              </div>
+            ) : (
+              <div className="flex justify-end -mb-2">
+                <button type="button" onClick={() => startEdit(p)} className="text-[11px] font-bold text-[#1B2A45]/70 border border-[#1B2A45]/20 rounded-full px-3 py-1 hover:bg-[#FAF8F3]">✏️ 내용 수정</button>
+              </div>
+            )}
+
             {/* 업체 정보 */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
               {p.business_age && <p><span className="text-gray-400">업력</span> {p.business_age}</p>}
@@ -415,6 +523,18 @@ export default function DigManageTab() {
                     <audio controls src={r.url} className="w-full" />
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* AI 분석이 비어 있는 건 — 다시 분석 */}
+            {p.recording_url && !(p.recording_analysis?.needs_level && p.recording_analysis?.checklist && !p.recording_analysis?.parse_error) && (
+              <div className="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 text-xs text-amber-800 flex items-center gap-3">
+                <div className="flex-1">
+                  <p className="font-bold">AI 분석(니즈·리포트)이 비어 있어요</p>
+                  <p className="opacity-80 mt-0.5">AI 서버 일시 오류로 빠진 건입니다. 다시 분석하면 채워집니다 (1분 정도 걸릴 수 있어요).</p>
+                </div>
+                <button type="button" disabled={reanalyzing === p.id} onClick={() => reanalyze(p.id)}
+                  className="shrink-0 bg-amber-500 text-white font-bold px-3 py-2 rounded-lg disabled:opacity-50">{reanalyzing === p.id ? '분석 중…' : '🔄 AI 재분석'}</button>
               </div>
             )}
 
@@ -711,20 +831,56 @@ export default function DigManageTab() {
           <p className="text-white/40 text-[10px] mt-1">{monthPct}% 달성 · 남은 목표 {Math.max(0, MONTHLY_GOAL - monthTotal)}건</p>
         </div>
 
-        {/* 이번달 개인별 */}
-        {Object.keys(byUserMonth).length > 0 && (
-          <div>
-            <p className="text-white/40 text-[10px] mb-2">개인별 이번달 승인</p>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(byUserMonth).map(([uid, info]) => (
-                <div key={uid} className="bg-white/10 rounded-lg px-3 py-1.5 flex items-center gap-2">
-                  <p className="text-white text-xs font-bold">{info.name}</p>
-                  <p className="text-white/60 text-[11px]">{info.count}건</p>
-                </div>
-              ))}
+        {/* 직원별 이번 달 통계 */}
+        <div>
+          <p className="text-white/40 text-[10px] mb-2">직원별 이번 달 통계 · 1인 목표 {MONTHLY_GOAL}건 (영업일 {monthBiz}일 × {DAILY_GOAL}건) · {MONTHLY_GOAL + 1}건부터 1건당 1만원 인센</p>
+          {statRows.length === 0 ? (
+            <p className="text-white/30 text-xs">이번 달 접수된 가망이 없습니다</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-[11px] text-white/80 min-w-[640px]">
+                <thead>
+                  <tr className="text-white/40 text-[10px] text-right">
+                    <th className="text-left font-normal pb-1">직원</th>
+                    <th className="font-normal pb-1">접수</th>
+                    <th className="font-normal pb-1">승인</th>
+                    <th className="font-normal pb-1">부결</th>
+                    <th className="font-normal pb-1">대기</th>
+                    <th className="font-normal pb-1">목표 달성</th>
+                    <th className="font-normal pb-1">승인율</th>
+                    <th className="font-normal pb-1">니즈 상/중/하</th>
+                    <th className="font-normal pb-1">니즈 점수</th>
+                    <th className="font-normal pb-1">AI 평균</th>
+                    <th className="font-normal pb-1">인센</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {statRows.map(r => {
+                    const rate = r.approved + r.rejected > 0 ? Math.round((r.approved / (r.approved + r.rejected)) * 100) : null
+                    const bonus = Math.max(0, r.approved - MONTHLY_GOAL) * 10000
+                    const na = needsAvg(r)
+                    return (
+                      <tr key={r.id} className="text-right border-t border-white/10">
+                        <td className="text-left py-1.5 font-bold text-white">{r.name}{bestNeeds?.id === r.id ? ' ⭐' : ''}</td>
+                        <td>{r.submitted}</td>
+                        <td className="text-emerald-300 font-bold">{r.approved}</td>
+                        <td className={r.rejected > 0 ? 'text-red-300 font-bold' : ''}>{r.rejected}</td>
+                        <td>{r.pending}</td>
+                        <td>{r.approved}/{MONTHLY_GOAL} <span className="text-white/40">({Math.round((r.approved / MONTHLY_GOAL) * 100)}%)</span></td>
+                        <td>{rate === null ? '-' : `${rate}%`}</td>
+                        <td>{r.needs.상}/{r.needs.중}/{r.needs.하}</td>
+                        <td className={na >= 2.3 ? 'text-emerald-300 font-bold' : na > 0 && na < 1.7 ? 'text-red-300' : ''}>{na ? na.toFixed(1) : '-'}</td>
+                        <td>{r.scoreN ? Math.round(r.scoreSum / r.scoreN) : '-'}</td>
+                        <td className="text-[#C5A258]">{bonus > 0 ? `+${bonus.toLocaleString()}원` : '-'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              <p className="text-white/30 text-[10px] mt-1.5">니즈 점수 = 상 3 · 중 2 · 하 1 평균 (⭐ = 접수 3건 이상 중 니즈가 가장 좋은 직원) · 승인율 = 승인 ÷ (승인+부결)</p>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* 오늘 현황 */}
         <div>
@@ -737,9 +893,6 @@ export default function DigManageTab() {
                 <div key={uid} className="bg-white/10 rounded-lg px-3 py-1.5">
                   <p className="text-white text-xs font-bold">{info.name}</p>
                   <p className="text-white/60 text-[11px]">오늘 {info.count}건 / {DAILY_GOAL}건</p>
-                  {info.bonus > 0 && (
-                    <p className="text-[#C5A258] text-[11px] font-semibold">인센티브 +{info.bonus.toLocaleString()}원</p>
-                  )}
                 </div>
               ))}
             </div>

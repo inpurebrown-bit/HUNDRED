@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { isTester } from '@/lib/tester'
+import { bizDays } from '@/lib/digStats'
 import { calcWithholding, calcSalesStructure, resignBizProration, SALES_BASE_PAY, SALES_BASE_RATE, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, calcMonthlySubBonus, calcRefundDeductions, calcDigSalary, DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
 import { contractWeight } from '@/lib/supplyRules'
 
@@ -110,7 +111,7 @@ function calcDig(e: DigEmployee, yearMonth: string) {
     workedDays = rb.worked
     totalDays  = rb.total
   }
-  const base = calcDigSalary(e.approved_count, workedDays, totalDays)
+  const base = calcDigSalary(e.approved_count, workedDays, totalDays, bizDays(yearMonth).total)
   const awardsSum = (e.awards || []).reduce((s, a) => s + Number(a.amount || 0), 0)
   const before = base.before + awardsSum
   const after  = calcWithholding(before).after
@@ -473,7 +474,7 @@ function DigCard({
           />
         </div>
         <PayRow
-          label={`인센 (${DIG_DAILY_GOAL}건 초과 ×${DIG_BONUS_PER_EXTRA.toLocaleString()}원)`}
+          label={`인센 (월 목표 ${bizDays(yearMonth).total * DIG_DAILY_GOAL}건 초과 ×${DIG_BONUS_PER_EXTRA.toLocaleString()}원)`}
           value={c.incentive}
           colorClass={c.incentive > 0 ? 'text-orange-600' : undefined}
         />
@@ -785,11 +786,14 @@ export default function PayrollTab() {
   const autoLoad = useCallback(async (
     baseOps?: OpsEmployee[],
     baseSales?: SalesEmployee[],
-    baseCosts?: OtherCosts
+    baseCosts?: OtherCosts,
+    baseDig?: DigEmployee[]
   ) => {
     const currentOps   = baseOps   || opsEmps
     const currentSales = baseSales || salesEmps
     const currentCosts = baseCosts || costs
+    // 방금 불러온 발굴팀 명단을 우선 사용 (예전 state로 덮어써서 직원이 사라지던 문제 방지)
+    const currentDig   = baseDig   || digEmps
     setAutoLoading(true)
     setMsg('')
     try {
@@ -944,7 +948,7 @@ export default function PayrollTab() {
       }
 
       // 발굴팀 승인 건수 자동 반영
-      let newDigEmps = digEmps
+      let newDigEmps = currentDig
       try {
         const digRes  = await fetch(`/api/dig-prospects?year_month=${yearMonth}`)
         const digJson = await digRes.json()
@@ -959,11 +963,22 @@ export default function PayrollTab() {
             if (key) countByUser[key] = (countByUser[key] || 0) + 1
           }
         }
-        newDigEmps = digEmps.map(e => {
+        newDigEmps = currentDig.map(e => {
           if (!e.name) return e
           const key = Object.keys(countByUser).find(k => k === e.name || k.includes(e.name) || e.name.includes(k))
           return key ? { ...e, approved_count: countByUser[key] } : e
         })
+        // 신규로 들어온 발굴팀 직원(계정이 있거나 이번 달 승인 건이 있는데 명단에 없는 사람)은 자동으로 추가
+        try {
+          const ur = await fetch('/api/users?role=dig')
+          const uj = ur.ok ? await ur.json() : { users: [] }
+          const names = new Set<string>([...(uj.users || []).map((u: any) => String(u.name || '').trim()), ...Object.keys(countByUser)])
+          for (const nm of names) {
+            if (!nm || isTester(nm)) continue
+            if (newDigEmps.some(e => e.name && (e.name === nm || nm.includes(e.name) || e.name.includes(nm)))) continue
+            newDigEmps = [...newDigEmps, { ...defaultDig(), name: nm, approved_count: countByUser[nm] || 0 }]
+          }
+        } catch { /* 명단 조회 실패해도 계속 */ }
         setDigEmps(newDigEmps)
       } catch { /* 발굴팀 로드 실패해도 계속 */ }
 
@@ -978,7 +993,7 @@ export default function PayrollTab() {
     } finally {
       setAutoLoading(false)
     }
-  }, [yearMonth, opsEmps, salesEmps, costs]) // eslint-disable-line
+  }, [yearMonth, opsEmps, salesEmps, costs, digEmps]) // eslint-disable-line
 
   // ── 불러오기 ──────────────────────────────────────────────
   async function handleLoad() {
@@ -1035,7 +1050,7 @@ export default function PayrollTab() {
       // 현재 월이면 저장된 레코드 로드 후 자동으로 최신 계약 데이터 반영
       if (yearMonth === thisMonth()) {
         setMsg('불러오기 완료 — 최신 계약 자동 반영 중…')
-        await autoLoad(freshOps, freshSales, freshCosts)
+        await autoLoad(freshOps, freshSales, freshCosts, freshDig)
       } else {
         setMsg('불러오기 완료')
         await loadPastContractMap(yearMonth)
@@ -1047,7 +1062,7 @@ export default function PayrollTab() {
       const rSales = salesEmps.map(e => ({ ...e, contract_revenue: 0, contract_count: 0, performance_bonus: 0, awards: [], pay_mode: undefined, work_days: undefined, memo: '' }))
       const rDig   = digEmps.map(e => ({ ...e, approved_count: 0, awards: [] }))
       setOpsEmps(rOps); setSalesEmps(rSales); setDigEmps(rDig)
-      if (yearMonth === thisMonth()) await autoLoad(rOps, rSales, costs)
+      if (yearMonth === thisMonth()) await autoLoad(rOps, rSales, costs, rDig)
       else {
         setMsg('저장된 데이터 없음')
         await loadPastContractMap(yearMonth)

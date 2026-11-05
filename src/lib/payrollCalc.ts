@@ -142,11 +142,13 @@ export function calcDigSalary(
   approvedCount: number,
   workedDays?: number,
   totalDays?: number,
+  monthBizDays?: number,   // 그 달 영업일 수 — 월 목표 = 영업일 × 일 8건, 초과분부터 1건당 인센
 ): { base: number; incentive: number; total: number; before: number; after: number } {
   const ratio = (workedDays != null && totalDays && totalDays > 0)
     ? workedDays / totalDays : 1
   const base      = Math.round(DIG_BASE_SALARY * ratio)
-  const extraCnt  = Math.max(0, approvedCount - DIG_DAILY_GOAL)
+  const monthGoal = Math.round((monthBizDays && monthBizDays > 0 ? monthBizDays : 1) * DIG_DAILY_GOAL * ratio)
+  const extraCnt  = Math.max(0, approvedCount - monthGoal)
   const incentive = extraCnt * DIG_BONUS_PER_EXTRA
   const before    = base + incentive
   const after     = calcWithholding(before).after

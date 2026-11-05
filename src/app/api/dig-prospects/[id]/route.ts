@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { assignProspect, queueAssign, cancelQueue } from '@/lib/digAssign'
+import { analyzeRecordingUrl } from '@/lib/recordingAnalysis'
+
+export const maxDuration = 120
 
 // PATCH: 상태 변경 (ceo: 승인/거절/배정, dig: 분석 결과 업데이트)
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -22,6 +25,54 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       if (cu) await supabaseAdmin.from('customers').update({ details: { ...(cu.details || {}), urgent_assign: false } }).eq('id', pr.customer_id)
     }
     return NextResponse.json({ ok: true })
+  }
+
+  // 대표: 녹취 AI 분석이 비어 있는 건을 다시 분석 (상태·배정은 건드리지 않음)
+  if (action === 'reanalyze') {
+    if (user.role !== 'ceo') return NextResponse.json({ error: '권한 없음' }, { status: 403 })
+    const { data: pr } = await supabaseAdmin.from('dig_prospects').select('recording_url, recording_filename, recording_analysis').eq('id', id).maybeSingle()
+    if (!pr?.recording_url) return NextResponse.json({ error: '녹취 파일이 없습니다' }, { status: 400 })
+    const a = await analyzeRecordingUrl(pr.recording_url, pr.recording_filename || undefined)
+    if (!a) return NextResponse.json({ error: 'AI 분석이 계속 실패합니다. 잠시 후 다시 눌러주세요' }, { status: 502 })
+    const old = pr.recording_analysis && typeof pr.recording_analysis === 'object' ? pr.recording_analysis : {}
+    const { data, error } = await supabaseAdmin.from('dig_prospects').update({ recording_analysis: { ...old, ...a } }).eq('id', id).select().single()
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ prospect: data })
+  }
+
+  // 대표: 심사 화면에서 접수 내용(직원이 잘못 입력한 값) 바로 수정
+  if (action === 'edit') {
+    if (user.role !== 'ceo') return NextResponse.json({ error: '권한 없음' }, { status: 403 })
+    const f = (body.fields || {}) as Record<string, any>
+    const allowed = ['company', 'ceo_name', 'phone', 'phone_010', 'business_age', 'annual_revenue', 'industry', 'credit_score', 'required_fund', 'memo', 'preferred_call_time']
+    const patch: Record<string, any> = {}
+    for (const k of allowed) if (f[k] !== undefined) patch[k] = typeof f[k] === 'string' ? f[k].trim() : f[k]
+    if (f.has_delinquency !== undefined) patch.has_delinquency = !!f.has_delinquency
+    if (Object.keys(patch).length === 0) return NextResponse.json({ error: '바꿀 내용이 없습니다' }, { status: 400 })
+    const { data, error } = await supabaseAdmin.from('dig_prospects').update(patch).eq('id', id).select().single()
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    // 이미 영업팀에 배정된 건이면 고객 카드에도 같이 반영
+    if (data?.customer_id) {
+      const { data: cu } = await supabaseAdmin.from('customers').select('details').eq('id', data.customer_id).single()
+      if (cu) {
+        const det: Record<string, any> = { ...(cu.details || {}) }
+        if (patch.company !== undefined) det.company = patch.company
+        if (patch.business_age !== undefined) { det.years_in_business = patch.business_age; det.business_age = patch.business_age }
+        if (patch.annual_revenue !== undefined) { det.revenue_2026 = patch.annual_revenue; det.annual_revenue = patch.annual_revenue }
+        if (patch.industry !== undefined) { det.business_type = patch.industry; det.industry = patch.industry }
+        if (patch.credit_score !== undefined) det.credit_score = patch.credit_score
+        if (patch.required_fund !== undefined) { det.required_funds = patch.required_fund; det.required_fund = patch.required_fund }
+        if (patch.memo !== undefined || patch.has_delinquency !== undefined) {
+          det.tax_delinquency = data.memo || (data.has_delinquency ? '있음' : '없음')
+          det.has_delinquency = data.has_delinquency
+        }
+        const top: Record<string, any> = { details: det }
+        if (patch.ceo_name !== undefined) top.name = patch.ceo_name
+        if (patch.phone_010 !== undefined) top.phone = patch.phone_010
+        await supabaseAdmin.from('customers').update(top).eq('id', data.customer_id)
+      }
+    }
+    return NextResponse.json({ prospect: data })
   }
 
   if (action === 'cancel_queue') {

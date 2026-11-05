@@ -678,6 +678,8 @@ export default function OpsCeoTab() {
   const [cases, setCases] = useState<OpsCase[]>([])
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<OpsView>('active')
+  // 진행중업체 안에서 실제 진행 상황(서류받는중·실사대기·입금전 …)으로 거르는 소분류
+  const [stageFilter, setStageFilter] = useState('')
   const [search, setSearch] = useState('')
   const [openPanelIds, setOpenPanelIds] = useState<string[]>([])
   const [closingPanelIds, setClosingPanelIds] = useState<string[]>([])
@@ -858,17 +860,28 @@ export default function OpsCeoTab() {
     return amt > 0 && c.progress_stage !== 'new_db'
   })
 
+  // 메인 메뉴 — 만료·환불·종료는 눈에 밟히지 않게 '보관함'으로 따로 뺐다
   const MENU = [
     { key: 'active' as OpsView,        label: '진행중업체', count: activeCases.length },
-    { key: 'expired' as OpsView,       label: '계약기간만료', count: expiredCases.length },
-    { key: 'refund' as OpsView,        label: '환불업체',   count: refundCases.length },
-    { key: 'completed' as OpsView,     label: '종료업체',   count: completedCases.length },
     { key: 'newdb' as OpsView,         label: '🗄️ 뿌토DB',    count: newdbCases.length },
     { key: 'puto_contract' as OpsView, label: '계약업체',   count: putoContractCases.length },
     { key: 'revenue' as OpsView,       label: '매출현황',   count: null },
   ] as const
+  const ARCHIVE = [
+    { key: 'expired' as OpsView,   label: '계약기간만료', count: expiredCases.length },
+    { key: 'refund' as OpsView,    label: '환불',         count: refundCases.length },
+    { key: 'completed' as OpsView, label: '종료',         count: completedCases.length },
+  ] as const
+  const inArchive = view === 'expired' || view === 'refund' || view === 'completed'
 
-  const viewCases = view === 'refund' ? refundCases : view === 'completed' ? completedCases : view === 'newdb' ? newdbCases : view === 'expired' ? expiredCases : activeCases
+  // 진행중업체 소분류 — 지금 실제로 있는 진행 단계만 건수와 함께 (PIPELINE_STAGES 순서)
+  const stageCounts: Record<string, number> = {}
+  activeCases.forEach(c => { const s = c.progress_stage || '미선택'; stageCounts[s] = (stageCounts[s] || 0) + 1 })
+  const stageOrder = [...PIPELINE_STAGES.map(s => s.key), '미선택']
+  const stageChips = Object.keys(stageCounts).sort((a, b) => (stageOrder.indexOf(a) === -1 ? 99 : stageOrder.indexOf(a)) - (stageOrder.indexOf(b) === -1 ? 99 : stageOrder.indexOf(b)))
+  const shownActive = stageFilter ? activeCases.filter(c => (c.progress_stage || '미선택') === stageFilter) : activeCases
+
+  const viewCases = view === 'refund' ? refundCases : view === 'completed' ? completedCases : view === 'newdb' ? newdbCases : view === 'expired' ? expiredCases : shownActive
 
   return (
     <div className="space-y-5 pb-8 max-w-[1500px] mx-auto">
@@ -895,14 +908,10 @@ export default function OpsCeoTab() {
             </div>
 
             {/* 핵심 숫자 */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <button onClick={() => setView('active')} className="text-left rounded-3xl p-5 text-white bg-gradient-to-br from-[#10203a] to-[#0a1424] hover:-translate-y-0.5 transition-transform">
                 <p className="text-[13.5px] text-white/65 font-semibold">진행 중 업체</p>
                 <p className="text-[34px] leading-tight font-black tabular-nums">{activeCases.length}<span className="text-[16px] text-white/50 font-semibold"> 곳</span></p>
-              </button>
-              <button onClick={() => setView('expired')} className={`text-left rounded-3xl p-5 border hover:-translate-y-0.5 transition-transform ${expiredCases.length > 0 ? 'bg-orange-50 border-orange-200' : 'bg-white border-gray-100'}`}>
-                <p className={`text-[13.5px] font-semibold ${expiredCases.length > 0 ? 'text-orange-700' : 'text-gray-500'}`}>계약 기간 만료</p>
-                <p className={`text-[34px] leading-tight font-black tabular-nums ${expiredCases.length > 0 ? 'text-orange-600' : 'text-[#0b2140]'}`}>{expiredCases.length}<span className="text-[16px] text-gray-400 font-semibold"> 곳</span></p>
               </button>
               <div className="rounded-3xl p-5 bg-white border border-gray-100">
                 <p className="text-[13.5px] text-gray-500 font-semibold">{monthLabel}월 수수료 매출</p>
@@ -928,7 +937,36 @@ export default function OpsCeoTab() {
                   )}
                 </button>
               ))}
+              {/* 보관함 — 계약기간만료·환불·종료는 메인과 분리해서 작게 */}
+              <span className="mx-1 h-5 w-px bg-gray-200" />
+              {ARCHIVE.map(m => (
+                <button key={m.key} onClick={() => setView(m.key)}
+                  className={`flex items-center gap-1.5 text-[12.5px] px-3 py-1.5 rounded-full font-semibold transition-all border ${
+                    view === m.key ? 'bg-gray-700 text-white border-gray-700' : 'bg-gray-50 text-gray-400 border-gray-200 hover:text-gray-600'
+                  }`}>
+                  {m.label}
+                  <span className="text-[11px] opacity-70">{m.count}</span>
+                </button>
+              ))}
             </div>
+
+            {/* 진행중업체 소분류 — 서류받는중 / 실사대기 / 입금전 … 실제 진행 상황별 필터 */}
+            {view === 'active' && stageChips.length > 0 && (
+              <div className="flex gap-1.5 flex-wrap items-center">
+                <span className="text-[12px] text-gray-400 font-semibold mr-1">진행 상황</span>
+                <button onClick={() => setStageFilter('')}
+                  className={`text-[12.5px] px-3 py-1 rounded-full font-bold border transition-colors ${stageFilter === '' ? 'bg-[#0b2140] text-white border-[#0b2140]' : 'bg-white text-gray-600 border-gray-200 hover:border-[#b8995a]'}`}>
+                  전체 {activeCases.length}
+                </button>
+                {stageChips.map(s => (
+                  <button key={s} onClick={() => setStageFilter(f => (f === s ? '' : s))}
+                    className={`text-[12.5px] px-3 py-1 rounded-full font-bold border transition-colors ${stageFilter === s ? 'bg-[#b8995a] text-white border-[#b8995a]' : 'bg-white text-gray-600 border-gray-200 hover:border-[#b8995a]'}`}>
+                    {s} {stageCounts[s]}
+                  </button>
+                ))}
+              </div>
+            )}
+            {inArchive && <p className="text-[12px] text-gray-400">📁 보관함 — 계약기간만료 · 환불 · 종료 업체 (진행중 업체와 분리해서 관리)</p>}
           </>
         )
       })()}
@@ -1038,7 +1076,7 @@ export default function OpsCeoTab() {
       ) : loading ? (
         <div className="text-center py-12 text-gray-400">불러오는 중...</div>
       ) : view === 'active' ? (
-        <InstitutionGroupedView cases={activeCases} openPanelIds={openPanelIds} onToggle={togglePanel} onScriptToggle={handleScriptToggle} onApprove={handleApprove} onSave={handleSave} />
+        <InstitutionGroupedView cases={shownActive} openPanelIds={openPanelIds} onToggle={togglePanel} onScriptToggle={handleScriptToggle} onApprove={handleApprove} onSave={handleSave} />
       ) : view === 'expired' ? (
         expiredCases.length === 0 ? (
           <div className="bg-white rounded-xl border border-[#E8E2D4] p-12 text-center text-gray-400 text-sm">계약기간 만료 업체가 없습니다</div>

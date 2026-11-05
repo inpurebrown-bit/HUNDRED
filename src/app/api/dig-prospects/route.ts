@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { releaseDue, loadQueue } from '@/lib/digAssign'
+import { analyzeRecordingUrl, isValidAnalysis } from '@/lib/recordingAnalysis'
+
+export const maxDuration = 120   // 접수 때 서버가 AI 분석을 다시 돌릴 수 있다
 
 // GET: 목록 조회
 // - dig: 본인 것만
@@ -67,12 +70,21 @@ export async function POST(req: NextRequest) {
     recording_url, recording_filename, recording_analysis: rawAnalysis, recordings, call_note,
   } = body
   // 통화가 2~3번 나뉜 경우: 첫 녹취는 기존 칸에, 전체 목록은 분석 결과 안에 함께 보관
-  const recording_analysis = Array.isArray(recordings) && recordings.length > 1
+  let recording_analysis = Array.isArray(recordings) && recordings.length > 1
     ? { ...(rawAnalysis || {}), recordings: recordings.map((r: any) => ({ url: r.url, name: r.name })) }
     : rawAnalysis
+  // 화면에서 AI 분석이 비어 넘어온 경우(AI 서버 일시 오류 등) 서버가 저장된 녹취로 직접 다시 분석 — 니즈·리포트가 빠진 채 접수되지 않게
+  if (!isValidAnalysis(recording_analysis) && recording_url) {
+    const redo = await analyzeRecordingUrl(recording_url, recording_filename)
+    if (redo) recording_analysis = { ...(recording_analysis || {}), ...redo }
+  }
 
   if (!phone_010) {
     return NextResponse.json({ error: '010 번호는 필수입니다' }, { status: 400 })
+  }
+  // 체납이 있으면 말소 가능한 건만 접수 (화면을 새로고침하지 않은 예전 화면에서 들어오는 건도 막는다)
+  if (has_delinquency && body.delinquency_clearable !== true) {
+    return NextResponse.json({ error: '체납이 있는 건은 말소 가능 확인 후에만 접수할 수 있습니다 (화면을 새로고침해 주세요)' }, { status: 400 })
   }
 
   // AI 분석 결과로 자동 승인 여부 결정

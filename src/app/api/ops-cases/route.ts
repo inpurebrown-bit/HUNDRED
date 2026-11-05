@@ -26,7 +26,11 @@ function isKoreanPhone(p: string): boolean {
 
 function normalize(c: any, customerMap: Record<string, any> = {}, customerIdMap: Record<string, any> = {}) {
   // customers 테이블에서 전화번호(원본 or 하이픈제거) 또는 customer_id로 매칭된 고객 데이터
-  const cust = customerMap[c.phone] || customerMap[normPhone(c.phone)] || customerIdMap[c.customer_id] || null
+  // 관리팀이 '신규DB 직접 추가'로 만든 케이스는 독립 업체다 — 전화번호가 같은 기존 고객(대표 한 명이 여러 사업체를 가진 경우 등)의 정보로 덮어쓰지 않는다
+  const isDirectAdd = !!c.details?.direct_add || (Array.isArray(c.timeline) && c.timeline.some((t: any) => String(t?.content || '').startsWith('신규DB 직접 추가')))
+  const cust = isDirectAdd
+    ? (customerIdMap[c.customer_id] || null)
+    : (customerMap[c.phone] || customerMap[normPhone(c.phone)] || customerIdMap[c.customer_id] || null)
   const custDetails = cust?.details || {}
 
   // sales_customer_info: ops_case.details에 저장된 값
@@ -88,6 +92,12 @@ function normalize(c: any, customerMap: Record<string, any> = {}, customerIdMap:
     revenue_2023:  pick(ij?.revenue_2023,  custDetails.revenue_2023,  sci?.revenue_2023),
     required_funds:pick(ij?.required_funds,custDetails.required_funds,sci?.required_funds),
     solution:      pick(ij?.solution,      custDetails.solution,      sci?.solution),
+  }
+
+  // 위 우선순위에서 비어 버린 항목은 직접 입력해 둔 값으로 채운다
+  for (const k of FLAT_KEYS) {
+    const cur = mergedDetails[k]
+    if ((cur === undefined || cur === null || String(cur).trim() === '') && flat[k] !== undefined) mergedDetails[k] = flat[k]
   }
 
   // 대표자 이름: ij > customers 테이블 > sci > customer_name(업체명 가능성 있어 최후)

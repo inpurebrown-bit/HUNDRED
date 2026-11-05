@@ -1148,7 +1148,8 @@ function CustomerCard({
     if ((qtContractDate && qtContractDate !== existingDate) || qtPayMethod !== existingMethod) {
       await onUpdate(c.id, { details: { contract_date: qtContractDate, payment_method: qtPayMethod } })
     }
-    await onTransferToOps(c)
+    // onUpdate 결과가 아직 c에 반영되기 전이므로, 방금 고른 결제방식·계약일을 담아서 전송 (예전엔 빈 값으로 넘어가 관리팀 착수금 결제방식이 비어 있었음)
+    await onTransferToOps({ ...c, details: { ...((c as any).details || {}), contract_date: qtContractDate || (c as any).details?.contract_date, payment_method: qtPayMethod } } as any)
     setQtLoading(false)
     setQuickTransferOpen(false)
     setQtCheckedGroup(false)

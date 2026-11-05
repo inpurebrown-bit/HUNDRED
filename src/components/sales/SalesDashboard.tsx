@@ -491,10 +491,11 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
           ...(contractType === '월정기권' ? { monthly_fee: 100000, monthly_months: 12, monthly_total: 1200000 } : {}),
           // 영업팀 세금계산서/결제방식 → 관리팀 착수금 섹션으로 직접 반영
           tax_invoice: anyDetails.tax_invoice === '발급' ? '희망' : anyDetails.tax_invoice === '미발급' ? '미희망' : undefined,
-          has_cash: anyDetails.has_cash || false,
-          has_card: anyDetails.has_card || false,
-          // 카드결제는 자동신고 → 착수금 세금계산서 발급완료 자동 처리
-          ...(anyDetails.has_card ? { tax_invoice_completed: true } : {}),
+          // 결제방식: 영업팀 계약/자금팀 전송 창은 payment_method('카드'|'현금')로 저장하고, 고객 카드 화면은 has_card/has_cash로 저장한다 — 둘 다 인식
+          has_cash: !!(anyDetails.has_cash || anyDetails.payment_method === '현금'),
+          has_card: !!(anyDetails.has_card || anyDetails.payment_method === '카드'),
+          // 카드결제는 자동신고 → 착수금 세금계산서 발급완료 자동 처리 (+ 계산서 '희망')
+          ...((anyDetails.has_card || anyDetails.payment_method === '카드') ? { tax_invoice: '희망', tax_invoice_completed: true } : {}),
           // 영업팀 계약날짜 → 관리팀 계약날짜로 전달
           ...(anyDetails.contract_date ? { contract_date: anyDetails.contract_date } : {}),
           sales_customer_info: {

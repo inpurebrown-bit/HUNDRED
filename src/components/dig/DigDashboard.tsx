@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { signOut } from 'next-auth/react'
+import { bizDays } from '@/lib/digStats'
 import MyProfileTab from '@/components/MyProfileTab'
 
 interface Props {
@@ -25,7 +26,7 @@ const CHECKLIST_ITEMS = [
   { key: 'source_disclosed',    label: '출처 고지',         desc: '✅ "연락처는 네이버를 통해 확인했습니다" — 수집 경로 고지', legal: true },
   { key: 'needs_check',         label: '니즈 확인',         desc: '"혹시 정책자금 알아보신 적 있으시거나 사용하고 계신 게 있으세요?"' },
   { key: 'basic_info',          label: '기본 정보 수집',    desc: '업력 / 연매출 / 업종 / 연체·체납 여부 / 신용점수 / 대표자 성함 (5가지 이상)' },
-  { key: 'cancel_checked',      label: '캔슬조건 확인',     desc: '❌ 거절 의사 1회라도 → 즉시 종료 | 단순 호기심 → 대환/캐피탈 여부 체크 후 판단' },
+  { key: 'cancel_checked',      label: '캔슬조건 확인',     desc: '❌ 확실히 필요 없다는 의사가 분명하면 종료 (이유 없이 한 번 거절한 건 재권유 가능) | 단순 호기심 → 대환/캐피탈 여부 체크 후 판단' },
   { key: 'check_requirements',  label: '체크요건 확인',     desc: '① 통화 희망 시간대 확인 ② 실제 자금 필요 여부 확인 (대환 포함)' },
   { key: 'closing_done',        label: '클로징 멘트',       desc: '"내일 전문 컨설턴트가 결과 안내드릴 건데, 통화 편한 시간이 언제이실까요?"' },
   { key: 'phone_secured',       label: '010 번호 확보',     desc: '통화 가능한 010 번호 확보 (문자·카카오톡 발송 금지 — 유선 통화만)' },
@@ -69,6 +70,8 @@ const EMPTY_FORM = {
   business_age: '', annual_revenue: '', industry: '',
   delinquency_detail: '', credit_score: '', required_fund: '',
   preferred_call_time: '',
+  // 연체·체납: '' 미선택 / none 없음 / yes 있음 — 있으면 말소 가능 여부(delinquency_clearable: yes|no) 확인 필수
+  delinquency_status: '', delinquency_clearable: '',
 }
 const EMPTY_CHECKLIST: Record<string, boolean> = {
   identity_disclosed: false, purpose_disclosed: false, source_disclosed: false,
@@ -133,7 +136,7 @@ const SCRIPT_SECTIONS = [
     label: '반론 대응', color: 'red' as const,
     rows: [
       { q: '바빠요 / 됐어요',     a: '"아 바쁘시죠~ 연락처만 주시면 편한 시간에 매니저가 연락드릴게요. 010~"' },
-      { q: '필요없어요',           a: '"아 그러세요~ 무료로 진단만 받아 놓으셔도 나중에 필요하실 때 도움이 되실 거예요." → 한 번이라도 명확히 거절 시 캔슬조건 ①' },
+      { q: '필요없어요',           a: '"아 그러세요~ 무료로 진단만 받아 놓으셔도 나중에 필요하실 때 도움이 되실 거예요." → 자세한 설명 없이 거절하신 거라면 바로 접지 말고 한 번 더 권유해 보세요. 설명을 듣고도 재차 분명히 거절하면 캔슬조건 ①' },
       { q: '이미 쓰고 있어요',    a: '"기관마다 중복으로 추가 가능한 것도 있어서 무료 진단 한번 받아보시면 좋은 정보 얻으실 거예요!"' },
       { q: '사기 같아요',          a: '"무료 컨설팅이고 진행 원하실 때만 비용 발생해요~ 부담 없이 상담만 받아보세요."' },
       { q: '문자 남겨주세요',      a: '"문자로는 정확한 안내가 어려워서요~ 연락처 주시면 상담사가 5분만 설명드릴게요."' },
@@ -146,7 +149,7 @@ const SCRIPT_SECTIONS = [
   {
     label: '🚫 캔슬조건 — 해당 시 즉시 가망 등록 금지', color: 'cancel' as const,
     content: [
-      { bold: true,  text: '① 대표님이 "안 한다 / 필요 없다" 취지의 말을 한 번이라도 한 경우 → 즉시 종료' },
+      { bold: true,  text: '① 대표님이 "안 한다 / 필요 없다"고 거절 — 자세한 설명 없이 처음 한 번 거절한 건 한 번 더 권유 가능, 설명을 듣고도 재차 분명히 거절하면 → 종료' },
       { bold: true,  text: '② 확실하게 정책자금이 필요하지 않다고 판단되는 경우' },
       { bold: true,  text: '③ 단순 호기심 / 가볍게 알아보는 경우 → 아래 두 가지 체크 후에도 니즈 없으면 캔슬' },
       { bold: false, text: '  ③-1. 대환(기존 대출 금리 갈아타기) 목적 여부 확인' },
@@ -301,7 +304,9 @@ export default function DigDashboard({ userId, userName, username }: Props) {
       ...EMPTY_FORM,
       company: p.company || '', ceo_name: p.ceo_name || '', phone: p.phone || '', phone_010: p.phone_010 || '',
       business_age: p.business_age || '', annual_revenue: p.annual_revenue || '', industry: p.industry || '',
-      delinquency_detail: p.memo || '', credit_score: p.credit_score || '', required_fund: p.required_fund || '',
+      delinquency_detail: p.has_delinquency ? (p.memo || '').replace(/\s*\(말소 가능\)$/, '') : '',
+      delinquency_status: p.has_delinquency ? 'yes' : 'none', delinquency_clearable: p.has_delinquency ? 'yes' : '',
+      credit_score: p.credit_score || '', required_fund: p.required_fund || '',
       preferred_call_time: p.preferred_call_time || '',
     })
     setChecklist({ ...EMPTY_CHECKLIST, ...(p.checklist || {}) })
@@ -351,8 +356,10 @@ export default function DigDashboard({ userId, userName, username }: Props) {
   const isMonth = (p: Prospect) => !!p.call_date?.startsWith(currentMonth)
   const todayApproved = prospects.filter(p => p.call_date === today && (p.status === 'approved' || p.status === 'assigned')).length
   const monthApproved = prospects.filter(p => p.call_date?.startsWith(currentMonth) && (p.status === 'approved' || p.status === 'assigned')).length
-  const MONTHLY_GOAL  = 160
-  const bonusCount    = Math.max(0, todayApproved - DAILY_GOAL)
+  // 이번 달 목표 = 영업일 × 일 8건 (예: 11월 영업일 21일 → 168건). 초과분부터 1건당 1만원 추가지급 (하루 기준이 아니라 한 달 기준)
+  const monthBizDays  = bizDays(currentMonth).total
+  const MONTHLY_GOAL  = monthBizDays * DAILY_GOAL
+  const bonusCount    = Math.max(0, monthApproved - MONTHLY_GOAL)
   const bonusAmount   = bonusCount * BONUS_PER_EXTRA
   const checkDoneCount   = Object.values(checklist).filter(Boolean).length
   const checklistAllDone = checkDoneCount === CHECKLIST_ITEMS.length
@@ -410,6 +417,31 @@ export default function DigDashboard({ userId, userName, username }: Props) {
     setPhoneSearching(false)
   }
 
+  // AI 분석 (니즈·리포트) — 일시 오류·형식 오류면 최대 3번 시도. 유효한 분석이 나와야 결과를 돌려준다
+  async function analyzeWithRetry(fileUrl: string, filename: string): Promise<any | null> {
+    for (let t = 0; t < 3; t++) {
+      try {
+        const res = await fetch('/api/analyze-recording', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileUrl, filename }),
+        })
+        const data = await res.json()
+        if (data.analysis && !data.analysis.parse_error && data.analysis.checklist) return data.analysis
+      } catch {}
+      await new Promise(r => setTimeout(r, 1500))
+    }
+    return null
+  }
+
+  async function retryAnalysis(id: string) {
+    const r = recs.find(x => x.id === id)
+    if (!r || !r.url) return
+    setRecs(prev => prev.map(x => (x.id === id ? { ...x, status: 'working' } : x)))
+    const analysis = await analyzeWithRetry(r.url, r.file.name)
+    setRecs(prev => prev.map(x => (x.id === id ? (analysis ? { ...x, analysis, status: 'done' } : { ...x, status: 'fail' }) : x)))
+    if (!analysis) showToast('AI 분석이 계속 실패합니다. 잠시 후 다시 눌러주세요', 'error')
+  }
+
   // 녹취 여러 개 한 번에: 하나씩 순서대로 올리고 분석한다
   async function processRecordingFiles(files: File[]) {
     const room = MAX_RECS - recs.length
@@ -440,18 +472,10 @@ export default function DigDashboard({ userId, userName, username }: Props) {
         if (!putRes.ok) throw new Error(`스토리지 업로드 실패 (${putRes.status})`)
         patch(it.id, { url: signData.publicUrl })
 
-        // 2단계: URL로 AI 분석 요청 (파일 본문 없이 소형 JSON 요청)
-        let analysis: any = null
-        try {
-          const res = await fetch('/api/analyze-recording', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fileUrl: signData.publicUrl, filename: it.file.name }),
-          })
-          const data = await res.json()
-          if (data.analysis) analysis = data.analysis
-        } catch {}
-        patch(it.id, { analysis, status: 'done' })
+        // 2단계: URL로 AI 분석 요청 — 실패해도 조용히 넘기지 않고 재시도, 끝내 실패하면 '실패'로 표시해 제출을 막는다
+        const analysis = await analyzeWithRetry(signData.publicUrl, it.file.name)
+        if (analysis) patch(it.id, { analysis, status: 'done' })
+        else { patch(it.id, { status: 'fail' }); showToast(`${it.file.name}: AI 분석 실패 — '다시 분석'을 눌러주세요`, 'error') }
       } catch (err: any) {
         console.error('processRecordingFiles error:', err)
         patch(it.id, { status: 'fail' })
@@ -542,9 +566,15 @@ export default function DigDashboard({ userId, userName, username }: Props) {
     setResubmitting(false)
   }
 
+  // 연체·체납: 없음 / 있음(내용 + 말소 가능) 중 하나여야 제출 가능
+  const delinqHas = form.delinquency_status === 'yes'
+  const delinqBlocked = delinqHas && form.delinquency_clearable === 'no'
+  const delinqOk = form.delinquency_status === 'none' || (delinqHas && form.delinquency_clearable === 'yes' && !!form.delinquency_detail.trim())
+
   function handleSubmitClick(e: React.FormEvent) {
     e.preventDefault()
     if (!form.phone_010.trim()) { showToast('010 번호는 필수입니다', 'error'); return }
+    if (!delinqOk) { showToast(delinqBlocked ? '말소 불가 체납은 제출할 수 없습니다' : '연체·체납 여부를 선택해주세요 (있으면 내용과 말소 가능 여부 필수)', 'error'); return }
     if (form.preferred_call_time && callTimeInPast(form.preferred_call_time)) { showToast('통화 희망시간이 지금보다 이전이에요. 다시 선택해주세요', 'error'); return }
     setRecs([])
     if (fileRef.current) fileRef.current.value = ''
@@ -569,10 +599,11 @@ export default function DigDashboard({ userId, userName, username }: Props) {
         body: JSON.stringify({
           company: form.company, ceo_name: form.ceo_name, phone: form.phone, phone_010: form.phone_010,
           business_age: form.business_age, annual_revenue: form.annual_revenue, industry: form.industry,
-          has_delinquency: !!form.delinquency_detail.trim(), credit_score: form.credit_score,
+          has_delinquency: delinqHas, delinquency_clearable: delinqHas ? form.delinquency_clearable === 'yes' : null,
+          credit_score: form.credit_score,
           required_fund: form.required_fund, preferred_call_time: form.preferred_call_time,
           urgent_assign: urgentAssign,
-          memo: form.delinquency_detail.trim(), checklist,
+          memo: delinqHas ? `${form.delinquency_detail.trim()} (말소 가능)` : '', checklist,
           recording_url, recording_filename, recording_analysis: analysis || null, recordings,
           call_note: activeDraft?.note || '',
         }),
@@ -641,8 +672,11 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                     <span className="font-black text-gray-500">{i + 1}</span>
                     <span className="flex-1 truncate font-semibold text-gray-700">{r.file.name}</span>
                     <span className={r.status === 'fail' ? 'text-red-600' : r.status === 'done' ? 'text-emerald-600' : 'text-blue-600'}>
-                      {r.status === 'working' ? '올리는 중…' : r.status === 'done' ? '✓ 완료' : '실패'}
+                      {r.status === 'working' ? '올리는 중…' : r.status === 'done' ? '✓ 완료' : r.url ? 'AI 분석 실패' : '업로드 실패'}
                     </span>
+                    {r.status === 'fail' && r.url && (
+                      <button type="button" onClick={() => retryAnalysis(r.id)} className="text-[11px] font-bold text-blue-600 border border-blue-300 bg-white rounded px-1.5 py-0.5">다시 분석</button>
+                    )}
                     <button type="button" onClick={() => setRecs(prev => prev.filter(x => x.id !== r.id))} className="text-gray-400 hover:text-red-500 px-1">✕</button>
                   </div>
                 ))}
@@ -659,11 +693,11 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                 ✅ 녹취 {recs.filter(r => r.status === 'done').length}개 업로드 완료 — 제출하면 대표님이 확인합니다
               </div>
             )}
-            <button type="button" onClick={handleFinalSubmit} disabled={submitting || analyzing || !recs.some(r => r.status === 'done')}
+            <button type="button" onClick={handleFinalSubmit} disabled={submitting || analyzing || !recs.some(r => r.status === 'done') || recs.some(r => r.status === 'fail')}
               className={`w-full py-4 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50 ${
-                recs.some(r => r.status === 'done') ? 'bg-[#1B2A45] hover:bg-[#1B2A45]/90' : 'bg-gray-300 cursor-not-allowed'
+                recs.some(r => r.status === 'done') && !recs.some(r => r.status === 'fail') ? 'bg-[#1B2A45] hover:bg-[#1B2A45]/90' : 'bg-gray-300 cursor-not-allowed'
               }`}>
-              {submitting ? '제출 중...' : analyzing ? '처리 중 — 잠시 후 제출 가능' : !recs.some(r => r.status === 'done') ? '녹취 파일을 먼저 첨부해주세요' : '제출 →'}
+              {submitting ? '제출 중...' : analyzing ? '처리 중 — 잠시 후 제출 가능' : recs.some(r => r.status === 'fail') ? '실패한 녹취를 다시 분석하거나 ✕로 지우세요' : !recs.some(r => r.status === 'done') ? '녹취 파일을 먼저 첨부해주세요' : '제출 →'}
             </button>
           </div>
         </div>
@@ -862,7 +896,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
             </div>
             {bonusCount > 0 && (
               <div className="text-right">
-                <p className="text-[#C5A258] text-xs font-bold">오늘 인센티브</p>
+                <p className="text-[#C5A258] text-xs font-bold">이번 달 인센티브 ({bonusCount}건 초과)</p>
                 <p className="text-[#C5A258] text-base font-black">+{bonusAmount.toLocaleString()}원</p>
               </div>
             )}
@@ -873,7 +907,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
             <p className="text-amber-800 text-xs font-black mb-1">📢 통화 전 필수 공지사항</p>
             <p className="text-amber-700 text-[11px] leading-relaxed">
               통화 시작 즉시 <strong>소속(헌드레드컨설팅 OOO)·목적(무료 상담 안내)·출처(네이버)</strong>를 반드시 먼저 고지하세요.
-              거절 의사 1회라도 표현 시 즉시 통화 종료. 문자·카카오톡 자료 전송 금지. 확정·과장 표현 금지.
+              문자·카카오톡 자료 전송 금지. 확정·과장 표현 금지.
             </p>
           </div>
 
@@ -901,6 +935,8 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                   <p className="text-gray-400 text-xs">이달 총 ({currentMonth})</p>
                   <p className="text-xs font-bold text-gray-700">{monthApproved} / {MONTHLY_GOAL}건</p>
                 </div>
+                <p className="text-[10px] text-gray-400 mt-0.5">영업일 {monthBizDays}일 × {DAILY_GOAL}건</p>
+                <p className="text-[11px] font-black text-[#C5A258] mt-1">🔥 {MONTHLY_GOAL + 1}개부터 추가 1만원 인센!!{bonusCount > 0 ? ` (현재 +${bonusAmount.toLocaleString()}원)` : ''}</p>
               </div>
 
               {/* 승인요청중 */}
@@ -1038,7 +1074,6 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                     { key: 'annual_revenue',     label: '연매출',         ph: '5억' },
                     { key: 'industry',           label: '업종',           ph: '제조업' },
                     { key: 'credit_score',       label: '신용점수',       ph: '780점' },
-                    { key: 'delinquency_detail', label: '연체·체납',      ph: '없음 / 500만원' },
                     { key: 'required_fund',      label: '필요자금',       ph: '1억' },
                   ] as const).map(f => (
                     <div key={f.key}>
@@ -1047,6 +1082,39 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                         placeholder={f.ph} className={inputCls} />
                     </div>
                   ))}
+                </div>
+
+                {/* 연체·체납 — 글자 입력 대신 선택. 있으면 말소 가능해야만 제출 */}
+                <div className={`rounded-xl border-2 p-3 space-y-2 ${delinqBlocked ? 'border-red-300 bg-red-50' : form.delinquency_status ? 'border-gray-200 bg-white' : 'border-amber-300 bg-amber-50'}`}>
+                  <label className={lblCls}>연체·체납 여부 <span className="text-red-500">*필수</span></label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setForm(p => ({ ...p, delinquency_status: 'none', delinquency_detail: '', delinquency_clearable: '' }))}
+                      className={`py-2.5 rounded-lg text-sm font-bold border-2 ${form.delinquency_status === 'none' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-500 border-gray-200'}`}>
+                      없음
+                    </button>
+                    <button type="button" onClick={() => setForm(p => ({ ...p, delinquency_status: 'yes' }))}
+                      className={`py-2.5 rounded-lg text-sm font-bold border-2 ${delinqHas ? 'bg-red-500 text-white border-red-500' : 'bg-white text-gray-500 border-gray-200'}`}>
+                      있음
+                    </button>
+                  </div>
+                  {delinqHas && (
+                    <>
+                      <input value={form.delinquency_detail} onChange={e => setForm(p => ({ ...p, delinquency_detail: e.target.value }))}
+                        placeholder="내용·금액 (예: 국세 500만원)" className={inputCls} />
+                      <p className="text-[11px] font-bold text-gray-600">말소 가능한가요? (분납·완납 등으로 말소할 수 있어야 접수됩니다)</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button type="button" onClick={() => setForm(p => ({ ...p, delinquency_clearable: 'yes' }))}
+                          className={`py-2.5 rounded-lg text-sm font-bold border-2 ${form.delinquency_clearable === 'yes' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-500 border-gray-200'}`}>
+                          말소 가능
+                        </button>
+                        <button type="button" onClick={() => setForm(p => ({ ...p, delinquency_clearable: 'no' }))}
+                          className={`py-2.5 rounded-lg text-sm font-bold border-2 ${delinqBlocked ? 'bg-red-600 text-white border-red-600' : 'bg-white text-gray-500 border-gray-200'}`}>
+                          말소 불가
+                        </button>
+                      </div>
+                      {delinqBlocked && <p className="text-xs font-bold text-red-600">🚫 말소 불가 체납은 제출할 수 없습니다. 이 건은 접수하지 마세요.</p>}
+                    </>
+                  )}
                 </div>
 
                 {/* 통화 희망시간 + 긴급배정 */}
@@ -1136,13 +1204,13 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                 )}
                 {/* 좌: 제출하기(대표 심사 요청) / 우: 나중에 통화로 저장 — 색을 달리하고 좌우로 떨어뜨려 오클릭 방지 */}
                 <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-stretch">
-                  <button type="submit" disabled={!phoneVerified || !form.phone_010.trim() || !checklistAllDone}
+                  <button type="submit" disabled={!phoneVerified || !form.phone_010.trim() || !checklistAllDone || !delinqOk}
                     className={`py-4 rounded-xl font-black text-sm transition-colors ${
-                      !phoneVerified || !form.phone_010.trim() || !checklistAllDone
+                      !phoneVerified || !form.phone_010.trim() || !checklistAllDone || !delinqOk
                         ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                         : 'bg-[#1B2A45] text-white hover:bg-[#1B2A45]/90'
                     }`}>
-                    {!phoneVerified ? '🔒 번호 중복검색 먼저' : !checklistAllDone ? `🔒 체크리스트 ${checkDoneCount}/${CHECKLIST_ITEMS.length} 미완료` : '✅ 제출하기 →'}
+                    {!phoneVerified ? '🔒 번호 중복검색 먼저' : !checklistAllDone ? `🔒 체크리스트 ${checkDoneCount}/${CHECKLIST_ITEMS.length} 미완료` : delinqBlocked ? '🚫 말소 불가 — 제출 불가' : !delinqOk ? '🔒 연체·체납 확인 필요' : '✅ 제출하기 →'}
                   </button>
                   <div className="w-px bg-gray-200 my-1" />
                   <button type="button" onClick={() => { setDraftNote(activeDraft?.kind === 'callback' ? activeDraft.note : ''); setDraftModal('callback') }}

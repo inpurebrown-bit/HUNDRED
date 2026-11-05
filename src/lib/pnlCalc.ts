@@ -5,6 +5,7 @@
 //  운영비    = DB 매입비 + 임대 + 관리비 + 고정비 + 기타(알바·장비 등)
 //  순이익    = 매출 − 세금적립 − 인건비 − 운영비
 import { calcSalesStructure, getPromo, calcDigSalary, OPS_FEE_RATE, OPS_PUTO_RATE, resignBizProration } from './payrollCalc'
+import { bizDays } from './digStats'
 
 export interface MonthPnl {
   ym: string
@@ -73,7 +74,7 @@ export function calcMonthPnl(ym: string, employees: any | null): MonthPnl {
     let worked: number | undefined, total: number | undefined
     if (d.join_date && String(d.join_date).slice(0, 7) === ym) { worked = daysInMonth - (parseInt(String(d.join_date).slice(8, 10), 10) || 1) + 1; total = daysInMonth }
     { const rb = resignBizProration(ym, d.resign_date); if (rb) { worked = rb.worked; total = rb.total } }
-    const b = calcDigSalary(n(d.approved_count), worked, total)
+    const b = calcDigSalary(n(d.approved_count), worked, total, bizDays(ym).total)
     digLabor += b.before + sumAwards(d.awards)
     digFixed += b.base
   }
