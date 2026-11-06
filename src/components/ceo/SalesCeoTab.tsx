@@ -1579,62 +1579,56 @@ export default function SalesCeoTab({ initialView, initialStatusTab, initialSear
       {ceoView === 'customers' && (<>
 
       {/* ── 매출 통계 패널 ── */}
-      <div className="bg-gradient-to-r from-[#1B2A45] to-blue-800 rounded-2xl px-5 py-4 text-white">
-        <p className="text-xs font-bold text-white/60 uppercase tracking-wide mb-3">영업팀 매출 현황</p>
+      <div className="space-y-3">
+        <div>
+          <h2 className="text-[26px] font-black text-[#0b2140] leading-tight">영업팀</h2>
+          <p className="text-[13.5px] text-gray-500 mt-0.5">매출 현황 · {now.getMonth() + 1}월</p>
+        </div>
 
-        {/* 이번달 / 저번달 나란히 */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="bg-white/10 rounded-xl px-4 py-3">
-            <p className="text-[10px] text-white/50 mb-1">이번달 ({now.getMonth() + 1}월)</p>
-            <p className="text-2xl font-black text-[#C5A258]">{fmtWon(thisMonthRevenue)}</p>
-            <p className="text-xs text-white/50 mt-0.5">
+        {/* 이번달 / 저번달 / 누적 */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="rounded-3xl p-5 text-white bg-gradient-to-br from-[#10203a] to-[#0a1424]">
+            <p className="text-[13.5px] text-white/65 font-semibold">이번달 ({now.getMonth() + 1}월) 매출</p>
+            <p className="text-[34px] leading-tight font-black tabular-nums text-[#C5A258]">{fmtWon(thisMonthRevenue)}</p>
+            <p className="text-[12.5px] text-white/55 mt-0.5">
               계약 {thisMonthContractCount % 1 === 0 ? thisMonthContractCount : thisMonthContractCount.toFixed(1)}건
             </p>
           </div>
-          <div className="bg-white/10 rounded-xl px-4 py-3">
-            <p className="text-[10px] text-white/50 mb-1">저번달 ({lastMonthDate.getMonth() + 1}월)</p>
-            <p className="text-2xl font-black text-white/70">{fmtWon(lastMonthRevenue)}</p>
-            <p className="text-xs text-white/50 mt-0.5">
+          <div className="rounded-3xl p-5 bg-white border border-gray-100">
+            <p className="text-[13.5px] text-gray-500 font-semibold">저번달 ({lastMonthDate.getMonth() + 1}월) 매출</p>
+            <p className="text-[34px] leading-tight font-black tabular-nums text-[#0b2140]">{fmtWon(lastMonthRevenue)}</p>
+            <p className="text-[12.5px] text-gray-400 mt-0.5">
               계약 {lastMonthContractCount % 1 === 0 ? lastMonthContractCount : lastMonthContractCount.toFixed(1)}건
             </p>
+          </div>
+          <div className="rounded-3xl p-5 bg-white border border-gray-100">
+            <p className="text-[13.5px] text-gray-500 font-semibold">전체 누적</p>
+            <p className="text-[34px] leading-tight font-black tabular-nums text-[#a8873f]">{fmtWon(totalRevenue)}</p>
+            <p className="text-[12.5px] text-gray-400 mt-0.5">계약 {customers.filter(c => c.status === 'contracted').length}개</p>
           </div>
         </div>
 
         {/* 인별 이번달 매출 */}
         {personThisMonth.length === 0 ? (
-          <p className="text-white/40 text-xs">등록된 영업사원 없음</p>
+          <p className="text-gray-400 text-sm">등록된 영업사원 없음</p>
         ) : (
-          <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {personThisMonth.filter(p => !isDiaryTester(p.name)).map(p => (
-              <div key={p.name} className="bg-white/10 rounded-xl px-3 py-2.5">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-bold">{p.name.charAt(0)}</div>
-                  <span className="text-xs font-semibold text-white/90 truncate">{p.name.replace(' 수석팀장', '')}</span>
+              <div key={p.name} className="bg-white border border-gray-100 rounded-3xl px-4 py-3.5">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="w-6 h-6 rounded-full bg-[#0b2140]/10 text-[#0b2140] flex items-center justify-center text-[11px] font-bold">{p.name.charAt(0)}</div>
+                  <span className="text-[13.5px] font-bold text-[#0b2140] truncate">{p.name.replace(' 수석팀장', '')}</span>
                 </div>
-                <p className="text-base font-black text-[#C5A258]">{fmtWon(p.revenue)}</p>
-                <p className="text-[10px] text-white/40 mt-0.5">계약 {p.count % 1 === 0 ? p.count : p.count.toFixed(1)}건</p>
+                <p className="text-[22px] leading-tight font-black tabular-nums text-[#a8873f]">{fmtWon(p.revenue)}</p>
+                <p className="text-[12.5px] text-gray-500 mt-0.5">계약 {p.count % 1 === 0 ? p.count : p.count.toFixed(1)}건</p>
                 {(p as any).db010 > 0 && (
-                  <p className="text-[10px] text-violet-300 font-semibold mt-0.5">직가 {(p as any).db010}개</p>
+                  <p className="text-[12px] text-violet-600 font-semibold mt-0.5">직가 {(p as any).db010}개</p>
                 )}
-                <div className="mt-0.5 text-[9px] text-white/30 leading-relaxed">
-                  <span>입금 {p.payment > 0 ? fmtWon(p.payment) : '—'}</span>
-                  <span className="mx-0.5 text-white/15">·</span>
-                  <span>매출 {p.revenue > 0 ? fmtWon(p.revenue) : '—'}</span>
-                </div>
+                <p className="mt-0.5 text-[12px] text-gray-400">입금 {p.payment > 0 ? fmtWon(p.payment) : '—'} · 매출 {p.revenue > 0 ? fmtWon(p.revenue) : '—'}</p>
               </div>
             ))}
           </div>
-          </>
         )}
-
-        {/* 전체 합계 (부가 표시) */}
-        <div className="mt-3 pt-3 border-t border-white/10 flex items-center gap-2">
-          <span className="text-[10px] text-white/30">전체 누적</span>
-          <span className="text-xs text-white/40 font-medium">{fmtWon(totalRevenue)}</span>
-          <span className="text-[10px] text-white/20 ml-1">·</span>
-          <span className="text-[10px] text-white/30">계약 {customers.filter(c => c.status === 'contracted').length}개</span>
-        </div>
       </div>
 
       {/* ── 공급 현황 패널 (한경연 vs 자체공급) ── */}

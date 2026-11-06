@@ -58,6 +58,7 @@ export default function DigManageTab() {
   const [salesUsers, setSalesUsers] = useState<SalesUser[]>([])
   const [queue, setQueue] = useState<{ prospect_id: string; assigned_to_name: string; release_at: string }[]>([])
   const [checked, setChecked] = useState<Set<string>>(new Set())
+  const [pChecked, setPChecked] = useState<Set<string>>(new Set())   // 심사 대기 일괄 승인 선택
   const [bulkTarget, setBulkTarget] = useState('')
   const [bulkBusy, setBulkBusy] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -304,6 +305,26 @@ export default function DigManageTab() {
     setBulkBusy(false)
   }
 
+  async function bulkApprove() {
+    if (pChecked.size === 0) { showToast('승인할 건을 체크해주세요', 'error'); return }
+    if (!confirm(`체크한 ${pChecked.size}건을 일괄 승인할까요?`)) return
+    setBulkBusy(true)
+    let ok = 0
+    for (const id of pChecked) {
+      const res = await fetch(`/api/dig-prospects/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve', ceo_comment: commentMap[id] || '' }),
+      })
+      if (res.ok) ok++
+    }
+    const fail = pChecked.size - ok
+    showToast(fail ? `${ok}건 승인, ${fail}건 실패` : `${ok}건 승인 완료`, fail ? 'error' : undefined)
+    setPChecked(new Set())
+    await load()
+    setBulkBusy(false)
+  }
+
   async function assign(id: string, mode: 'schedule' | 'now' = 'schedule') {
     const salesId = assignTarget[id]
     if (!salesId) {
@@ -354,6 +375,13 @@ export default function DigManageTab() {
             <button type="button" onClick={() => { if (confirm('긴급 표시를 뺄까요? (직원이 실수로 누른 경우)')) clearUrgent(p.id) }}
               className="ml-auto bg-white/90 text-red-600 text-[11px] font-bold px-2.5 py-0.5 rounded-full hover:bg-white">긴급 빼기</button>
           </div>
+        )}
+
+        {p.status === 'pending' && (
+          <label className="flex items-center gap-2 px-4 pt-2 text-[11px] text-gray-400 cursor-pointer select-none">
+            <input type="checkbox" checked={pChecked.has(p.id)} onChange={e => setPChecked(prev => { const n = new Set(prev); if (e.target.checked) n.add(p.id); else n.delete(p.id); return n })} className="w-3.5 h-3.5 accent-emerald-600" />
+            일괄 승인에 선택
+          </label>
         )}
 
         {p.status === 'approved' && (() => {
@@ -815,32 +843,47 @@ export default function DigManageTab() {
       )}
 
       {/* 성과 요약 */}
-      <div className="bg-[#1B2A45] rounded-xl px-5 py-4 space-y-4">
-        {/* 이번달 전체 진행률 */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <p className="text-white/50 text-[11px]">{thisMonth} · 이번달 총 목표</p>
-            <p className="text-white text-xs font-bold">{monthTotal} / {MONTHLY_GOAL}건</p>
-          </div>
-          <div className="w-full bg-white/10 rounded-full h-2">
-            <div
-              className={`h-2 rounded-full transition-all ${monthPct >= 100 ? 'bg-emerald-400' : monthPct >= 70 ? 'bg-[#C5A258]' : 'bg-white/40'}`}
-              style={{ width: `${monthPct}%` }}
-            />
-          </div>
-          <p className="text-white/40 text-[10px] mt-1">{monthPct}% 달성 · 남은 목표 {Math.max(0, MONTHLY_GOAL - monthTotal)}건</p>
+          <h2 className="text-[26px] font-black text-[#0b2140] leading-tight">발굴팀</h2>
+          <p className="text-[13.5px] text-gray-500 mt-0.5">심사 · 승인 현황 · {thisMonth}</p>
         </div>
+      </div>
 
+      {/* 핵심 숫자 */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="rounded-3xl p-5 text-white bg-gradient-to-br from-[#10203a] to-[#0a1424]">
+          <p className="text-[13.5px] text-white/65 font-semibold">이번달 승인 / 목표</p>
+          <p className="text-[34px] leading-tight font-black tabular-nums">{monthTotal}<span className="text-[16px] text-white/50 font-semibold"> / {MONTHLY_GOAL}건</span></p>
+          <div className="w-full bg-white/15 rounded-full h-1.5 mt-2">
+            <div className={`h-1.5 rounded-full transition-all ${monthPct >= 100 ? 'bg-emerald-400' : 'bg-[#C5A258]'}`} style={{ width: `${Math.min(100, monthPct)}%` }} />
+          </div>
+          <p className="text-[12.5px] text-white/55 mt-1.5">{monthPct}% 달성 · 남은 목표 {Math.max(0, MONTHLY_GOAL - monthTotal)}건</p>
+        </div>
+        <div className="rounded-3xl p-5 bg-white border border-gray-100">
+          <p className="text-[13.5px] text-gray-500 font-semibold">심사 대기</p>
+          <p className="text-[34px] leading-tight font-black tabular-nums text-[#a8873f]">{pendingList.length}<span className="text-[16px] text-gray-400 font-semibold"> 건</span></p>
+          <p className="text-[12.5px] text-gray-400 mt-0.5">배정 대기 {approvedList.length}건</p>
+        </div>
+        <div className="rounded-3xl p-5 bg-white border border-gray-100">
+          <p className="text-[13.5px] text-gray-500 font-semibold">오늘 승인</p>
+          <p className="text-[34px] leading-tight font-black tabular-nums text-[#0b2140]">{Object.values(byUser).reduce((s, i) => s + i.count, 0)}<span className="text-[16px] text-gray-400 font-semibold"> 건</span></p>
+          <p className="text-[12.5px] text-gray-400 mt-0.5">{today} · 1인 일 목표 {DAILY_GOAL}건</p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-3xl border border-gray-100 p-5 space-y-5">
         {/* 직원별 이번 달 통계 */}
         <div>
-          <p className="text-white/40 text-[10px] mb-2">직원별 이번 달 통계 · 1인 목표 {MONTHLY_GOAL}건 (영업일 {monthBiz}일 × {DAILY_GOAL}건) · {MONTHLY_GOAL + 1}건부터 1건당 1만원 인센</p>
+          <p className="text-[14px] font-black text-[#0b2140]">직원별 이번 달 통계</p>
+          <p className="text-[12.5px] text-gray-400 mb-3">1인 목표 {MONTHLY_GOAL}건 (영업일 {monthBiz}일 × {DAILY_GOAL}건) · {MONTHLY_GOAL + 1}건부터 1건당 1만원 인센</p>
           {statRows.length === 0 ? (
-            <p className="text-white/30 text-xs">이번 달 접수된 가망이 없습니다</p>
+            <p className="text-gray-400 text-sm">이번 달 접수된 가망이 없습니다</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-[11px] text-white/80 min-w-[640px]">
+              <table className="w-full text-[13px] text-gray-700 min-w-[640px]">
                 <thead>
-                  <tr className="text-white/40 text-[10px] text-right">
+                  <tr className="text-gray-400 text-[12px] text-right">
                     <th className="text-left font-normal pb-1">직원</th>
                     <th className="font-normal pb-1">접수</th>
                     <th className="font-normal pb-1">승인</th>
@@ -860,39 +903,39 @@ export default function DigManageTab() {
                     const bonus = Math.max(0, r.approved - MONTHLY_GOAL) * 10000
                     const na = needsAvg(r)
                     return (
-                      <tr key={r.id} className="text-right border-t border-white/10">
-                        <td className="text-left py-1.5 font-bold text-white">{r.name}{bestNeeds?.id === r.id ? ' ⭐' : ''}</td>
+                      <tr key={r.id} className="text-right border-t border-gray-100">
+                        <td className="text-left py-2.5 font-bold text-[#0b2140]">{r.name}{bestNeeds?.id === r.id ? ' ⭐' : ''}</td>
                         <td>{r.submitted}</td>
-                        <td className="text-emerald-300 font-bold">{r.approved}</td>
-                        <td className={r.rejected > 0 ? 'text-red-300 font-bold' : ''}>{r.rejected}</td>
+                        <td className="text-emerald-600 font-bold">{r.approved}</td>
+                        <td className={r.rejected > 0 ? 'text-red-500 font-bold' : ''}>{r.rejected}</td>
                         <td>{r.pending}</td>
-                        <td>{r.approved}/{MONTHLY_GOAL} <span className="text-white/40">({Math.round((r.approved / MONTHLY_GOAL) * 100)}%)</span></td>
+                        <td>{r.approved}/{MONTHLY_GOAL} <span className="text-gray-400">({Math.round((r.approved / MONTHLY_GOAL) * 100)}%)</span></td>
                         <td>{rate === null ? '-' : `${rate}%`}</td>
                         <td>{r.needs.상}/{r.needs.중}/{r.needs.하}</td>
-                        <td className={na >= 2.3 ? 'text-emerald-300 font-bold' : na > 0 && na < 1.7 ? 'text-red-300' : ''}>{na ? na.toFixed(1) : '-'}</td>
+                        <td className={na >= 2.3 ? 'text-emerald-600 font-bold' : na > 0 && na < 1.7 ? 'text-red-500' : ''}>{na ? na.toFixed(1) : '-'}</td>
                         <td>{r.scoreN ? Math.round(r.scoreSum / r.scoreN) : '-'}</td>
-                        <td className="text-[#C5A258]">{bonus > 0 ? `+${bonus.toLocaleString()}원` : '-'}</td>
+                        <td className="text-[#a8873f] font-bold">{bonus > 0 ? `+${bonus.toLocaleString()}원` : '-'}</td>
                       </tr>
                     )
                   })}
                 </tbody>
               </table>
-              <p className="text-white/30 text-[10px] mt-1.5">니즈 점수 = 상 3 · 중 2 · 하 1 평균 (⭐ = 접수 3건 이상 중 니즈가 가장 좋은 직원) · 승인율 = 승인 ÷ (승인+부결)</p>
+              <p className="text-gray-400 text-[12px] mt-2">니즈 점수 = 상 3 · 중 2 · 하 1 평균 (⭐ = 접수 3건 이상 중 니즈가 가장 좋은 직원) · 승인율 = 승인 ÷ (승인+부결)</p>
             </div>
           )}
         </div>
 
         {/* 오늘 현황 */}
         <div>
-          <p className="text-white/40 text-[10px] mb-2">오늘 {today} · 일별 목표 {DAILY_GOAL}건</p>
+          <p className="text-[14px] font-black text-[#0b2140] mb-2">오늘 현황 <span className="text-[12.5px] font-medium text-gray-400">{today} · 일별 목표 {DAILY_GOAL}건</span></p>
           {Object.keys(byUser).length === 0 ? (
-            <p className="text-white/30 text-xs">오늘 승인된 가망이 없습니다</p>
+            <p className="text-gray-400 text-sm">오늘 승인된 가망이 없습니다</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {Object.entries(byUser).map(([uid, info]) => (
-                <div key={uid} className="bg-white/10 rounded-lg px-3 py-1.5">
-                  <p className="text-white text-xs font-bold">{info.name}</p>
-                  <p className="text-white/60 text-[11px]">오늘 {info.count}건 / {DAILY_GOAL}건</p>
+                <div key={uid} className="bg-gray-50 border border-gray-100 rounded-2xl px-4 py-2">
+                  <p className="text-[#0b2140] text-[13.5px] font-bold">{info.name}</p>
+                  <p className="text-gray-500 text-[12.5px]">오늘 {info.count}건 / {DAILY_GOAL}건</p>
                 </div>
               ))}
             </div>
@@ -901,16 +944,16 @@ export default function DigManageTab() {
       </div>
 
       {/* 뷰 탭 */}
-      <div className="flex bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="flex gap-2 flex-wrap items-center">
         {([
-          { key: 'pending',  label: '심사 대기', activeCls: 'bg-amber-500 text-white' },
-          { key: 'approved', label: `승인됨 (미배정 ${approvedList.length} / 배정완료 ${assignedList.length})`, activeCls: 'bg-emerald-500 text-white' },
-          { key: 'rejected', label: '거절됨',    activeCls: 'bg-red-500 text-white' },
+          { key: 'pending',  label: '심사 대기', activeCls: '' },
+          { key: 'approved', label: `승인됨 (미배정 ${approvedList.length} / 배정완료 ${assignedList.length})`, activeCls: '' },
+          { key: 'rejected', label: '거절됨',    activeCls: '' },
         ] as const).map(t => (
           <button key={t.key}
             onClick={() => setViewTab(t.key)}
-            className={`flex-1 py-2.5 text-xs font-semibold transition-colors relative ${
-              viewTab === t.key ? t.activeCls : 'text-gray-500 hover:bg-gray-50'
+            className={`text-[14px] px-4 py-2.5 rounded-full font-bold transition-all relative ${
+              viewTab === t.key ? 'bg-gradient-to-r from-[#0b2140] to-[#4a5a9a] text-white shadow-[0_8px_18px_-8px_rgba(11,33,64,.7)]' : 'bg-white text-gray-600 border border-gray-200 hover:border-[#b8995a]'
             }`}>
             {t.label}
             {t.key !== 'approved' && counts[t.key] > 0 && (
@@ -987,6 +1030,17 @@ export default function DigManageTab() {
         </div>
       ) : (
         <div className="space-y-3">
+          {viewTab === 'pending' && (
+            <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 flex flex-wrap items-center gap-2">
+              <button type="button" className="text-[11px] px-2.5 py-1 rounded-lg bg-gray-100 text-gray-600 font-semibold"
+                onClick={() => setPChecked(prev => prev.size >= pendingList.length ? new Set() : new Set(pendingList.map(p => p.id)))}>
+                전체 선택/해제
+              </button>
+              <span className="text-[11px] text-gray-500">선택 <b className="text-[#1B2A45]">{pChecked.size}</b>건</span>
+              <button type="button" disabled={bulkBusy || pChecked.size === 0} onClick={bulkApprove}
+                className="text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-600 text-white disabled:opacity-40">✅ 선택 건 일괄 승인</button>
+            </div>
+          )}
           {filtered.map(p => renderCard(p))}
         </div>
       )}
