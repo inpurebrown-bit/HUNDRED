@@ -19,6 +19,12 @@ export function nextReleaseAt(): string {
   const hh = String(RELEASE_HOUR_KST).padStart(2, '0')
   let target = new Date(`${day}T${hh}:00:00+09:00`)
   if (target.getTime() <= Date.now()) target = new Date(target.getTime() + 24 * 3600 * 1000)
+  // 주말에는 넣지 않는다 — 금요일 저녁에 예약하면 월요일 아침에 들어간다
+  for (let i = 0; i < 3; i++) {
+    const dow = new Date(target.getTime() + 9 * 3600 * 1000).getUTCDay()
+    if (dow !== 0 && dow !== 6) break
+    target = new Date(target.getTime() + 24 * 3600 * 1000)
+  }
   return target.toISOString()
 }
 

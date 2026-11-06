@@ -282,7 +282,8 @@ export default function DigManageTab() {
     const k = new Date(d.getTime() + 9 * 3600 * 1000)
     const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
     const day = k.toISOString().slice(0, 10)
-    return `${day === today ? '오늘' : day.slice(5).replace('-', '/')} ${String(k.getUTCHours()).padStart(2, '0')}:00`
+    const wd = '일월화수목금토'[k.getUTCDay()]
+    return `${day === today ? '오늘' : day.slice(5).replace('-', '/') + '(' + wd + ')'} ${String(k.getUTCHours()).padStart(2, '0')}:00`
   }
 
   async function cancelQueued(id: string) {

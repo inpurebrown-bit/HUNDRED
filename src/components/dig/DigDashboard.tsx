@@ -181,7 +181,9 @@ const SCRIPT_COLOR: Record<string, { header: string; border: string }> = {
 
 const pad2 = (n: number) => String(n).padStart(2, '0')
 const localDate = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
-const tomorrowDate = () => { const d = new Date(); d.setDate(d.getDate() + 1); return localDate(d) }
+// 내일이 주말이면 월요일 (주말에는 영업팀 배정·통화가 없다)
+const tomorrowDate = () => { const d = new Date(); d.setDate(d.getDate() + 1); while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1); return localDate(d) }
+const tomorrowLabel = () => { const d = new Date(); d.setDate(d.getDate() + 1); return d.getDay() === 0 || d.getDay() === 6 ? '월요일' : '내일' }
 const nowLocalMin = () => { const d = new Date(); return `${localDate(d)}T${pad2(d.getHours())}:${pad2(d.getMinutes())}` }
 const callTimeInPast = (v: string) => { const t = new Date(v).getTime(); return !isNaN(t) && t < Date.now() }
 
@@ -1125,11 +1127,11 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                       <button type="button" onClick={() => { setCallTomorrow(false) }}
                         className={`px-3 py-1 rounded-lg text-xs font-bold border ${!callTomorrow ? 'bg-[#1B2A45] text-white border-[#1B2A45]' : 'bg-white text-gray-500 border-gray-200'}`}>날짜 선택</button>
                       <button type="button" onClick={() => { setCallTomorrow(true); setForm(p => ({ ...p, preferred_call_time: `${tomorrowDate()}T${p.preferred_call_time.slice(11, 16) || '10:00'}` })) }}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold border ${callTomorrow ? 'bg-[#1B2A45] text-white border-[#1B2A45]' : 'bg-white text-gray-500 border-gray-200'}`}>내일</button>
+                        className={`px-3 py-1 rounded-lg text-xs font-bold border ${callTomorrow ? 'bg-[#1B2A45] text-white border-[#1B2A45]' : 'bg-white text-gray-500 border-gray-200'}`}>{tomorrowLabel()}</button>
                     </div>
                     {callTomorrow ? (
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-[#1B2A45] shrink-0">내일 ({tomorrowDate().slice(5).replace('-', '/')})</span>
+                        <span className="text-sm font-bold text-[#1B2A45] shrink-0">{tomorrowLabel()} ({tomorrowDate().slice(5).replace('-', '/')})</span>
                         <input
                           type="time"
                           value={form.preferred_call_time.slice(11, 16)}
