@@ -1725,7 +1725,7 @@ function EmployeeManageSection({ onResigned }: { onResigned?: () => void } = {})
       const psRes = await fetch('/api/payslip-settings')
       if (psRes.ok) {
         const psData = await psRes.json()
-        const employees: any[] = psData.record?.employees || []
+        const employees: any[] = psData.settings?.employees || []
         const idx = employees.findIndex((e: any) => e.user_id === emp.id || e.name === emp.name)
         if (idx >= 0) {
           const updated = employees.map((e: any, i: number) => i === idx ? { ...e, resign_date: dateToUse } : e)

@@ -132,6 +132,7 @@ export function calcRefundDeductions(customers: any[], yearMonth: string): Refun
 export const DIG_BASE_SALARY     = 2_100_000  // 기본급 (월)
 export const DIG_DAILY_GOAL      = 8          // 무인센 기준
 export const DIG_BONUS_PER_EXTRA = 10_000     // 초과 1건당 인센
+export const DIG_HOURLY_BASE     = 1_400_000  // 시급 기준 보수 (기본급 210만 = 이 금액 + 만근수당 70만)
 
 /** 발굴팀 월 급여 계산
  *  @param approvedCount  해당 월 승인 건수
@@ -143,10 +144,13 @@ export function calcDigSalary(
   workedDays?: number,
   totalDays?: number,
   monthBizDays?: number,   // 그 달 영업일 수 — 월 목표 = 영업일 × 일 8건, 초과분부터 1건당 인센
+  resigned?: boolean,      // 퇴사월 — 만근수당(70만)이 없으니 시급 기준 140만만 영업일로 일할 (10원 미만 절사)
 ): { base: number; incentive: number; total: number; before: number; after: number } {
   const ratio = (workedDays != null && totalDays && totalDays > 0)
     ? workedDays / totalDays : 1
-  const base      = Math.round(DIG_BASE_SALARY * ratio)
+  const base      = resigned
+    ? Math.floor(DIG_HOURLY_BASE * ratio / 10) * 10
+    : Math.round(DIG_BASE_SALARY * ratio)
   const monthGoal = Math.round((monthBizDays && monthBizDays > 0 ? monthBizDays : 1) * DIG_DAILY_GOAL * ratio)
   const extraCnt  = Math.max(0, approvedCount - monthGoal)
   const incentive = extraCnt * DIG_BONUS_PER_EXTRA

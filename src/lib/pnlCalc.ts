@@ -73,8 +73,9 @@ export function calcMonthPnl(ym: string, employees: any | null): MonthPnl {
   for (const d of dig) {
     let worked: number | undefined, total: number | undefined
     if (d.join_date && String(d.join_date).slice(0, 7) === ym) { worked = daysInMonth - (parseInt(String(d.join_date).slice(8, 10), 10) || 1) + 1; total = daysInMonth }
-    { const rb = resignBizProration(ym, d.resign_date); if (rb) { worked = rb.worked; total = rb.total } }
-    const b = calcDigSalary(n(d.approved_count), worked, total, bizDays(ym).total)
+    let resigned = false
+    { const rb = resignBizProration(ym, d.resign_date); if (rb) { worked = rb.worked; total = rb.total; resigned = true } }
+    const b = calcDigSalary(n(d.approved_count), worked, total, bizDays(ym).total, resigned)
     digLabor += b.before + sumAwards(d.awards)
     digFixed += b.base
   }

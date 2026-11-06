@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { isTester } from '@/lib/tester'
 import { bizDays } from '@/lib/digStats'
-import { calcWithholding, calcSalesStructure, resignBizProration, SALES_BASE_PAY, SALES_BASE_RATE, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, calcMonthlySubBonus, calcRefundDeductions, calcDigSalary, DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
+import { calcWithholding, calcSalesStructure, resignBizProration, SALES_BASE_PAY, SALES_BASE_RATE, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, calcMonthlySubBonus, calcRefundDeductions, calcDigSalary, DIG_BASE_SALARY, DIG_HOURLY_BASE, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
 import { contractWeight } from '@/lib/supplyRules'
 
 // ─── 타입 ─────────────────────────────────────────────────
@@ -111,7 +111,7 @@ function calcDig(e: DigEmployee, yearMonth: string) {
     workedDays = rb.worked
     totalDays  = rb.total
   }
-  const base = calcDigSalary(e.approved_count, workedDays, totalDays, bizDays(yearMonth).total)
+  const base = calcDigSalary(e.approved_count, workedDays, totalDays, bizDays(yearMonth).total, !!rb)
   const awardsSum = (e.awards || []).reduce((s, a) => s + Number(a.amount || 0), 0)
   const before = base.before + awardsSum
   const after  = calcWithholding(before).after
@@ -463,7 +463,9 @@ function DigCard({
         </div>
       </div>
       <div className="px-4 py-3 space-y-0">
-        <PayRow label={`기본급 (${DIG_BASE_SALARY.toLocaleString('ko-KR')}원)`} value={c.base} autoTag />
+        <PayRow label={emp.resign_date && emp.resign_date.slice(0, 7) === yearMonth
+          ? `기본급 시급분 ${DIG_HOURLY_BASE.toLocaleString('ko-KR')}원 일할 (퇴사 ${emp.resign_date.slice(5).replace('-', '/')}, 만근수당 제외)`
+          : `기본급 (${DIG_BASE_SALARY.toLocaleString('ko-KR')}원)`} value={c.base} autoTag />
         <div className="flex items-center justify-between py-1.5 border-b border-gray-50">
           <span className="text-xs text-gray-400">이달 승인 건수</span>
           <input
@@ -982,8 +984,22 @@ export default function PayrollTab() {
         setDigEmps(newDigEmps)
       } catch { /* 발굴팀 로드 실패해도 계속 */ }
 
+      // 직원관리에서 퇴사 처리한 사람의 퇴사일을 급여에도 반영 → 퇴사월 일할이 자동으로 굳는다
+      let finalSales = newSalesEmps
+      try {
+        const psRes = await fetch('/api/payslip-settings')
+        const psEmps: any[] = psRes.ok ? ((await psRes.json()).settings?.employees || []) : []
+        const resignOf = (name: string) => {
+          const hit = psEmps.find(p => p.resign_date && p.name && (p.name === name || name.includes(p.name) || p.name.includes(name)))
+          return hit ? String(hit.resign_date) : ''
+        }
+        finalSales = newSalesEmps.map(e => { const d = e.name && !e.resign_date ? resignOf(e.name) : ''; return d ? { ...e, resign_date: d } : e })
+        newDigEmps = newDigEmps.map(e => { const d = e.name && !e.resign_date ? resignOf(e.name) : ''; return d ? { ...e, resign_date: d } : e })
+        setSalesEmps(finalSales); setDigEmps(newDigEmps)
+      } catch { /* 퇴사일 동기화 실패해도 계속 */ }
+
       // 자동저장
-      await doSave(newOpsEmps, newSalesEmps, newCosts, newRevTotals, undefined, newDigEmps)
+      await doSave(newOpsEmps, finalSales, newCosts, newRevTotals, undefined, newDigEmps)
 
       const ts = nowTimestamp()
       setLastUpdated(ts)
