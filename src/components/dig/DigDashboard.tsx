@@ -472,10 +472,19 @@ export default function DigDashboard({ userId, userName, username }: Props) {
         const contentType = (it.file.type && it.file.type !== 'audio/x-m4a') ? it.file.type : (mimeMap[ext] || 'audio/mpeg')
         const putRes = await fetch(signData.signedUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: it.file })
         if (!putRes.ok) throw new Error(`스토리지 업로드 실패 (${putRes.status})`)
-        patch(it.id, { url: signData.publicUrl })
+        // 통화녹음기 wav 는 GSM 같은 압축 형식이라 브라우저에서 재생이 안 된다 → 서버에서 일반 wav 로 변환
+        let finalUrl: string = signData.publicUrl
+        if (ext === 'wav') {
+          try {
+            const cv = await fetch('/api/convert-recording', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: signData.path }) })
+            const cj = await cv.json()
+            if (cv.ok && cj.url) finalUrl = cj.url
+          } catch { /* 변환 실패해도 원본으로 계속 (분석은 가능) */ }
+        }
+        patch(it.id, { url: finalUrl })
 
         // 2단계: URL로 AI 분석 요청 — 실패해도 조용히 넘기지 않고 재시도, 끝내 실패하면 '실패'로 표시해 제출을 막는다
-        const analysis = await analyzeWithRetry(signData.publicUrl, it.file.name)
+        const analysis = await analyzeWithRetry(finalUrl, it.file.name)
         if (analysis) patch(it.id, { analysis, status: 'done' })
         else { patch(it.id, { status: 'fail' }); showToast(`${it.file.name}: AI 분석 실패 — '다시 분석'을 눌러주세요`, 'error') }
       } catch (err: any) {

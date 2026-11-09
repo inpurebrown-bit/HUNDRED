@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { ensurePlayableWav } from '@/lib/recordingConvert'
 
 // POST: 녹취 파일 Supabase Storage 업로드
 export async function POST(req: NextRequest) {
@@ -57,6 +58,13 @@ export async function POST(req: NextRequest) {
       .from('dig-recordings')
       .getPublicUrl(data.path)
 
+    // GSM 등 브라우저가 재생 못 하는 wav 는 일반 wav 로 변환
+    if (ext === 'wav') {
+      try {
+        const pl = await ensurePlayableWav(data.path)
+        return NextResponse.json({ url: pl.url, path: pl.path, filename: file.name })
+      } catch { /* 변환 실패 시 원본 */ }
+    }
     return NextResponse.json({ url: publicUrl, path: data.path, filename: file.name })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
