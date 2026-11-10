@@ -202,6 +202,15 @@ export default function DigManageTab() {
     const sc = Number(p.recording_analysis?.overall_score)
     if (!isNaN(sc) && p.recording_analysis?.overall_score != null) { s.scoreSum += sc; s.scoreN++ }
   })
+  // 오늘 현황 — 직원별 오늘 접수한 건의 승인·대기·부결
+  const todayMap: Record<string, { submitted: number; approved: number; rejected: number; pending: number }> = {}
+  prospects.filter(p => p.call_date === today).forEach(p => {
+    const t = todayMap[p.dig_user_id] || (todayMap[p.dig_user_id] = { submitted: 0, approved: 0, rejected: 0, pending: 0 })
+    t.submitted++
+    if (p.status === 'approved' || p.status === 'assigned') t.approved++
+    else if (p.status === 'rejected') t.rejected++
+    else t.pending++
+  })
   // 니즈 점수: 상 3 · 중 2 · 하 1 평균 (높을수록 좋은 가망을 따오는 사람)
   const needsAvg = (s: { needs: { 상: number; 중: number; 하: number } }) => {
     const n = s.needs.상 + s.needs.중 + s.needs.하
@@ -865,100 +874,129 @@ export default function DigManageTab() {
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl border border-gray-100 p-5 space-y-5">
-        {/* 직원별 이번 달 통계 */}
+      {/* 직원별 이번 달 통계 */}
+      <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 space-y-6">
         <div>
-          <p className="text-[14px] font-black text-[#0b2140]">직원별 이번 달 통계</p>
-          <p className="text-[12.5px] text-gray-400 mb-3">1인 목표 {MONTHLY_GOAL}건 (영업일 {monthBiz}일 × {DAILY_GOAL}건) · {MONTHLY_GOAL + 1}건부터 1건당 1만원 인센</p>
+          <p className="text-[16px] font-black text-[#0b2140]">직원별 이번 달 통계</p>
+          <p className="text-[13px] text-gray-400 mt-0.5 mb-4">1인 목표 {MONTHLY_GOAL}건 (영업일 {monthBiz}일 × {DAILY_GOAL}건) · {MONTHLY_GOAL + 1}건부터 1건당 1만원 인센</p>
           {statRows.length === 0 ? (
             <p className="text-gray-400 text-sm">이번 달 접수된 가망이 없습니다</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-[13px] text-gray-700 min-w-[640px]">
-                <thead>
-                  <tr className="text-gray-400 text-[12px] text-right">
-                    <th className="text-left font-normal pb-1">직원</th>
-                    <th className="font-normal pb-1">접수</th>
-                    <th className="font-normal pb-1">승인</th>
-                    <th className="font-normal pb-1">부결</th>
-                    <th className="font-normal pb-1">대기</th>
-                    <th className="font-normal pb-1">목표 달성</th>
-                    <th className="font-normal pb-1">승인율</th>
-                    <th className="font-normal pb-1">니즈 상/중/하</th>
-                    <th className="font-normal pb-1">니즈 점수</th>
-                    <th className="font-normal pb-1">AI 평균</th>
-                    <th className="font-normal pb-1">인센</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {statRows.map(r => {
-                    const rate = r.approved + r.rejected > 0 ? Math.round((r.approved / (r.approved + r.rejected)) * 100) : null
-                    const bonus = Math.max(0, r.approved - MONTHLY_GOAL) * 10000
-                    const na = needsAvg(r)
-                    return (
-                      <tr key={r.id} className="text-right border-t border-gray-100">
-                        <td className="text-left py-2.5 font-bold text-[#0b2140]">{r.name}{bestNeeds?.id === r.id ? ' ⭐' : ''}</td>
-                        <td>{r.submitted}</td>
-                        <td className="text-emerald-600 font-bold">{r.approved}</td>
-                        <td className={r.rejected > 0 ? 'text-red-500 font-bold' : ''}>{r.rejected}</td>
-                        <td>{r.pending}</td>
-                        <td>{r.approved}/{MONTHLY_GOAL} <span className="text-gray-400">({Math.round((r.approved / MONTHLY_GOAL) * 100)}%)</span></td>
-                        <td>{rate === null ? '-' : `${rate}%`}</td>
-                        <td>{r.needs.상}/{r.needs.중}/{r.needs.하}</td>
-                        <td className={na >= 2.3 ? 'text-emerald-600 font-bold' : na > 0 && na < 1.7 ? 'text-red-500' : ''}>{na ? na.toFixed(1) : '-'}</td>
-                        <td>{r.scoreN ? Math.round(r.scoreSum / r.scoreN) : '-'}</td>
-                        <td className="text-[#a8873f] font-bold">{bonus > 0 ? `+${bonus.toLocaleString()}원` : '-'}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-              <p className="text-gray-400 text-[12px] mt-2">니즈 점수 = 상 3 · 중 2 · 하 1 평균 (⭐ = 접수 3건 이상 중 니즈가 가장 좋은 직원) · 승인율 = 승인 ÷ (승인+부결)</p>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {statRows.map(r => {
+                const rate = r.approved + r.rejected > 0 ? Math.round((r.approved / (r.approved + r.rejected)) * 100) : null
+                const bonus = Math.max(0, r.approved - MONTHLY_GOAL) * 10000
+                const na = needsAvg(r)
+                const pct = Math.min(100, Math.round((r.approved / MONTHLY_GOAL) * 100))
+                const left = Math.max(0, MONTHLY_GOAL - r.approved)
+                return (
+                  <div key={r.id} className="rounded-2xl border border-gray-100 bg-[#FAF9F6] p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-[17px] font-black text-[#0b2140]">{r.name}{bestNeeds?.id === r.id ? ' ⭐' : ''}</p>
+                      <div className="text-right">
+                        <p className="text-[26px] leading-none font-black tabular-nums text-[#0b2140]">{r.approved}<span className="text-[14px] text-gray-400 font-semibold"> / {MONTHLY_GOAL}건</span></p>
+                        <p className="text-[12.5px] text-gray-500 mt-1">{pct}% 달성</p>
+                      </div>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
+                      <div className={`h-2 rounded-full ${pct >= 100 ? 'bg-emerald-500' : 'bg-[#C5A258]'}`} style={{ width: `${pct}%` }} />
+                    </div>
+                    <p className="text-[13.5px] font-bold mt-2 text-[#a8873f]">{left > 0 ? `목표까지 ${left}건 더 필요` : '🎉 목표 달성'}</p>
+
+                    <div className="grid grid-cols-4 gap-2 mt-3">
+                      {[
+                        { l: '접수', v: r.submitted, c: 'text-[#0b2140]' },
+                        { l: '승인', v: r.approved, c: 'text-emerald-600' },
+                        { l: '부결', v: r.rejected, c: r.rejected > 0 ? 'text-red-500' : 'text-gray-400' },
+                        { l: '대기', v: r.pending, c: r.pending > 0 ? 'text-amber-600' : 'text-gray-400' },
+                      ].map(x => (
+                        <div key={x.l} className="bg-white rounded-xl border border-gray-100 py-2 text-center">
+                          <p className="text-[12px] text-gray-400">{x.l}</p>
+                          <p className={`text-[20px] font-black tabular-nums ${x.c}`}>{x.v}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-[13px] text-gray-600">
+                      <span>승인율 <b className="text-[#0b2140]">{rate === null ? '-' : `${rate}%`}</b></span>
+                      <span>니즈 <b className="text-red-500">상 {r.needs.상}</b> · <b className="text-orange-500">중 {r.needs.중}</b> · <b className="text-blue-500">하 {r.needs.하}</b></span>
+                      <span>니즈 점수 <b className={na >= 2.3 ? 'text-emerald-600' : na > 0 && na < 1.7 ? 'text-red-500' : 'text-[#0b2140]'}>{na ? na.toFixed(1) : '-'}</b></span>
+                      <span>AI 평균 <b className="text-[#0b2140]">{r.scoreN ? Math.round(r.scoreSum / r.scoreN) : '-'}</b></span>
+                      <span>인센 <b className="text-[#a8873f]">{bonus > 0 ? `+${bonus.toLocaleString()}원` : '-'}</b></span>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
+          <p className="text-gray-400 text-[12px] mt-3">니즈 점수 = 상 3 · 중 2 · 하 1 평균 (⭐ = 접수 3건 이상 중 니즈가 가장 좋은 직원) · 승인율 = 승인 ÷ (승인+부결)</p>
         </div>
 
         {/* 오늘 현황 */}
         <div>
-          <p className="text-[14px] font-black text-[#0b2140] mb-2">오늘 현황 <span className="text-[12.5px] font-medium text-gray-400">{today} · 일별 목표 {DAILY_GOAL}건</span></p>
-          {Object.keys(byUser).length === 0 ? (
-            <p className="text-gray-400 text-sm">오늘 승인된 가망이 없습니다</p>
+          <p className="text-[16px] font-black text-[#0b2140] mb-3">오늘 현황 <span className="text-[13px] font-medium text-gray-400">{today} · 1인 일 목표 {DAILY_GOAL}건</span></p>
+          {statRows.length === 0 ? (
+            <p className="text-gray-400 text-sm">오늘 접수된 가망이 없습니다</p>
           ) : (
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(byUser).map(([uid, info]) => (
-                <div key={uid} className="bg-gray-50 border border-gray-100 rounded-2xl px-4 py-2">
-                  <p className="text-[#0b2140] text-[13.5px] font-bold">{info.name}</p>
-                  <p className="text-gray-500 text-[12.5px]">오늘 {info.count}건 / {DAILY_GOAL}건</p>
-                </div>
-              ))}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {statRows.map(r => {
+                const t = todayMap[r.id] || { submitted: 0, approved: 0, rejected: 0, pending: 0 }
+                const pct = Math.min(100, Math.round((t.approved / DAILY_GOAL) * 100))
+                const left = Math.max(0, DAILY_GOAL - t.approved)
+                return (
+                  <div key={r.id} className="rounded-2xl border border-gray-100 bg-[#FAF9F6] p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-[17px] font-black text-[#0b2140]">{r.name}</p>
+                      <p className="text-[24px] leading-none font-black tabular-nums text-[#0b2140]">{t.approved}<span className="text-[14px] text-gray-400 font-semibold"> / {DAILY_GOAL}건</span></p>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
+                      <div className={`h-2 rounded-full ${pct >= 100 ? 'bg-emerald-500' : 'bg-[#C5A258]'}`} style={{ width: `${pct}%` }} />
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 mt-3">
+                      <div className="bg-white rounded-xl border border-emerald-100 py-2 text-center">
+                        <p className="text-[12px] text-emerald-600 font-semibold">승인</p>
+                        <p className="text-[20px] font-black tabular-nums text-emerald-600">{t.approved}</p>
+                      </div>
+                      <div className="bg-white rounded-xl border border-amber-100 py-2 text-center">
+                        <p className="text-[12px] text-amber-600 font-semibold">대기</p>
+                        <p className="text-[20px] font-black tabular-nums text-amber-600">{t.pending}</p>
+                      </div>
+                      <div className="bg-white rounded-xl border border-red-100 py-2 text-center">
+                        <p className="text-[12px] text-red-500 font-semibold">불가</p>
+                        <p className="text-[20px] font-black tabular-nums text-red-500">{t.rejected}</p>
+                      </div>
+                      <div className="bg-[#0b2140] rounded-xl py-2 text-center">
+                        <p className="text-[12px] text-white/70 font-semibold">목표까지</p>
+                        <p className="text-[20px] font-black tabular-nums text-white">{left > 0 ? `${left}건` : '달성'}</p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
       </div>
 
-      {/* 뷰 탭 */}
-      <div className="flex gap-2 flex-wrap items-center">
+      {/* 뷰 탭 — 큰 카드형 */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {([
-          { key: 'pending',  label: '심사 대기', activeCls: '' },
-          { key: 'approved', label: `승인됨 (미배정 ${approvedList.length} / 배정완료 ${assignedList.length})`, activeCls: '' },
-          { key: 'rejected', label: '거절됨',    activeCls: '' },
+          { key: 'pending',  title: '심사 대기', big: String(counts.pending), unit: '건', sub: '대표 확인이 필요한 가망' },
+          { key: 'approved', title: '승인됨',    big: String(counts.approved), unit: '건', sub: `미배정 ${approvedList.length} · 배정완료 ${assignedList.length}` },
+          { key: 'rejected', title: '거절됨',    big: String(counts.rejected), unit: '건', sub: '부결 처리된 가망' },
         ] as const).map(t => (
           <button key={t.key}
             onClick={() => setViewTab(t.key)}
-            className={`text-[14px] px-4 py-2.5 rounded-full font-bold transition-all relative ${
-              viewTab === t.key ? 'bg-gradient-to-r from-[#0b2140] to-[#4a5a9a] text-white shadow-[0_8px_18px_-8px_rgba(11,33,64,.7)]' : 'bg-white text-gray-600 border border-gray-200 hover:border-[#b8995a]'
+            className={`relative text-left rounded-3xl px-5 py-4 transition-all border-2 ${
+              viewTab === t.key
+                ? 'bg-gradient-to-br from-[#10203a] to-[#0a1424] border-[#C5A258] text-white shadow-[0_10px_22px_-10px_rgba(11,33,64,.8)]'
+                : 'bg-white border-gray-200 text-[#0b2140] hover:border-[#b8995a]'
             }`}>
-            {t.label}
-            {t.key !== 'approved' && counts[t.key] > 0 && (
-              <span className={`ml-1 ${viewTab === t.key ? 'text-white/80' : 'text-gray-400'}`}>
-                ({counts[t.key]})
-              </span>
-            )}
-            {/* 긴급 뱃지 */}
+            <p className={`text-[15px] font-black ${viewTab === t.key ? 'text-[#E3C781]' : 'text-gray-600'}`}>{t.title}</p>
+            <p className="text-[34px] leading-tight font-black tabular-nums">{t.big}<span className={`text-[16px] font-semibold ${viewTab === t.key ? 'text-white/60' : 'text-gray-400'}`}> {t.unit}</span></p>
+            <p className={`text-[13px] ${viewTab === t.key ? 'text-white/70' : 'text-gray-400'}`}>{t.sub}</p>
             {t.key === 'approved' && urgentCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
-                🚨{urgentCount}
-              </span>
+              <span className="absolute top-3 right-3 bg-red-500 text-white text-[12px] font-black px-2 py-0.5 rounded-full">🚨 긴급 {urgentCount}</span>
             )}
           </button>
         ))}
