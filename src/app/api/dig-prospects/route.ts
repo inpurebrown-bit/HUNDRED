@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { releaseDue, loadQueue } from '@/lib/digAssign'
 import { analyzeRecordingUrl, isValidAnalysis } from '@/lib/recordingAnalysis'
+import { playableUrl } from '@/lib/recordingConvert'
 
 export const maxDuration = 120   // 접수 때 서버가 AI 분석을 다시 돌릴 수 있다
 
@@ -67,8 +68,13 @@ export async function POST(req: NextRequest) {
     has_delinquency, credit_score, required_fund, preferred_call_time,
     urgent_assign,
     checklist, memo,
-    recording_url, recording_filename, recording_analysis: rawAnalysis, recordings, call_note,
+    recording_url: rawRecordingUrl, recording_filename, recording_analysis: rawAnalysis, recordings: rawRecordings, call_note,
   } = body
+  // 안전장치: 화면에서 변환이 안 된 채 넘어온 wav(재생 불가 형식)는 접수 때 서버가 mp3 로 바꿔 저장
+  const recording_url = await playableUrl(rawRecordingUrl, 'dig-prospects:submit')
+  const recordings = Array.isArray(rawRecordings)
+    ? await Promise.all(rawRecordings.map(async (r: any) => ({ ...r, url: await playableUrl(r?.url, 'dig-prospects:submit') })))
+    : rawRecordings
   // 통화가 2~3번 나뉜 경우: 첫 녹취는 기존 칸에, 전체 목록은 분석 결과 안에 함께 보관
   let recording_analysis = Array.isArray(recordings) && recordings.length > 1
     ? { ...(rawAnalysis || {}), recordings: recordings.map((r: any) => ({ url: r.url, name: r.name })) }

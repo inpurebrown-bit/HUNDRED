@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { ensurePlayableWav } from '@/lib/recordingConvert'
+import { ensurePlayableWav, logConvertError } from '@/lib/recordingConvert'
 
 export const maxDuration = 60
 
@@ -19,6 +19,7 @@ export async function POST(req: NextRequest) {
   try {
     return NextResponse.json(await ensurePlayableWav(path))
   } catch (e: any) {
+    await logConvertError('convert-recording', e)
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }

@@ -38,6 +38,25 @@ interface SalesUser {
   username: string
 }
 
+// 시각 문자열 → 'MM/DD(요일) HH:MM' (KST). 시간대 없는 'YYYY-MM-DDTHH:MM' 은 입력한 그대로(한국 시간)로 본다
+function fmtKst(v?: string | null): string {
+  if (!v) return ''
+  const s = String(v)
+  const DOW = ['일', '월', '화', '수', '목', '금', '토']
+  let y: number, mo: number, d: number, hh: string, mm: string
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/)
+  if (m && !/(Z|[+-]\d{2}:?\d{2})$/.test(s)) { y = +m[1]; mo = +m[2]; d = +m[3]; hh = m[4]; mm = m[5] }
+  else {
+    const t = new Date(s)
+    if (isNaN(t.getTime())) return s
+    const k = new Date(t.getTime() + 9 * 3600 * 1000)
+    y = k.getUTCFullYear(); mo = k.getUTCMonth() + 1; d = k.getUTCDate()
+    hh = String(k.getUTCHours()).padStart(2, '0'); mm = String(k.getUTCMinutes()).padStart(2, '0')
+  }
+  const dow = DOW[new Date(Date.UTC(y, mo - 1, d)).getUTCDay()]
+  return `${String(mo).padStart(2, '0')}/${String(d).padStart(2, '0')}(${dow}) ${hh}:${mm}`
+}
+
 const CHECKLIST_LABELS: Record<string, string> = {
   identity_disclosed:  '소속 고지',
   purpose_disclosed:   '목적 고지',
@@ -435,11 +454,11 @@ export default function DigManageTab() {
                 )}
               </div>
               <p className="text-[11px] text-gray-400 mt-0.5">
-                {p.ceo_name} · {p.phone_010} · {p.call_date}
-                {p.preferred_call_time && !p.urgent_assign && (
-                  <span className="ml-1 text-gray-500">· 통화희망: {p.preferred_call_time}</span>
-                )}
+                {p.ceo_name} · {p.phone_010} · 접수 {p.created_at ? fmtKst(p.created_at) : p.call_date}
               </p>
+              {p.preferred_call_time && !p.urgent_assign && (
+                <p className="text-[12px] font-bold text-[#1B2A45] mt-1">📞 통화희망 {fmtKst(p.preferred_call_time)}</p>
+              )}
             </div>
             <span className="text-gray-300 text-xs shrink-0">{isExpanded ? '▲' : '▼'}</span>
           </div>
@@ -458,9 +477,9 @@ export default function DigManageTab() {
         </button>
 
         {isExpanded && (
-          <div className="border-t border-gray-100 px-4 py-4 space-y-4">
-            {/* 접수 내용 간단 수정 (직원이 잘못 입력해서 수정 요청한 경우) */}
-            {editId === p.id ? (
+          <div className="border-t border-gray-100 px-4 py-3 space-y-3">
+            {/* 접수 내용 수정 (아래 "내용 수정" 버튼으로 연다) */}
+            {editId === p.id && (
               <div className="border-2 border-[#C5A258]/50 bg-[#FAF8F3] rounded-xl p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-bold text-[#1B2A45]">✏️ 접수 내용 수정</p>
@@ -503,52 +522,17 @@ export default function DigManageTab() {
                   className="w-full bg-[#1B2A45] text-white text-xs font-bold py-2 rounded-lg disabled:opacity-50">{processing === p.id ? '저장 중…' : '저장'}</button>
                 {p.status === 'assigned' && <p className="text-[10px] text-gray-400">이미 영업팀에 배정된 건이라 고객 카드에도 같이 반영됩니다.</p>}
               </div>
-            ) : (
-              <div className="flex justify-end -mb-2">
-                <button type="button" onClick={() => startEdit(p)} className="text-[11px] font-bold text-[#1B2A45]/70 border border-[#1B2A45]/20 rounded-full px-3 py-1 hover:bg-[#FAF8F3]">✏️ 내용 수정</button>
-              </div>
-            )}
-
-            {/* 업체 정보 */}
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
-              {p.business_age && <p><span className="text-gray-400">업력</span> {p.business_age}</p>}
-              {p.annual_revenue && <p><span className="text-gray-400">연매출</span> {p.annual_revenue}</p>}
-              {p.industry && <p><span className="text-gray-400">업종</span> {p.industry}</p>}
-              {p.credit_score && <p><span className="text-gray-400">신용점수</span> {p.credit_score}</p>}
-              {p.required_fund && <p><span className="text-gray-400">필요자금</span> {p.required_fund}</p>}
-              {p.preferred_call_time && <p><span className="text-gray-400">통화희망</span> {p.preferred_call_time}</p>}
-              <p><span className="text-gray-400">연체·체납</span> {p.has_delinquency ? '있음' : '없음'}</p>
-              {p.phone && <p><span className="text-gray-400">원번호</span> {p.phone}</p>}
-            </div>
-
-            {/* AI 코멘트 (심사 대기에서 미흡 항목 보고) */}
-            {p.status === 'pending' && p.ceo_comment && (
-              <div className={`rounded-lg px-3 py-2 text-xs ${
-                p.ceo_comment.startsWith('AI 검토 필요')
-                  ? 'bg-amber-50 border border-amber-200 text-amber-800'
-                  : 'bg-blue-50 border border-blue-100 text-blue-700'
-              }`}>
-                <p className="font-semibold mb-0.5">AI 리포트</p>
-                {p.ceo_comment}
-              </div>
-            )}
-
-            {p.memo && (
-              <div className="bg-gray-50 rounded-lg px-3 py-2 text-xs text-gray-600">
-                <p className="text-[10px] text-gray-400 mb-0.5">메모</p>
-                {p.memo}
-              </div>
             )}
 
             {/* 녹취 플레이어 */}
             {p.recording_url && (
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-3">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 space-y-2">
                 {(Array.isArray(p.recording_analysis?.recordings) && p.recording_analysis.recordings.length > 1
                   ? p.recording_analysis.recordings as { url: string; name: string }[]
                   : [{ url: p.recording_url, name: p.recording_filename }]
                 ).map((r, i, arr) => (
                   <div key={r.url}>
-                    <p className="text-[11px] text-slate-600 font-semibold mb-2">녹취 파일{arr.length > 1 ? ` ${i + 1}/${arr.length}` : ''} — {r.name}</p>
+                    <p className="text-[11px] text-slate-600 font-semibold mb-1">녹취 파일{arr.length > 1 ? ` ${i + 1}/${arr.length}` : ''} — {r.name}</p>
                     <audio controls src={r.url} className="w-full" />
                   </div>
                 ))}
@@ -575,6 +559,8 @@ export default function DigManageTab() {
               </div>
             )}
 
+            {/* 비교표 | AI 리포트 — 2단, 각 칸은 높이를 제한해 안에서 스크롤 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
             {/* 직원 입력 vs AI 추출 비교표 */}
             {p.recording_analysis && (
               <div className="border border-gray-200 rounded-xl overflow-hidden">
@@ -582,6 +568,7 @@ export default function DigManageTab() {
                   <p className="text-xs font-bold text-gray-700">직원 입력 vs AI 분석 비교</p>
                   <p className="text-xs text-gray-400">황색 = 불일치 항목</p>
                 </div>
+                <div className="max-h-[380px] overflow-y-auto">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-100">
@@ -603,6 +590,7 @@ export default function DigManageTab() {
                         { label: '신용점수', emp: p.credit_score,   ai: ci.credit_score },
                         { label: '필요자금', emp: p.required_fund,  ai: ci.required_fund },
                         { label: '연체여부', emp: p.has_delinquency ? '있음' : '없음', ai: ci.has_delinquency == null ? '-' : ci.has_delinquency ? '있음' : '없음' },
+                        ...(p.memo ? [{ label: '메모', emp: p.memo, ai: '' }] : []),
                       ]
                       return rows.map(({ label, emp, ai }) => {
                         const mismatch = emp && ai && ai !== '-' && emp !== ai
@@ -617,9 +605,9 @@ export default function DigManageTab() {
                     })()}
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
-
             {/* AI 분석 결과 */}
             {p.recording_analysis && !p.recording_analysis.parse_error && (() => {
               const ra = p.recording_analysis
@@ -653,7 +641,7 @@ export default function DigManageTab() {
                     </div>
                   </div>
 
-                  <div className="p-3 space-y-3">
+                  <div className="p-3 space-y-3 max-h-[380px] overflow-y-auto">
                     {/* 총평 */}
                     {ra.ceo_comment && (
                       <div className="bg-gray-50 rounded-lg px-3 py-2">
@@ -712,6 +700,7 @@ export default function DigManageTab() {
                 </div>
               )
             })()}
+            </div>
 
             {/* 심사 대기: 승인/거절 액션 */}
             {p.status === 'pending' && (
@@ -788,7 +777,10 @@ export default function DigManageTab() {
             )}
 
             {/* 삭제 (CEO 전용, 모든 상태) */}
-            <div className="border-t border-gray-100 pt-3">
+            <div className="border-t border-gray-100 pt-3 flex items-center gap-4">
+              {editId !== p.id && (
+                <button type="button" onClick={() => startEdit(p)} className="text-xs text-gray-400 hover:text-[#1B2A45] font-medium transition-colors">✏️ 내용 수정</button>
+              )}
               {deleteConfirm === p.id ? (
                 <div className="flex items-center gap-2">
                   <p className="text-xs text-red-600 font-semibold flex-1">정말 삭제하시겠습니까?</p>

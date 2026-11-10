@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
     // 녹취 wav 변환용 ffmpeg 실행 파일
     '/api/convert-recording': ['./node_modules/ffmpeg-static/**/*'],
     '/api/upload-recording': ['./node_modules/ffmpeg-static/**/*'],
+    '/api/dig-prospects': ['./node_modules/ffmpeg-static/**/*'],
+    '/api/cron/dig-release': ['./node_modules/ffmpeg-static/**/*'],
     '/api/contract/generate': ['./src/lib/contract/fonts/**/*'],
     '/api/company-rules/export': ['./src/lib/contract/fonts/**/*'],
   },
