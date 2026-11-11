@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { isTester } from '@/lib/tester'
 import { bizDays } from '@/lib/digStats'
-import { calcWithholding, calcSalesStructure, resignBizProration, SALES_BASE_PAY, SALES_BASE_RATE, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, calcMonthlySubBonus, calcRefundDeductions, calcDigSalary, DIG_BASE_SALARY, DIG_HOURLY_BASE, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
+import { calcWithholding, calcSalesStructure, resignBizProration, SALES_BASE_PAY, SALES_BASE_RATE, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, calcMonthlySubBonus, calcRefundDeductions, calcDigSalary, calcDigMonth, digLeaveDays, digUnpaidLeaveCount, DIG_BASE_SALARY, DIG_HOURLY_BASE, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
 import { contractWeight } from '@/lib/supplyRules'
 
 // ─── 타입 ─────────────────────────────────────────────────
@@ -42,6 +42,7 @@ interface DigEmployee {
   approved_count: number  // 해당 월 승인 건수 (자동)
   join_date?: string      // 입사일 (일할계산용)
   resign_date?: string    // 퇴사일 (일할계산용)
+  leave_days?: string[]   // 휴무일 (그 달 가장 이른 하루는 유급, 나머지는 무급 → 일할 공제)
   awards: AwardItem[]
 }
 
@@ -93,29 +94,7 @@ function calcSales(e: SalesEmployee, ym: string) {
 }
 
 function calcDig(e: DigEmployee, yearMonth: string) {
-  // 일할 계산 여부 판단
-  let workedDays: number | undefined
-  let totalDays: number | undefined
-  const [yr, mo] = yearMonth.split('-').map(Number)
-  const daysInMonth = new Date(yr, mo, 0).getDate()
-  // 입사월이면 입사일부터 말일까지
-  if (e.join_date && e.join_date.slice(0, 7) === yearMonth) {
-    const joinDay = parseInt(e.join_date.slice(8, 10), 10) || 1
-    workedDays = daysInMonth - joinDay + 1
-    totalDays  = daysInMonth
-  }
-  // 퇴사월이면 1일부터 퇴사일까지
-  // 퇴사월이면 영업일 기준 (근무한 영업일 ÷ 그 달 영업일)
-  const rb = resignBizProration(yearMonth, e.resign_date)
-  if (rb) {
-    workedDays = rb.worked
-    totalDays  = rb.total
-  }
-  const base = calcDigSalary(e.approved_count, workedDays, totalDays, bizDays(yearMonth).total, !!rb)
-  const awardsSum = (e.awards || []).reduce((s, a) => s + Number(a.amount || 0), 0)
-  const before = base.before + awardsSum
-  const after  = calcWithholding(before).after
-  return { ...base, awardsSum, before, after }
+  return calcDigMonth(e, yearMonth, bizDays(yearMonth).total)
 }
 
 // ─── 유틸 ─────────────────────────────────────────────────
@@ -433,10 +412,50 @@ function SalesCard({
 
 // ─── 발굴팀 직원 카드 ─────────────────────────────────────
 
+// 발굴팀 휴무일 설정 — 날짜를 체크해 두면 그 달 가장 이른 하루는 유급, 나머지는 무급으로 월급에서 일할 공제
+function DigLeaveRow({ emp, idx, yearMonth, onLeave }: { emp: DigEmployee; idx: number; yearMonth: string; onLeave: (i: number, days: string[]) => void }) {
+  const [pick, setPick] = useState('')
+  const days = digLeaveDays(emp.leave_days, yearMonth)
+  const all = emp.leave_days || []
+  const DOW = ['일', '월', '화', '수', '목', '금', '토']
+  const label = (d: string) => `${d.slice(5).replace('-', '/')}(${DOW[new Date(d + 'T00:00:00').getDay()]})`
+  function add() {
+    if (!pick) return
+    if (pick.slice(0, 7) !== yearMonth) { alert(yearMonth + ' 날짜만 넣을 수 있습니다'); return }
+    const dow = new Date(pick + 'T00:00:00').getDay()
+    if (dow === 0 || dow === 6) { alert('주말은 휴무일로 세지 않습니다'); return }
+    if (!all.includes(pick)) onLeave(idx, [...all, pick].sort())
+    setPick('')
+  }
+  return (
+    <div className="py-2 border-b border-gray-50">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-gray-400">휴무일 <span className="text-[9px] text-gray-300">(한 달 첫 휴무 1일은 유급, 나머지 무급)</span></span>
+        <div className="flex items-center gap-1.5">
+          <input type="date" value={pick} min={yearMonth + '-01'} max={yearMonth + '-31'} onChange={e => setPick(e.target.value)}
+            className="text-[11px] border border-gray-200 rounded-lg px-2 py-1 text-gray-600" />
+          <button type="button" onClick={add} className="text-[10px] text-orange-600 border border-orange-300/50 rounded px-1.5 py-1 hover:bg-orange-50">+ 추가</button>
+        </div>
+      </div>
+      {days.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {days.map((d, i) => (
+            <span key={d} className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${i === 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+              {label(d)} · {i === 0 ? '유급' : '무급'}
+              <button type="button" onClick={() => onLeave(idx, all.filter(x => x !== d))} className="opacity-60 hover:opacity-100">✕</button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function DigCard({
-  emp, idx, yearMonth, onChange, onRemove, onAddAward, onUpdateAward, onRemoveAward,
+  emp, idx, yearMonth, onChange, onLeave, onRemove, onAddAward, onUpdateAward, onRemoveAward,
 }: {
   emp: DigEmployee; idx: number; yearMonth: string
+  onLeave: (i: number, days: string[]) => void
   onChange: (i: number, f: keyof DigEmployee, v: string) => void
   onRemove: (i: number) => void
   onAddAward: (i: number) => void
@@ -466,6 +485,10 @@ function DigCard({
         <PayRow label={emp.resign_date && emp.resign_date.slice(0, 7) === yearMonth
           ? `기본급 시급분 ${DIG_HOURLY_BASE.toLocaleString('ko-KR')}원 일할 (퇴사 ${emp.resign_date.slice(5).replace('-', '/')}, 만근수당 제외)`
           : `기본급 (${DIG_BASE_SALARY.toLocaleString('ko-KR')}원)`} value={c.base} autoTag />
+        {c.leaveDeduction > 0 && (
+          <PayRow label={`무급 휴무 공제 (기본급 ÷ 영업일 × ${digUnpaidLeaveCount(emp.leave_days, yearMonth)}일)`} value={-c.leaveDeduction} colorClass="text-red-500" />
+        )}
+        <DigLeaveRow emp={emp} idx={idx} yearMonth={yearMonth} onLeave={onLeave} />
         <div className="flex items-center justify-between py-1.5 border-b border-gray-50">
           <span className="text-xs text-gray-400">이달 승인 건수</span>
           <input
@@ -1076,7 +1099,7 @@ export default function PayrollTab() {
       // 새 달: 직원 명단·기본급만 이어받고 매출·시상금·성과급은 비운 상태로 시작
       const rOps   = opsEmps.map(e => ({ ...e, fee_revenue: 0, puto_revenue: 0, performance_bonus: 0, monthly_sub_bonus: 0, awards: [], fee_details: [] }))
       const rSales = salesEmps.map(e => ({ ...e, contract_revenue: 0, contract_count: 0, performance_bonus: 0, awards: [], pay_mode: undefined, work_days: undefined, memo: '' }))
-      const rDig   = digEmps.map(e => ({ ...e, approved_count: 0, awards: [] }))
+      const rDig   = digEmps.map(e => ({ ...e, approved_count: 0, awards: [], leave_days: [] }))
       setOpsEmps(rOps); setSalesEmps(rSales); setDigEmps(rDig)
       if (yearMonth === thisMonth()) await autoLoad(rOps, rSales, costs, rDig)
       else {
@@ -1147,6 +1170,7 @@ export default function PayrollTab() {
   function updateDig(i: number, f: keyof DigEmployee, v: string) {
     setDigEmps(prev => { const n = [...prev]; n[i] = { ...n[i], [f]: f === 'name' ? v : (f === 'approved_count' ? (parseInt(v.replace(/[^0-9]/g, ''), 10) || 0) : v) }; return n })
   }
+  function updateDigLeave(i: number, days: string[]) { setDigEmps(prev => { const n = [...prev]; n[i] = { ...n[i], leave_days: days }; return n }) }
   function removeDig(i: number) { setDigEmps(prev => prev.filter((_, j) => j !== i)) }
   function addDigAward(ei: number) {
     setDigEmps(prev => { const n = [...prev]; n[ei] = { ...n[ei], awards: [...(n[ei].awards || []), { reason: '', amount: 0 }] }; return n })
@@ -1405,7 +1429,7 @@ export default function PayrollTab() {
           </div>
 
           {digEmps.map((emp, i) => (
-            <DigCard key={i} emp={emp} idx={i} yearMonth={yearMonth} onChange={updateDig} onRemove={removeDig}
+            <DigCard key={i} emp={emp} idx={i} yearMonth={yearMonth} onChange={updateDig} onLeave={updateDigLeave} onRemove={removeDig}
               onAddAward={addDigAward} onUpdateAward={updateDigAward} onRemoveAward={removeDigAward} />
           ))}
 

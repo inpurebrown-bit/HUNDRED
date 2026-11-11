@@ -52,7 +52,10 @@ export async function POST(req: NextRequest) {
           if (!name) continue
           const hit = incList.find(e => String(e?.name || '').trim() === name)
           if (!hit) incList.push({ ...o })
-          else if (!(hit.awards || []).length && (o.awards || []).length) hit.awards = o.awards
+          else {
+            if (!(hit.awards || []).length && (o.awards || []).length) hit.awards = o.awards
+            if (!(hit.leave_days || []).length && (o.leave_days || []).length) hit.leave_days = o.leave_days
+          }
         }
         merged[g] = incList
       }

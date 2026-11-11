@@ -4,7 +4,7 @@
 //  인건비    = 영업·관리·발굴팀 세전 지급액 (급여명세 기준)
 //  운영비    = DB 매입비 + 임대 + 관리비 + 고정비 + 기타(알바·장비 등)
 //  순이익    = 매출 − 세금적립 − 인건비 − 운영비
-import { calcSalesStructure, getPromo, calcDigSalary, OPS_FEE_RATE, OPS_PUTO_RATE, resignBizProration } from './payrollCalc'
+import { calcSalesStructure, getPromo, calcDigMonth, OPS_FEE_RATE, OPS_PUTO_RATE, resignBizProration } from './payrollCalc'
 import { bizDays } from './digStats'
 
 export interface MonthPnl {
@@ -71,13 +71,10 @@ export function calcMonthPnl(ym: string, employees: any | null): MonthPnl {
   const [yr, mo] = ym.split('-').map(Number)
   const daysInMonth = new Date(yr, mo, 0).getDate()
   for (const d of dig) {
-    let worked: number | undefined, total: number | undefined
-    if (d.join_date && String(d.join_date).slice(0, 7) === ym) { worked = daysInMonth - (parseInt(String(d.join_date).slice(8, 10), 10) || 1) + 1; total = daysInMonth }
-    let resigned = false
-    { const rb = resignBizProration(ym, d.resign_date); if (rb) { worked = rb.worked; total = rb.total; resigned = true } }
-    const b = calcDigSalary(n(d.approved_count), worked, total, bizDays(ym).total, resigned)
-    digLabor += b.before + sumAwards(d.awards)
-    digFixed += b.base
+    // 입·퇴사월 일할과 무급 휴무 공제는 급여 화면과 같은 계산을 쓴다
+    const b = calcDigMonth({ approved_count: n(d.approved_count), join_date: d.join_date, resign_date: d.resign_date, leave_days: (d as any).leave_days, awards: d.awards }, ym, bizDays(ym).total)
+    digLabor += b.before
+    digFixed += b.base - b.leaveDeduction
   }
 
   const labor = {

@@ -145,7 +145,8 @@ export function calcDigSalary(
   totalDays?: number,
   monthBizDays?: number,   // 그 달 영업일 수 — 월 목표 = 영업일 × 일 8건, 초과분부터 1건당 인센
   resigned?: boolean,      // 퇴사월 — 만근수당(70만)이 없으니 시급 기준 140만만 영업일로 일할 (10원 미만 절사)
-): { base: number; incentive: number; total: number; before: number; after: number } {
+  unpaidDays?: number,     // 무급 휴무일수 — 기본급을 영업일로 나눈 일할 금액을 공제
+): { base: number; incentive: number; leaveDeduction: number; total: number; before: number; after: number } {
   const ratio = (workedDays != null && totalDays && totalDays > 0)
     ? workedDays / totalDays : 1
   const base      = resigned
@@ -154,9 +155,50 @@ export function calcDigSalary(
   const monthGoal = Math.round((monthBizDays && monthBizDays > 0 ? monthBizDays : 1) * DIG_DAILY_GOAL * ratio)
   const extraCnt  = Math.max(0, approvedCount - monthGoal)
   const incentive = extraCnt * DIG_BONUS_PER_EXTRA
-  const before    = base + incentive
+  const unit      = DIG_BASE_SALARY   // 무급 휴무 하루치 = 210만원 ÷ 그 달 영업일 (퇴사월도 동일)
+  const leaveDeduction = unpaidDays && unpaidDays > 0 && monthBizDays && monthBizDays > 0
+    ? Math.min(base, Math.floor(unit * unpaidDays / monthBizDays / 10) * 10) : 0
+  const before    = base - leaveDeduction + incentive
   const after     = calcWithholding(before).after
-  return { base, incentive, total: before, before, after }
+  return { base, incentive, leaveDeduction, total: before, before, after }
+}
+
+// ── 발굴팀 휴무 ─────────────────────────────────────────
+// 한 달에 한 번(1일)은 유급 휴무, 그 밖의 휴무는 무급 → 무급일수만큼 일할 공제.
+// 날짜를 체크해 두면 그 달 가장 이른 하루를 유급으로 보고 나머지를 무급으로 센다. 주말은 휴무일로 세지 않는다.
+export function digLeaveDays(leaves: string[] | undefined, yearMonth: string): string[] {
+  const ok = (d: string) => {
+    if (String(d).slice(0, 7) !== yearMonth) return false
+    const dow = new Date(String(d).slice(0, 10) + 'T00:00:00').getDay()
+    return dow !== 0 && dow !== 6
+  }
+  return [...new Set((leaves || []).map(String).filter(ok))].sort()
+}
+export function digUnpaidLeaveCount(leaves: string[] | undefined, yearMonth: string): number {
+  return Math.max(0, digLeaveDays(leaves, yearMonth).length - 1)
+}
+
+/** 발굴팀 한 사람의 그 달 급여 — 입사월·퇴사월 일할, 무급 휴무 공제, 시상금까지 (급여 화면·손익·급여명세 공통) */
+export function calcDigMonth(
+  e: { approved_count: number; join_date?: string; resign_date?: string; leave_days?: string[]; awards?: { amount: number }[] },
+  yearMonth: string,
+  monthBizDays: number,
+) {
+  let workedDays: number | undefined
+  let totalDays: number | undefined
+  const [yr, mo] = yearMonth.split('-').map(Number)
+  const daysInMonth = new Date(yr, mo, 0).getDate()
+  if (e.join_date && e.join_date.slice(0, 7) === yearMonth) {
+    workedDays = daysInMonth - (parseInt(e.join_date.slice(8, 10), 10) || 1) + 1
+    totalDays = daysInMonth
+  }
+  const rb = resignBizProration(yearMonth, e.resign_date)
+  if (rb) { workedDays = rb.worked; totalDays = rb.total }
+  const base = calcDigSalary(e.approved_count, workedDays, totalDays, monthBizDays, !!rb, digUnpaidLeaveCount(e.leave_days, yearMonth))
+  const awardsSum = (e.awards || []).reduce((s, a) => s + Number(a.amount || 0), 0)
+  const before = base.before + awardsSum
+  const after = calcWithholding(before).after
+  return { ...base, awardsSum, before, after, resigned: !!rb }
 }
 
 // ── 추가 입금(잔금 등) 갯수 ─────────────────────────────

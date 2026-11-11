@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { calcSalesStructure, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PROMO_TIERS, PERF_BONUS_MIN_COUNT, PERF_BONUS_RATE, INCOME_TAX_RATE, LOCAL_TAX_RATE, calcWithholding, OPS_FEE_RATE, OPS_PUTO_RATE, currentYearMonth, buildSalesContractMap, calcRefundDeductions, DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
+import { bizDays } from '@/lib/digStats'
+import { calcSalesStructure, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PROMO_TIERS, PERF_BONUS_MIN_COUNT, PERF_BONUS_RATE, INCOME_TAX_RATE, LOCAL_TAX_RATE, calcWithholding, calcDigMonth, digLeaveDays, OPS_FEE_RATE, OPS_PUTO_RATE, currentYearMonth, buildSalesContractMap, calcRefundDeductions, DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
 
 // ─── 타입 ─────────────────────────────────────────────────
 
@@ -39,6 +40,10 @@ interface EmpFinancial {
   puto_revenue: number
   ops_performance_bonus: number
   monthly_sub_bonus: number  // 월정기권 5% 보너스
+  // 발굴팀 휴무 (급여 화면에서 정한 휴무일 → 무급 공제)
+  dig_leave_days?: string[]
+  dig_leave_deduction?: number
+  dig_resigned?: boolean
   // 공통
   allowance_details: AllowanceDetail[]
   deduction: number
@@ -140,10 +145,11 @@ function PayslipDocument({ emp, financial, yearMonth }: {
     const extraCnt  = Math.max(0, approved - DIG_DAILY_GOAL)
     const incentive = extraCnt * DIG_BONUS_PER_EXTRA
     const allowSum  = (financial.allowance_details || []).reduce((s, a) => s + Number(a.amount || 0), 0)
-    const subtotal  = base + incentive + allowSum
+    const leaveDed  = Number(financial.dig_leave_deduction) || 0
+    const subtotal  = base + incentive + allowSum - leaveDed
     const beforeTax = subtotal - financial.deduction
     const { incomeTax, localTax, after: actualPay } = calcWithholding(beforeTax)
-    return { base, incentive, extraCnt, allowSum, subtotal, beforeTax, incomeTax, localTax, actualPay }
+    return { base, incentive, extraCnt, allowSum, leaveDed, subtotal, beforeTax, incomeTax, localTax, actualPay }
   })()
 
   const isSales = emp.team === 'sales'
@@ -231,9 +237,25 @@ function PayslipDocument({ emp, financial, yearMonth }: {
               {/* 발굴팀 */}
               <tr>
                 <td className={tdL}>① 기본급</td>
-                <td className={tdV}>{DIG_BASE_SALARY.toLocaleString('ko-KR')}원 (월)</td>
+                <td className={tdV}>{financial.dig_resigned ? '시급분 1,400,000원 영업일 일할 (퇴사월, 만근수당 제외)' : `${DIG_BASE_SALARY.toLocaleString('ko-KR')}원 (월)`}</td>
                 <td className={tdN}>{fmt(digCalc.base)}</td>
               </tr>
+              {(financial.dig_leave_days || []).length > 0 && (
+                <tr>
+                  <td className={tdL}>휴무</td>
+                  <td className={tdV}>
+                    {(financial.dig_leave_days || []).map((d, i) => `${d.slice(5).replace('-', '/')}(${i === 0 ? '유급' : '무급'})`).join(', ')}
+                  </td>
+                  <td className={tdN}>-</td>
+                </tr>
+              )}
+              {digCalc.leaveDed > 0 && (
+                <tr>
+                  <td className={tdL}>무급 휴무 공제</td>
+                  <td className={tdV}>기본급 ÷ 이달 영업일 × {Math.max(0, (financial.dig_leave_days || []).length - 1)}일</td>
+                  <td className={tdN + ' text-red-600 font-semibold'}>-{fmt(digCalc.leaveDed)}</td>
+                </tr>
+              )}
               <tr>
                 <td className={tdL}>② 인센티브</td>
                 <td className={tdV}>
@@ -671,9 +693,14 @@ export default function PayslipTab() {
           // 발굴팀: payroll dig_employees에서 승인 건수 로드, 기본급 고정
           const digEmpsFromPayroll: any[] = emps?.dig_employees || []
           const match = digEmpsFromPayroll.find((e: any) => nameMatch(emp.name, e.name || ''))
+          // 입사·퇴사 일할, 무급 휴무 공제까지 급여 화면과 같은 계산(calcDigMonth)을 쓴다
+          const dm = match ? calcDigMonth({ approved_count: Number(match.approved_count || 0), join_date: match.join_date, resign_date: match.resign_date, leave_days: match.leave_days, awards: match.awards }, yearMonth, bizDays(yearMonth).total) : null
           updates[emp.id] = {
-            base_salary:    DIG_BASE_SALARY,
+            base_salary:    dm ? dm.base : DIG_BASE_SALARY,
             contract_count: match ? Number(match.approved_count || 0) : 0,
+            dig_leave_days: match ? digLeaveDays(match.leave_days, yearMonth) : [],
+            dig_leave_deduction: dm ? dm.leaveDeduction : 0,
+            dig_resigned:   dm ? dm.resigned : false,
           }
         } else {
           const match = opsList.find((e: any) => nameMatch(emp.name, e.name || ''))
