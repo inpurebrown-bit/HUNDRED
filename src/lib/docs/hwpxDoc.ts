@@ -9,8 +9,10 @@ export type DocBlock =
   | { t: 'h1' | 'h2' | 'h3' | 'p' | 'li' | 'note'; text: string; align?: 'center' | 'right' }
   | { t: 'table'; rows: string[][]; form?: boolean; labelCols?: number[]; widths?: number[]; heights?: number[] }
   | { t: 'approval'; leader?: string; ceo?: string }          // 상단 결재란 (팀장·실장·대표)
+  | { t: 'gap'; n?: number }                                   // 빈 줄 n개 (한 쪽을 알맞게 채울 때)
   | { t: 'title'; text: string; pb?: boolean }                 // 가운데 큰 제목 (묶음 서식에서 서식마다 새 쪽)
-export interface DocContent { title: string; subtitle?: string; blocks: DocBlock[] }
+// rowH: 표 한 줄 높이(기본 1700), gap: 표 뒤·소제목 앞 빈 줄 수 — 한 쪽짜리 서식이 위쪽에만 몰리지 않게 쪽을 알맞게 채울 때 쓴다
+export interface DocContent { title: string; subtitle?: string; blocks: DocBlock[]; rowH?: number; gap?: number }
 // 표지·목차를 붙일 때 쓰는 정보 (정관 내려받기용)
 export interface CoverOpts { org: string; version: string; date: string; eyebrow?: string }
 
@@ -41,7 +43,8 @@ export async function buildDocParts(doc: DocContent, cover?: CoverOpts, mode: 'h
     return id
   }
   const CV = cover ? { eyebrow: withColor('18', 1100, '#C5A258'), title: withColor('18', 3800, '#FFFFFF'), bar: withColor('18', 1400, '#C5A258'), sub: withColor('19', 1300, '#DCE3EF'), meta: withColor('18', 1200, '#FFFFFF'), conf: withColor('19', 900, '#AEB9CE') } : null
-  const CP = { title: '26', h1: withHeight('18', 1500), h2: withHeight('18', 1150), h3: withHeight('18', 1020), p: '19', li: '19', note: '12', cell: '29', cellHead: '8' }
+  // 문서 규격: 제목 20pt · 장 제목 14pt · 소제목 11pt (모두 맑은 고딕 굵게) / 본문 10pt 함초롬바탕 / 표 10pt 맑은 고딕 / 주석·부제 9pt
+  const CP = { title: '26', h1: withHeight('18', 1400), h2: withHeight('18', 1100), h3: withHeight('18', 1100), p: withHeight('19', 1000), li: withHeight('19', 1000), note: withHeight('12', 900), cell: withHeight('29', 1000), cellHead: withHeight('8', 1000) }
   header = header.replace('</hh:charProperties>', clones.join('') + '</hh:charProperties>')
   header = header.replace(/(<hh:charProperties itemCnt=")(\d+)(")/, (_m, a, n, c) => a + (Number(n) + clones.length) + c)
 
@@ -50,9 +53,10 @@ export async function buildDocParts(doc: DocContent, cover?: CoverOpts, mode: 'h
   const empty = () => para('', CP.p)
 
   let tblId = 1226400000
-  const table = (rows: string[][], o: { form?: boolean; labelCols?: number[]; widths?: number[]; heights?: number[]; total?: number; right?: boolean; center?: boolean } = {}) => {
+  const table = (rows: string[][], o: { form?: boolean; labelCols?: number[]; widths?: number[]; heights?: number[]; total?: number; right?: boolean; center?: boolean; noFit?: boolean } = {}) => {
     const total = o.total ?? W_TOTAL
     const nC = Math.max(...rows.map(r => r.length)), nR = rows.length
+    const rowH = o.noFit ? 1700 : (doc.rowH ?? 1700)   // 문서 단위로 칸 높이를 늘려 한 쪽을 채울 수 있다
     // 열 너비: 글자 수에 비례 (최소 비율 보장)
     const len = Array.from({ length: nC }, (_, c) => Math.max(8, ...rows.map(r => Math.min(40, (r[c] || '').length))))
     const sum = len.reduce((a, v) => a + v, 0)
@@ -64,10 +68,10 @@ export async function buildDocParts(doc: DocContent, cover?: CoverOpts, mode: 'h
       const bf = head ? 9 : 5
       const mid = !!o.center
       const ps = String(txt ?? '').split('\n').map(line => para(line, head ? CP.cellHead : CP.cell, head ? '21' : mid ? '21' : '22')).join('')
-      return `<hp:tc name="" header="${head ? 1 : 0}" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="${bf}"><hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">${ps}</hp:subList><hp:cellAddr colAddr="${c}" rowAddr="${r}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="${widths[c]}" height="${o.heights?.[r] ?? 1700}"/><hp:cellMargin left="510" right="510" top="141" bottom="141"/></hp:tc>`
+      return `<hp:tc name="" header="${head ? 1 : 0}" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="${bf}"><hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">${ps}</hp:subList><hp:cellAddr colAddr="${c}" rowAddr="${r}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="${widths[c]}" height="${o.heights?.[r] ?? rowH}"/><hp:cellMargin left="510" right="510" top="141" bottom="141"/></hp:tc>`
     }
     const trs = rows.map((row, r) => `<hp:tr>${Array.from({ length: nC }, (_, c) => cell(row[c] ?? '', r, c, o.form ? !!o.labelCols?.includes(c) : r === 0)).join('')}</hp:tr>`).join('')
-    return `<hp:p id="0" paraPrIDRef="${o.right ? 24 : 25}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="${CP.cell}"><hp:tbl id="${tblId++}" zOrder="0" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="CELL" repeatHeader="1" rowCnt="${nR}" colCnt="${nC}" cellSpacing="0" borderFillIDRef="5" noAdjust="0"><hp:sz width="${total}" widthRelTo="ABSOLUTE" height="${Array.from({ length: nR }, (_, r) => o.heights?.[r] ?? 1700).reduce((a, v) => a + v, 0)}" heightRelTo="ABSOLUTE" protect="0"/><hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/><hp:outMargin left="0" right="0" top="283" bottom="283"/><hp:inMargin left="510" right="510" top="141" bottom="141"/>${trs}</hp:tbl><hp:t/></hp:run></hp:p>`
+    return `<hp:p id="0" paraPrIDRef="${o.right ? 24 : 25}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="${CP.cell}"><hp:tbl id="${tblId++}" zOrder="0" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="CELL" repeatHeader="1" rowCnt="${nR}" colCnt="${nC}" cellSpacing="0" borderFillIDRef="5" noAdjust="0"><hp:sz width="${total}" widthRelTo="ABSOLUTE" height="${Array.from({ length: nR }, (_, r) => o.heights?.[r] ?? rowH).reduce((a, v) => a + v, 0)}" heightRelTo="ABSOLUTE" protect="0"/><hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/><hp:outMargin left="0" right="0" top="283" bottom="283"/><hp:inMargin left="510" right="510" top="141" bottom="141"/>${trs}</hp:tbl><hp:t/></hp:run></hp:p>`
   }
 
   // 첫 문단: 쪽 설정(용지·배경)이 들어 있는 원본의 첫 문단을 그대로 쓰고 제목 글만 바꾼다
@@ -120,18 +124,19 @@ export async function buildDocParts(doc: DocContent, cover?: CoverOpts, mode: 'h
 
   let firstH1 = !cover
   for (const bl of doc.blocks) {
-    if (bl.t === 'table') { body += table(bl.rows, bl); body += para('', CP.note); continue }
+    if (bl.t === 'table') { body += table(bl.rows, bl); body += para('', CP.note); for (let i = 0; i < (doc.gap ?? 0); i++) body += empty(); continue }
+    if (bl.t === 'gap') { for (let i = 0; i < (bl.n ?? 1); i++) body += empty(); continue }
     if (bl.t === 'approval') {
       // 팀장·실장·대표 결재란: 오른쪽 위. 이름은 찍지 않고 각자 서명한다
-      body += table([['팀  장', '실  장', '대  표'], ['\n\n', '\n\n', '\n\n']], { widths: [1, 1, 1], heights: [1500, 2600], total: 18000, right: true, center: true })
+      body += table([['팀  장', '실  장', '대  표'], ['\n\n', '\n\n', '\n\n']], { widths: [1, 1, 1], heights: [1500, 2600], total: 18000, right: true, center: true, noFit: true })
       body += para('', CP.note); continue
     }
-    if (bl.t === 'title') { body += para(bl.text, CP.h1, '25', !!bl.pb) + empty(); continue }
+    if (bl.t === 'title') { body += para(bl.text, CP.title, '25', !!bl.pb) + empty(); continue }
     const text = bl.text || ''
     const al = bl.align === 'center' ? '25' : bl.align === 'right' ? '24' : ''
     if (bl.t === 'h1') { body += para(text, CP.h1, '12', !firstH1); firstH1 = false; body += empty(); continue }
     if (bl.t === 'h2') { body += empty() + para(text, CP.h2, '12'); continue }
-    if (bl.t === 'h3') { body += para(text, CP.h3, '12'); continue }
+    if (bl.t === 'h3') { for (let i = 0; i < (doc.gap ?? 0); i++) body += empty(); body += para(text, CP.h3, '12'); continue }
     if (bl.t === 'li') { body += para(text, CP.li, al || '12'); continue }
     if (bl.t === 'note') { body += para(text, CP.note, al || '12'); continue }
     body += para(text, CP.p, al || '0')
