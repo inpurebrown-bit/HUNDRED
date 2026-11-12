@@ -29,6 +29,7 @@ import PullToRefresh from '@/components/ui/PullToRefresh'
 import SplitView from '@/components/shared/SplitView'
 import TabErrorBoundary from '@/components/shared/TabErrorBoundary'
 import DigManageTab from './DigManageTab'
+import PlannerTab from './PlannerTab'
 import AuthCodeTab from './AuthCodeTab'
 import RevenueAnalytics from './RevenueAnalytics'
 import DigEffectPanel from './DigEffectPanel'
@@ -60,7 +61,7 @@ function SubTabBar<T extends string>({ tabs, active, onChange }: {
 
 // 손익·급여 통합 탭
 function AnalyticsTab() {
-  const [sub, setSub] = useState<'revenue' | 'payroll' | 'payslip' | 'tax' | 'personal' | 'planner'>('revenue')
+  const [sub, setSub] = useHistoryState<'revenue' | 'payroll' | 'payslip' | 'tax' | 'personal' | 'planner'>('a', 'revenue', ['revenue','payroll','payslip','tax','personal','planner'])
   return (
     <div>
       <SubTabBar
@@ -81,21 +82,6 @@ function AnalyticsTab() {
       {sub === 'personal' && <PersonalFinanceTab />}
       {sub === 'planner'  && <PlannerTab />}
     </div>
-  )
-}
-
-// 플래너 — 정산·저축·채용 계획 (CRM 실적과 연동, 화면은 iframe)
-function PlannerTab() {
-  const [h, setH] = useState(1400)
-  useEffect(() => {
-    const on = (e: MessageEvent) => {
-      if (e.origin === window.location.origin && e.data?.type === 'planner-h' && typeof e.data.h === 'number') setH(Math.max(600, Math.ceil(e.data.h) + 8))
-    }
-    window.addEventListener('message', on)
-    return () => window.removeEventListener('message', on)
-  }, [])
-  return (
-    <iframe src="/api/planner/page" title="플래너" style={{ width: '100%', height: h, border: 0, display: 'block', background: 'transparent' }} />
   )
 }
 
