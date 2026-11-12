@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useHistoryState } from '@/lib/navHistory'
 import Image from 'next/image'
 import Link from 'next/link'
 import { signOut } from 'next-auth/react'
@@ -70,7 +71,8 @@ function filterCustomers(list: Customer[], q: string): Customer[] {
 
 // ── Component ──────────────────────────────────────────────────────────
 export default function SalesDashboard({ userId, userName, username }: Props) {
-  const [activeTab, setActiveTab] = useState<SalesTab>('board')
+  // 탭은 주소(#t=)에 남겨 뒤로가기·새로고침에서도 그 자리 유지
+  const [activeTab, setActiveTab] = useHistoryState<SalesTab>('t', 'board', ['board','db010','customers','contracted','emotional','trash','revenue','report','schedule','profile'])
   const goTab = (tab: SalesTab) => { setActiveTab(tab); setTabSearchQuery('') }
   const [customers, setCustomers] = useState<Customer[]>([])
   const [contracts, setContracts] = useState<Contract[]>([])

@@ -3,6 +3,7 @@ import ActivityStamps from '@/components/shared/ActivityStamps'
 import ContractWizard from '@/components/shared/ContractWizard'
 
 import { useState, useEffect, useRef, useCallback, FormEvent, ReactNode } from 'react'
+import { useHistoryState } from '@/lib/navHistory'
 import { signOut, useSession } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -4840,7 +4841,7 @@ function OpsReportTab({ userId, userName, activeCases }: { userId: string; userN
 export default function OpsDashboard({ userId, userName }: Props) {
   const { data: session } = useSession()
   const userRole = (session?.user as any)?.role || 'ops'
-  const [activeTab, setActiveTab] = useState<OpsTab>('dashboard')
+  const [activeTab, setActiveTab] = useHistoryState<OpsTab>('t', 'dashboard', ['dashboard','active','expired','refund','completed','newdb','ops_contract','report','revenue','profile'])
   const [stageFilter, setStageFilter] = useState('')   // 진행중업체 소분류(실제 진행 상황)
   const [menuOpen, setMenuOpen] = useState(false)
   const [cases, setCases] = useState<OpsCase[]>([])

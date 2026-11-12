@@ -4,6 +4,7 @@ import DbHandoverTab from './DbHandoverTab'
 import ContractSettingsTab from './ContractSettingsTab'
 import CompanyRulesTab from './CompanyRulesTab'
 import { useState, useRef, useEffect, FormEvent, ReactNode, Fragment } from 'react'
+import { useHistoryState } from '@/lib/navHistory'
 import { signOut, useSession } from 'next-auth/react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import Image from 'next/image'
@@ -187,7 +188,8 @@ export default function CeoDashboard() {
   const { data: session } = useSession()
   const ceoName = session?.user?.name ?? '대표'
   const ceoId = (session?.user as any)?.id ?? ''
-  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'staffmanage' | 'minutesreports' | 'calendar' | 'ailogs' | 'trash' | 'authcode' | 'tools' | 'rules' | 'dbmanage' | 'profile' | 'dig' | 'authcode'>('overview')
+  type CeoTab = 'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'staffmanage' | 'minutesreports' | 'calendar' | 'ailogs' | 'trash' | 'authcode' | 'tools' | 'rules' | 'dbmanage' | 'profile' | 'dig'
+  const [activeTab, setActiveTab] = useHistoryState<CeoTab>('t', 'overview', ['overview','sales','ops','assign','analytics','staffmanage','minutesreports','calendar','ailogs','trash','authcode','tools','rules','dbmanage','profile','dig'])
   const [menuOpen, setMenuOpen] = useState(false)
   const [salesInitialView, setSalesInitialView] = useState<'customers' | 'inspection' | 'as' | 'transfer' | 'diary' | undefined>(undefined)
   const [salesInitialStatusTab, setSalesInitialStatusTab] = useState<'all' | 'lead' | 'db010' | 'contracted' | 'emotional' | 'trash' | undefined>(undefined)
@@ -599,7 +601,7 @@ function CustomerQuickDrawer({ customer, onClose }: { customer: any; onClose: ()
   const [loading, setLoading]       = useState(true)
   const [tlText, setTlText]         = useState('')
   const [tlSaving, setTlSaving]     = useState(false)
-  const [activeTab, setActiveTab]   = useState<'incall' | 'ops'>('incall')
+  const [activeTab, setActiveTab]   = useHistoryState<'incall' | 'ops'>('s', 'incall', ['incall','ops'])
 
   const company  = customer.details?.company || customer.company || customer.name || '—'
   const ownerName = customer.details?.sales_user_name || customer.sales_user_name || '-'
@@ -1407,8 +1409,54 @@ function RevenueTab() {
   if (loading) return <div className="text-center py-16 text-gray-400 text-sm">불러오는 중...</div>
   if (!data) return null
 
+  // 이번 달 지금까지 부서별 매출 (환불 차감 반영된 월별 집계 기준) + 전월 같은 기간이 아니라 전월 전체와 비교
+  const curM  = data?.monthly?.find((m: any) => m.fullMonth === thisMonthStr) || {}
+  const prevM = data?.monthly?.find((m: any) => m.fullMonth === lastMonthStr) || {}
+  const deptSales = Number(curM.영업팀 || 0)
+  const deptOpsFee = Number(curM.관리팀 || 0)
+  const deptOpsCon = Number(curM.관리팀계약 || 0)
+  const deptOps = deptOpsFee + deptOpsCon
+  const deptTotal = deptSales + deptOps
+  const prevSales = Number(prevM.영업팀 || 0)
+  const prevOps = Number(prevM.관리팀 || 0) + Number(prevM.관리팀계약 || 0)
+  const opsCount = thisMonthOps.length + ((data?.thisMonthOpsContracts || []) as any[]).length
+  const manWon = (v: number) => v >= 100000000 ? (parseFloat((v / 100000000).toFixed(2)) + '억') : Math.round(v / 10000).toLocaleString() + '만'
+  const deltaTxt = (cur: number, prev: number) => prev > 0
+    ? <span className={cur >= prev ? 'text-emerald-600' : 'text-red-500'}>{cur >= prev ? '▲' : '▼'} 전월 전체 {manWon(prev)}의 {Math.round((cur / prev) * 100)}%</span>
+    : <span className="text-gray-400">전월 {manWon(prev)}</span>
+
   return (
     <div className="space-y-6 pb-8">
+      {/* ── 이번 달 지금까지 부서별 매출 ── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 md:p-6">
+        <div className="flex items-baseline justify-between mb-4">
+          <h3 className="text-sm font-bold text-[#0b2140]">이번 달 부서별 매출</h3>
+          <p className="text-[11px] text-gray-400">{now.getMonth() + 1}월 1일 ~ {now.getMonth() + 1}월 {now.getDate()}일 (오늘까지)</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="rounded-xl bg-[#0b2140]/[.05] border border-[#0b2140]/10 px-4 py-4">
+            <p className="text-[11px] font-semibold text-[#0b2140]/70">영업팀</p>
+            <p className="text-2xl font-black text-[#0b2140] mt-1 tabular-nums">{manWon(deptSales)}</p>
+            <p className="text-[11px] text-gray-400 tabular-nums">{Math.round(deptSales).toLocaleString()}원 · 계약 {thisMonthSales.length}건</p>
+            <p className="text-[11px] mt-1">{deltaTxt(deptSales, prevSales)}</p>
+          </div>
+          <div className="rounded-xl bg-[#b8995a]/10 border border-[#b8995a]/25 px-4 py-4">
+            <p className="text-[11px] font-semibold text-[#a8873f]">관리팀</p>
+            <p className="text-2xl font-black text-[#a8873f] mt-1 tabular-nums">{manWon(deptOps)}</p>
+            <p className="text-[11px] text-gray-400 tabular-nums">{Math.round(deptOps).toLocaleString()}원 · {opsCount}건</p>
+            <p className="text-[11px] text-gray-400">수수료 {manWon(deptOpsFee)} · 계약금 {manWon(deptOpsCon)}</p>
+            <p className="text-[11px] mt-1">{deltaTxt(deptOps, prevOps)}</p>
+          </div>
+          <div className="rounded-xl bg-gradient-to-br from-[#10203a] to-[#0a1424] px-4 py-4">
+            <p className="text-[11px] font-semibold text-white/60">전체 합계</p>
+            <p className="text-2xl font-black text-[#E8D080] mt-1 tabular-nums">{manWon(deptTotal)}</p>
+            <p className="text-[11px] text-white/45 tabular-nums">{Math.round(deptTotal).toLocaleString()}원</p>
+            <p className="text-[11px] mt-1 text-white/60">{deltaTxt(deptTotal, prevSales + prevOps)}</p>
+          </div>
+        </div>
+        <p className="text-[10px] text-gray-400 mt-3">발굴팀은 DB를 공급하는 부서라 직접 매출이 없습니다(절감 효과는 아래 발굴팀 패널). 환불은 영업팀 매출에서 차감되어 반영됩니다.</p>
+      </div>
+
       {/* ── 경영 분석: 매출·비용·순이익 추이, 성장 여부, 팀별 본전, 목표 시뮬레이션, 세금 ── */}
       <RevenueAnalytics data={data} />
 

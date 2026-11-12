@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
+import { useHistoryState } from '@/lib/navHistory'
 import Image from 'next/image'
 import Link from 'next/link'
 import { signOut } from 'next-auth/react'
@@ -188,7 +189,7 @@ const nowLocalMin = () => { const d = new Date(); return `${localDate(d)}T${pad2
 const callTimeInPast = (v: string) => { const t = new Date(v).getTime(); return !isNaN(t) && t < Date.now() }
 
 export default function DigDashboard({ userId, userName, username }: Props) {
-  const [activeTab, setActiveTab]   = useState<Tab>('dig')
+  const [activeTab, setActiveTab]   = useHistoryState<Tab>('t', 'dig', ['dig','profile'])
   const [menuOpen, setMenuOpen]     = useState(false)
   const [prospects, setProspects]   = useState<Prospect[]>([])
   const [submitting, setSubmitting] = useState(false)

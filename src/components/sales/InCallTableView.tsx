@@ -3,6 +3,7 @@ import ActivityStamps, { type StampEntry } from '@/components/shared/ActivitySta
 import ContractWizard from '@/components/shared/ContractWizard'
 
 import { useState, useRef, useEffect } from 'react'
+import { useBackToClose } from '@/lib/navHistory'
 import { createPortal } from 'react-dom'
 import NumberInput, { parseNumber, formatNumber } from '@/components/ui/NumberInput'
 import MeetingJournal from '@/components/sales/MeetingJournal'
@@ -119,19 +120,36 @@ export interface Customer {
 function ResultMemoField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [local, setLocal] = useState(value)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingRef = useRef<string | null>(null)       // 아직 저장 안 된 입력
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
 
-  useEffect(() => { setLocal(value) }, [value])
+  // 서버 값이 바뀌어 들어와도, 지금 치고 있는(저장 대기 중인) 글은 덮어쓰지 않는다 — 타자가 빠를 때 입력하던 문장이 사라지던 원인
+  useEffect(() => { if (pendingRef.current === null) setLocal(value) }, [value])
+
+  function flush() {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null }
+    if (pendingRef.current !== null) {
+      const v = pendingRef.current
+      pendingRef.current = null
+      onChangeRef.current(v)
+    }
+  }
+  // 창을 닫거나 다른 곳으로 이동할 때 아직 저장 안 된 글을 먼저 저장
+  useEffect(() => () => flush(), [])   // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleChange(v: string) {
     setLocal(v)
+    pendingRef.current = v
     if (timer.current) clearTimeout(timer.current)
-    timer.current = setTimeout(() => onChange(v), 1000)
+    timer.current = setTimeout(flush, 1000)
   }
 
   return (
     <textarea
       value={local}
       onChange={e => handleChange(e.target.value)}
+      onBlur={flush}
       rows={4}
       placeholder="통화 결과, 반응, 특이사항..."
       className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50 resize-none"
@@ -427,31 +445,59 @@ interface BadgeDropdownProps {
 
 function BadgeDropdown({ value, options, onChange, placeholder }: BadgeDropdownProps) {
   const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number } | null>(null)
   const ref = useRef<HTMLDivElement>(null)
+  const popRef = useRef<HTMLDivElement>(null)
   const current = options.find(o => o.key === value) || options[options.length - 1]
 
   useEffect(() => {
     if (!open) return
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    function handler(e: Event) {
+      const t = e.target as Node
+      if (ref.current?.contains(t) || popRef.current?.contains(t)) return
+      setOpen(false)
     }
+    const close = () => setOpen(false)
     document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    document.addEventListener('touchstart', handler, { passive: true })
+    window.addEventListener('resize', close)
+    window.addEventListener('scroll', close, true)
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      document.removeEventListener('touchstart', handler)
+      window.removeEventListener('resize', close)
+      window.removeEventListener('scroll', close, true)
+    }
   }, [open])
+
+  // 메뉴는 카드 밖(body)에 띄워서, 아래쪽 카드나 패널 경계에 가려지지 않게 한다. 화면 아래가 모자라면 위로 펼침.
+  function toggle() {
+    if (!open && ref.current) {
+      const r = ref.current.getBoundingClientRect()
+      const h = options.length * 30 + 10
+      const left = Math.max(8, Math.min(window.innerWidth - 118, r.left + r.width / 2 - 55))
+      setPos(r.bottom + h + 8 > window.innerHeight && r.top > h
+        ? { left, bottom: window.innerHeight - r.top + 4 }
+        : { left, top: r.bottom + 4 })
+    }
+    setOpen(v => !v)
+  }
 
   return (
     <div className="relative w-full" ref={ref}>
       <button
         type="button"
-        onClick={() => setOpen(v => !v)}
+        onClick={toggle}
         title={current.key || placeholder || '—'}
         className={`w-full block text-center px-0.5 py-0.5 rounded text-[8px] font-bold cursor-pointer select-none leading-tight overflow-hidden whitespace-nowrap ${current.color}`}
         style={{ textOverflow: 'ellipsis' }}
       >
         {current.key || placeholder || '—'}
       </button>
-      {open && (
-        <div className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[100px] py-1">
+      {open && pos && createPortal(
+        <div ref={popRef} style={{ position: 'fixed', left: pos.left, top: pos.top, bottom: pos.bottom }}
+          className="z-[600] bg-white rounded-lg shadow-xl border border-gray-200 min-w-[110px] py-1"
+          onClick={e => e.stopPropagation()}>
           {options.map(opt => (
             <button
               key={opt.key || '__empty__'}
@@ -464,7 +510,8 @@ function BadgeDropdown({ value, options, onChange, placeholder }: BadgeDropdownP
               </span>
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
@@ -1026,7 +1073,9 @@ function CustomerCard({
 
   const c = customer
   const expanded = expandedId === c.id
-  // 카드가 펼쳐진 동안은 뒤쪽 화면이 스크롤되지 않게 잠근다
+  // 카드가 펼쳐진 동안은 뒤쪽 화면이 스크롤되지 않게 잠근다.
+  // (예전에는 body 를 position:fixed 로 고정하는 방식을 함께 써서, 휴대폰에서 맨 아래까지 본 뒤 위로 밀 때 스크롤이 걸렸다 — overflow 잠금 하나만 쓰고 패널 쪽에서 overscroll 을 막는다)
+  useBackToClose(expanded, () => onExpand(null))
   useEffect(() => {
     if (!expanded) return
     const prev = document.body.style.overflow
@@ -1034,32 +1083,6 @@ function CustomerCard({
     return () => { document.body.style.overflow = prev }
   }, [expanded])
   const isTransferred = !!(c.details as any)?.ops_transferred
-
-  // 확장 패널 열리면 배경 스크롤 잠금 (iOS 호환)
-  useEffect(() => {
-    if (expanded) {
-      const scrollY = window.scrollY
-      document.body.style.overflow = 'hidden'
-      document.body.style.position = 'fixed'
-      document.body.style.top = `-${scrollY}px`
-      document.body.style.width = '100%'
-    } else {
-      const scrollY = Math.abs(parseInt(document.body.style.top || '0', 10))
-      document.body.style.overflow = ''
-      document.body.style.position = ''
-      document.body.style.top = ''
-      document.body.style.width = ''
-      if (scrollY) window.scrollTo(0, scrollY)
-    }
-    return () => {
-      const scrollY = Math.abs(parseInt(document.body.style.top || '0', 10))
-      document.body.style.overflow = ''
-      document.body.style.position = ''
-      document.body.style.top = ''
-      document.body.style.width = ''
-      if (scrollY) window.scrollTo(0, scrollY)
-    }
-  }, [expanded])
 
   // 직가/공가 판정을 한 곳으로 통일: DB 탭 상태 → 직가 플래그 → 선택값 (표시·통계 불일치 방지)
   const leadType: '' | '직가' | '공가' =
@@ -1092,7 +1115,8 @@ function CustomerCard({
 
   async function addTimelineEntry() {
     if (!tlText.trim() || tlSaving) return
-    const savedText = tlText.trim()
+    const sentRaw = tlText
+    const savedText = sentRaw.trim()
     const entry = {
       user: userName,
       content: savedText,
@@ -1103,7 +1127,8 @@ function CustomerCard({
     setTlError('')
     try {
       await onUpdate(c.id, { call_timeline: updated })
-      setTlText('')
+      // 저장하는 동안 계속 친 글자는 지우지 않는다 — 저장한 부분만 빼고 나머지는 남김
+      setTlText(cur => cur === sentRaw ? '' : (cur.startsWith(sentRaw) ? cur.slice(sentRaw.length) : cur))
     } catch {
       setTlError('저장 실패 — 다시 시도해주세요')
     } finally {
@@ -1680,7 +1705,7 @@ function CustomerCard({
           {/* 배경 오버레이 */}
           <div className="fixed inset-0 bg-black/40 z-[199]" onClick={() => onExpand(null)} />
           {/* 우측 슬라이딩 패널 */}
-          <div ref={expandedRef} className="fixed top-0 right-0 bottom-0 w-full md:w-[34vw] md:min-w-[620px] md:max-w-[960px] bg-[#FAFAF8] z-[200] flex flex-col overflow-y-auto md:overflow-hidden shadow-2xl">
+          <div ref={expandedRef} className="fixed top-0 right-0 bottom-0 w-full md:w-[34vw] md:min-w-[620px] md:max-w-[960px] bg-[#FAFAF8] z-[200] flex flex-col overflow-y-auto overscroll-contain md:overflow-hidden shadow-2xl" style={{ WebkitOverflowScrolling: 'touch' }}>
 
           {/* 상단 액션 바 */}
           <div className="sticky md:static top-0 shrink-0 flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b border-gray-100 bg-white z-10">
@@ -1826,7 +1851,8 @@ function CustomerCard({
                 )}
               </div>
               {/* 스크롤 영역 */}
-              <div className="flex-1 overflow-y-auto min-h-0">
+              {/* 휴대폰에서는 패널 전체가 한 번에 스크롤(안쪽 스크롤 겹침 방지), 큰 화면에서만 이 영역이 따로 스크롤 */}
+              <div className="md:flex-1 md:overflow-y-auto md:min-h-0">
 
               {logEditMode ? (
                 /* ── 편집 모드: 인풋 폼 ── */
@@ -2290,7 +2316,6 @@ function CustomerCard({
                         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTimelineEntry() } }}
                         placeholder="기록 입력 후 Enter…"
                         className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400/50"
-                        disabled={tlSaving}
                       />
                       <button
                         type="button"
