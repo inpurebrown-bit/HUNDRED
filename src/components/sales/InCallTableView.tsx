@@ -877,6 +877,10 @@ function CustomerCard({
   const [menuPos, setMenuPos] = useState<{ top: number; left: number; maxH: number } | null>(null)
   const popRef = useRef<HTMLDivElement>(null)
   const [ceoMoveOpen, setCeoMoveOpen] = useState(false)
+  const [upsellOpen, setUpsellOpen] = useState(false)
+  const [upKind, setUpKind] = useState('')
+  const [upAmount, setUpAmount] = useState('')
+  const [upDate, setUpDate] = useState(() => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10))
 
   // 직가DB로 설정: status + is_direct 플래그 + db010_month 동시 설정
   async function setToDirectDb() {
@@ -1702,6 +1706,52 @@ function CustomerCard({
           >
             자금팀 전송
           </button>
+        )}
+        {tabType === 'contracted' && (
+          <>
+            {((c as any).details?.cert_upsells || []).length > 0 && (
+              <p className="mt-1 text-[9px] font-bold text-teal-700 bg-teal-50 border border-teal-200 rounded px-1 py-0.5 text-center">
+                인증 업셀 {((c as any).details.cert_upsells as any[]).length}건 · {((c as any).details.cert_upsells as any[]).reduce((s, u) => s + Number(u.amount || 0), 0).toLocaleString('ko-KR')}원
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); setUpsellOpen(true) }}
+              className="mt-1 w-full text-[9px] bg-teal-600 hover:bg-teal-700 text-white rounded py-1 font-semibold transition-colors"
+            >
+              + 인증 업셀링
+            </button>
+          </>
+        )}
+        {upsellOpen && (
+          <div className="fixed inset-0 z-[300] bg-black/40 flex items-center justify-center p-4" onClick={e => { e.stopPropagation(); setUpsellOpen(false) }}>
+            <div className="bg-white rounded-2xl w-full max-w-sm p-4 space-y-3" onClick={e => e.stopPropagation()}>
+              <p className="font-bold text-[#1B2A45] text-sm">인증 업셀링 · {(c as any).details?.company || c.name}</p>
+              <p className="text-[11px] text-gray-500 leading-relaxed">이미 계약한 업체에 인증(이노비즈·벤처 등)을 추가로 받은 건입니다. 자금 승인 후 영업팀이 다시 영업해 받은 건을 넣으세요. 잔금이 아니라 <b>별도 인증 매출(인센 20%)</b>로 잡히고, 관리팀 카드에 &quot;인증추가&quot; 표시가 붙습니다.</p>
+              {((c as any).details?.cert_upsells || []).map((u: any, i: number) => (
+                <div key={i} className="flex items-center justify-between text-xs bg-teal-50 rounded-lg px-2 py-1">
+                  <span>{u.date} · {u.kind || '인증'} · {Number(u.amount || 0).toLocaleString('ko-KR')}원</span>
+                  <button type="button" className="text-red-500 text-[11px]" onClick={async () => {
+                    if (!confirm('이 업셀링 기록을 삭제할까요?')) return
+                    await onUpdate(c.id, { details: { cert_upsells: ((c as any).details.cert_upsells as any[]).filter((_, k) => k !== i) } })
+                  }}>삭제</button>
+                </div>
+              ))}
+              <input value={upKind} onChange={e => setUpKind(e.target.value)} placeholder="인증 종류 (예: 이노비즈, 벤처)" className="w-full border rounded-lg px-2 py-1.5 text-xs" />
+              <input value={upAmount} onChange={e => setUpAmount(e.target.value.replace(/[^\d]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ','))} placeholder="업셀 금액 (VAT 별도, 원)" className="w-full border rounded-lg px-2 py-1.5 text-xs" />
+              <input type="date" value={upDate} onChange={e => setUpDate(e.target.value)} className="w-full border rounded-lg px-2 py-1.5 text-xs" />
+              <div className="flex gap-2">
+                <button type="button" className="flex-1 border rounded-lg py-1.5 text-xs" onClick={() => setUpsellOpen(false)}>닫기</button>
+                <button type="button" className="flex-1 bg-teal-600 text-white rounded-lg py-1.5 text-xs font-semibold" onClick={async () => {
+                  const amt = Number(upAmount.replace(/,/g, ''))
+                  if (!amt) { alert('금액을 입력하세요'); return }
+                  const prev = ((c as any).details?.cert_upsells || []) as any[]
+                  await onUpdate(c.id, { details: { cert_upsells: [...prev, { date: upDate, kind: upKind.trim() || '인증', amount: amt, by: 'sales' }] } })
+                  setUpKind(''); setUpAmount('')
+                }}>추가</button>
+              </div>
+            </div>
+          </div>
         )}
         {tabType === 'contracted' && isTransferred && (
           <div className="mt-1.5 space-y-1">

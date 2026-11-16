@@ -34,6 +34,10 @@ export function teamOf(teams: { name: string; team_no: number }[], name: string)
 }
 export const isStartMember = (teams: { name: string; team_no: number }[], name: string) => teamOf(teams, name) === 1
 
+// 관리실장 새 보수 — 2026-12 급여부터 (11월은 옛 건과 섞여 있어 종전 그대로)
+export const OPS_V2_FROM = '2026-12'
+export const OPS_V2 = { certUpsellRate: 0.20, chiefRate: 0.05, introRate: 0.30, upsellPay: 150_000 } as const   // 총 매출 5% · 소개건 선금 30% · 기장료 업셀 1개당 15만원
+
 export const parseMoney = (v: any) => parseInt(String(v ?? '0').replace(/[^0-9]/g, ''), 10) || 0
 export const tierRate = (monthlyPrepay: number) => (V2.tiers.find(t => monthlyPrepay >= t.min) || V2.tiers[V2.tiers.length - 1]).rate
 
@@ -50,7 +54,7 @@ const mondayOf = (d: string) => {
 }
 
 // 계약 금액 중 인증사업 몫 (입금을 항목 금액 비율대로 나눈다)
-function certShare(c: any): number {
+export function certShare(c: any): number {
   const cert = parseMoney(c?.details?.cert_amount)
   if (cert <= 0) return 0
   const fee = parseMoney(c?.details?.contract_fee)
@@ -58,7 +62,7 @@ function certShare(c: any): number {
 }
 
 // 선금 매출(계약 시 입금, 부가세 제외): 입력한 "내 매출"이 있으면 그것, 없으면 입금액(부가세 포함이면 1.1로 나눔)
-function prepayRevenue(c: any): number {
+export function prepayRevenue(c: any): number {
   const my = parseMoney(c?.details?.my_revenue)
   if (my > 0) return my
   const pay = parseMoney(c?.details?.payment_amount)
@@ -73,12 +77,41 @@ export interface V2Bucket {
 }
 const emptyBucket = (): V2Bucket => ({ prepayFund: 0, prepayCert: 0, balanceFund: 0, balanceCert: 0, weeklyPrepay: {}, entries: [] })
 
+/** 관리팀이 직접 받은 인증 업셀 금액 — 월별·담당자별 {month: {name: amount}} */
+export function opsUpsellByMonth(customers: any[]): Record<string, Record<string, number>> {
+  const out: Record<string, Record<string, number>> = {}
+  for (const c of customers || []) for (const u of (Array.isArray(c?.details?.cert_upsells) ? c.details.cert_upsells : [])) {
+    if (u?.by !== 'ops' || !u?.by_name) continue
+    const amt = Math.round(parseMoney(u?.amount)); const m = String(u?.date || '').slice(0, 7)
+    if (amt <= 0 || !m) continue
+    const nm = String(u.by_name).trim()
+    const row = (out[m] ||= {})
+    row[nm] = (row[nm] || 0) + amt
+  }
+  return out
+}
+
 /** 그 달에 들어온 새 구조(v2) 건의 영업 사원별 매출 집계 */
 export function buildSalesV2Map(customers: any[], yearMonth: string): Record<string, V2Bucket> {
   const map: Record<string, V2Bucket> = {}
   const get = (name: string) => (map[name] ||= emptyBucket())
   const ownerOf = (c: any) => String(c?.details?.sales_user_name || c?.sales_user_name || '').trim()
   for (const c of customers || []) {
+    // 인증 업셀링: 영업팀이 자금 승인 후 다시 영업해서 받은 건(by 'sales')만 영업 인증 매출(20%)로 잡는다.
+    // 관리팀이 직접 친 건(by 'ops')은 영업 인센 없음 — 관리실장 총 매출 5%에만 자동 포함. 옛 계약 업체에도 적용.
+    if (Array.isArray(c?.details?.cert_upsells)) {
+      const uname = ownerOf(c)
+      for (const u of c.details.cert_upsells) {
+        if (!uname || u?.by === 'ops' || String(u?.date || '').slice(0, 7) !== yearMonth) continue
+        const amt = Math.round(parseMoney(u?.amount))
+        if (amt <= 0) continue
+        const b = get(uname)
+        b.prepayCert += amt
+        const wk = mondayOf(String(u.date))
+        b.weeklyPrepay[wk] = (b.weeklyPrepay[wk] || 0) + amt
+        b.entries.push({ company: `${c.details?.company || c.name || ''} (인증 업셀 ${u.kind || ''})`, date: String(u.date), kind: '선금', fund: 0, cert: amt })
+      }
+    }
     if (!isV2Contract(c)) continue
     const name = ownerOf(c)
     if (!name) continue
@@ -166,4 +199,65 @@ export function v2PayFor(customers: any[], yearMonth: string, name: string, join
   const key = Object.keys(map).find(k => k === name || k.includes(name) || name.includes(k))
   const pay = calcSalesV2(key ? map[key] : undefined, yearMonth, joinDate, startMember)
   return { ...pay, entries: key ? map[key].entries : [] }
+}
+
+// ───────── 회사 전체 새 구조 매출 · 받을 잔금 (매출 관리·손익 화면용) ─────────
+export interface V2MonthRev { month: string; prepayFund: number; prepayCert: number; balanceFund: number; balanceCert: number; total: number; contracts: number }
+export interface V2Receivable { count: number; sum: number; overdueCount: number; overdueSum: number; soonCount: number; soonSum: number; nextDue: string }
+
+const addDaysStr = (d: string, n: number) => { const t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10) }
+const diffDaysStr = (a: string, b: string) => Math.round((Date.parse(a + 'T00:00:00Z') - Date.parse(b + 'T00:00:00Z')) / 86400000)
+
+/** 새 구조 건의 월별 매출(선금·잔금·인증 구분). months: ['2026-11', ...] */
+export function v2MonthlyRevenue(customers: any[], months: string[]): V2MonthRev[] {
+  const rows: Record<string, V2MonthRev> = Object.fromEntries(months.map(m => [m, { month: m, prepayFund: 0, prepayCert: 0, balanceFund: 0, balanceCert: 0, total: 0, contracts: 0 }]))
+  for (const c of customers || []) {
+    if (Array.isArray(c?.details?.cert_upsells)) for (const u of c.details.cert_upsells) {
+      const m = String(u?.date || '').slice(0, 7)
+      const amt = Math.round(parseMoney(u?.amount))
+      if (rows[m] && amt > 0) rows[m].prepayCert += amt
+    }
+    if (!isV2Contract(c)) continue
+    const share = certShare(c)
+    const cm = contractDateOf(c).slice(0, 7)
+    if (rows[cm]) {   // 매출 API 는 계약완료 고객만 넘겨주므로 status 는 보지 않는다
+      const rev = prepayRevenue(c), cert = Math.round(rev * share)
+      rows[cm].prepayCert += cert; rows[cm].prepayFund += rev - cert; rows[cm].contracts += 1
+    }
+    const extras = c?.details?.extra_counts
+    if (Array.isArray(extras)) for (const e of extras) {
+      const m = String(e?.date || '').slice(0, 7)
+      const amt = Math.round(parseFloat(String(e?.amount ?? 0).replace(/[^0-9.-]/g, '')) || 0)
+      if (!rows[m] || amt <= 0) continue
+      const cert = Math.round(amt * share)
+      rows[m].balanceCert += cert; rows[m].balanceFund += amt - cert
+    }
+  }
+  for (const r of Object.values(rows)) r.total = r.prepayFund + r.prepayCert + r.balanceFund + r.balanceCert
+  return months.map(m => rows[m])
+}
+
+/** 받을 잔금(미수) — 선금만 받은 새 구조 계약의 남은 잔금 합계와 기한 */
+export function v2Receivables(customers: any[], today: string): V2Receivable {
+  const out: V2Receivable = { count: 0, sum: 0, overdueCount: 0, overdueSum: 0, soonCount: 0, soonSum: 0, nextDue: '' }
+  for (const c of customers || []) {
+    if (!isV2Contract(c)) continue
+    const d = c.details || {}
+    const total = parseMoney(d.contract_fee)
+    if (total <= 0 || d.balance_done === true) continue
+    const extraSum = (Array.isArray(d.extra_counts) ? d.extra_counts : []).reduce((s: number, e: any) => s + (parseFloat(String(e?.amount ?? 0).replace(/[^0-9.-]/g, '')) || 0), 0)
+    const prepaid = parseMoney(d.net_paid) || (d.vat_included ? Math.round(parseMoney(d.payment_amount) / 1.1) : parseMoney(d.payment_amount))
+    const remaining = Math.max(0, total - prepaid - Math.round(extraSum))
+    if (remaining <= 0) continue
+    const setup = String(d.setup_done_date || d.contract_date || '').slice(0, 10)
+    const due = String(d.balance_due_date || (setup ? addDaysStr(setup, 90) : '')).slice(0, 10)
+    out.count += 1; out.sum += remaining
+    if (due) {
+      const dd = diffDaysStr(due, today)
+      if (dd < 0) { out.overdueCount += 1; out.overdueSum += remaining }
+      else if (dd <= 14) { out.soonCount += 1; out.soonSum += remaining }
+      if (dd >= 0 && (!out.nextDue || due < out.nextDue)) out.nextDue = due
+    }
+  }
+  return out
 }

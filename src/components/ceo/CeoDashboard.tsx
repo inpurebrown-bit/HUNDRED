@@ -1446,6 +1446,59 @@ function RevenueTab() {
         <p className="text-[10px] text-gray-400 mt-3">발굴팀은 DB를 공급하는 부서라 직접 매출이 없습니다(절감 효과는 아래 발굴팀 패널). 환불은 영업팀 매출에서 차감되어 반영됩니다.</p>
       </div>
 
+      {/* ── 새 구조(선금·잔금) 매출 · 받을 잔금 — 2026-11-16 이후 계약 ── */}
+      {(() => {
+        const v2: any = data?.v2
+        if (!v2) return null
+        const months: any[] = (v2.monthly || []).filter((m: any) => m.total > 0 || m.month === thisMonthStr).slice(-4)
+        const cur = (v2.monthly || []).find((m: any) => m.month === thisMonthStr) || { prepayFund: 0, prepayCert: 0, balanceFund: 0, balanceCert: 0, total: 0, contracts: 0 }
+        const rc = v2.receivable || { count: 0, sum: 0, overdueCount: 0, overdueSum: 0, soonCount: 0, soonSum: 0, nextDue: '' }
+        const prepay = cur.prepayFund + cur.prepayCert, balance = cur.balanceFund + cur.balanceCert, cert = cur.prepayCert + cur.balanceCert
+        return (
+          <div className="bg-white rounded-2xl border border-emerald-100 p-5 md:p-6">
+            <div className="flex items-baseline justify-between mb-4 flex-wrap gap-2">
+              <h3 className="text-sm font-bold text-[#0b2140]">새 구조 매출 (선금·잔금)</h3>
+              <p className="text-[11px] text-gray-400">2026-11-16 이후 신규·월정기권 계약 · 수수료 계약은 아래 기존 매출에 그대로 포함</p>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { l: '선금 매출', v: prepay, s: `계약 ${cur.contracts}건`, c: 'text-[#0b2140]' },
+                { l: '잔금 매출', v: balance, s: '이후 받은 잔금', c: 'text-emerald-700' },
+                { l: '인증사업(종합컨설팅)', v: cert, s: '선금+잔금 중 인증 몫', c: 'text-violet-700' },
+                { l: '합계', v: cur.total, s: `${now.getMonth() + 1}월 지금까지`, c: 'text-[#a8873f]' },
+              ].map(t => (
+                <div key={t.l} className="rounded-xl bg-gray-50 border border-gray-100 px-4 py-3">
+                  <p className="text-[11px] text-gray-400">{t.l}</p>
+                  <p className={`text-xl font-black tabular-nums mt-0.5 ${t.c}`}>{manWon(t.v)}</p>
+                  <p className="text-[10px] text-gray-400">{t.s}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 rounded-xl bg-amber-50/70 border border-amber-100 px-4 py-3 flex items-center gap-4 flex-wrap">
+              <div>
+                <p className="text-[11px] font-bold text-amber-700">받을 잔금 (미수)</p>
+                <p className="text-xl font-black text-[#0b2140] tabular-nums">{manWon(rc.sum)} <span className="text-xs font-semibold text-gray-500">{rc.count}건</span></p>
+              </div>
+              <div className="text-[12px] text-gray-600 space-y-0.5 flex-1 min-w-[180px]">
+                <p>기한 지남 <b className={rc.overdueCount ? 'text-rose-600' : 'text-gray-400'}>{rc.overdueCount}건 {rc.overdueCount ? manWon(rc.overdueSum) : ''}</b> · 2주 안 마감 <b className={rc.soonCount ? 'text-amber-700' : 'text-gray-400'}>{rc.soonCount}건 {rc.soonCount ? manWon(rc.soonSum) : ''}</b></p>
+                <p className="text-gray-400">{rc.nextDue ? `가장 가까운 기한 ${rc.nextDue}` : '기한이 잡힌 잔금 없음'}</p>
+              </div>
+              <button type="button" onClick={() => { window.location.hash = 't=balance' }} className="px-3.5 py-2 rounded-xl bg-[#0b2140] text-white text-xs font-bold">잔금 관리 열기 →</button>
+            </div>
+            {months.length > 1 && (
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full min-w-[420px] text-[12px] tabular-nums">
+                  <thead><tr className="text-gray-400 text-[11px] border-b border-gray-100"><th className="text-left font-medium py-1.5">월</th><th className="text-right font-medium">선금</th><th className="text-right font-medium">잔금</th><th className="text-right font-medium">인증</th><th className="text-right font-medium">합계</th></tr></thead>
+                  <tbody>{months.slice().reverse().map((m: any) => (
+                    <tr key={m.month} className="border-b border-gray-50"><td className="py-1.5 text-[#0b2140]">{m.month.slice(5)}월</td><td className="text-right">{manWon(m.prepayFund + m.prepayCert)}</td><td className="text-right">{manWon(m.balanceFund + m.balanceCert)}</td><td className="text-right">{manWon(m.prepayCert + m.balanceCert)}</td><td className="text-right font-bold">{manWon(m.total)}</td></tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
       {/* ── 경영 분석: 매출·비용·순이익 추이, 성장 여부, 팀별 본전, 목표 시뮬레이션, 세금 ── */}
       <RevenueAnalytics data={data} />
 

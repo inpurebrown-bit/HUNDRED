@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { calcExtraCounts } from '@/lib/payrollCalc'
-import { isV2Contract } from '@/lib/payrollV2'
+import { isV2Contract, v2MonthlyRevenue, v2Receivables, opsUpsellByMonth } from '@/lib/payrollV2'
 
 function parseMoney(v: any): number {
   if (!v) return 0
@@ -120,6 +120,27 @@ export async function GET(req: NextRequest) {
         company: `${c.details?.company || c.name || ''} (${e.label || '추가 입금'})`,
         isExtra: true,
         v2: isV2Contract(c),
+      } as any)
+    })
+  }
+
+  // 인증 업셀링: 계약 후 관리팀 단계에서 추가로 받은 인증 매출 — 입금일 달의 회사 매출에 포함.
+  // v2:true 로 표시해 영업 옛 급여에서는 빠지고, 관리실장 총 매출 5%에는 자동 포함된다. (영업 인센은 CERT_UPSELL_SALES_RATE 로 별도)
+  for (const c of (custContracted || []) as any[]) {
+    const list = c.details?.cert_upsells
+    if (!Array.isArray(list)) continue
+    list.forEach((u: any, i: number) => {
+      const amt = parseMoney(u?.amount)
+      if (!(amt > 0) || !u?.date) return
+      salesEntries.push({
+        id: `certup_${c.id}_${i}`,
+        amount: amt,
+        date: String(u.date),
+        sales_user_id: c.owner_id || '',
+        sales_user_name: c.details?.sales_user_name || '',
+        company: `${c.details?.company || c.name || ''} (인증 업셀 ${u.kind || ''})`,
+        isExtra: true,
+        v2: true,
       } as any)
     })
   }
@@ -477,7 +498,16 @@ export async function GET(req: NextRequest) {
     e => e.type === 'puto' && e.date?.startsWith(thisMonthKey)
   ).length
 
+  // 새 구조(선금·잔금) 매출·받을 잔금 — 매출 관리·손익 화면용
+  const v2Months = Object.keys(monthlyMap)
+  const v2 = {
+    monthly: v2MonthlyRevenue(custContracted || [], v2Months),
+    opsUpsell: opsUpsellByMonth(custContracted || []),
+    receivable: v2Receivables(custContracted || [], new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)),
+  }
+
   return NextResponse.json({
+    v2,
     thisMonthExtraCounts: calcExtraCounts(custContracted || [], thisMonthKey),
     monthly,
     salesByUser: Object.values(salesByUser),

@@ -4,15 +4,15 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { DEFAULT_ASM, calcPlan, simulateLoans, parsePhaseEnd, type Assumptions, type PlanLoan } from '@/lib/plannerCalc'
 
 // ─────────────────────────────────────────────────────────────
-// 플래너 — ① 건수를 조작하면 매출·남는 돈이 바로 보이는 시뮬레이터
+// 플래너 — ① 월 선금 매출을 조작하면 인센·남는 돈이 바로 보이는 시뮬레이터
 //          ② 기준점 표 / 월별 현황(실제 매출 연동)
 //          ③ 그 아래: 시뮬레이션 여유 금액으로 짜지는 대출 상환 계획
-// 계산식은 엑셀(기준점·현황 시트)과 같고, 매출은 CRM 매출 관리에서 가져온다.
+// 새 보수 구조(영업 구간 인센, 관리실장 총 매출 5%) 기준이고, 매출은 CRM 매출 관리에서 가져온다.
 // ─────────────────────────────────────────────────────────────
 
 type Mode = 'now' | 'avg' | 'manual'
 interface Saved {
-  asm?: Partial<Assumptions>; simN?: number; opsMode?: Mode; opsManual?: number
+  asm?: Partial<Assumptions>; simRev?: number; opsMode?: Mode; opsManual?: number
   share?: number; extraOverride?: number | null; balances?: Record<string, number>
 }
 interface RawLoan {
@@ -49,7 +49,7 @@ export default function PlannerTab() {
   const [phaseLabels, setPhaseLabels] = useState<[string, string]>(['', ''])
 
   const [asm, setAsm] = useState<Assumptions>({ ...DEFAULT_ASM })
-  const [simN, setSimN] = useState(20)
+  const [simRev, setSimRev] = useState(10_000_000)   // 월 선금 매출(영업)
   const [opsMode, setOpsMode] = useState<Mode>('avg')
   const [opsManual, setOpsManual] = useState(0)
   const [share, setShare] = useState(100)
@@ -80,7 +80,7 @@ export default function PlannerTab() {
       const v: Saved | null = st?.value || null
       if (v) {
         if (v.asm) setAsm({ ...DEFAULT_ASM, ...v.asm })
-        if (typeof v.simN === 'number') setSimN(v.simN)
+        if (typeof v.simRev === 'number') setSimRev(v.simRev)
         if (v.opsMode) setOpsMode(v.opsMode)
         if (typeof v.opsManual === 'number') setOpsManual(v.opsManual)
         if (typeof v.share === 'number') setShare(v.share)
@@ -97,12 +97,12 @@ export default function PlannerTab() {
   useEffect(() => {
     if (!loaded.current) return
     const t = setTimeout(() => {
-      const value: Saved = { asm, simN, opsMode, opsManual, share, extraOverride, balances }
+      const value: Saved = { asm, simRev, opsMode, opsManual, share, extraOverride, balances }
       fetch('/api/planner/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value }) })
         .then(r => setSaveMsg(r.ok ? '자동 저장됨' : '저장 실패')).catch(() => setSaveMsg('저장 실패'))
     }, 900)
     return () => clearTimeout(t)
-  }, [asm, simN, opsMode, opsManual, share, extraOverride, balances])
+  }, [asm, simRev, opsMode, opsManual, share, extraOverride, balances])
 
   // ── 매출 연동 값 ──
   const now = kst()
@@ -116,7 +116,7 @@ export default function PlannerTab() {
   const salesNowRev = Number(curRow?.영업팀 || 0)
   const day = now.getUTCDate()
   const dim = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate()
-  const pacedN = day > 0 && salesNowRev > 0 ? (salesNowRev / asm.unit) / day * dim : 0
+  const pacedRev = day > 0 && salesNowRev > 0 ? salesNowRev / day * dim : 0
 
   // ── 대출 연동 ──
   const phase1End = parsePhaseEnd(phaseLabels[0])
@@ -125,30 +125,20 @@ export default function PlannerTab() {
   const monthlyOf = (l: RawLoan) => Number(inPhase1 ? l.p1_monthly : (l.p2_same ? l.p1_monthly : l.p2_monthly)) || 0
   const loanMonthly = loansRaw.reduce((s, l) => s + monthlyOf(l), 0)
 
-  const plan = useMemo(() => calcPlan(asm, simN, opsRev, loanMonthly), [asm, simN, opsRev, loanMonthly])
+  const plan = useMemo(() => calcPlan(asm, simRev, opsRev, loanMonthly), [asm, simRev, opsRev, loanMonthly])
 
-  // ── ① 기준점 표 ──
+  // ── ① 기준점 표 (월 선금 매출별) ──
   const baseRows = useMemo(() => {
-    const ns = Array.from(new Set([10, 15, 20, 25, 30, 35, 40, simN])).sort((a, b) => a - b)
-    return ns.map(n => ({ n, r: calcPlan(asm, n, opsRev, loanMonthly) }))
-  }, [asm, opsRev, loanMonthly, simN])
+    const ns = Array.from(new Set([500, 750, 1000, 1250, 1500, 1750, 2000, 2250, 2500, Math.round(simRev / 10000)])).sort((a, b) => a - b)
+    return ns.map(n => ({ n, r: calcPlan(asm, n * 10000, opsRev, loanMonthly) }))
+  }, [asm, opsRev, loanMonthly, simRev])
 
-  // ── ② 월별 현황 (실제 매출) ──
-  const monthRows = useMemo(() => monthly.slice(-6).reverse().map(m => {
-    const n = asm.unit > 0 ? Number(m.영업팀 || 0) / asm.unit : 0
-    return { key: m.fullMonth as string, label: m.month as string, cur: m.fullMonth === curKey, n, sales: Number(m.영업팀 || 0), ops: opsOf(m), r: calcPlan(asm, n, opsOf(m), loanMonthly) }
-  }), [monthly, asm, loanMonthly, curKey])
-  // 실제 영업 매출을 그대로 쓰기 위해, 월별 현황은 건수×단가가 아니라 실제 매출로 다시 계산
-  const monthRowsExact = monthRows.map(x => {
-    const rev = x.sales + x.ops
-    const salesPay = x.sales * asm.salesRate, opsPay = x.ops * asm.opsRate
-    const pay = salesPay + opsPay + asm.opsBase + asm.digBase
-    const tax = rev * asm.taxRate
-    const left = rev - pay - tax
-    const afterFixed = left - x.r.fixed
-    const final = afterFixed - x.r.goals
-    return { ...x, rev, left, afterFixed, final, ok: final > 0 }
-  })
+  // ── ② 월별 현황 (실제 매출을 새 보수 구조로 계산하면) ──
+  const monthRowsExact = useMemo(() => monthly.slice(-6).reverse().map(m => {
+    const sales = Number(m.영업팀 || 0), ops = opsOf(m)
+    const r = calcPlan(asm, sales, ops, loanMonthly)
+    return { key: m.fullMonth as string, label: m.month as string, cur: m.fullMonth === curKey, sales, ops, rev: r.rev, left: r.left, afterFixed: r.afterFixed, final: r.final, ok: r.ok, rate: r.rate, needMore: r.needMore }
+  }), [monthly, asm, loanMonthly, curKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 대출 상환 계획 ──
   const planLoans: PlanLoan[] = loansRaw.map(l => ({
@@ -181,34 +171,31 @@ export default function PlannerTab() {
       {/* ═══ ① 시뮬레이터 ═══ */}
       <section className="rounded-2xl bg-gradient-to-br from-[#10203a] to-[#0a1424] text-white p-4 md:p-6 shadow-sm">
         <div className="flex items-baseline justify-between gap-2">
-          <h2 className="text-sm font-bold text-[#E8D080]">이번 달, 얼마 하면?</h2>
+          <h2 className="text-sm font-bold text-[#E8D080]">이번 달, 선금 매출 얼마 하면?</h2>
           <span className="text-[10px] text-white/40">{saveMsg}</span>
         </div>
 
         <div className="mt-4 grid md:grid-cols-[1.1fr_1fr] gap-5">
           {/* 조작 */}
           <div>
-            <p className="text-[11px] text-white/60 mb-1.5">영업 계약 건수 (건당 {man(asm.unit)})</p>
+            <p className="text-[11px] text-white/60 mb-1.5">영업 월 선금 매출 (구간 인센율 {Math.round(plan.rate * 100)}%)</p>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setSimN(n => Math.max(0, n - 1))} className="w-11 h-11 rounded-xl bg-white/10 text-xl font-bold active:bg-white/20">−</button>
-              <input inputMode="numeric" value={simN} onChange={e => setSimN(Math.min(200, parseInt(e.target.value.replace(/[^0-9]/g, ''), 10) || 0))}
-                className="w-24 h-11 rounded-xl bg-white text-[#0b2140] text-center text-2xl font-black tabular-nums focus:outline-none" />
-              <button type="button" onClick={() => setSimN(n => Math.min(200, n + 1))} className="w-11 h-11 rounded-xl bg-white/10 text-xl font-bold active:bg-white/20">+</button>
-              <span className="text-sm text-white/70">건</span>
+              <button type="button" onClick={() => setSimRev(n => Math.max(0, n - 500000))} className="w-11 h-11 rounded-xl bg-white/10 text-xl font-bold active:bg-white/20">−</button>
+              <input inputMode="numeric" value={Math.round(simRev / 10000).toLocaleString()} onChange={e => setSimRev((parseInt(e.target.value.replace(/[^0-9]/g, ''), 10) || 0) * 10000)}
+                className="w-28 h-11 rounded-xl bg-white text-[#0b2140] text-center text-2xl font-black tabular-nums focus:outline-none" />
+              <button type="button" onClick={() => setSimRev(n => Math.min(300000000, n + 500000))} className="w-11 h-11 rounded-xl bg-white/10 text-xl font-bold active:bg-white/20">+</button>
+              <span className="text-sm text-white/70">만원</span>
             </div>
-            <input type="range" min={0} max={60} step={1} value={Math.min(60, simN)} onChange={e => setSimN(parseInt(e.target.value, 10))}
+            <input type="range" min={0} max={30000000} step={500000} value={Math.min(30000000, simRev)} onChange={e => setSimRev(parseInt(e.target.value, 10))}
               className="w-full mt-3 accent-[#E8D080]" />
-            <div className="flex justify-between text-[10px] text-white/35 -mt-0.5"><span>0</span><span>15</span><span>30</span><span>45</span><span>60</span></div>
-            <p className="mt-2 text-[12px] text-white/70">영업 매출 <b className="text-white text-base tabular-nums">{man(plan.salesRev)}</b>
-              <span className="text-white/40"> · 직접 입력 </span>
-              <input inputMode="numeric" value={plan.salesRev ? Math.round(plan.salesRev / 10000).toLocaleString() : ''} placeholder="0"
-                onChange={e => { const v = parseInt(e.target.value.replace(/[^0-9]/g, ''), 10) || 0; setSimN(Math.round(v * 10000 / (asm.unit || 1))) }}
-                className="w-20 rounded-lg bg-white/10 border border-white/15 px-2 py-1 text-right text-sm tabular-nums focus:outline-none" /> 만원</p>
+            <div className="flex justify-between text-[10px] text-white/35 -mt-0.5"><span>0</span><span>750만</span><span>1,500만</span><span>2,250만</span><span>3,000만</span></div>
+            <p className="mt-2 text-[12px] text-white/70">영업 구간 인센 <b className="text-white text-base tabular-nums">{man(plan.salesPay)}</b>
+              <span className="text-white/40"> ({man(simRev)} × {Math.round(plan.rate * 100)}%)</span></p>
 
             {/* 연동 정보 */}
             <div className="mt-4 rounded-xl bg-white/[.06] border border-white/10 px-3 py-2.5 text-[11px] leading-relaxed text-white/70 space-y-1">
-              <p>📊 <b className="text-white/90">이번 달 실제(지금까지)</b> 영업 {man(salesNowRev)} ≈ <b className="text-white/90">{(salesNowRev / (asm.unit || 1)).toFixed(1)}건</b>
-                {pacedN > 0 && <> · 이 속도면 월말 약 <b className="text-[#E8D080]">{Math.round(pacedN)}건</b></>}</p>
+              <p>📊 <b className="text-white/90">이번 달 실제(지금까지)</b> 영업 매출 {man(salesNowRev)}
+                {pacedRev > 0 && <> · 이 속도면 월말 약 <b className="text-[#E8D080]">{man(pacedRev)}</b></>}</p>
               <div className="flex flex-wrap items-center gap-1.5">
                 <span>🏢 관리팀 매출 가정</span>
                 {([['now', `지금까지 ${man(opsNow)}`], ['avg', `3개월 평균 ${man(opsAvg)}`], ['manual', '직접']] as const).map(([k, l]) => (
@@ -236,20 +223,19 @@ export default function PlannerTab() {
                 : <span className="inline-block px-3 py-1 rounded-full bg-rose-400/15 text-rose-300 text-xs font-bold">❌ 실패 — 부족 {man(-plan.final)}</span>}
             </div>
             {!plan.ok && (
-              <p className="mt-2 text-[12px] text-white/80 leading-relaxed">
-                내가 직접 <b className="text-[#E8D080]">{plan.needSelf}건</b> 더 계약하면 채워져요
-                <span className="text-white/45"> (팀 계약이면 {plan.needTeam}건)</span>
-              </p>
+              <p className="mt-2 text-[12px] text-white/80 leading-relaxed">선금 매출을 <b className="text-[#E8D080]">{man(plan.needMore)}</b> 더 올리면 채워져요 <span className="text-white/45">(→ {man(simRev + plan.needMore)})</span></p>
             )}
-            <p className="mt-2 text-[11px] text-white/55">관리팀 {man(opsRev)} 기준, 영업 <b className="text-white/85">{plan.breakEvenN}건</b> 이상이면 성공</p>
+            <p className="mt-2 text-[11px] text-white/55">관리팀 {man(opsRev)} 기준, 선금 매출 <b className="text-white/85">{man(plan.breakEvenRev)}</b> 이상이면 성공</p>
+            {simRev < 5000000 && <p className="mt-2 text-[11px] font-bold text-rose-300">⚠ 월 선금 매출 500만원 미만 — 순환(정리) 대상 수준</p>}
           </div>
         </div>
 
         {/* 계산 내역 */}
         <div className="mt-4 rounded-xl bg-white/[.04] border border-white/10 overflow-hidden text-[12px]">
           {([
-            ['총 매출', plan.rev, `영업 ${man(plan.salesRev)} + 관리 ${man(plan.opsRev)}`, 'text-white'],
-            ['− 인건비', -(plan.salesPay + plan.opsPay), `영업 ${rate(asm.salesRate)}% · 관리 ${rate(asm.opsRate)}%`, 'text-white/80'],
+            ['총 매출', plan.rev, `영업 선금 ${man(plan.salesRev)} + 관리 ${man(plan.opsRev)}`, 'text-white'],
+            ['− 영업 구간 인센', -plan.salesPay, `선금 ${man(plan.salesRev)} × ${Math.round(plan.rate * 100)}%`, 'text-white/80'],
+            ['− 관리실장 5%', -plan.opsPay, `총 매출의 ${rate(asm.chiefRate)}%`, 'text-white/80'],
             ['− 기본급', -plan.baseSalary, `관리 ${man(asm.opsBase)} + 발굴 ${man(asm.digBase)}`, 'text-white/80'],
             ['− 세금', -plan.tax, `매출의 ${rate(asm.taxRate)}%`, 'text-white/80'],
             ['= 남은돈', plan.left, '최종 매출에서 남은돈', 'text-[#E8D080] font-bold'],
@@ -276,31 +262,31 @@ export default function PlannerTab() {
 
         {page === 'base' ? (
           <>
-            <p className="text-[11px] text-gray-400 mb-2">건수별로 이러면 어떻게 되는지 한눈에 — 줄을 누르면 위 시뮬레이터가 그 건수로 바뀝니다 · 관리팀 {man(opsRev)} 기준</p>
+            <p className="text-[11px] text-gray-400 mb-2">월 선금 매출별로 이러면 어떻게 되는지 한눈에 — 줄을 누르면 위 시뮬레이터가 그 금액으로 바뀝니다 · 관리팀 {man(opsRev)} 기준</p>
             <div className="overflow-x-auto -mx-1">
               <table className="w-full min-w-[560px] text-[12px] tabular-nums">
                 <thead>
                   <tr className="text-gray-400 text-[11px] border-b border-gray-100">
-                    <th className="text-left font-medium py-2 px-2">영업 건수</th>
-                    <th className="text-right font-medium px-2">총 매출</th>
+                    <th className="text-left font-medium py-2 px-2">월 선금 매출</th>
+                    <th className="text-right font-medium px-2">인센율</th>
+                    <th className="text-right font-medium px-2">영업 인센</th>
                     <th className="text-right font-medium px-2">남은돈</th>
                     <th className="text-right font-medium px-2">뺄거 다빼고</th>
                     <th className="text-right font-medium px-2">이러면 남은돈</th>
                     <th className="text-center font-medium px-2">결과</th>
-                    <th className="text-right font-medium px-2">내가 더</th>
                   </tr>
                 </thead>
                 <tbody>
                   {baseRows.map(({ n, r }) => (
-                    <tr key={n} onClick={() => setSimN(n)}
-                      className={`cursor-pointer border-b border-gray-50 hover:bg-[#0b2140]/[.04] ${n === simN ? 'bg-[#b8995a]/15 font-bold' : ''}`}>
-                      <td className="py-2 px-2 text-[#0b2140]">{n}건{n === simN && <span className="ml-1 text-[10px] text-[#a8873f]">◀ 지금</span>}</td>
-                      <td className="text-right px-2">{man(r.rev)}</td>
+                    <tr key={n} onClick={() => setSimRev(n * 10000)}
+                      className={`cursor-pointer border-b border-gray-50 hover:bg-[#0b2140]/[.04] ${n * 10000 === simRev ? 'bg-[#b8995a]/15 font-bold' : ''}`}>
+                      <td className="py-2 px-2 text-[#0b2140]">{n.toLocaleString()}만{n * 10000 === simRev && <span className="ml-1 text-[10px] text-[#a8873f]">◀ 지금</span>}</td>
+                      <td className="text-right px-2">{Math.round(r.rate * 100)}%</td>
+                      <td className="text-right px-2">{man(r.salesPay)}</td>
                       <td className="text-right px-2">{man(r.left)}</td>
                       <td className="text-right px-2">{man(r.afterFixed)}</td>
                       <td className={`text-right px-2 font-bold ${r.ok ? 'text-emerald-600' : 'text-rose-500'}`}>{man(r.final)}</td>
                       <td className="text-center px-2">{r.ok ? <span className="text-emerald-600">성공</span> : <span className="text-rose-500">실패</span>}</td>
-                      <td className="text-right px-2 text-gray-500">{r.ok ? '달성' : `${r.needSelf}건 필요`}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -309,38 +295,34 @@ export default function PlannerTab() {
           </>
         ) : (
           <>
-            <p className="text-[11px] text-gray-400 mb-2">CRM 매출 관리의 실제 매출을 그대로 가져와 같은 계산식에 넣은 결과입니다 · 이번 달은 아직 진행 중이라 지금까지 기준</p>
+            <p className="text-[11px] text-gray-400 mb-2">CRM 매출 관리의 실제 영업·관리 매출을 새 보수 구조로 계산하면 이렇게 됩니다 · 이번 달은 진행 중이라 지금까지 기준</p>
             <div className="overflow-x-auto -mx-1">
               <table className="w-full min-w-[640px] text-[12px] tabular-nums">
                 <thead>
                   <tr className="text-gray-400 text-[11px] border-b border-gray-100">
                     <th className="text-left font-medium py-2 px-2">월</th>
-                    <th className="text-right font-medium px-2">영업 매출<span className="text-gray-300"> (환산)</span></th>
+                    <th className="text-right font-medium px-2">영업 매출</th>
                     <th className="text-right font-medium px-2">관리 매출</th>
                     <th className="text-right font-medium px-2">총 매출</th>
                     <th className="text-right font-medium px-2">남은돈</th>
                     <th className="text-right font-medium px-2">이러면 남은돈</th>
                     <th className="text-center font-medium px-2">결과</th>
-                    <th className="text-right font-medium px-2">내가 더</th>
+                    <th className="text-right font-medium px-2">더 필요</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {monthRowsExact.map(x => {
-                    const perSelf = asm.unit * (1 - asm.taxRate)
-                    const need = x.final < 0 && perSelf > 0 ? Math.ceil(-x.final / perSelf) : 0
-                    return (
-                      <tr key={x.key} className={`border-b border-gray-50 ${x.cur ? 'bg-[#b8995a]/15 font-bold' : ''}`}>
-                        <td className="py-2 px-2 text-[#0b2140]">{x.label}{x.cur && <span className="ml-1 text-[10px] text-[#a8873f]">지금까지</span>}</td>
-                        <td className="text-right px-2">{man(x.sales)}<span className="text-gray-300 text-[10px]"> ({x.n.toFixed(1)}건)</span></td>
-                        <td className="text-right px-2">{man(x.ops)}</td>
-                        <td className="text-right px-2">{man(x.rev)}</td>
-                        <td className="text-right px-2">{man(x.left)}</td>
-                        <td className={`text-right px-2 font-bold ${x.ok ? 'text-emerald-600' : 'text-rose-500'}`}>{man(x.final)}</td>
-                        <td className="text-center px-2">{x.ok ? <span className="text-emerald-600">성공</span> : <span className="text-rose-500">실패</span>}</td>
-                        <td className="text-right px-2 text-gray-500">{x.ok ? '달성' : `${need}건 필요`}</td>
-                      </tr>
-                    )
-                  })}
+                  {monthRowsExact.map(x => (
+                    <tr key={x.key} className={`border-b border-gray-50 ${x.cur ? 'bg-[#b8995a]/15 font-bold' : ''}`}>
+                      <td className="py-2 px-2 text-[#0b2140]">{x.label}{x.cur && <span className="ml-1 text-[10px] text-[#a8873f]">지금까지</span>}</td>
+                      <td className="text-right px-2">{man(x.sales)}</td>
+                      <td className="text-right px-2">{man(x.ops)}</td>
+                      <td className="text-right px-2">{man(x.rev)}</td>
+                      <td className="text-right px-2">{man(x.left)}</td>
+                      <td className={`text-right px-2 font-bold ${x.ok ? 'text-emerald-600' : 'text-rose-500'}`}>{man(x.final)}</td>
+                      <td className="text-center px-2">{x.ok ? <span className="text-emerald-600">성공</span> : <span className="text-rose-500">실패</span>}</td>
+                      <td className="text-right px-2 text-gray-500">{x.ok ? '달성' : man(x.needMore)}</td>
+                    </tr>
+                  ))}
                   {monthRowsExact.length === 0 && <tr><td colSpan={8} className="text-center text-gray-400 py-8">아직 매출 데이터가 없습니다</td></tr>}
                 </tbody>
               </table>
@@ -363,10 +345,10 @@ export default function PlannerTab() {
             {/* 연동 설명 + 조작 */}
             <div className="mt-3 rounded-xl bg-[#0b2140]/[.04] border border-[#0b2140]/10 p-3.5">
               <p className="text-[12px] text-gray-600">
-                지금 시뮬레이션({simN}건)의 남는 돈 <b className={plan.ok ? 'text-emerald-600' : 'text-rose-500'}>{man(plan.final)}</b>
+                지금 시뮬레이션(선금 {man(simRev)})의 남는 돈 <b className={plan.ok ? 'text-emerald-600' : 'text-rose-500'}>{man(plan.final)}</b>
                 {plan.ok
                   ? <> 중 <b className="text-[#0b2140]">{share}%</b> 를 매달 금리 높은 대출부터 추가 상환합니다.</>
-                  : <> — 여유가 없어 추가 상환은 0원입니다. 영업 <b>{plan.breakEvenN}건</b> 이상이면 추가 상환이 시작돼요.</>}
+                  : <> — 여유가 없어 추가 상환은 0원입니다. 선금 매출 <b>{man(plan.breakEvenRev)}</b> 이상이면 추가 상환이 시작돼요.</>}
               </p>
               <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2">
                 <label className="flex items-center gap-2 text-[11px] text-gray-500">여유의
@@ -479,13 +461,13 @@ export default function PlannerTab() {
         {showAsm && (
           <div className="mt-4 grid sm:grid-cols-2 gap-x-6 gap-y-2.5 text-[12px]">
             {([
-              ['unit', '계약 1건당 매출', '원'], ['opsBase', '관리팀 기본급', '원'], ['digBase', '발굴팀 기본급', '원'],
+              ['opsBase', '관리실장 기본급', '원'], ['digBase', '발굴팀 기본급', '원'],
               ['rent', '사무실 임대료', '원'], ['extraInterest', '기타 이자·할부 (대출 현황 밖)', '원'], ['card', '카드값', '원'], ['living', '월세', '원'],
               ['marry', '결혼 모을돈 (월)', '원'], ['expand', '사무실 확장 모을돈 (월)', '원'],
             ] as [keyof Assumptions, string, string][]).map(([k, l, u]) => (
               <label key={k} className="flex items-center justify-between gap-3"><span className="text-gray-600">{l}</span><NumInput value={asm[k]} onChange={v => setA(k, v)} suffix={u} className="w-44" /></label>
             ))}
-            {([['salesRate', '영업팀 인건비율'], ['opsRate', '관리팀 인건비율'], ['taxRate', '세금']] as [keyof Assumptions, string][]).map(([k, l]) => (
+            {([['chiefRate', '관리실장 총 매출 인센율'], ['taxRate', '세금']] as [keyof Assumptions, string][]).map(([k, l]) => (
               <label key={k} className="flex items-center justify-between gap-3"><span className="text-gray-600">{l}</span>
                 <span className="inline-flex items-center gap-1 w-44"><input inputMode="decimal" value={rate(asm[k])} onChange={e => setA(k, (parseFloat(e.target.value) || 0) / 100)}
                   className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm text-right tabular-nums focus:outline-none" /><span className="text-[11px] text-gray-400">%</span></span></label>

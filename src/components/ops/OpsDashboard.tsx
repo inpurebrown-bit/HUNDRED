@@ -626,6 +626,51 @@ function CreditReportTab({ savedReport, onSaveReport }: {
 // ──────────────────────────────────────────────────────────────────────
 // OpsDetailPanel (타임라인 기본, 고객정보 탭 제거)
 // ──────────────────────────────────────────────────────────────────────
+// 관리팀 직접 인증 업셀링 — 영업이 가져갔어야 할 20%를 이 담당자가 받는다 (관리실장은 총매출 5%가 따로 붙어 합 25%)
+function CertUpsellOps({ customerId, opsName, initial }: { customerId: string; opsName: string; initial: any[] }) {
+  const [list, setList] = useState<any[]>(initial)
+  const [open, setOpen] = useState(false)
+  const [kind, setKind] = useState('')
+  const [amount, setAmount] = useState('')
+  const [date, setDate] = useState(() => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10))
+  const [busy, setBusy] = useState(false)
+  async function save(next: any[]) {
+    setBusy(true)
+    try {
+      const res = await fetch('/api/customers/' + customerId, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ details: { cert_upsells: next } }) })
+      if (!res.ok) { alert('저장 실패'); return false }
+      setList(next); return true
+    } finally { setBusy(false) }
+  }
+  return (
+    <div className="mb-2 rounded-xl border border-teal-200 bg-teal-50 p-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-bold text-teal-700">인증 업셀링 {list.length > 0 && `· ${list.length}건 ${list.reduce((s, u) => s + Number(u.amount || 0), 0).toLocaleString('ko-KR')}원`}</span>
+        <button type="button" onClick={() => setOpen(o => !o)} className="text-[11px] bg-teal-600 text-white rounded px-2 py-0.5 font-semibold">{open ? '닫기' : '+ 추가'}</button>
+      </div>
+      {list.map((u, i) => (
+        <div key={i} className="flex items-center justify-between text-[11px] mt-1">
+          <span>{u.date} · {u.kind || '인증'} · {Number(u.amount || 0).toLocaleString('ko-KR')}원 · {u.by === 'ops' ? `관리(${u.by_name || ''})` : '영업'}</span>
+          <button type="button" disabled={busy} className="text-red-500" onClick={async () => { if (confirm('삭제할까요?')) await save(list.filter((_, k) => k !== i)) }}>삭제</button>
+        </div>
+      ))}
+      {open && (
+        <div className="mt-2 space-y-1.5">
+          <p className="text-[10px] text-teal-700">관리팀이 직접 받은 인증 건입니다. 영업 인센 20%는 영업이 아니라 입력한 담당자({opsName || '미지정'})에게 갑니다.</p>
+          <input value={kind} onChange={e => setKind(e.target.value)} placeholder="인증 종류" className="w-full border rounded px-2 py-1 text-xs" />
+          <input value={amount} onChange={e => setAmount(e.target.value.replace(/[^\d]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ','))} placeholder="금액 (VAT 별도, 원)" className="w-full border rounded px-2 py-1 text-xs" />
+          <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full border rounded px-2 py-1 text-xs" />
+          <button type="button" disabled={busy} className="w-full bg-teal-600 text-white rounded py-1 text-xs font-semibold" onClick={async () => {
+            const amt = Number(amount.replace(/,/g, ''))
+            if (!amt) { alert('금액을 입력하세요'); return }
+            if (await save([...list, { date, kind: kind.trim() || '인증', amount: amt, by: 'ops', by_name: opsName }])) { setKind(''); setAmount(''); setOpen(false) }
+          }}>업셀링 저장</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; onSave: (id: string, patch: Record<string, any>) => void; userRole?: string; userName?: string }) {
   const [local, setLocal] = useState<OpsCase>({ ...c })
   const [activeDetailTab, setActiveDetailTab] = useState<DetailTab>('진행현황')
@@ -1383,6 +1428,9 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                 ...((local.customers?.details as any)?.activity_log || []).map((e: any) => ({ ...e, src: 'sales' })),
               ]} />
             </div>
+            {(c as any).customers?.id && (
+              <CertUpsellOps customerId={String((c as any).customers.id)} opsName={c.ops_user_name || userName || ''} initial={((c as any).customers?.details?.cert_upsells as any[]) || []} />
+            )}
             <TimelineSection initialTimeline={local.timeline || []} onSchedule={schedule} userName={userRole === 'ceo' ? 'ceo' : userName}
               salesTimeline={local.customers?.call_timeline || []}
               salesMemos={(() => {
@@ -2600,11 +2648,14 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
     !['종료','완료','환불','refunded','completed'].includes(c.progress_stage)
 
   const isMonthlyCard = c.details?.contract_type === '월정기권'
+  const hasCertUpsell = Array.isArray(c.customers?.details?.cert_upsells) && c.customers.details.cert_upsells.length > 0
 
   return (
     <div
       className={`border rounded-xl p-2 cursor-pointer hover:shadow-md transition-all relative flex flex-col ${
-        isMonthlyCard
+        hasCertUpsell
+          ? isOpen ? 'bg-teal-50 ring-2 ring-teal-500 border-teal-400' : 'bg-teal-50 border-teal-300 hover:border-teal-500'
+          : isMonthlyCard
           ? isOpen ? 'bg-purple-50 ring-2 ring-purple-400 border-purple-300' : 'bg-purple-50 border-purple-200 hover:border-purple-400'
           : isOpen ? 'bg-white ring-2 ring-violet-400 border-violet-300' : 'bg-white border-gray-200 hover:border-violet-300'
       }`}
@@ -2623,6 +2674,9 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
         )}
         {needsConsulting && (
           <span className="text-[7px] font-bold bg-amber-500 text-white px-1 rounded leading-tight shrink-0">자료</span>
+        )}
+        {hasCertUpsell && (
+          <span className="text-[7px] font-bold bg-teal-600 text-white px-1 rounded leading-tight shrink-0">인증추가</span>
         )}
       </div>
 

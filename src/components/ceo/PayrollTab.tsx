@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { isTester } from '@/lib/tester'
 import { bizDays } from '@/lib/digStats'
 import { calcWithholding, calcSalesStructure, resignBizProration, SALES_BASE_PAY, SALES_BASE_RATE, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, calcMonthlySubBonus, calcRefundDeductions, calcDigSalary, calcDigMonth, digLeaveDays, digUnpaidLeaveCount, DIG_BASE_SALARY, DIG_HOURLY_BASE, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
-import { v2PayFor, isV2Contract, V2_START, V2, teamOf } from '@/lib/payrollV2'
+import { v2PayFor, isV2Contract, V2_START, V2, teamOf, OPS_V2_FROM, OPS_V2 } from '@/lib/payrollV2'
 import { contractWeight } from '@/lib/supplyRules'
 
 // ─── 타입 ─────────────────────────────────────────────────
@@ -18,6 +18,10 @@ interface OpsEmployee {
   puto_revenue: number
   performance_bonus: number
   monthly_sub_bonus: number  // 월정기권 5% 보너스 (관리팀장)
+  chief?: boolean            // 관리실장 — 2026-12 급여부터 새 보수(총 매출 5% + 소개건 30% + 기장료 업셀). false 면 종전 계산
+  upsell_count?: number      // 기장료 업셀 개수 (1개당 15만원)
+  cert_upsell_rev?: number   // 이 담당자가 직접 받은 인증 업셀 금액(그 달) — 20% 지급, 자동 반영
+  v2_total?: number          // 새 보수 세전 합계(기본급·성과급·시상금 포함) — 명세서·손익이 읽는다
   fee_details?: OpsFeeDetail[]
   awards: AwardItem[]
 }
@@ -66,14 +70,24 @@ interface OtherCosts {
 
 // ─── 계산 ─────────────────────────────────────────────────
 
-function calcOps(e: OpsEmployee) {
+function calcOps(e: OpsEmployee, ym?: string, totalRev = 0) {
+  // 2026-12 급여부터 관리실장은 새 보수: 기본급 + 총 매출 5% + 소개건 선금 30% + 기장료 업셀 1개당 15만원 (수수료 10%·월정기권 5%는 폐지)
+  if (ym && ym >= OPS_V2_FROM && e.chief !== false) {
+    const total5  = Math.round(totalRev * OPS_V2.chiefRate)
+    const intro   = Math.round(Number(e.puto_revenue) * OPS_V2.introRate)
+    const upsell  = Math.round(Number(e.upsell_count || 0)) * OPS_V2.upsellPay
+    const certUp  = Math.round(Number(e.cert_upsell_rev || 0) * OPS_V2.certUpsellRate)
+    const awardsSum2 = (e.awards || []).reduce((s, a) => s + Number(a.amount || 0), 0)
+    const before2 = Number(e.base_salary) + total5 + intro + upsell + certUp + Number(e.performance_bonus) + awardsSum2
+    return { v2: true as const, feeInc: 0, putoInc: 0, subBonus: 0, total5, intro, upsell, certUp, awardsSum: awardsSum2, before: before2, after: calcWithholding(before2).after }
+  }
   const feeInc   = Math.round(Number(e.fee_revenue)  * OPS_FEE_RATE)
   const putoInc  = Math.round(Number(e.puto_revenue) * OPS_PUTO_RATE)
   const subBonus = Number(e.monthly_sub_bonus || 0)
   const awardsSum = (e.awards || []).reduce((s, a) => s + Number(a.amount || 0), 0)
   const before   = Number(e.base_salary) + feeInc + putoInc + Number(e.performance_bonus) + subBonus + awardsSum
   const after    = calcWithholding(before).after
-  return { feeInc, putoInc, subBonus, awardsSum, before, after }
+  return { v2: false as const, feeInc, putoInc, subBonus, total5: 0, intro: 0, upsell: 0, certUp: 0, awardsSum, before, after }
 }
 
 // 기본제(160만+7%)는 계약 시작 후 2달까지만 고를 수 있고, 그 뒤에는 인센제(올인센)로 고정된다
@@ -189,16 +203,16 @@ function PayRow({
 // ─── 관리팀 직원 카드 ─────────────────────────────────────
 
 function OpsCard({
-  emp, idx, onChange, onRemove, onAddAward, onUpdateAward, onRemoveAward,
+  emp, idx, ym, totalRev, onChange, onRemove, onAddAward, onUpdateAward, onRemoveAward,
 }: {
-  emp: OpsEmployee; idx: number
+  emp: OpsEmployee; idx: number; ym: string; totalRev: number
   onChange: (i: number, f: keyof OpsEmployee, v: string) => void
   onRemove: (i: number) => void
   onAddAward: (i: number) => void
   onUpdateAward: (ei: number, ai: number, f: keyof AwardItem, v: string) => void
   onRemoveAward: (ei: number, ai: number) => void
 }) {
-  const c = calcOps(emp)
+  const c = calcOps(emp, ym, totalRev)
   return (
     <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
       {/* 헤더 */}
@@ -222,10 +236,30 @@ function OpsCard({
       {/* 항목 */}
       <div className="px-4 py-3 space-y-0">
         <PayRow label="기본급" value={emp.base_salary} editable onEdit={v => onChange(idx, 'base_salary', v)} />
-        <PayRow label="수수료매출(VAT제외)" value={emp.fee_revenue} autoTag />
-        <PayRow label="수수료인센(10%)" value={c.feeInc} />
-        <PayRow label="뿌토매출(VAT제외)" value={emp.puto_revenue} autoTag />
-        <PayRow label="뿌토인센(40%)" value={c.putoInc} />
+        {c.v2 ? (
+          <>
+            <div className="mt-1 mb-0.5 rounded-lg bg-emerald-50 border border-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-700">새 보수 (2026-12~) · 관리실장</div>
+            <PayRow label={`총 매출 5% (회사 총 매출 ${Math.round(totalRev).toLocaleString('ko-KR')}원)`} value={c.total5} autoTag />
+            <PayRow label="소개건 선금 매출(VAT제외)" value={emp.puto_revenue} autoTag />
+            <PayRow label="소개건 인센(30%)" value={c.intro} />
+            <PayRow label={`직접 인증 업셀 20% (업셀 ${Number(emp.cert_upsell_rev || 0).toLocaleString('ko-KR')}원)`} value={c.certUp} autoTag />
+            <div className="flex items-center justify-between py-1.5 border-b border-gray-50">
+              <span className="text-xs text-gray-400">기장료 업셀 <span className="text-[9px] text-gray-300">(1개당 15만원)</span></span>
+              <div className="flex items-center gap-2">
+                <input type="number" min={0} value={emp.upsell_count || 0} onChange={e => onChange(idx, 'upsell_count', e.target.value)}
+                  className="w-16 text-right text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-emerald-300" />
+                <span className="text-xs font-semibold text-gray-700 w-24 text-right">{c.upsell > 0 ? c.upsell.toLocaleString('ko-KR') + '원' : '-'}</span>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <PayRow label="수수료매출(VAT제외)" value={emp.fee_revenue} autoTag />
+            <PayRow label="수수료인센(10%)" value={c.feeInc} />
+            <PayRow label="뿌토매출(VAT제외)" value={emp.puto_revenue} autoTag />
+            <PayRow label="뿌토인센(40%)" value={c.putoInc} />
+          </>
+        )}
         <PayRow label="성과급" value={emp.performance_bonus} editable onEdit={v => onChange(idx, 'performance_bonus', v)} />
         {c.subBonus > 0 && (
           <PayRow label="월정기권보너스(5%)" value={c.subBonus} autoTag colorClass="text-violet-600" />
@@ -663,6 +697,48 @@ export default function PayrollTab() {
     }, 1500)
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
   }, [opsEmps, salesEmps, digEmps, costs, revTotals]) // eslint-disable-line
+
+  // ── 관리팀 직접 인증 업셀 금액 자동 반영 (담당자 이름 기준) ──
+  useEffect(() => {
+    if (yearMonth < OPS_V2_FROM) return
+    let dead = false
+    ;(async () => {
+      try {
+        const d = await (await fetch('/api/revenue')).json()
+        const m: Record<string, number> = d?.v2?.opsUpsell?.[yearMonth] || {}
+        if (dead) return
+        setOpsEmps(prev => {
+          let changed = false
+          const next = prev.map(e => {
+            const want = e.name ? (m[e.name.trim()] || 0) : 0
+            if (Number(e.cert_upsell_rev || 0) === want) return e
+            changed = true
+            return { ...e, cert_upsell_rev: want }
+          })
+          return changed ? next : prev
+        })
+      } catch {}
+    })()
+    return () => { dead = true }
+  }, [yearMonth, opsEmps.length]) // eslint-disable-line
+
+  // ── 관리실장 새 보수 합계를 기록에 남긴다 (2026-12 급여부터) ──
+  useEffect(() => {
+    if (yearMonth < OPS_V2_FROM) return
+    const totalRev = (revTotals?.sales || 0) + (revTotals?.ops || 0) + (revTotals?.opsContract || 0)
+    setOpsEmps(prev => {
+      let changed = false
+      const next = prev.map(e => {
+        if (!e.name) return e
+        const c = calcOps(e, yearMonth, totalRev)
+        const want = c.v2 ? c.before : undefined
+        if ((e.v2_total ?? undefined) === want) return e
+        changed = true
+        return { ...e, v2_total: want }
+      })
+      return changed ? next : prev
+    })
+  }, [yearMonth, opsEmps, revTotals]) // eslint-disable-line
 
   // ── 새 구조(2026-11-16 이후 체결 건) 자동 계산 — 고객 DB 의 선금·잔금·인증사업 금액으로 영업 사원별 급여를 구한다 ──
   const v2CustRef = useRef<{ ym: string; list: any[] } | null>(null)
@@ -1267,7 +1343,7 @@ export default function PayrollTab() {
   }
 
   // ── 손익 집계 ─────────────────────────────────────────────
-  const opsCalcs   = opsEmps.map(calcOps)
+  const opsCalcs   = opsEmps.map(e => calcOps(e, yearMonth, (revTotals?.sales || 0) + (revTotals?.ops || 0) + (revTotals?.opsContract || 0)))
   const salesCalcs = salesEmps.map(e => calcSales(e, yearMonth))
   const digCalcs   = digEmps.map(e => calcDig(e, yearMonth))
 
@@ -1448,7 +1524,7 @@ export default function PayrollTab() {
           </div>
 
           {opsEmps.map((emp, i) => (
-            <OpsCard key={i} emp={emp} idx={i} onChange={updateOps} onRemove={removeOps}
+            <OpsCard key={i} emp={emp} idx={i} ym={yearMonth} totalRev={(revTotals?.sales || 0) + (revTotals?.ops || 0) + (revTotals?.opsContract || 0)} onChange={updateOps} onRemove={removeOps}
               onAddAward={addOpsAward} onUpdateAward={updateOpsAward} onRemoveAward={removeOpsAward} />
           ))}
 

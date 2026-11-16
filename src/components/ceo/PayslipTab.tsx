@@ -36,6 +36,7 @@ interface EmpFinancial {
   work_days?: number
   resign_date?: string
   v2_total?: number          // 2026-11-16 이후 체결 건(선금·잔금 구조) 급여 — 급여 화면에서 자동 계산
+  ops_v2_total?: number      // 관리실장 새 보수 세전 합계(2026-12~) — 있으면 종전 계산 대신 사용
   v2?: { newHire: boolean; stipend: number; startMember: boolean; rotation: boolean; prepayTotal: number; prepayFund: number; rate: number; tierPay: number; balancePay: number; certPay: number; promoWeeks: number; weeklyPromo: number; newHireIncentive: number; total: number }
   // 관리팀
   base_salary: number
@@ -136,10 +137,11 @@ function PayslipDocument({ emp, financial, yearMonth }: {
     const subBonus  = Number(financial.monthly_sub_bonus || 0)
     const awardsSum = (financial.awards || []).reduce((s, a) => s + Number(a.amount || 0), 0)
     const allowSum  = (financial.allowance_details || []).reduce((s, a) => s + Number(a.amount || 0), 0)
-    const subtotal  = Number(financial.base_salary) + feeInc + putoInc + Number(financial.ops_performance_bonus) + subBonus + awardsSum + allowSum
+    const opsV2     = financial.ops_v2_total != null
+    const subtotal  = opsV2 ? Number(financial.ops_v2_total) + allowSum : Number(financial.base_salary) + feeInc + putoInc + Number(financial.ops_performance_bonus) + subBonus + awardsSum + allowSum
     const beforeTax = subtotal - financial.deduction
     const { incomeTax, localTax, after: actualPay } = calcWithholding(beforeTax)
-    return { feeInc, putoInc, subBonus, awardsSum, allowSum, subtotal, beforeTax, incomeTax, localTax, actualPay }
+    return { opsV2, feeInc: opsV2 ? 0 : feeInc, putoInc: opsV2 ? 0 : putoInc, subBonus: opsV2 ? 0 : subBonus, awardsSum, allowSum, subtotal, beforeTax, incomeTax, localTax, actualPay }
   })()
 
   // ── 발굴팀 계산 ──
@@ -740,6 +742,7 @@ export default function PayslipTab() {
               puto_revenue:          Number(match.puto_revenue || 0),
               ops_performance_bonus: Number(match.performance_bonus || 0),
               monthly_sub_bonus:     Number(match.monthly_sub_bonus || 0),
+              ops_v2_total:          match.v2_total != null ? Number(match.v2_total) : undefined,
               awards:                match.awards || [],
             }
           }

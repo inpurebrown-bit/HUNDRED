@@ -60,8 +60,10 @@ export function calcMonthPnl(ym: string, employees: any | null): MonthPnl {
   // 관리팀
   let opsLabor = 0, opsFixed = 0, opsFeeCount = 0
   for (const o of ops) {
-    opsLabor += n(o.base_salary) + Math.round(n(o.fee_revenue) * OPS_FEE_RATE) + Math.round(n(o.puto_revenue) * OPS_PUTO_RATE)
-      + n(o.performance_bonus) + n(o.monthly_sub_bonus) + sumAwards(o.awards)
+    opsLabor += o.v2_total != null
+      ? n(o.v2_total)   // 관리실장 새 보수(2026-12~): 기본급 + 총 매출 5% + 소개건 30% + 기장료 업셀 + 성과급 + 시상금
+      : n(o.base_salary) + Math.round(n(o.fee_revenue) * OPS_FEE_RATE) + Math.round(n(o.puto_revenue) * OPS_PUTO_RATE)
+        + n(o.performance_bonus) + n(o.monthly_sub_bonus) + sumAwards(o.awards)
     opsFixed += n(o.base_salary)
     opsFeeCount += Array.isArray(o.fee_details) ? o.fee_details.length : 0
   }
