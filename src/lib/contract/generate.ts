@@ -10,7 +10,7 @@ export type ContractType = 'fee' | 'nofee'          // fee: 성과 수수료(%) 
 
 export interface CompanyInfo { name: string; bizNo: string; address: string; ceo: string; bank: string; account: string; holder: string }
 export const DEFAULT_COMPANY: CompanyInfo = {
-  name: '헌드레드 컨설팅', bizNo: '533-36-01551', address: '서울특별시 구로구 디지털로243, G-하이시티 911호',
+  name: '헌드레드컨설팅', bizNo: '533-36-01551', address: '서울특별시 구로구 디지털로243, G-하이시티 911호',
   ceo: '백승협', bank: '기업은행', account: '420-102301-04-016', holder: '헌드레드컨설팅 (백승협)',
 }
 
@@ -179,9 +179,7 @@ async function prepare(inp: ContractInput, forPdf = false) {
       } else if (inp.type === 'fee' && t.includes('실행금액의 ______%')) {
         x = x.replace('______%', `${esc(String(inp.feePercent || '___'))}%`)
       } else if (/별지 1\(업무범위 확인서\) 및 별지 2/.test(t)) {
-        // 확인 문구·날짜·서명란은 항상 새 쪽에 한꺼번에 오게 한다
-        if (!forPdf) x = x.replace('pageBreak="0"', 'pageBreak="1"')
-        if (!forPdf) for (let q = k - 1; q >= 0 && !textOf(ps[q].xml).trim() && !ps[q].xml.includes('<hp:tbl'); q--) edits.push({ b: ps[q], xml: '' })
+        // 확인 문구·날짜·서명란은 앞 쪽 끝에 이어 붙인다 (SJ 수정본과 동일 — 강제 쪽나눔으로 빈 쪽이 생기지 않게)
       } else if (inp.textOverrides && inp.textOverrides[t.trim()] != null && !x.includes('<hp:tbl')) {
         x = setParaText(x, inp.textOverrides[t.trim()])
       }
@@ -204,7 +202,7 @@ async function prepare(inp: ContractInput, forPdf = false) {
     for (const t of [...tbls].reverse()) {
       let x = t.xml
       if (x.includes('<hp:t>2026</hp:t>') && x.includes('<hp:t>년</hp:t>')) {
-        x = mapCell(x, 0, 0, tc => cellText(tc, B ? '' : String(dt.getFullYear())))
+        x = mapCell(x, 0, 0, tc => cellText(tc, String(dt.getFullYear())))
         x = mapCell(x, 0, 2, tc => cellText(tc, B ? '' : String(dt.getMonth() + 1)))
         x = mapCell(x, 0, 4, tc => cellText(tc, B ? '' : String(dt.getDate())))
       } else if (x.includes('<hp:t>사업자등록번호</hp:t>')) {
@@ -239,7 +237,7 @@ async function prepare(inp: ContractInput, forPdf = false) {
       }
     }
     // 과제 선정 이후 사후관리 (교부 지원금의 N%)
-    if (B) { x = mapCell(x, 9, 0, tc => cellStrikeAll(tc, plain)); x = mapCell(x, 9, 1, tc => cellText(tc, '교부 지원금의         %', plain)) }
+    if (B) { x = mapCell(x, 9, 1, tc => cellText(tc, '', plain)) }   // SJ 수정본과 같이 공계약서는 이 칸을 비워 둔다
     else if (inp.postCare?.on) { x = mapCell(x, 9, 0, tc => cellStrikeAll(tc, plain)); x = mapCell(x, 9, 1, tc => cellText(tc, `교부 지원금의 ${inp.postCare?.percent || ''} %`, plain)) }
     else { x = mapCell(x, 9, 0, tc => cellStrikeAll(tc, strike)); x = mapCell(x, 9, 1, tc => cellText(tc, ' '.repeat(14), strike)) }
     // P라인
@@ -268,7 +266,7 @@ async function prepare(inp: ContractInput, forPdf = false) {
     const d2 = inp.contractDate ? new Date(inp.contractDate + 'T00:00:00') : new Date(Date.now() + 9 * 3600 * 1000)
     s2 = s2.replace(/<hp:tbl [^>]*colCnt="6"[\s\S]*?<\/hp:tbl>/, tbl => {
       if (!tbl.includes('<hp:t>2026</hp:t>')) return tbl
-      let x = mapCell(tbl, 0, 0, tc => cellText(tc, B ? '' : String(d2.getFullYear())))
+      let x = mapCell(tbl, 0, 0, tc => cellText(tc, String(d2.getFullYear())))
       x = mapCell(x, 0, 2, tc => cellText(tc, B ? '' : String(d2.getMonth() + 1)))
       return mapCell(x, 0, 4, tc => cellText(tc, B ? '' : String(d2.getDate())))
     })
