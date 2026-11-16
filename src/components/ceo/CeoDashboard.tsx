@@ -29,6 +29,7 @@ import PullToRefresh from '@/components/ui/PullToRefresh'
 import SplitView from '@/components/shared/SplitView'
 import TabErrorBoundary from '@/components/shared/TabErrorBoundary'
 import DigManageTab from './DigManageTab'
+import BalanceTab from '@/components/shared/BalanceTab'
 import PlannerTab from './PlannerTab'
 import AuthCodeTab from './AuthCodeTab'
 import RevenueAnalytics from './RevenueAnalytics'
@@ -174,8 +175,8 @@ export default function CeoDashboard() {
   const { data: session } = useSession()
   const ceoName = session?.user?.name ?? '대표'
   const ceoId = (session?.user as any)?.id ?? ''
-  type CeoTab = 'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'staffmanage' | 'minutesreports' | 'calendar' | 'ailogs' | 'trash' | 'authcode' | 'tools' | 'rules' | 'dbmanage' | 'profile' | 'dig'
-  const [activeTab, setActiveTab] = useHistoryState<CeoTab>('t', 'overview', ['overview','sales','ops','assign','analytics','staffmanage','minutesreports','calendar','ailogs','trash','authcode','tools','rules','dbmanage','profile','dig'])
+  type CeoTab = 'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'staffmanage' | 'balance' | 'minutesreports' | 'calendar' | 'ailogs' | 'trash' | 'authcode' | 'tools' | 'rules' | 'dbmanage' | 'profile' | 'dig'
+  const [activeTab, setActiveTab] = useHistoryState<CeoTab>('t', 'overview', ['overview','sales','ops','assign','analytics','staffmanage','balance','minutesreports','calendar','ailogs','trash','authcode','tools','rules','dbmanage','profile','dig'])
   const [menuOpen, setMenuOpen] = useState(false)
   const [salesInitialView, setSalesInitialView] = useState<'customers' | 'inspection' | 'as' | 'transfer' | 'diary' | undefined>(undefined)
   const [salesInitialStatusTab, setSalesInitialStatusTab] = useState<'all' | 'lead' | 'db010' | 'contracted' | 'emotional' | 'trash' | undefined>(undefined)
@@ -296,6 +297,7 @@ export default function CeoDashboard() {
     { key: 'ops',            label: '관리팀' },
     { key: 'dig',            label: '발굴팀' },
     { key: 'assign',         label: '계약 배정' },
+    { key: 'balance',        label: '잔금 관리' },
     // ── 운영 (보고·일정·직원·도구) ──
     { key: 'minutesreports', label: '회의록·보고' },
     { key: 'calendar',       label: '일정관리' },
@@ -479,6 +481,7 @@ export default function CeoDashboard() {
         {activeTab === 'ops'            && <TabErrorBoundary tabName="관리팀"><OpsCeoTab /></TabErrorBoundary>}
         {activeTab === 'analytics'      && <AnalyticsTab />}
         {activeTab === 'staffmanage'    && <StaffManageTab />}
+        {activeTab === 'balance'        && <BalanceTab isCeo />}
         {activeTab === 'minutesreports' && <MinutesReportsTab />}
         {activeTab === 'calendar'       && <CalendarTab />}
         {activeTab === 'tools'          && <ToolsTab codeCount={authCodeCount} delCount={deleteReqCount} />}
@@ -1624,17 +1627,70 @@ function DuplicateOnlyTab() {
 }
 
 // ─── 직원 관리 섹션 (생성·수정·팀이관) ──────────────────────
-interface EmpRow { id: string; name: string; username: string; role: string; blocked?: boolean; info_locked?: boolean }
+interface EmpRow { id: string; name: string; username: string; role: string; blocked?: boolean; info_locked?: boolean; team_no?: number }
+
+// 아이디 사용 현황 — 계정 아이디 번호(hd-sales1, hd-sales2 …)를 어디까지 썼는지, 다음에 줄 번호, 영업 팀별 구성원
+function IdUsageCard({ employees }: { employees: EmpRow[] }) {
+  const [open, setOpen] = useState(true)
+  const groups: Record<string, { nums: number[]; test: number[] }> = {}
+  for (const e of employees) {
+    const m = String(e.username || '').match(/^(.*?)(\d+)$/)
+    if (!m) continue
+    const g = (groups[m[1]] ||= { nums: [], test: [] })
+    const n = parseInt(m[2], 10)
+    ;(/tester/i.test(e.username + ' ' + e.name) || n >= 90 ? g.test : g.nums).push(n)
+  }
+  const salesByTeam: Record<number, EmpRow[]> = {}
+  for (const e of employees.filter(x => x.role === 'sales' && !/tester/i.test(x.username + ' ' + x.name))) (salesByTeam[e.team_no ?? 1] ||= []).push(e)
+  const teamNos = Object.keys(salesByTeam).map(Number).sort((a, b) => a - b)
+  return (
+    <div className="bg-white border border-gray-100 shadow-sm rounded-2xl">
+      <button type="button" onClick={() => setOpen(v => !v)} className="w-full flex items-center justify-between px-5 py-3">
+        <span className="text-[14px] font-black text-[#0b2140]">아이디 사용 현황 · 다음 번호</span>
+        <span className="text-xs text-gray-400">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="px-5 pb-4 space-y-3">
+          <div className="space-y-1.5">
+            {Object.entries(groups).map(([prefix, g]) => {
+              const nums = [...new Set(g.nums)].sort((a, b) => a - b)
+              const last = nums.length ? nums[nums.length - 1] : 0
+              return (
+                <div key={prefix} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px]">
+                  <span className="font-mono font-bold text-[#0b2140] w-28">{prefix}</span>
+                  <span className="text-gray-500">{nums.length}개 사용 ({nums.join(', ') || '-'}){g.test.length ? ' · 시험용 ' + [...new Set(g.test)].sort((a, b) => a - b).join(', ') : ''}</span>
+                  <span className="ml-auto px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold">다음 → {prefix}{last + 1}</span>
+                </div>
+              )
+            })}
+            {Object.keys(groups).length === 0 && <p className="text-xs text-gray-400">번호가 붙은 아이디가 없습니다.</p>}
+          </div>
+          <p className="text-[10.5px] text-gray-400">블락·퇴사 계정도 번호를 쓴 것으로 세므로 겹치지 않게 다음 번호를 쓰면 됩니다. 시험용(99번 등)은 다음 번호 계산에서 뺍니다.</p>
+          <div className="border-t border-gray-100 pt-2.5 space-y-1">
+            {teamNos.map(t => (
+              <div key={t} className="flex flex-wrap items-center gap-2 text-[12.5px]">
+                <span className="w-16 font-bold text-sky-700">영업 {t}팀</span>
+                <span className="text-gray-500">{salesByTeam[t].length}명 — {salesByTeam[t].map(e => e.name + '(' + e.username + (e.blocked ? ', 블락' : '') + ')').join(', ')}</span>
+                {t === 1 && <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-[10px] font-bold">스타트 멤버 · 잔금 인센 10%</span>}
+              </div>
+            ))}
+            {teamNos.length === 0 && <p className="text-xs text-gray-400">영업 구성원이 없습니다.</p>}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 function EmployeeManageSection({ onResigned }: { onResigned?: () => void } = {}) {
   const [employees, setEmployees] = useState<EmpRow[]>([])
   const [loading, setLoading] = useState(false)
   const [newlyCreatedId, setNewlyCreatedId] = useState<string | null>(null)
   const [editId, setEditId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState<{ name: string; username: string; password: string; role: string }>({ name: '', username: '', password: '', role: '' })
+  const [editForm, setEditForm] = useState<{ name: string; username: string; password: string; role: string; team_no: number }>({ name: '', username: '', password: '', role: '', team_no: 1 })
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
-  const [createForm, setCreateForm] = useState({ name: '', username: '', password: '', role: 'sales' as 'sales' | 'ops' | 'dig' })
+  const [createForm, setCreateForm] = useState({ name: '', username: '', password: '', role: 'sales' as 'sales' | 'ops' | 'dig', team_no: 1 })
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
   const [blockingId, setBlockingId] = useState<string | null>(null)
@@ -1666,17 +1722,20 @@ function EmployeeManageSection({ onResigned }: { onResigned?: () => void } = {})
 
   const load = async () => {
     setLoading(true)
-    const [usersRes, psRes] = await Promise.all([
+    const [usersRes, psRes, teamRes] = await Promise.all([
       fetch('/api/users'),
       fetch('/api/payslip-settings'),
+      fetch('/api/staff-teams').catch(() => null),
     ])
     const usersData = await usersRes.json()
     const psData    = await psRes.json()
+    const teamData  = teamRes ? await teamRes.json().catch(() => ({})) : {}
+    const teamMap: Record<string, number> = teamData.map || {}
     const psEmps: any[] = psData.record?.employees || []
     const users = (usersData.users || []).filter((u: EmpRow) => u.role !== 'ceo')
     setEmployees(users.map((u: EmpRow) => {
       const match = psEmps.find((e: any) => e.user_id === u.id || e.name === u.name)
-      return { ...u, info_locked: match?.info_locked === true }
+      return { ...u, info_locked: match?.info_locked === true, team_no: u.role === 'sales' ? (teamMap[u.id] ?? 1) : undefined }
     }))
     setLoading(false)
   }
@@ -1684,7 +1743,7 @@ function EmployeeManageSection({ onResigned }: { onResigned?: () => void } = {})
 
   function openEdit(emp: EmpRow) {
     setEditId(emp.id)
-    setEditForm({ name: emp.name, username: emp.username, password: '', role: emp.role })
+    setEditForm({ name: emp.name, username: emp.username, password: '', role: emp.role, team_no: emp.team_no ?? 1 })
     setEditError('')
   }
 
@@ -1708,7 +1767,11 @@ function EmployeeManageSection({ onResigned }: { onResigned?: () => void } = {})
     if (data.customersUnassigned) {
       alert(`팀이관 완료: ${editForm.name}의 담당 고객 DB가 전부 미배정으로 변경됐습니다.\n다른 영업사원에게 재배정해주세요.`)
     }
-    setEmployees(p => p.map(e => e.id === editId ? { ...e, ...data.user } : e))
+    if (editForm.role === 'sales') {
+      const cur = employees.find(e => e.id === editId)
+      if ((cur?.team_no ?? 1) !== editForm.team_no) await fetch('/api/staff-teams', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: editId, team_no: editForm.team_no }) })
+    }
+    setEmployees(p => p.map(e => e.id === editId ? { ...e, ...data.user, team_no: editForm.role === 'sales' ? editForm.team_no : undefined } : e))
     setEditId(null)
     setEditSaving(false)
   }
@@ -1785,13 +1848,14 @@ function EmployeeManageSection({ onResigned }: { onResigned?: () => void } = {})
     setCreating(true)
     const res = await fetch('/api/users', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(createForm),
+      body: JSON.stringify({ name: createForm.name, username: createForm.username, password: createForm.password, role: createForm.role }),
     })
     const data = await res.json()
     if (!res.ok) { setCreateError(data.error || '생성 실패'); setCreating(false); return }
-    setEmployees(p => [...p, data.user])
+    if (createForm.role === 'sales') await fetch('/api/staff-teams', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: data.user.id, team_no: createForm.team_no }) })
+    setEmployees(p => [...p, { ...data.user, team_no: createForm.role === 'sales' ? createForm.team_no : undefined }])
     setNewlyCreatedId(data.user.id)
-    setCreateForm({ name: '', username: '', password: '', role: 'sales' })
+    setCreateForm({ name: '', username: '', password: '', role: 'sales', team_no: 1 })
     setShowCreate(false)
     setCreating(false)
     setTimeout(() => setNewlyCreatedId(null), 5000)
@@ -1812,6 +1876,8 @@ function EmployeeManageSection({ onResigned }: { onResigned?: () => void } = {})
           </button>
         </div>
       </div>
+
+      <IdUsageCard employees={employees} />
 
       {/* 직원 생성 폼 */}
       {showCreate && (
@@ -1842,6 +1908,17 @@ function EmployeeManageSection({ onResigned }: { onResigned?: () => void } = {})
               </div>
             ))}
           </div>
+          {createForm.role === 'sales' && (
+            <div>
+              <label className="text-xs text-gray-500 font-medium mb-1 block">영업 몇 팀 <span className="text-gray-400">(1팀 = 스타트 멤버, 2팀부터는 잔금 인센 없음)</span></label>
+              <div className="flex gap-2 flex-wrap">
+                {[1, 2, 3, 4, 5, 6].map(n => (
+                  <button key={n} type="button" onClick={() => setCreateForm(f => ({ ...f, team_no: n }))}
+                    className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-colors ${createForm.team_no === n ? 'bg-sky-500 text-white border-sky-500' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'}`}>{n}팀</button>
+                ))}
+              </div>
+            </div>
+          )}
           {createError && <p className="text-xs text-red-500 font-medium">{createError}</p>}
           <button onClick={createEmployee} disabled={creating}
             className="w-full py-2.5 bg-[#1B2A45] hover:bg-[#1B2A45]/90 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50">
@@ -1907,6 +1984,15 @@ function EmployeeManageSection({ onResigned }: { onResigned?: () => void } = {})
                       </select>
                     </div>
                   </div>
+                  {editForm.role === 'sales' && (
+                    <div>
+                      <label className="text-[10px] text-gray-400 font-medium block mb-1">영업 몇 팀 (1팀 = 스타트 멤버, 2팀부터 잔금 인센 없음)</label>
+                      <select value={editForm.team_no} onChange={e => setEditForm(f => ({ ...f, team_no: Number(e.target.value) }))}
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-[#1B2A45]/50">
+                        {[1, 2, 3, 4, 5, 6].map(n => <option key={n} value={n}>{n}팀</option>)}
+                      </select>
+                    </div>
+                  )}
                   {editForm.role !== emp.role && (
                     <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                       <p className="text-xs text-amber-700 font-semibold">팀이관 시 {emp.name}의 담당 고객 DB가 모두 미배정으로 변경됩니다</p>
@@ -1941,6 +2027,7 @@ function EmployeeManageSection({ onResigned }: { onResigned?: () => void } = {})
                           {roleLabel[emp.role] || emp.role}
                         </span>
                       )}
+                      {emp.role === 'sales' && !emp.blocked && <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-sky-50 text-sky-700 border border-sky-200">{emp.team_no ?? 1}팀{(emp.team_no ?? 1) === 1 ? ' · 스타트 멤버' : ''}</span>}
                       {emp.id === newlyCreatedId && <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-green-100 text-green-700">방금 생성</span>}
                     </div>
                   </div>

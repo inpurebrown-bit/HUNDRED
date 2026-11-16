@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { calcExtraCounts } from '@/lib/payrollCalc'
+import { isV2Contract } from '@/lib/payrollV2'
 
 function parseMoney(v: any): number {
   if (!v) return 0
@@ -98,9 +99,10 @@ export async function GET(req: NextRequest) {
         company: c.details?.company || c.name || '',
         payment_amount: c.details?.payment_amount,
         vat_included: c.details?.vat_included,
+        v2: isV2Contract(c),   // 2026-11-16 이후 체결 건 — 옛 급여 계산에서는 빼고 payrollV2 로 계산
       }
     })
-    .filter(Boolean) as { id: string; amount: number; date: string; sales_user_id: string; sales_user_name: string; company: string; payment_amount?: any; vat_included?: boolean }[]
+    .filter(Boolean) as { id: string; amount: number; date: string; sales_user_id: string; sales_user_name: string; company: string; payment_amount?: any; vat_included?: boolean; v2?: boolean }[]
 
   // 잔금 등 추가 입금: 입금한 달의 영업팀 매출로 포함 (개수는 별도로 이미 가산됨 → 건수에서는 제외)
   for (const c of (custContracted || []) as any[]) {
@@ -117,6 +119,7 @@ export async function GET(req: NextRequest) {
         sales_user_name: c.details?.sales_user_name || '',
         company: `${c.details?.company || c.name || ''} (${e.label || '추가 입금'})`,
         isExtra: true,
+        v2: isV2Contract(c),
       } as any)
     })
   }
@@ -274,6 +277,7 @@ export async function GET(req: NextRequest) {
         sales_user_name: (c.details?.refund_deduction_sales || '').trim(),
         company: c.details?.refund_company || c.details?.company || c.name || '',
         isRefund: true,
+        v2: isV2Contract(c),
       }
     })
     .filter(Boolean) as any[]
@@ -418,6 +422,7 @@ export async function GET(req: NextRequest) {
         sales_user_name: c.details?.refund_deduction_sales || '',
         company: c.details?.refund_company || c.name || '',
         isRefund: true,
+        v2: isV2Contract(c),
       }
     })
     .filter(Boolean) as any[]

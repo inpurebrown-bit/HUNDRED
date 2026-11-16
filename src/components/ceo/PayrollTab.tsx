@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { isTester } from '@/lib/tester'
 import { bizDays } from '@/lib/digStats'
 import { calcWithholding, calcSalesStructure, resignBizProration, SALES_BASE_PAY, SALES_BASE_RATE, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, calcMonthlySubBonus, calcRefundDeductions, calcDigSalary, calcDigMonth, digLeaveDays, digUnpaidLeaveCount, DIG_BASE_SALARY, DIG_HOURLY_BASE, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
-import { v2PayFor, isV2Contract, V2_START, V2 } from '@/lib/payrollV2'
+import { v2PayFor, isV2Contract, V2_START, V2, teamOf } from '@/lib/payrollV2'
 import { contractWeight } from '@/lib/supplyRules'
 
 // ─── 타입 ─────────────────────────────────────────────────
@@ -36,8 +36,10 @@ interface SalesEmployee {
   resign_date?: string      // 퇴사일 — 입력하면 퇴사월 기본급을 영업일 기준으로 일할
   join_date?: string        // 계약 시작일 — 기본제(160만+7%)를 고를 수 있는 2달 기간 계산
   memo?: string             // 비고(계산 사유)
+  team_no?: number          // 영업 몇 팀 (직원관리에서 지정) — 1팀 = 스타트 멤버, 잔금 매출 10% 지급 대상
+  start_member?: boolean    // 1팀이면 true (자동)
   v2_total?: number         // 2026-11-16 이후 체결 건(선금·잔금 구조)의 세전 급여 — 자동 계산
-  v2?: { newHire: boolean; stipend: number; prepayFund: number; rate: number; tierPay: number; balancePay: number; certPay: number; promoWeeks: number; weeklyPromo: number; newHireIncentive: number; total: number }
+  v2?: { newHire: boolean; stipend: number; startMember: boolean; rotation: boolean; prepayTotal: number; prepayFund: number; rate: number; tierPay: number; balancePay: number; certPay: number; promoWeeks: number; weeklyPromo: number; newHireIncentive: number; total: number }
 }
 
 interface DigEmployee {
@@ -82,6 +84,8 @@ function payWindow(joinDate: string | undefined, ym: string) {
   const left = Math.ceil((end.getTime() - Date.now()) / 86400000)
   return { end, locked, left }
 }
+
+const ym2 = (v: string) => v   // 순환 대상 표시는 2026-12 급여부터 (11월은 옛 건과 섞여 있음)
 
 function calcSales(e: SalesEmployee, ym: string) {
   const perfBonus    = Number(e.performance_bonus)
@@ -349,25 +353,33 @@ function SalesCard({
         )}
 
         {/* 새 구조(2026-11-16 이후 체결 건) — 선금·잔금 */}
-        {emp.v2 && (emp.v2.total > 0 || emp.v2.newHire) && (
+        {emp.v2 && (emp.v2.total > 0 || emp.v2.newHire || emp.v2.rotation) && (
           <div className="mt-2 mb-1 rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
             <p className="text-[10px] font-bold text-emerald-700 mb-1">새 구조 ({V2_START.slice(5).replace('-', '/')} 이후 체결 건){emp.v2.newHire ? ' · 신입 첫 1개월' : ''}</p>
-            {emp.v2.newHire ? (
+            {emp.v2.newHire && (
               <>
                 <PayRow label="업무정착비(일할)" value={emp.v2.stipend} />
-                <PayRow label={`입금 매출 인센(${Math.round(V2.newHireRate * 100)}%)`} value={emp.v2.newHireIncentive} />
+                <PayRow label={`입금 매출 인센(${Math.round(V2.newHireRate * 100)}% 고정)`} value={emp.v2.newHireIncentive} />
+                <div className="py-1 text-[10px] text-gray-400 border-b border-gray-50">아래 기본 구조가 더 높으면 높은 쪽으로 지급합니다</div>
               </>
-            ) : (
-              <>
-                <PayRow label={`선금 구간 인센(${man(emp.v2.prepayFund)}원 × ${Math.round(emp.v2.rate * 100)}%)`} value={emp.v2.tierPay} />
-                <PayRow label={`잔금 인센(${Math.round(V2.balanceRate * 100)}%)`} value={emp.v2.balancePay} />
-                <PayRow label="인증사업 인센(20%)" value={emp.v2.certPay} />
-                <PayRow label={`주 프로모션(${emp.v2.promoWeeks}주)`} value={emp.v2.weeklyPromo} />
-              </>
+            )}
+            <PayRow label={`선금 구간 인센(${man(emp.v2.prepayFund)}원 × ${Math.round(emp.v2.rate * 100)}%)`} value={emp.v2.tierPay} />
+            <PayRow label={emp.start_member ? `잔금 인센(스타트 멤버 ${Math.round(V2.balanceRate * 100)}%)` : '잔금 인센(스타트 멤버만)'} value={emp.v2.balancePay} />
+            <PayRow label="인증사업 인센(20% 고정)" value={emp.v2.certPay} />
+            <PayRow label={`주 프로모션(${emp.v2.promoWeeks}주, 주 400만 이상)`} value={emp.v2.weeklyPromo} />
+            {emp.v2.rotation && ym2(yearMonth) >= '2026-12' && (
+              <div className="mt-1 rounded-lg bg-rose-50 border border-rose-200 px-2 py-1 text-[10px] font-bold text-rose-600">⚠ 월 선금 매출 {man(emp.v2.prepayTotal)}원 — 500만원 미만이면 순환(정리) 대상</div>
             )}
             <PayRow label="새 구조 합계" value={emp.v2.total} bold />
           </div>
         )}
+        {/* 스타트 멤버: 잔금 매출 10% 지급 대상 */}
+        <div className="flex items-center justify-between py-1.5 border-b border-gray-50">
+          <span className="text-xs text-gray-400">영업 팀 <span className="text-[9px] text-gray-300">(직원관리에서 지정)</span></span>
+          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${(emp.team_no ?? 1) === 1 ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-gray-100 text-gray-500'}`}>
+            {emp.team_no ?? 1}팀{(emp.team_no ?? 1) === 1 ? ' · 스타트 멤버(잔금 10%)' : ' · 잔금 인센 없음'}
+          </span>
+        </div>
         {/* 계약 시작일 — 기본제 선택 가능 기간(2달) 계산 */}
         <div className="flex items-center justify-between py-1.5 border-b border-gray-50">
           <span className="text-xs text-gray-400">계약 시작일 <span className="text-[9px] text-gray-300">(기본제 선택 2달)</span></span>
@@ -654,6 +666,7 @@ export default function PayrollTab() {
 
   // ── 새 구조(2026-11-16 이후 체결 건) 자동 계산 — 고객 DB 의 선금·잔금·인증사업 금액으로 영업 사원별 급여를 구한다 ──
   const v2CustRef = useRef<{ ym: string; list: any[] } | null>(null)
+  const teamsRef = useRef<{ name: string; team_no: number }[] | null>(null)
   useEffect(() => {
     if (yearMonth < V2_START.slice(0, 7)) return          // 시행(2026-11) 이전 달에는 새 구조 건이 없다
     if (!salesEmps.some(e => e.name)) return
@@ -666,16 +679,22 @@ export default function PayrollTab() {
           list = j.customers || []
           v2CustRef.current = { ym: yearMonth, list: list! }
         }
+        if (!teamsRef.current) {
+          try { teamsRef.current = ((await (await fetch('/api/staff-teams')).json()).teams || []).map((t: any) => ({ name: t.name, team_no: t.team_no })) } catch { teamsRef.current = [] }
+        }
         if (dead) return
+        const teams = teamsRef.current || []
         setSalesEmps(prev => {
           let changed = false
           const next = prev.map(e => {
             if (!e.name) return e
-            const r = v2PayFor(list!, yearMonth, e.name, e.join_date)
-            const nv = { newHire: r.newHire, stipend: r.stipend, prepayFund: r.prepayFund, rate: r.rate, tierPay: r.tierPay, balancePay: r.balancePay, certPay: r.certPay, promoWeeks: r.promoWeeks, weeklyPromo: r.weeklyPromo, newHireIncentive: r.newHireIncentive, total: r.total }
-            if (Number(e.v2_total || 0) === r.total && JSON.stringify(e.v2 || null) === JSON.stringify(r.total > 0 || r.newHire ? nv : null)) return e
+            const tn = teamOf(teams, e.name)
+            const sm = tn === 1
+            const r = v2PayFor(list!, yearMonth, e.name, e.join_date, sm)
+            const nv = { newHire: r.newHire, stipend: r.stipend, startMember: r.startMember, rotation: r.rotation, prepayTotal: r.prepayTotal, prepayFund: r.prepayFund, rate: r.rate, tierPay: r.tierPay, balancePay: r.balancePay, certPay: r.certPay, promoWeeks: r.promoWeeks, weeklyPromo: r.weeklyPromo, newHireIncentive: r.newHireIncentive, total: r.total }
+            if (e.team_no === tn && !!e.start_member === sm && Number(e.v2_total || 0) === r.total && JSON.stringify(e.v2 || null) === JSON.stringify(r.total > 0 || r.newHire || (r.rotation && yearMonth >= '2026-12') ? nv : null)) return e
             changed = true
-            return { ...e, v2_total: r.total, v2: r.total > 0 || r.newHire ? nv : undefined }
+            return { ...e, team_no: tn, start_member: sm, v2_total: r.total, v2: r.total > 0 || r.newHire || (r.rotation && yearMonth >= '2026-12') ? nv : undefined }
           })
           return changed ? next : prev
         })
@@ -899,6 +918,7 @@ export default function PayrollTab() {
       for (const e of salesEntries) {
         if ((e as any).isRefund) continue   // 환불 항목은 아래 별도 처리
         if ((e as any).isExtra) continue    // 추가 입금(잔금)은 아래에서 갯수·금액 함께 처리
+        if ((e as any).v2) continue         // 새 구조(2026-11-16 이후 체결) 건은 payrollV2 에서 계산
         const name = (e.sales_user_name || '').trim()
         if (!name) continue
         if (!salesByName[name]) salesByName[name] = { amount: 0, count: 0 }
@@ -916,6 +936,7 @@ export default function PayrollTab() {
 
       // 잔금 등 추가 입금분 (갯수 + 매출 금액)
       for (const ex of (data.thisMonthExtraCounts || []) as any[]) {
+        if (ex.v2) continue                 // 새 구조 건의 잔금은 payrollV2 에서 계산
         const name = String(ex.name || '').trim()
         if (!name) continue
         if (!salesByName[name]) salesByName[name] = { amount: 0, count: 0 }
@@ -928,6 +949,7 @@ export default function PayrollTab() {
       // thisMonthSales에 포함된 환불 차감 항목 반영 (API가 weight deduct 포함해서 반환)
       for (const e of salesEntries) {
         if (!(e as any).isRefund) continue
+        if ((e as any).v2) continue         // 새 구조 건의 해지·정산 차감은 payrollV2 에서
         const name = (e.sales_user_name || '').trim()
         if (!name) continue
         if (!salesByName[name]) salesByName[name] = { amount: 0, count: 0 }

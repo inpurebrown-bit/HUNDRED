@@ -268,13 +268,14 @@ const INCALL_CLOSING_RESULTS = [
 ]
 
 // ── Tab types ──────────────────────────────────────────────────────────
-type OpsTab = 'dashboard' | 'active' | 'expired' | 'refund' | 'completed' | 'newdb' | 'ops_contract' | 'report' | 'revenue' | 'profile'
+type OpsTab = 'dashboard' | 'active' | 'expired' | 'refund' | 'completed' | 'newdb' | 'ops_contract' | 'balance' | 'report' | 'revenue' | 'profile'
 
 const opsTabs: { key: OpsTab; label: string }[] = [
   { key: 'dashboard',    label: '대시보드' },
   { key: 'active',       label: '진행중업체' },
   { key: 'newdb',        label: '신규DB' },
   { key: 'ops_contract', label: '관리팀계약' },
+  { key: 'balance',      label: '잔금 관리' },
   { key: 'report',       label: '관리팀보고' },
   { key: 'revenue',      label: '매출 현황' },
   { key: 'profile',      label: '사원정보' },
@@ -4838,10 +4839,12 @@ function OpsReportTab({ userId, userName, activeCases }: { userId: string; userN
 // ──────────────────────────────────────────────────────────────────────
 // Main OpsDashboard
 // ──────────────────────────────────────────────────────────────────────
+import BalanceTab from '@/components/shared/BalanceTab'
+
 export default function OpsDashboard({ userId, userName }: Props) {
   const { data: session } = useSession()
   const userRole = (session?.user as any)?.role || 'ops'
-  const [activeTab, setActiveTab] = useHistoryState<OpsTab>('t', 'dashboard', ['dashboard','active','expired','refund','completed','newdb','ops_contract','report','revenue','profile'])
+  const [activeTab, setActiveTab] = useHistoryState<OpsTab>('t', 'dashboard', ['dashboard','active','expired','refund','completed','newdb','ops_contract','balance','report','revenue','profile'])
   const [stageFilter, setStageFilter] = useState('')   // 진행중업체 소분류(실제 진행 상황)
   const [menuOpen, setMenuOpen] = useState(false)
   const [cases, setCases] = useState<OpsCase[]>([])
@@ -5079,6 +5082,7 @@ export default function OpsDashboard({ userId, userName }: Props) {
     completed:    completedCases.length,
     newdb:        newdbCases.length,
     ops_contract: null,
+    balance:      null,
     report:       null,
     revenue:      null,
     profile:      null,
@@ -5475,6 +5479,9 @@ export default function OpsDashboard({ userId, userName }: Props) {
             }
           />
         )}
+
+        {/* ── 잔금 관리 ── */}
+        {activeTab === 'balance' && <BalanceTab />}
 
         {/* ── 관리팀보고 ── */}
         {activeTab === 'report' && (

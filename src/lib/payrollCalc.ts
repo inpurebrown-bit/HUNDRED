@@ -207,7 +207,7 @@ export function calcDigMonth(
 // ── 추가 입금(잔금 등) 갯수 ─────────────────────────────
 // 계약월과 다른 달에 들어온 잔금을 "입금한 달의 갯수"로만 가산한다. 매출·계약 건수·계약일은 건드리지 않음.
 // 고객 details.extra_counts: [{ date:'YYYY-MM-DD', weight:0.4, label:'잔금 200,000원 입금', amount:200000 }]
-export interface ExtraCount { name: string; weight: number; amount: number; company: string; date: string; label: string; customerId: string }
+export interface ExtraCount { name: string; weight: number; amount: number; company: string; date: string; label: string; customerId: string; v2?: boolean }
 
 export function calcExtraCounts(customers: any[], yearMonth: string, opts: { skipV2?: boolean } = {}): ExtraCount[] {
   const out: ExtraCount[] = []
@@ -227,6 +227,7 @@ export function calcExtraCounts(customers: any[], yearMonth: string, opts: { ski
         date: String(e.date),
         label: e.label || '추가 입금',
         customerId: String(c.id || ''),
+        v2: isV2Contract(c),
       })
     }
   }
