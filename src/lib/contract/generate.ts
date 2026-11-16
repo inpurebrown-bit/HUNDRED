@@ -245,6 +245,8 @@ async function prepare(inp: ContractInput, forPdf = false) {
     // P라인
     if (!inp.pLine && !B) { x = mapCell(x, 10, 0, tc => cellStrikeAll(tc, strike)); for (const rr of [10, 11, 12, 13]) x = mapCell(x, rr, 1, tc => cellText(tc, ' '.repeat(14), strike)) }
     else { x = mapCell(x, 10, 0, tc => cellStrikeAll(tc, plain)); for (const rr of [10, 11, 12, 13]) x = mapCell(x, rr, 1, tc => cellStrikeAll(tc, plain)) }
+    // 금액 칸은 모두 가운데 정렬 — 원본 서식의 이노비즈 행만 왼쪽 정렬(36번) 문단 모양이라 가운데(23번)로 맞춘다
+    for (let rr = 1; rr <= 13; rr++) x = mapCell(x, rr, 1, tc => tc.replace(/paraPrIDRef="36"/g, 'paraPrIDRef="23"'))
     x = mapCell(x, 14, 1, tc => cellText(tc, B ? '' : `${won(sum)}원`))
     x = mapCell(x, 15, 1, tc => cellText(tc, B ? '' : `${won(vat)}원`))
     x = mapCell(x, 16, 1, tc => cellText(tc, B ? '' : `${won(total)}원`))
