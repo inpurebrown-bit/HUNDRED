@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { isTester } from '@/lib/tester'
 import { bizDays } from '@/lib/digStats'
 import { calcWithholding, calcSalesStructure, resignBizProration, SALES_BASE_PAY, SALES_BASE_RATE, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, calcMonthlySubBonus, calcRefundDeductions, calcDigSalary, calcDigMonth, digLeaveDays, digUnpaidLeaveCount, DIG_BASE_SALARY, DIG_HOURLY_BASE, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
+import { v2PayFor, isV2Contract, V2_START, V2 } from '@/lib/payrollV2'
 import { contractWeight } from '@/lib/supplyRules'
 
 // ─── 타입 ─────────────────────────────────────────────────
@@ -35,6 +36,8 @@ interface SalesEmployee {
   resign_date?: string      // 퇴사일 — 입력하면 퇴사월 기본급을 영업일 기준으로 일할
   join_date?: string        // 계약 시작일 — 기본제(160만+7%)를 고를 수 있는 2달 기간 계산
   memo?: string             // 비고(계산 사유)
+  v2_total?: number         // 2026-11-16 이후 체결 건(선금·잔금 구조)의 세전 급여 — 자동 계산
+  v2?: { newHire: boolean; stipend: number; prepayFund: number; rate: number; tierPay: number; balancePay: number; certPay: number; promoWeeks: number; weeklyPromo: number; newHireIncentive: number; total: number }
 }
 
 interface DigEmployee {
@@ -88,9 +91,10 @@ function calcSales(e: SalesEmployee, ym: string) {
     revenue: Number(e.contract_revenue), perfBonus, promo,
     payMode: e.pay_mode, joinDate: e.join_date, basePay: e.base_pay, workDays: e.work_days, yearMonth: ym, resignDate: e.resign_date,
   })
-  const before       = st.main + awardsSum
+  const v2Total      = Number(e.v2_total || 0)
+  const before       = st.main + awardsSum + v2Total
   const after        = calcWithholding(before).after
-  return { ...st, contractInc: st.allInc, perfBonus, promo, awardsSum, before, after }
+  return { ...st, contractInc: st.allInc, perfBonus, promo, awardsSum, v2Total, before, after }
 }
 
 function calcDig(e: DigEmployee, yearMonth: string) {
@@ -344,6 +348,26 @@ function SalesCard({
           </>
         )}
 
+        {/* 새 구조(2026-11-16 이후 체결 건) — 선금·잔금 */}
+        {emp.v2 && (emp.v2.total > 0 || emp.v2.newHire) && (
+          <div className="mt-2 mb-1 rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+            <p className="text-[10px] font-bold text-emerald-700 mb-1">새 구조 ({V2_START.slice(5).replace('-', '/')} 이후 체결 건){emp.v2.newHire ? ' · 신입 첫 1개월' : ''}</p>
+            {emp.v2.newHire ? (
+              <>
+                <PayRow label="업무정착비(일할)" value={emp.v2.stipend} />
+                <PayRow label={`입금 매출 인센(${Math.round(V2.newHireRate * 100)}%)`} value={emp.v2.newHireIncentive} />
+              </>
+            ) : (
+              <>
+                <PayRow label={`선금 구간 인센(${man(emp.v2.prepayFund)}원 × ${Math.round(emp.v2.rate * 100)}%)`} value={emp.v2.tierPay} />
+                <PayRow label={`잔금 인센(${Math.round(V2.balanceRate * 100)}%)`} value={emp.v2.balancePay} />
+                <PayRow label="인증사업 인센(20%)" value={emp.v2.certPay} />
+                <PayRow label={`주 프로모션(${emp.v2.promoWeeks}주)`} value={emp.v2.weeklyPromo} />
+              </>
+            )}
+            <PayRow label="새 구조 합계" value={emp.v2.total} bold />
+          </div>
+        )}
         {/* 계약 시작일 — 기본제 선택 가능 기간(2달) 계산 */}
         <div className="flex items-center justify-between py-1.5 border-b border-gray-50">
           <span className="text-xs text-gray-400">계약 시작일 <span className="text-[9px] text-gray-300">(기본제 선택 2달)</span></span>
@@ -628,6 +652,38 @@ export default function PayrollTab() {
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
   }, [opsEmps, salesEmps, digEmps, costs, revTotals]) // eslint-disable-line
 
+  // ── 새 구조(2026-11-16 이후 체결 건) 자동 계산 — 고객 DB 의 선금·잔금·인증사업 금액으로 영업 사원별 급여를 구한다 ──
+  const v2CustRef = useRef<{ ym: string; list: any[] } | null>(null)
+  useEffect(() => {
+    if (yearMonth < V2_START.slice(0, 7)) return          // 시행(2026-11) 이전 달에는 새 구조 건이 없다
+    if (!salesEmps.some(e => e.name)) return
+    let dead = false
+    ;(async () => {
+      try {
+        let list = v2CustRef.current?.ym === yearMonth ? v2CustRef.current.list : null
+        if (!list) {
+          const j = await (await fetch('/api/customers?scope=payroll')).json()
+          list = j.customers || []
+          v2CustRef.current = { ym: yearMonth, list: list! }
+        }
+        if (dead) return
+        setSalesEmps(prev => {
+          let changed = false
+          const next = prev.map(e => {
+            if (!e.name) return e
+            const r = v2PayFor(list!, yearMonth, e.name, e.join_date)
+            const nv = { newHire: r.newHire, stipend: r.stipend, prepayFund: r.prepayFund, rate: r.rate, tierPay: r.tierPay, balancePay: r.balancePay, certPay: r.certPay, promoWeeks: r.promoWeeks, weeklyPromo: r.weeklyPromo, newHireIncentive: r.newHireIncentive, total: r.total }
+            if (Number(e.v2_total || 0) === r.total && JSON.stringify(e.v2 || null) === JSON.stringify(r.total > 0 || r.newHire ? nv : null)) return e
+            changed = true
+            return { ...e, v2_total: r.total, v2: r.total > 0 || r.newHire ? nv : undefined }
+          })
+          return changed ? next : prev
+        })
+      } catch { /* 새 구조 계산 실패해도 옛 계산은 그대로 */ }
+    })()
+    return () => { dead = true }
+  }, [yearMonth, salesEmps]) // eslint-disable-line
+
   // ── 과거 월 계약 목록만 로드 (집계된 계약 표시용, salesEmps/doSave 건드리지 않음) ──
   // 저장된 contract_count(이미 환수 반영된 값)는 그대로 두고 지급명세 목록만 채움
   async function loadPastContractMap(ym: string) {
@@ -643,6 +699,7 @@ export default function PayrollTab() {
       ;(custJson.customers || []).forEach((c: any) => {
         const dedMonth = c.details?.refund_deduction_month
         if (dedMonth !== ym) return
+        if (isV2Contract(c)) return
         const name = (c.details?.refund_deduction_sales || '').trim()
         if (!name) return
         const w = parseFloat(String(c.details?.refund_deduction_weight || 0)) || 0
@@ -692,6 +749,7 @@ export default function PayrollTab() {
       ;(custJson.customers || []).forEach((c: any) => {
         const dedMonth = c.details?.refund_deduction_month
         if (dedMonth !== yearMonth) return
+        if (isV2Contract(c)) return
         const name = (c.details?.refund_deduction_sales || '').trim()
         if (!name) return
         const w = parseFloat(String(c.details?.refund_deduction_weight || 0)) || 0

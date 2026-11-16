@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { bizDays } from '@/lib/digStats'
 import { calcSalesStructure, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PROMO_TIERS, PERF_BONUS_MIN_COUNT, PERF_BONUS_RATE, INCOME_TAX_RATE, LOCAL_TAX_RATE, calcWithholding, calcDigMonth, digLeaveDays, OPS_FEE_RATE, OPS_PUTO_RATE, currentYearMonth, buildSalesContractMap, calcRefundDeductions, DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
+import { v2PayFor, V2 } from '@/lib/payrollV2'
 
 // ─── 타입 ─────────────────────────────────────────────────
 
@@ -34,6 +35,8 @@ interface EmpFinancial {
   sales_base_pay?: number
   work_days?: number
   resign_date?: string
+  v2_total?: number          // 2026-11-16 이후 체결 건(선금·잔금 구조) 급여 — 급여 화면에서 자동 계산
+  v2?: { newHire: boolean; stipend: number; prepayFund: number; rate: number; tierPay: number; balancePay: number; certPay: number; promoWeeks: number; weeklyPromo: number; newHireIncentive: number; total: number }
   // 관리팀
   base_salary: number
   fee_revenue: number
@@ -119,10 +122,11 @@ function PayslipDocument({ emp, financial, yearMonth }: {
       payMode: financial.sales_pay_mode, joinDate: financial.sales_join_date, basePay: financial.sales_base_pay, workDays: financial.work_days, yearMonth, resignDate: financial.resign_date,
     })
     const contractInc = st.allInc
-    const subtotal    = st.main + awardsSum + allowSum
+    const v2Total     = Number(financial.v2_total || 0)
+    const subtotal    = st.main + awardsSum + allowSum + v2Total
     const beforeTax   = subtotal - financial.deduction
     const { incomeTax, localTax, after: actualPay } = calcWithholding(beforeTax)
-    return { ...st, contractInc, perfBonus, promo, awardsSum, allowSum, subtotal, beforeTax, incomeTax, localTax, actualPay }
+    return { ...st, contractInc, perfBonus, promo, awardsSum, allowSum, v2Total, subtotal, beforeTax, incomeTax, localTax, actualPay }
   })()
 
   // ── 관리팀 계산 ──
@@ -332,6 +336,18 @@ function PayslipDocument({ emp, financial, yearMonth }: {
                     </td>
                   </tr>
                 </>
+              )}
+              {salesCalc.v2Total > 0 && financial.v2 && (
+                <tr>
+                  <td className={tdL}>새 구조 인센</td>
+                  <td className={tdV}>
+                    {financial.v2.newHire
+                      ? `신입 업무정착비 ${fmt(financial.v2.stipend)} + 입금 매출 ${Math.round(V2.newHireRate * 100)}% ${fmt(financial.v2.newHireIncentive)}`
+                      : [`선금 ${fmt(financial.v2.prepayFund)} × ${Math.round(financial.v2.rate * 100)}%`, financial.v2.balancePay > 0 ? `잔금 ${Math.round(V2.balanceRate * 100)}% ${fmt(financial.v2.balancePay)}` : '', financial.v2.certPay > 0 ? `인증사업 20% ${fmt(financial.v2.certPay)}` : '', financial.v2.weeklyPromo > 0 ? `주 프로모션 ${financial.v2.promoWeeks}주 ${fmt(financial.v2.weeklyPromo)}` : ''].filter(Boolean).join(' · ')}
+                    <span className="block text-[10px] text-gray-400">2026.11.16 이후 체결 건</span>
+                  </td>
+                  <td className={tdN + ' text-emerald-700 font-semibold'}>{fmt(salesCalc.v2Total)}</td>
+                </tr>
               )}
               <tr>
                 <td className={tdL}>{salesCalc.chosen === 'base7' ? '③' : '④'} 시상금</td>
@@ -612,7 +628,7 @@ export default function PayslipTab() {
       // ── 해당 월 계약 실시간 집계 (buildSalesContractMap — payrollCalc.ts 단일 구현) ──
       const liveMap    = buildSalesContractMap(custJson.customers || [], yearMonth)
       // customers 테이블 기반 weight 차감 (refund_deduction_weight 있는 active 케이스 포함)
-      const custDeductions = calcRefundDeductions(custJson.customers || [], yearMonth)
+      const custDeductions = calcRefundDeductions(custJson.customers || [], yearMonth, { skipV2: true })
       const liveByName = Object.fromEntries(
         Object.entries(liveMap).map(([k, v]) => {
           const myDeds = custDeductions.filter(d => d.name === k || k.includes(d.name) || d.name.includes(k))
@@ -687,6 +703,17 @@ export default function PayslipTab() {
               resign_date:    savedMatch?.resign_date,
               work_days:      savedMatch?.work_days,
               memo:           savedMatch?.memo || '',
+            }
+          }
+          // 2026-11-16 이후 체결 건(선금·잔금 구조) — 이번 달은 고객 DB 로 새로 계산, 지난 달은 저장된 값이 있으면 그대로
+          {
+            const prevV2 = (savedMatch as any)?.v2_total
+            if (!isCurrentMon && prevV2 != null) {
+              updates[emp.id] = { ...(updates[emp.id] || {}), v2_total: Number(prevV2 || 0), v2: (savedMatch as any)?.v2 }
+            } else {
+              const r = v2PayFor(custJson.customers || [], yearMonth, emp.name, (savedMatch as any)?.join_date)
+              const nv = { newHire: r.newHire, stipend: r.stipend, prepayFund: r.prepayFund, rate: r.rate, tierPay: r.tierPay, balancePay: r.balancePay, certPay: r.certPay, promoWeeks: r.promoWeeks, weeklyPromo: r.weeklyPromo, newHireIncentive: r.newHireIncentive, total: r.total }
+              updates[emp.id] = { ...(updates[emp.id] || {}), v2_total: r.total, v2: r.total > 0 || r.newHire ? nv : undefined }
             }
           }
         } else if (emp.team === 'dig') {

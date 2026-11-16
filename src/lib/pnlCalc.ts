@@ -52,7 +52,7 @@ export function calcMonthPnl(ym: string, employees: any | null): MonthPnl {
       revenue: n(s.contract_revenue), perfBonus: n(s.performance_bonus), promo: getPromo(n(s.contract_count)),
       payMode: s.pay_mode, joinDate: (s as any).join_date, basePay: s.base_pay, workDays: s.work_days, yearMonth: ym, resignDate: s.resign_date,
     })
-    salesLabor += st.main + sumAwards(s.awards)
+    salesLabor += st.main + sumAwards(s.awards) + n((s as any).v2_total)   // 새 구조(2026-11-16 이후 체결 건) 급여
     if (st.chosen === 'base7') salesFixed += st.baseProrated
     salesCount += n(s.contract_count)
   }

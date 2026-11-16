@@ -4,6 +4,7 @@ import ContractWizard from '@/components/shared/ContractWizard'
 
 import { useState, useRef, useEffect } from 'react'
 import { useBackToClose } from '@/lib/navHistory'
+import { V2_START } from '@/lib/payrollV2'
 import { createPortal } from 'react-dom'
 import NumberInput, { parseNumber, formatNumber } from '@/components/ui/NumberInput'
 import MeetingJournal from '@/components/sales/MeetingJournal'
@@ -547,11 +548,14 @@ export function ContractModal({ company, cumulativeBase, initialMemo = '', initi
   const [coopRequestSent,  setCoopRequestSent]  = useState(false)
   const [saving, setSaving] = useState(false)
   const [contractType, setContractType] = useState<'일반' | '월정기권'>('일반')
+  const [certAmount, setCertAmount] = useState('')   // 인증사업(벤처·연구소 등) 금액 — 새 구조에서 영업팀 20% 고정 인센 대상
 
   const feeNum      = parseNumber(contractFee)
   const paidNum     = parseNumber(paidAmount)
   const myRevNum    = parseNumber(myRevenue)
   const approvedNum = parseNumber(approvedAmount)
+  const certNum     = parseNumber(certAmount)
+  const isNew       = contractDate >= V2_START   // 2026-11-16 이후 체결 = 1년 관리비(선금·잔금) 구조, 수수료 없음
 
   // 부가세: 입금액 ÷ 11
   const vat     = vatIncluded && paidNum > 0 ? Math.round(paidNum / 11) : 0
@@ -581,8 +585,10 @@ export function ContractModal({ company, cumulativeBase, initialMemo = '', initi
       cumulative_revenue:  formatNumber(cumulative),
       payment_method:      paymentMethod,
       approved_amount:     approvedNum > 0 ? formatNumber(approvedNum) : '',
-      commission_rate:     contractType === '월정기권' ? '' : commissionRate,
-      commission_amount:   contractType === '월정기권' ? '' : (commAmount > 0 ? formatNumber(commAmount) : ''),
+      commission_rate:     contractType === '월정기권' || isNew ? '' : commissionRate,
+      commission_amount:   contractType === '월정기권' || isNew ? '' : (commAmount > 0 ? formatNumber(commAmount) : ''),
+      cert_amount:         isNew && certNum > 0 ? formatNumber(certNum) : '',
+      fee_model:           isNew ? 'v2' : 'old',
       contract_type:       contractType,
       result_memo:         opsMemo,
       call_memo:           initialMemo,                 // 계약 전 통화메모
@@ -631,7 +637,7 @@ export function ContractModal({ company, cumulativeBase, initialMemo = '', initi
                   }`}>
                   {type}
                   {type === '월정기권' && <span className="block text-[10px] font-normal opacity-80">120만원 · 수수료없음</span>}
-                  {type === '일반' && <span className="block text-[10px] font-normal opacity-80">착수금 + 성공보수</span>}
+                  {type === '일반' && <span className="block text-[10px] font-normal opacity-80">{isNew ? '1년 관리비 선금·잔금' : '착수금 + 성공보수'}</span>}
                 </button>
               ))}
             </div>
@@ -640,16 +646,26 @@ export function ContractModal({ company, cumulativeBase, initialMemo = '', initi
           {/* ② 계약금 */}
           <div>
             <label className="text-[10px] text-blue-700 mb-1 block font-bold">
-              계약금 <span className="text-gray-400 font-normal">(계약서 작성 시 기입한 금액, VAT 별도)</span>
+              {isNew ? '1년 관리비 총액' : '계약금'} <span className="text-gray-400 font-normal">({isNew ? '연매출 구간 금액, 선금+잔금 합계, VAT 별도' : '계약서 작성 시 기입한 금액, VAT 별도'})</span>
             </label>
             <NumberInput value={contractFee} onChange={setContractFee} className={INP} placeholder="500,000" />
           </div>
 
           {/* ② 이번 입금액 */}
           <div>
-            <label className="text-[10px] text-blue-700 mb-1 block font-bold">이번 입금액 <span className="text-gray-400 font-normal">(VAT 포함)</span></label>
+            <label className="text-[10px] text-blue-700 mb-1 block font-bold">{isNew ? '이번 입금액 (선금)' : '이번 입금액'} <span className="text-gray-400 font-normal">(VAT 포함)</span></label>
             <NumberInput value={paidAmount} onChange={setPaidAmount} className={INP} placeholder="330,000" />
+            {isNew && <p className="text-[10px] text-gray-400 mt-1">선금 비율은 협의(총액의 50% 이상 권장) · 잔금은 업무 세팅 후 90일 이내</p>}
           </div>
+
+          {/* 새 구조: 인증사업 금액 (영업팀 고정 20%) */}
+          {isNew && (
+            <div>
+              <label className="text-[10px] text-emerald-700 mb-1 block font-bold">인증사업 금액 <span className="text-gray-400 font-normal">(벤처·연구소·이노비즈·메인비즈 등, VAT 별도 · 없으면 비워 두기)</span></label>
+              <NumberInput value={certAmount} onChange={setCertAmount} className={INP} placeholder="0" />
+              <p className="text-[10px] text-gray-400 mt-1">인증사업은 선금 구간 인센에서 제외되고 영업팀 고정 20%로 계산됩니다. 총액 중 이 금액의 비율만큼이 인증사업 입금으로 나뉩니다.</p>
+            </div>
+          )}
 
           <label className="flex items-center gap-2 cursor-pointer bg-blue-50 rounded-lg px-3 py-2">
             <input type="checkbox" checked={vatIncluded} onChange={e => setVatIncluded(e.target.checked)}
@@ -675,7 +691,7 @@ export function ContractModal({ company, cumulativeBase, initialMemo = '', initi
           </div>
 
           {/* 수수료율 — 월정기권은 숨김 */}
-          {contractType !== '월정기권' && <div className="bg-violet-50 rounded-xl p-3 space-y-2.5 border border-violet-100">
+          {contractType !== '월정기권' && !isNew && <div className="bg-violet-50 rounded-xl p-3 space-y-2.5 border border-violet-100">
             <p className="text-[10px] text-violet-700 font-bold">
               수수료율
             </p>
