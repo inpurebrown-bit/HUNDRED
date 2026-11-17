@@ -548,7 +548,9 @@ export function ContractModal({ company, cumulativeBase, initialMemo = '', initi
   const [coopRequestSent,  setCoopRequestSent]  = useState(false)
   const [saving, setSaving] = useState(false)
   // 계약 방식 3가지: v2 = 1년 관리비(선금·잔금, 신규) / sub = 월정기권 / fee = 수수료 계약(기존, 착수금 + 성공보수)
-  const [route, setRoute] = useState<'v2' | 'sub' | 'fee'>('v2')
+  // 2026-12-01 전까지는 종전 방식(일반·수수료 / 월정기권)만 쓴다. 12월 1일부터 신규(1년 관리비 선금·잔금) 루트가 열린다.
+  const newRouteOpen = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10) >= V2_START
+  const [route, setRoute] = useState<'v2' | 'sub' | 'fee'>(newRouteOpen ? 'v2' : 'fee')
   const contractType: '일반' | '월정기권' = route === 'sub' ? '월정기권' : '일반'
   const [certAmount, setCertAmount] = useState('')   // 인증사업(벤처·연구소 등) 금액 — 새 구조에서 영업팀 20% 고정 인센 대상
 
@@ -626,12 +628,12 @@ export function ContractModal({ company, cumulativeBase, initialMemo = '', initi
           {/* ① 계약 방식 — 3가지 */}
           <div>
             <label className="text-[10px] text-gray-500 mb-1.5 block font-bold">계약 방식</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className={`grid gap-2 ${newRouteOpen ? 'grid-cols-3' : 'grid-cols-2'}`}>
               {([
                 ['v2', '신규', '1년 관리비\n선금·잔금', 'bg-[#1B2A45] text-white border-[#1B2A45]'],
                 ['sub', '월정기권', '120만원\n수수료 없음', 'bg-purple-600 text-white border-purple-600'],
-                ['fee', '수수료 계약', '기존 방식\n착수금+수수료', 'bg-violet-500 text-white border-violet-500'],
-              ] as const).map(([key, label, sub, on]) => (
+                ['fee', newRouteOpen ? '수수료 계약' : '일반 계약', '기존 방식\n착수금+수수료', 'bg-violet-500 text-white border-violet-500'],
+              ] as const).filter(([k]) => newRouteOpen || k !== 'v2').map(([key, label, sub, on]) => (
                 <button key={key} type="button" onClick={() => setRoute(key)}
                   className={`py-2 rounded-xl text-sm font-semibold border transition-colors ${route === key ? on : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'}`}>
                   {label}
@@ -639,10 +641,10 @@ export function ContractModal({ company, cumulativeBase, initialMemo = '', initi
                 </button>
               ))}
             </div>
-            {route !== 'fee' && contractDate < V2_START && (
+            {newRouteOpen && route !== 'fee' && contractDate < V2_START && (
               <p className="text-[10px] text-amber-600 mt-1">계약일이 2026-11-16 이전이면 옛 급여 기준(개수·프로모션)으로 계산됩니다.</p>
             )}
-            {route === 'fee' && (
+            {newRouteOpen && route === 'fee' && (
               <p className="text-[10px] text-gray-400 mt-1">수수료 계약은 계약일과 관계없이 옛 급여 기준(개수·프로모션)으로 계산됩니다.</p>
             )}
           </div>

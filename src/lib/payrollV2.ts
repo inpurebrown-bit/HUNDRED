@@ -7,7 +7,7 @@
 //  · 영업팀장·주임·관리팀 새 보수는 아직 자동 계산하지 않는다 (팀장·주임은 인원이 생길 때 추가)
 // 11월 15일까지 체결한 옛 건은 payrollCalc.ts 의 종전 계산을 그대로 쓴다.
 
-export const V2_START = '2026-11-16'
+export const V2_START = '2026-12-01'
 
 export const V2 = {
   stipend: 1_500_000,          // 신입 업무정착비 (월)
