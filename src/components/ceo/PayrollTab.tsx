@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { isTester } from '@/lib/tester'
 import { bizDays } from '@/lib/digStats'
-import { calcWithholding, calcSalesStructure, resignBizProration, SALES_BASE_PAY, SALES_BASE_RATE, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, calcMonthlySubBonus, calcRefundDeductions, calcDigSalary, calcDigMonth, digLeaveDays, digUnpaidLeaveCount, DIG_BASE_SALARY, DIG_HOURLY_BASE, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
+import { calcWithholding, calcSalesStructure, resignBizProration, SALES_BASE_PAY, SALES_BASE_RATE, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, baseSalesName, calcMonthlySubBonus, calcRefundDeductions, calcDigSalary, calcDigMonth, digLeaveDays, digUnpaidLeaveCount, DIG_BASE_SALARY, DIG_HOURLY_BASE, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
 import { v2PayFor, isV2Contract, V2_START, V2, teamOf, OPS_V2_FROM, OPS_V2 } from '@/lib/payrollV2'
 import { contractWeight } from '@/lib/supplyRules'
 
@@ -795,7 +795,7 @@ export default function PayrollTab() {
         const dedMonth = c.details?.refund_deduction_month
         if (dedMonth !== ym) return
         if (isV2Contract(c)) return
-        const name = (c.details?.refund_deduction_sales || '').trim()
+        const name = baseSalesName(c.details?.refund_deduction_sales)
         if (!name) return
         const w = parseFloat(String(c.details?.refund_deduction_weight || 0)) || 0
         if (w <= 0) return
@@ -845,7 +845,7 @@ export default function PayrollTab() {
         const dedMonth = c.details?.refund_deduction_month
         if (dedMonth !== yearMonth) return
         if (isV2Contract(c)) return
-        const name = (c.details?.refund_deduction_sales || '').trim()
+        const name = baseSalesName(c.details?.refund_deduction_sales)
         if (!name) return
         const w = parseFloat(String(c.details?.refund_deduction_weight || 0)) || 0
         if (w <= 0) return
@@ -995,7 +995,7 @@ export default function PayrollTab() {
         if ((e as any).isRefund) continue   // 환불 항목은 아래 별도 처리
         if ((e as any).isExtra) continue    // 추가 입금(잔금)은 아래에서 갯수·금액 함께 처리
         if ((e as any).v2) continue         // 새 구조(2026-11-16 이후 체결) 건은 payrollV2 에서 계산
-        const name = (e.sales_user_name || '').trim()
+        const name = baseSalesName(e.sales_user_name)
         if (!name) continue
         if (!salesByName[name]) salesByName[name] = { amount: 0, count: 0 }
         salesByName[name].amount += e.amount || 0
@@ -1013,7 +1013,7 @@ export default function PayrollTab() {
       // 잔금 등 추가 입금분 (갯수 + 매출 금액)
       for (const ex of (data.thisMonthExtraCounts || []) as any[]) {
         if (ex.v2) continue                 // 새 구조 건의 잔금은 payrollV2 에서 계산
-        const name = String(ex.name || '').trim()
+        const name = baseSalesName(ex.name)
         if (!name) continue
         if (!salesByName[name]) salesByName[name] = { amount: 0, count: 0 }
         salesByName[name].count += Number(ex.weight) || 0
@@ -1026,7 +1026,7 @@ export default function PayrollTab() {
       for (const e of salesEntries) {
         if (!(e as any).isRefund) continue
         if ((e as any).v2) continue         // 새 구조 건의 해지·정산 차감은 payrollV2 에서
-        const name = (e.sales_user_name || '').trim()
+        const name = baseSalesName(e.sales_user_name)
         if (!name) continue
         if (!salesByName[name]) salesByName[name] = { amount: 0, count: 0 }
         salesByName[name].amount += (e.amount || 0)  // 음수 → 차감
