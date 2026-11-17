@@ -220,7 +220,7 @@ export function calcExtraCounts(customers: any[], yearMonth: string, opts: { ski
       if (w <= 0) continue
       if (String(e?.date || '').slice(0, 7) !== yearMonth) continue
       out.push({
-        name: String(c.details?.sales_user_name || c.sales_user_name || '').trim(),
+        name: baseSalesName(c.details?.sales_user_name || c.sales_user_name),
         weight: w,
         amount: parseFloat(String(e?.amount ?? 0).replace(/[^0-9.-]/g, '')) || 0,
         company: c.details?.company || c.name || '',
@@ -240,7 +240,7 @@ export function extraRevenueSum(customers: any[], yearMonth?: string, name?: str
   for (const c of customers || []) {
     const list = c?.details?.extra_counts
     if (!Array.isArray(list)) continue
-    const owner = String(c.details?.sales_user_name || c.sales_user_name || '').trim()
+    const owner = baseSalesName(c.details?.sales_user_name || c.sales_user_name)
     if (name && !(owner === name || name.includes(owner) || owner.includes(name))) continue
     for (const e of list) {
       if (!((parseFloat(String(e?.weight ?? 0)) || 0) > 0)) continue
@@ -250,6 +250,9 @@ export function extraRevenueSum(customers: any[], yearMonth?: string, name?: str
   }
   return sum
 }
+
+// 같은 사람이 직함 붙은 이름('손제후 수석팀장')과 이름만('손제후')으로 입력된 계약을 한 사람으로 묶는다
+export const baseSalesName = (n: any) => String(n || '').replace(/s*(수석팀장|팀장|팀원|대리|과장|부장|차장|이사|수석|매니저|주임|사원).*$/, '').trim()
 
 export function buildSalesContractMap(
   customers: any[],
@@ -262,7 +265,7 @@ export function buildSalesContractMap(
     if (isV2Contract(c)) continue   // 2026-11-16 이후 체결 건은 payrollV2 (선금·잔금 구조)에서 계산
     const cm = (c.details?.contract_date || c.created_at || '').slice(0, 7)
     if (cm !== yearMonth) continue
-    const name = (c.details?.sales_user_name || c.sales_user_name || '').trim()
+    const name = baseSalesName(c.details?.sales_user_name || c.sales_user_name)
     if (!name) continue
     const rev = parseMon(c.details?.my_revenue) || parseMon(c.details?.payment_amount)
     const w   = contractWeight(c.details?.payment_amount, c.details?.vat_included)

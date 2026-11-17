@@ -5,6 +5,7 @@ import ContractWizard from '@/components/shared/ContractWizard'
 import { useState, useRef, useEffect } from 'react'
 import { useBackToClose } from '@/lib/navHistory'
 import { V2_START } from '@/lib/payrollV2'
+import { baseSalesName } from '@/lib/payrollCalc'
 import { createPortal } from 'react-dom'
 import NumberInput, { parseNumber, formatNumber } from '@/components/ui/NumberInput'
 import MeetingJournal from '@/components/sales/MeetingJournal'
@@ -360,7 +361,7 @@ function calcMonthlyRevenue(allCustomers: Customer[], salesUserName: string): nu
   return allCustomers
     .filter(c =>
       c.status === 'contracted' &&
-      (c.sales_user_name === salesUserName || c.details?.sales_user_name === salesUserName) &&
+      (baseSalesName(c.sales_user_name) === baseSalesName(salesUserName) || baseSalesName(c.details?.sales_user_name) === baseSalesName(salesUserName)) &&
       (c.details?.contract_date || c.created_at || '').slice(0, 7) === currentMonth
     )
     .reduce((sum, c) => sum + parseNumber(c.details?.my_revenue || '0'), 0)
