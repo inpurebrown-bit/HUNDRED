@@ -672,6 +672,79 @@ function CertUpsellOps({ customerId, opsName, initial }: { customerId: string; o
   )
 }
 
+// 잔금 관리 — 새 계약(1년 관리비 선금·잔금) 카드 안에서: 남은 잔금·기한 확인, 잔금 입금 기록(→ 잔금 매출·관리실장 매출 5% 반영), 요청 기록
+const n0 = (v: any) => parseInt(String(v ?? '0').replace(/[^0-9]/g, ''), 10) || 0
+function BalanceOps({ customerId, details }: { customerId: string; details: Record<string, any> }) {
+  const [d, setD] = useState<Record<string, any>>(details || {})
+  const [amt, setAmt] = useState('')
+  const [vat, setVat] = useState(false)
+  const [date, setDate] = useState(() => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10))
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const total = n0(d.contract_fee)
+  const extras: any[] = Array.isArray(d.extra_counts) ? d.extra_counts : []
+  const paidExtra = Math.round(extras.reduce((s, e) => s + (parseFloat(String(e?.amount ?? 0).replace(/[^0-9.-]/g, '')) || 0), 0))
+  const prepaid = n0(d.net_paid) || (d.vat_included ? Math.round(n0(d.payment_amount) / 1.1) : n0(d.payment_amount))
+  const remaining = Math.max(0, total - prepaid - paidExtra)
+  const done = remaining <= 0 || d.balance_done === true
+  const setup = String(d.setup_done_date || d.contract_date || '').slice(0, 10)
+  const due = String(d.balance_due_date || (setup ? new Date(Date.parse(setup + 'T00:00:00Z') + 90 * 86400000).toISOString().slice(0, 10) : '')).slice(0, 10)
+  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
+  const dday = due ? Math.round((Date.parse(due + 'T00:00:00Z') - Date.parse(today + 'T00:00:00Z')) / 86400000) : null
+  const won = (v: number) => Math.round(v).toLocaleString('ko-KR') + '원'
+  async function act(body: Record<string, any>, local: (cur: Record<string, any>) => Record<string, any>) {
+    setBusy(true)
+    try {
+      const r = await fetch('/api/balances', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: customerId, ...body }) })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) { alert(j.error || '저장 실패'); return false }
+      setD(cur => local(cur)); return true
+    } finally { setBusy(false) }
+  }
+  const reqs: any[] = Array.isArray(d.balance_requests) ? d.balance_requests : []
+  return (
+    <div className={`mb-2 rounded-xl border p-2 ${done ? 'border-emerald-200 bg-emerald-50' : dday != null && dday < 0 ? 'border-rose-300 bg-rose-50' : 'border-amber-200 bg-amber-50'}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-bold text-[#1B2A45]">💰 잔금 관리 <span className="font-normal text-gray-400">· 1년 관리비 {won(total)}</span></span>
+        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${done ? 'bg-emerald-600 text-white' : dday != null && dday < 0 ? 'bg-rose-600 text-white' : 'bg-amber-500 text-white'}`}>
+          {done ? '잔금 완료' : dday == null ? '기한 미정' : dday < 0 ? `기한 ${-dday}일 지남` : `D-${dday}`}
+        </span>
+      </div>
+      <div className="grid grid-cols-3 gap-1.5 text-center mt-1.5">
+        {([['선금 입금', prepaid], ['잔금 입금', paidExtra], ['남은 잔금', done ? 0 : remaining]] as const).map(([l, v]) => (
+          <div key={l} className="bg-white/80 rounded-lg py-1"><p className="text-[9px] text-gray-400">{l}</p><p className={`text-[11px] font-bold tabular-nums ${l === '남은 잔금' && !done ? 'text-rose-600' : 'text-[#1B2A45]'}`}>{won(v)}</p></div>
+        ))}
+      </div>
+      <p className="text-[10px] text-gray-500 mt-1">잔금 기한 <b>{due || '-'}</b>(업무 세팅 후 90일){setup ? ` · 세팅일 ${setup}` : ''}</p>
+      {extras.length > 0 && <p className="text-[10px] text-emerald-700 mt-0.5">입금 내역: {extras.map(e => `${String(e.date || '').slice(5, 10)} ${won(parseFloat(String(e?.amount ?? 0)) || 0)}`).join(' · ')}</p>}
+      {reqs.length > 0 && <p className="text-[10px] text-gray-500 mt-0.5">요청 {reqs.length}회 · 마지막 {String(reqs[reqs.length - 1].date || '').slice(5, 10)}{reqs[reqs.length - 1].note ? ` — ${reqs[reqs.length - 1].note}` : ''}</p>}
+      {!done && (
+        <div className="mt-2 space-y-1.5 border-t border-black/5 pt-2">
+          <p className="text-[10px] font-bold text-emerald-700">잔금 입금 입력 — 입력하면 잔금 매출로 잡히고 관리실장 매출 5%에 반영됩니다</p>
+          <div className="flex gap-1.5 items-center">
+            <input value={amt} inputMode="numeric" onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); setAmt(v ? Number(v).toLocaleString() : '') }} placeholder={`남은 ${remaining.toLocaleString()}`} className="flex-1 min-w-0 border rounded px-2 py-1 text-xs text-right bg-white" />
+            <label className="text-[10px] text-gray-500 flex items-center gap-1 shrink-0"><input type="checkbox" checked={vat} onChange={e => setVat(e.target.checked)} />VAT 포함</label>
+            <button type="button" onClick={() => { setAmt(remaining.toLocaleString()); setVat(false) }} className="text-[10px] border border-emerald-300 text-emerald-700 rounded px-1.5 py-1 bg-white font-bold">전액</button>
+          </div>
+          <div className="flex gap-1.5">
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="border rounded px-2 py-1 text-xs bg-white" />
+            <button type="button" disabled={busy} className="flex-1 bg-emerald-600 text-white rounded py-1 text-xs font-bold disabled:opacity-50" onClick={async () => {
+              const v = Number(amt.replace(/[^0-9]/g, '')); if (!v) { alert('입금액을 입력하세요'); return }
+              const net = vat ? Math.round(v / 1.1) : v
+              if (await act({ action: 'payment', amount: v, vatIncluded: vat, date }, cur => ({ ...cur, extra_counts: [...(Array.isArray(cur.extra_counts) ? cur.extra_counts : []), { date, weight: Math.max(0.01, Math.round(net / 100000 * 0.2 * 100) / 100), amount: net, label: '잔금' }] }))) setAmt('')
+            }}>잔금 입금 기록</button>
+          </div>
+          <div className="flex gap-1.5">
+            <input value={note} onChange={e => setNote(e.target.value)} placeholder="잔금 요청 메모 (예: 다음 주 입금 약속)" className="flex-1 min-w-0 border rounded px-2 py-1 text-xs bg-white" />
+            <button type="button" disabled={busy} className="bg-amber-500 text-white rounded px-2 py-1 text-xs font-bold disabled:opacity-50" onClick={async () => { if (await act({ action: 'request', note }, cur => ({ ...cur, balance_requests: [...(Array.isArray(cur.balance_requests) ? cur.balance_requests : []), { date: today, note, by: '' }] }))) setNote('') }}>📞 요청 기록</button>
+          </div>
+          <button type="button" disabled={busy} className="text-[10px] text-gray-500 underline" onClick={() => { if (confirm('남은 금액이 있어도 잔금을 다 정산한 것으로 표시합니다. 완납 처리할까요?')) act({ action: 'done' }, cur => ({ ...cur, balance_done: true })) }}>잔금 정산 끝 (완납 처리)</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; onSave: (id: string, patch: Record<string, any>) => void; userRole?: string; userName?: string }) {
   const [local, setLocal] = useState<OpsCase>({ ...c })
   const [activeDetailTab, setActiveDetailTab] = useState<DetailTab>('진행현황')
@@ -1429,6 +1502,9 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
                 ...((local.customers?.details as any)?.activity_log || []).map((e: any) => ({ ...e, src: 'sales' })),
               ]} />
             </div>
+            {(c as any).customers?.id && isNewModel({ details: (c as any).customers?.details }) && n0(((c as any).customers?.details || {}).contract_fee) > 0 && (
+              <BalanceOps customerId={String((c as any).customers.id)} details={(c as any).customers?.details || {}} />
+            )}
             {(c as any).customers?.id && (
               <CertUpsellOps customerId={String((c as any).customers.id)} opsName={c.ops_user_name || userName || ''} initial={((c as any).customers?.details?.cert_upsells as any[]) || []} />
             )}
@@ -2653,6 +2729,11 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
   // 새 계약(1년 관리비 선금·잔금) vs 기존(수수료·착수금) 구분 — 새 계약은 초록 카드 + '선금잔금' 배지, 기존은 흰 카드 + '수수료' 배지
   const isNewContract = !isMonthlyCard && isNewModel({ details: c.customers?.details })
   const isOldFeeCard = !isMonthlyCard && !isNewContract
+  const cd: any = c.customers?.details || {}
+  const balTotal = n0(cd.contract_fee)
+  const balPaid = (n0(cd.net_paid) || (cd.vat_included ? Math.round(n0(cd.payment_amount) / 1.1) : n0(cd.payment_amount))) + Math.round((Array.isArray(cd.extra_counts) ? cd.extra_counts : []).reduce((s: number, e: any) => s + (parseFloat(String(e?.amount ?? 0).replace(/[^0-9.-]/g, '')) || 0), 0))
+  const balRemain = isNewContract && balTotal > 0 ? Math.max(0, balTotal - balPaid) : 0
+  const balDone = isNewContract && balTotal > 0 && (balRemain <= 0 || cd.balance_done === true)
 
   return (
     <div
@@ -2674,6 +2755,11 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
         )}
         {isNewContract && (
           <span className="text-[7px] font-bold bg-emerald-600 text-white px-1 rounded leading-tight shrink-0">선금잔금</span>
+        )}
+        {isNewContract && balTotal > 0 && (
+          balDone
+            ? <span className="text-[7px] font-bold bg-emerald-800 text-white px-1 rounded leading-tight shrink-0">잔금완료</span>
+            : <span className="text-[7px] font-bold bg-rose-500 text-white px-1 rounded leading-tight shrink-0">잔금 {Math.round(balRemain / 10000).toLocaleString()}만</span>
         )}
         {isOldFeeCard && (
           <span className="text-[7px] font-bold bg-gray-500 text-white px-1 rounded leading-tight shrink-0">수수료</span>

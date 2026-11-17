@@ -20,6 +20,7 @@ import {
 } from '@/lib/businessDays'
 import { SUPPLY_RATE_TABLE, calcRecommendedSupply, isActiveRow, contractWeight } from '@/lib/supplyRules'
 import { calcRefundDeductions, calcExtraCounts, extraRevenueSum } from '@/lib/payrollCalc'
+import { isNewModel } from '@/lib/payrollV2'
 import SalesScheduleTab from './SalesScheduleTab'
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -676,7 +677,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
     (sum, c) => sum + contractWeight((c as any).details?.payment_amount, (c as any).details?.vat_included), 0
   )
   // 잔금 등 추가 입금 갯수 (입금한 달에만 가산, 매출·계약건수는 그대로)
-  const myExtraWeight = calcExtraCounts(customers, thisMonth).reduce((s, x) => s + x.weight, 0)
+  const myExtraWeight = calcExtraCounts((customers as any[]).filter(c => !isNewModel(c)), thisMonth).reduce((s, x) => s + x.weight, 0)
   const myTotalContracted = (mySupplyCfg ? (Number(mySupplyCfg.base) || 0) + myDbContracted : myDbContracted) + myExtraWeight
 
   // 월 목표: supply_config.goal 우선, 없으면 MONTHLY_GOALS 폴백
@@ -785,7 +786,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
     !c.details?.is_cancelled &&
     ((c as any).details?.contract_date || '').slice(0, 7) === thisMonth
   )
-  const thisMonthTotalRevenue = thisMonthRevenue.reduce((sum, c) => sum + pNum((c as any).details?.my_revenue), 0) + extraRevenueSum(customers as any[], thisMonth)
+  const thisMonthTotalRevenue = thisMonthRevenue.reduce((sum, c) => sum + pNum((c as any).details?.my_revenue), 0) + extraRevenueSum((customers as any[]).filter(c => !isNewModel(c)), thisMonth)
   const thisMonthTotalPaid    = thisMonthRevenue.reduce((sum, c) => sum + pNum((c as any).details?.payment_amount), 0)
   // 환불 차감 (단일 소스: payrollCalc.calcRefundDeductions)
   const thisMonthRefunds = calcRefundDeductions(customers, thisMonth)
@@ -802,7 +803,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
   // 전체 합계
   const totalRevenue = revenueCustomers
     .filter(c => !c.details?.is_cancelled)
-    .reduce((sum, c) => sum + pNum((c as any).details?.my_revenue), 0) + extraRevenueSum(customers as any[])
+    .reduce((sum, c) => sum + pNum((c as any).details?.my_revenue), 0) + extraRevenueSum((customers as any[]).filter(c => !isNewModel(c)))
   const cancelledCount = revenueCustomers.filter(c => c.details?.is_cancelled).length
 
   // 월별 그룹 (계약일 기준 내림차순)

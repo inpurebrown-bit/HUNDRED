@@ -627,7 +627,7 @@ export function ContractModal({ company, cumulativeBase, initialMemo = '', initi
           {/* ① 계약 방식 — 1년 관리비(선금·잔금) 하나로 통일 */}
           <div className="rounded-xl bg-[#1B2A45] text-white px-4 py-2.5">
             <p className="text-sm font-semibold">1년 관리비 · 선금·잔금</p>
-            <p className="text-[10px] text-white/70 leading-snug">매출은 선금 기준으로 잡힙니다. 잔금은 업무 세팅 후 90일 이내 입금 시 잔금 매출로 추가됩니다.</p>
+            <p className="text-[10px] text-white/70 leading-snug">영업 매출은 선금 기준으로만 잡힙니다. 잔금은 관리팀이 받아서 관리합니다.</p>
           </div>
 
           {/* ② 계약금 */}
@@ -642,7 +642,7 @@ export function ContractModal({ company, cumulativeBase, initialMemo = '', initi
           <div>
             <label className="text-[10px] text-blue-700 mb-1 block font-bold">{isNew ? '이번 입금액 (선금)' : '이번 입금액'} <span className="text-gray-400 font-normal">(VAT 포함)</span></label>
             <NumberInput value={paidAmount} onChange={setPaidAmount} className={INP} placeholder="330,000" />
-            {isNew && <p className="text-[10px] text-gray-400 mt-1">선금 비율은 협의(총액의 50% 이상 권장) · 잔금은 업무 세팅 후 90일 이내</p>}
+            {isNew && <p className="text-[10px] text-gray-400 mt-1">선금 비율은 협의(총액의 50% 이상 권장)</p>}
           </div>
 
           {/* 새 구조: 인증사업 금액 (영업팀 고정 20%) */}
@@ -699,7 +699,7 @@ export function ContractModal({ company, cumulativeBase, initialMemo = '', initi
 
           {/* ③ 자동계산 박스 */}
           <div className="bg-gray-50 rounded-xl px-4 py-3 space-y-2">
-            <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="grid grid-cols-2 gap-2 text-center">
               <div>
                 <p className="text-[10px] text-gray-400 mb-0.5">부가세</p>
                 <p className={`text-sm font-bold ${vat > 0 ? 'text-blue-600' : 'text-gray-300'}`}>
@@ -712,20 +712,7 @@ export function ContractModal({ company, cumulativeBase, initialMemo = '', initi
                   {netPaid > 0 ? netPaid.toLocaleString() + '원' : '—'}
                 </p>
               </div>
-              <div>
-                <p className="text-[10px] text-gray-400 mb-0.5">잔금</p>
-                <p className={`text-sm font-bold ${unpaid > 0 ? 'text-red-500' : unpaid === 0 && feeNum > 0 ? 'text-emerald-500' : 'text-gray-300'}`}>
-                  {feeNum > 0
-                    ? unpaid > 0 ? unpaid.toLocaleString() + '원' : '완납 ✓'
-                    : '—'}
-                </p>
-              </div>
             </div>
-            {feeNum > 0 && paidNum > 0 && (
-              <p className="text-[10px] text-gray-400 text-center border-t border-gray-200 pt-2">
-                {feeNum.toLocaleString()}원 (합의) − {netPaid.toLocaleString()}원 (순입금) = <span className={unpaid > 0 ? 'text-red-500 font-semibold' : 'text-emerald-600 font-semibold'}>{unpaid > 0 ? unpaid.toLocaleString() + '원 잔금' : '완납'}</span>
-              </p>
-            )}
           </div>
 
           {/* ★ 계약 일자 (매출 월 반영 기준) */}

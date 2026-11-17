@@ -96,7 +96,7 @@ export default function BalanceTab({ isCeo = false }: { isCeo?: boolean }) {
       {err && <p className="text-sm text-rose-600">{err}</p>}
       {loading ? <p className="text-center text-gray-400 text-sm py-10">불러오는 중...</p> : shown.length === 0 ? (
         <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-10 text-center text-sm text-gray-400">
-          {items.length === 0 ? '아직 새 구조(선금·잔금) 계약이 없습니다. 계약완료 창에서 "신규" 방식으로 넘긴 계약이 여기에 나옵니다.' : '해당하는 건이 없습니다.'}
+          {items.length === 0 ? '아직 새 구조(선금·잔금) 계약이 없습니다. 영업팀이 계약완료로 넘긴 새 계약(선금·잔금)이 여기에 나옵니다.' : '해당하는 건이 없습니다.'}
         </div>
       ) : (
         <div className="space-y-2.5">

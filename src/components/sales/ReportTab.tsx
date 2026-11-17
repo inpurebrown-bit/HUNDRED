@@ -2,6 +2,7 @@
 
 import { useState, useEffect, FormEvent, ReactNode } from 'react'
 import { calcRefundDeductions, calcExtraCounts } from '@/lib/payrollCalc'
+import { isNewModel } from '@/lib/payrollV2'
 import { contractWeight as contractWeightLib } from '@/lib/supplyRules'
 
 // ── 타입 ────────────────────────────────────────────────
@@ -224,7 +225,7 @@ export default function ReportTab({ userId, userName }: Props) {
     .reduce((sum: number, c: any) => sum + contractWeight(c.details?.payment_amount, c.details?.vat_included), 0)
   const myRefundWeight = calcRefundDeductions(allCustomers, monthStr)
     .reduce((s, d) => s + d.weight, 0)
-  const myExtraWeight = calcExtraCounts(allCustomers, monthStr).reduce((s, x) => s + x.weight, 0)   // 잔금 등 추가 입금 갯수
+  const myExtraWeight = calcExtraCounts((allCustomers as any[]).filter(c => !isNewModel(c)), monthStr).reduce((s, x) => s + x.weight, 0)   // 잔금 등 추가 입금 갯수
   const autoMonthContracts = Math.max(0, autoMonthContractsRaw + myExtraWeight - myRefundWeight)
 
   // 이번달 직가DB 등록 수 (현재 status 무관 — db010_month 기준)
