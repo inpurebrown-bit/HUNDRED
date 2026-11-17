@@ -63,7 +63,7 @@ export function calcWithholding(before: number): { incomeTax: number; localTax: 
   return { incomeTax, localTax, tax: incomeTax + localTax, after: gross - incomeTax - localTax }
 }
 
-import { isV2Contract } from './payrollV2'
+import { v2PayrollOn } from './payrollV2'
 
 // ── 실시간 영업팀 계약 집계 ───────────────────────────────
 // PayrollTab / PayslipTab 공통 — 인별 계약 매출·개수 한 번만 계산
@@ -77,6 +77,7 @@ export interface ContractEntry {
 
 // 월정기권 계약 보너스 총액 계산 (contract_type === '월정기권' 이고 해당 월에 들어온 것)
 export function calcMonthlySubBonus(customers: any[], yearMonth: string): number {
+  return 0   // 월정기권 폐지 — 관리팀 보수에서 제외 (이번 달부터 본인 수수료 매출 + 뿌토 매출만)
   const parseMon = (v: any) => parseInt(String(v || '0').replace(/[^0-9]/g, ''), 10) || 0
   let total = 0
   for (const c of customers) {
@@ -107,7 +108,7 @@ export function calcRefundDeductions(customers: any[], yearMonth: string, opts: 
   for (const c of customers) {
     const dedMonth = (c.details?.refund_deduction_month || '').trim()
     if (dedMonth !== yearMonth) continue
-    if (opts.skipV2 && isV2Contract(c)) continue   // 새 구조 건의 해지·정산은 payrollV2 에서 차감
+    if (opts.skipV2 && v2PayrollOn(c, yearMonth)) continue   // 12월부터 새 구조 건의 해지·정산은 payrollV2 에서 차감
     const name = (c.details?.refund_deduction_sales || '').trim()
     if (!name) continue
     const w = parseFloat(String(c.details?.refund_deduction_weight || 0)) || 0
@@ -212,7 +213,7 @@ export interface ExtraCount { name: string; weight: number; amount: number; comp
 export function calcExtraCounts(customers: any[], yearMonth: string, opts: { skipV2?: boolean } = {}): ExtraCount[] {
   const out: ExtraCount[] = []
   for (const c of customers || []) {
-    if (opts.skipV2 && isV2Contract(c)) continue
+    if (opts.skipV2 && v2PayrollOn(c, yearMonth)) continue
     const list = c?.details?.extra_counts
     if (!Array.isArray(list)) continue
     for (const e of list) {
@@ -227,7 +228,7 @@ export function calcExtraCounts(customers: any[], yearMonth: string, opts: { ski
         date: String(e.date),
         label: e.label || '추가 입금',
         customerId: String(c.id || ''),
-        v2: isV2Contract(c),
+        v2: v2PayrollOn(c, yearMonth),
       })
     }
   }
@@ -262,9 +263,9 @@ export function buildSalesContractMap(
   const map: Record<string, { revenue: number; count: number; details: ContractEntry[] }> = {}
   for (const c of customers) {
     if (c.status !== 'contracted') continue
-    if (isV2Contract(c)) continue   // 2026-11-16 이후 체결 건은 payrollV2 (선금·잔금 구조)에서 계산
     const cm = (c.details?.contract_date || c.created_at || '').slice(0, 7)
     if (cm !== yearMonth) continue
+    if (v2PayrollOn(c, cm)) continue   // 12월부터 체결 건은 payrollV2 (선금·잔금 구조)에서 계산 — 11월까지는 선금 매출을 개수로 치환
     const name = baseSalesName(c.details?.sales_user_name || c.sales_user_name)
     if (!name) continue
     const rev = parseMon(c.details?.my_revenue) || parseMon(c.details?.payment_amount)

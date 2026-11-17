@@ -134,7 +134,7 @@ function PayslipDocument({ emp, financial, yearMonth }: {
   const opsCalc = (() => {
     const feeInc    = Math.round(Number(financial.fee_revenue) * OPS_FEE_RATE)
     const putoInc   = Math.round(Number(financial.puto_revenue) * OPS_PUTO_RATE)
-    const subBonus  = Number(financial.monthly_sub_bonus || 0)
+    const subBonus  = 0   // 월정기권 폐지
     const awardsSum = (financial.awards || []).reduce((s, a) => s + Number(a.amount || 0), 0)
     const allowSum  = (financial.allowance_details || []).reduce((s, a) => s + Number(a.amount || 0), 0)
     const opsV2     = financial.ops_v2_total != null

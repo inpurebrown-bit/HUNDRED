@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { isTester } from '@/lib/tester'
 import { bizDays } from '@/lib/digStats'
 import { calcWithholding, calcSalesStructure, resignBizProration, SALES_BASE_PAY, SALES_BASE_RATE, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, baseSalesName, calcMonthlySubBonus, calcRefundDeductions, calcDigSalary, calcDigMonth, digLeaveDays, digUnpaidLeaveCount, DIG_BASE_SALARY, DIG_HOURLY_BASE, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
-import { v2PayFor, isV2Contract, V2_START, V2, teamOf, OPS_V2_FROM, OPS_V2 } from '@/lib/payrollV2'
+import { v2PayFor, v2PayrollOn, V2_START, V2, teamOf, OPS_V2_FROM, OPS_V2 } from '@/lib/payrollV2'
 import { contractWeight } from '@/lib/supplyRules'
 
 // ─── 타입 ─────────────────────────────────────────────────
@@ -18,7 +18,7 @@ interface OpsEmployee {
   puto_revenue: number
   performance_bonus: number
   monthly_sub_bonus: number  // 월정기권 5% 보너스 (관리팀장)
-  chief?: boolean            // 관리실장 — 2026-12 급여부터 새 보수(총 매출 5% + 소개건 30% + 기장료 업셀). false 면 종전 계산
+  chief?: boolean            // 관리실장 — 2026-12 급여부터 새 보수(총 매출 5% + 뿌토 40% + 기장료 업셀). false 면 종전 계산
   upsell_count?: number      // 기장료 업셀 개수 (1개당 15만원)
   cert_upsell_rev?: number   // 이 담당자가 직접 받은 인증 업셀 금액(그 달) — 20% 지급, 자동 반영
   v2_total?: number          // 새 보수 세전 합계(기본급·성과급·시상금 포함) — 명세서·손익이 읽는다
@@ -83,7 +83,7 @@ function calcOps(e: OpsEmployee, ym?: string, totalRev = 0) {
   }
   const feeInc   = Math.round(Number(e.fee_revenue)  * OPS_FEE_RATE)
   const putoInc  = Math.round(Number(e.puto_revenue) * OPS_PUTO_RATE)
-  const subBonus = Number(e.monthly_sub_bonus || 0)
+  const subBonus = 0   // 월정기권 폐지 — 이번 달까지는 본인 수수료 매출 + 뿌토 매출만
   const awardsSum = (e.awards || []).reduce((s, a) => s + Number(a.amount || 0), 0)
   const before   = Number(e.base_salary) + feeInc + putoInc + Number(e.performance_bonus) + subBonus + awardsSum
   const after    = calcWithholding(before).after
@@ -240,8 +240,8 @@ function OpsCard({
           <>
             <div className="mt-1 mb-0.5 rounded-lg bg-emerald-50 border border-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-700">새 보수 (2026-12~) · 관리실장</div>
             <PayRow label={`총 매출 5% (회사 총 매출 ${Math.round(totalRev).toLocaleString('ko-KR')}원)`} value={c.total5} autoTag />
-            <PayRow label="소개건 선금 매출(VAT제외)" value={emp.puto_revenue} autoTag />
-            <PayRow label="소개건 인센(30%)" value={c.intro} />
+            <PayRow label="뿌토 매출(VAT제외)" value={emp.puto_revenue} autoTag />
+            <PayRow label={`뿌토(소개건) 인센(${Math.round(OPS_V2.introRate * 100)}%)`} value={c.intro} />
             <PayRow label={`직접 인증 업셀 20% (업셀 ${Number(emp.cert_upsell_rev || 0).toLocaleString('ko-KR')}원)`} value={c.certUp} autoTag />
             <div className="flex items-center justify-between py-1.5 border-b border-gray-50">
               <span className="text-xs text-gray-400">기장료 업셀 <span className="text-[9px] text-gray-300">(1개당 15만원)</span></span>
@@ -698,6 +698,22 @@ export default function PayrollTab() {
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
   }, [opsEmps, salesEmps, digEmps, costs, revTotals]) // eslint-disable-line
 
+  // ── 이번 달(새 구조 전환 전 달) 선금·잔금 방식 매출 — 개수 방식과 나란히 보여 주기 위해 ──
+  const [v2Rev, setV2Rev] = useState<any>(null)
+  useEffect(() => {
+    setV2Rev(null)
+    if (yearMonth >= OPS_V2_FROM || yearMonth < '2026-11') return
+    let dead = false
+    ;(async () => {
+      try {
+        const d = await (await fetch('/api/revenue')).json()
+        const row = (d?.v2?.monthly || []).find((m: any) => m.month === yearMonth)
+        if (!dead) setV2Rev(row || { prepayFund: 0, prepayCert: 0, balanceFund: 0, balanceCert: 0, total: 0, contracts: 0 })
+      } catch {}
+    })()
+    return () => { dead = true }
+  }, [yearMonth, revTotals]) // eslint-disable-line
+
   // ── 관리팀 직접 인증 업셀 금액 자동 반영 (담당자 이름 기준) ──
   useEffect(() => {
     if (yearMonth < OPS_V2_FROM) return
@@ -794,7 +810,7 @@ export default function PayrollTab() {
       ;(custJson.customers || []).forEach((c: any) => {
         const dedMonth = c.details?.refund_deduction_month
         if (dedMonth !== ym) return
-        if (isV2Contract(c)) return
+        if (v2PayrollOn(c, ym)) return
         const name = baseSalesName(c.details?.refund_deduction_sales)
         if (!name) return
         const w = parseFloat(String(c.details?.refund_deduction_weight || 0)) || 0
@@ -844,7 +860,7 @@ export default function PayrollTab() {
       ;(custJson.customers || []).forEach((c: any) => {
         const dedMonth = c.details?.refund_deduction_month
         if (dedMonth !== yearMonth) return
-        if (isV2Contract(c)) return
+        if (v2PayrollOn(c, yearMonth)) return
         const name = baseSalesName(c.details?.refund_deduction_sales)
         if (!name) return
         const w = parseFloat(String(c.details?.refund_deduction_weight || 0)) || 0
@@ -1623,6 +1639,21 @@ export default function PayrollTab() {
               </div>
             </div>
 
+            {/* 이번 달만: 개수 방식 vs 선금·잔금 방식 */}
+            {v2Rev && (
+              <div className="rounded-xl p-4 space-y-2 border border-emerald-200 bg-emerald-50/60">
+                <p className="text-[10px] font-bold text-emerald-700 tracking-widest mb-1">{yearMonth.slice(5)}월 한시 · 두 방식 비교</p>
+                <p className="text-[10px] text-gray-500 leading-snug">급여는 이번 달까지 <b>개수 방식</b>(선금 매출을 10만 원당 0.2개로 치환)으로 나가고, 다음 달부터 아래 <b>선금·잔금 매출</b> 기준 새 구조로 계산됩니다.</p>
+                <SumRow label="개수 방식 · 영업 계약 매출" value={revTotals?.sales || 0} />
+                <SumRow label="개수 방식 · 영업팀 합계 개수" value={Math.round(salesEmps.reduce((s2, e) => s2 + Number(e.contract_count || 0), 0) * 10) / 10} unit="개" />
+                <div className="border-t border-emerald-200 pt-2 space-y-2">
+                  <SumRow label={`선금·잔금 방식 · 새 계약 선금 (${v2Rev.contracts}건)`} value={(v2Rev.prepayFund || 0) + (v2Rev.prepayCert || 0)} />
+                  <SumRow label="선금·잔금 방식 · 잔금 입금" value={(v2Rev.balanceFund || 0) + (v2Rev.balanceCert || 0)} />
+                  <SumRow label="선금·잔금 방식 · 합계" value={v2Rev.total || 0} bold />
+                </div>
+              </div>
+            )}
+
             {/* 운영비 입력 */}
             <div className="space-y-1">
               <p className="text-[10px] font-bold text-[#1B2A45]/40 uppercase tracking-widest mb-2">운영비</p>
@@ -1779,12 +1810,12 @@ export default function PayrollTab() {
 
 // ─── SumRow 헬퍼 ─────────────────────────────────────────
 
-function SumRow({ label, value, bold, negative }: { label: string; value: number; bold?: boolean; negative?: boolean }) {
+function SumRow({ label, value, bold, negative, unit }: { label: string; value: number; bold?: boolean; negative?: boolean; unit?: string }) {
   return (
     <div className="flex justify-between items-center">
       <span className={`text-xs ${bold ? 'font-bold text-[#1B2A45]' : 'text-gray-500'}`}>{label}</span>
       <span className={`text-xs font-semibold ${bold ? 'text-[#1B2A45] text-sm' : negative && value > 0 ? 'text-red-500' : 'text-gray-700'}`}>
-        {value > 0 ? (negative ? '-' : '') + value.toLocaleString('ko-KR') + '원' : '-'}
+        {value > 0 ? (negative ? '-' : '') + value.toLocaleString('ko-KR') + (unit || '원') : '-'}
       </span>
     </div>
   )

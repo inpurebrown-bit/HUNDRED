@@ -36,14 +36,23 @@ export const isStartMember = (teams: { name: string; team_no: number }[], name: 
 
 // 관리실장 새 보수 — 2026-12 급여부터 (11월은 옛 건과 섞여 있어 종전 그대로)
 export const OPS_V2_FROM = '2026-12'
-export const OPS_V2 = { certUpsellRate: 0.20, chiefRate: 0.05, introRate: 0.30, upsellPay: 150_000 } as const   // 총 매출 5% · 소개건 선금 30% · 기장료 업셀 1개당 15만원
+export const OPS_V2 = { certUpsellRate: 0.20, chiefRate: 0.05, introRate: 0.40, upsellPay: 150_000 } as const   // 총 매출 5% · 소개건 선금 30% · 기장료 업셀 1개당 15만원
 
 export const parseMoney = (v: any) => parseInt(String(v ?? '0').replace(/[^0-9]/g, ''), 10) || 0
 export const tierRate = (monthlyPrepay: number) => (V2.tiers.find(t => monthlyPrepay >= t.min) || V2.tiers[V2.tiers.length - 1]).rate
 
 export const contractDateOf = (c: any): string => String(c?.details?.contract_date || c?.created_at || '').slice(0, 10)
 /** 새 구조(선금·잔금)로 계산하는 계약인가 — 2026-11-16 이후 체결이고, 수수료 계약(fee_model 'old')이 아닌 것 */
-export const isV2Contract = (c: any): boolean => c?.details?.fee_model !== 'old' && contractDateOf(c) >= V2_START
+export const PAYROLL_V2_MONTH = V2_START.slice(0, 7)
+/** 새 모델(1년 관리비 선금·잔금) 계약인가 — 새로 등록한 건(fee_model 'v2') 또는 12/1 이후 체결 건. 매출·잔금 관리·카드 표시 기준 */
+export const isNewModel = (c: any): boolean => {
+  const m = c?.details?.fee_model
+  if (m === 'old' || m === 'sub') return false
+  return m === 'v2' || contractDateOf(c) >= V2_START
+}
+export const isV2Contract = isNewModel
+/** 이 날짜(계약일·잔금 입금일·해지 차감월)의 급여를 새 구조로 계산하는가 — 2026-12 급여부터. 그 전(11월)은 선금 매출을 개수로 치환한 종전 방식 */
+export const v2PayrollOn = (c: any, date: string): boolean => isNewModel(c) && String(date || '').slice(0, 7) >= PAYROLL_V2_MONTH
 
 // 그 날이 속한 주의 월요일 (YYYY-MM-DD)
 const mondayOf = (d: string) => {
@@ -112,13 +121,13 @@ export function buildSalesV2Map(customers: any[], yearMonth: string): Record<str
         b.entries.push({ company: `${c.details?.company || c.name || ''} (인증 업셀 ${u.kind || ''})`, date: String(u.date), kind: '선금', fund: 0, cert: amt })
       }
     }
-    if (!isV2Contract(c)) continue
+    if (!isNewModel(c)) continue
     const name = ownerOf(c)
     if (!name) continue
     const company = c.details?.company || c.company || c.name || '(업체명 없음)'
     const share = certShare(c)
     // 선금: 계약 시 입금 (계약일이 속한 달)
-    if (c.status === 'contracted' && contractDateOf(c).slice(0, 7) === yearMonth) {
+    if (c.status === 'contracted' && contractDateOf(c).slice(0, 7) === yearMonth && v2PayrollOn(c, contractDateOf(c))) {
       const rev = prepayRevenue(c)
       const cert = Math.round(rev * share), fund = rev - cert
       const b = get(name)
@@ -130,7 +139,7 @@ export function buildSalesV2Map(customers: any[], yearMonth: string): Record<str
     // 잔금: 이후 추가 입금 (입금한 달)
     const extras = c?.details?.extra_counts
     if (Array.isArray(extras)) for (const e of extras) {
-      if (String(e?.date || '').slice(0, 7) !== yearMonth) continue
+      if (String(e?.date || '').slice(0, 7) !== yearMonth || !v2PayrollOn(c, yearMonth)) continue
       const amt = parseFloat(String(e?.amount ?? 0).replace(/[^0-9.-]/g, '')) || 0
       if (amt <= 0) continue
       const cert = Math.round(amt * share), fund = Math.round(amt) - cert
@@ -139,7 +148,7 @@ export function buildSalesV2Map(customers: any[], yearMonth: string): Record<str
       b.entries.push({ company: `${company} (${e?.label || '잔금'})`, date: String(e.date), kind: '잔금', fund, cert })
     }
     // 해지·정산: 그 달 반환액만큼 선금 매출에서 차감
-    if (String(c?.details?.refund_deduction_month || '').trim() === yearMonth) {
+    if (String(c?.details?.refund_deduction_month || '').trim() === yearMonth && v2PayrollOn(c, yearMonth)) {
       const w = parseFloat(String(c.details?.refund_deduction_weight || 0)) || 0
       const amt = parseMoney(c.details?.refund_deduction_amount)
       if (w > 0 || amt > 0) {

@@ -4,7 +4,6 @@ import ContractWizard from '@/components/shared/ContractWizard'
 
 import { useState, useRef, useEffect } from 'react'
 import { useBackToClose } from '@/lib/navHistory'
-import { V2_START } from '@/lib/payrollV2'
 import { baseSalesName } from '@/lib/payrollCalc'
 import { createPortal } from 'react-dom'
 import NumberInput, { parseNumber, formatNumber } from '@/components/ui/NumberInput'
@@ -548,11 +547,10 @@ export function ContractModal({ company, cumulativeBase, initialMemo = '', initi
   const [groupChatInvited, setGroupChatInvited] = useState(false)
   const [coopRequestSent,  setCoopRequestSent]  = useState(false)
   const [saving, setSaving] = useState(false)
-  // 계약 방식 3가지: v2 = 1년 관리비(선금·잔금, 신규) / sub = 월정기권 / fee = 수수료 계약(기존, 착수금 + 성공보수)
-  // 2026-12-01 전까지는 종전 방식(일반·수수료 / 월정기권)만 쓴다. 12월 1일부터 신규(1년 관리비 선금·잔금) 루트가 열린다.
-  const newRouteOpen = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10) >= V2_START
-  const [route, setRoute] = useState<'v2' | 'sub' | 'fee'>(newRouteOpen ? 'v2' : 'fee')
-  const contractType: '일반' | '월정기권' = route === 'sub' ? '월정기권' : '일반'
+  // 계약은 1년 관리비(선금·잔금) 한 가지만 쓴다 — 수수료 계약·월정기권 폐지.
+  // 매출은 선금 기준으로 잡히고, 이번 달(11월) 급여는 선금 매출을 개수로 치환해 종전 방식으로 나가며 12월 급여부터 새 구조로 계산된다.
+  const route = 'v2' as const
+  const contractType: '일반' | '월정기권' = '일반'
   const [certAmount, setCertAmount] = useState('')   // 인증사업(벤처·연구소 등) 금액 — 새 구조에서 영업팀 20% 고정 인센 대상
 
   const feeNum      = parseNumber(contractFee)
@@ -560,7 +558,7 @@ export function ContractModal({ company, cumulativeBase, initialMemo = '', initi
   const myRevNum    = parseNumber(myRevenue)
   const approvedNum = parseNumber(approvedAmount)
   const certNum     = parseNumber(certAmount)
-  const isNew       = route !== 'fee'            // 신규(1년 관리비 선금·잔금)·월정기권은 수수료 없음, 수수료 계약만 수수료율 입력
+  const isNew       = true            // 신규(1년 관리비 선금·잔금)·월정기권은 수수료 없음, 수수료 계약만 수수료율 입력
 
   // 부가세: 입금액 ÷ 11
   const vat     = vatIncluded && paidNum > 0 ? Math.round(paidNum / 11) : 0
@@ -592,8 +590,8 @@ export function ContractModal({ company, cumulativeBase, initialMemo = '', initi
       approved_amount:     approvedNum > 0 ? formatNumber(approvedNum) : '',
       commission_rate:     contractType === '월정기권' || isNew ? '' : commissionRate,
       commission_amount:   contractType === '월정기권' || isNew ? '' : (commAmount > 0 ? formatNumber(commAmount) : ''),
-      cert_amount:         route === 'v2' && certNum > 0 ? formatNumber(certNum) : '',
-      fee_model:           route === 'fee' ? 'old' : route === 'sub' ? 'sub' : 'v2',   // 'old' 만 옛 급여 기준(개수·프로모션)으로 계산
+      cert_amount:         certNum > 0 ? formatNumber(certNum) : '',
+      fee_model:           'v2',   // 'old' 만 옛 급여 기준(개수·프로모션)으로 계산
       contract_type:       contractType,
       result_memo:         opsMemo,
       call_memo:           initialMemo,                 // 계약 전 통화메모
@@ -626,28 +624,10 @@ export function ContractModal({ company, cumulativeBase, initialMemo = '', initi
         {/* Body */}
         <div className="px-6 py-5 space-y-4">
 
-          {/* ① 계약 방식 — 3가지 */}
-          <div>
-            <label className="text-[10px] text-gray-500 mb-1.5 block font-bold">계약 방식</label>
-            <div className={`grid gap-2 ${newRouteOpen ? 'grid-cols-3' : 'grid-cols-2'}`}>
-              {([
-                ['v2', '신규', '1년 관리비\n선금·잔금', 'bg-[#1B2A45] text-white border-[#1B2A45]'],
-                ['sub', '월정기권', '120만원\n수수료 없음', 'bg-purple-600 text-white border-purple-600'],
-                ['fee', newRouteOpen ? '수수료 계약' : '일반 계약', '기존 방식\n착수금+수수료', 'bg-violet-500 text-white border-violet-500'],
-              ] as const).filter(([k]) => newRouteOpen || k !== 'v2').map(([key, label, sub, on]) => (
-                <button key={key} type="button" onClick={() => setRoute(key)}
-                  className={`py-2 rounded-xl text-sm font-semibold border transition-colors ${route === key ? on : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'}`}>
-                  {label}
-                  <span className="block text-[10px] font-normal opacity-80 whitespace-pre-line leading-tight">{sub}</span>
-                </button>
-              ))}
-            </div>
-            {newRouteOpen && route !== 'fee' && contractDate < V2_START && (
-              <p className="text-[10px] text-amber-600 mt-1">계약일이 2026-11-16 이전이면 옛 급여 기준(개수·프로모션)으로 계산됩니다.</p>
-            )}
-            {newRouteOpen && route === 'fee' && (
-              <p className="text-[10px] text-gray-400 mt-1">수수료 계약은 계약일과 관계없이 옛 급여 기준(개수·프로모션)으로 계산됩니다.</p>
-            )}
+          {/* ① 계약 방식 — 1년 관리비(선금·잔금) 하나로 통일 */}
+          <div className="rounded-xl bg-[#1B2A45] text-white px-4 py-2.5">
+            <p className="text-sm font-semibold">1년 관리비 · 선금·잔금</p>
+            <p className="text-[10px] text-white/70 leading-snug">매출은 선금 기준으로 잡힙니다. 잔금은 업무 세팅 후 90일 이내 입금 시 잔금 매출로 추가됩니다.</p>
           </div>
 
           {/* ② 계약금 */}
@@ -698,7 +678,7 @@ export function ContractModal({ company, cumulativeBase, initialMemo = '', initi
           </div>
 
           {/* 수수료율 — 월정기권은 숨김 */}
-          {contractType !== '월정기권' && !isNew && <div className="bg-violet-50 rounded-xl p-3 space-y-2.5 border border-violet-100">
+          {!isNew && <div className="bg-violet-50 rounded-xl p-3 space-y-2.5 border border-violet-100">
             <p className="text-[10px] text-violet-700 font-bold">
               수수료율
             </p>

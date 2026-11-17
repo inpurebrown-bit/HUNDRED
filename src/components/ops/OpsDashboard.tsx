@@ -14,6 +14,7 @@ import { contractWeight } from '@/lib/supplyRules'
 import { printIncall, buildCustomerSections } from '@/lib/printIncall'
 import ConsultingReportTab from './ConsultingReportTab'
 import { ContractModal } from '@/components/sales/InCallTableView'
+import { isNewModel } from '@/lib/payrollV2'
 // ── KST Utils ──────────────────────────────────────────────────────────
 function nowKST() {
   return new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(' ', 'T') + '+09:00'
@@ -2649,6 +2650,9 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
 
   const isMonthlyCard = c.details?.contract_type === '월정기권'
   const hasCertUpsell = Array.isArray(c.customers?.details?.cert_upsells) && c.customers.details.cert_upsells.length > 0
+  // 새 계약(1년 관리비 선금·잔금) vs 기존(수수료·착수금) 구분 — 새 계약은 초록 카드 + '선금잔금' 배지, 기존은 흰 카드 + '수수료' 배지
+  const isNewContract = !isMonthlyCard && isNewModel({ details: c.customers?.details })
+  const isOldFeeCard = !isMonthlyCard && !isNewContract
 
   return (
     <div
@@ -2657,6 +2661,8 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
           ? isOpen ? 'bg-teal-50 ring-2 ring-teal-500 border-teal-400' : 'bg-teal-50 border-teal-300 hover:border-teal-500'
           : isMonthlyCard
           ? isOpen ? 'bg-purple-50 ring-2 ring-purple-400 border-purple-300' : 'bg-purple-50 border-purple-200 hover:border-purple-400'
+          : isNewContract
+          ? isOpen ? 'bg-emerald-50 ring-2 ring-emerald-500 border-emerald-400' : 'bg-emerald-50 border-emerald-300 hover:border-emerald-500'
           : isOpen ? 'bg-white ring-2 ring-violet-400 border-violet-300' : 'bg-white border-gray-200 hover:border-violet-300'
       }`}
       onClick={() => onToggle(c.id)}
@@ -2665,6 +2671,12 @@ function OpsCard({ c, isOpen, onToggle, onScriptToggle }: {
       <div className="h-[14px] flex items-center gap-1 mb-0.5 overflow-hidden">
         {isMonthlyCard && (
           <span className="text-[7px] font-bold bg-purple-500 text-white px-1 rounded leading-tight shrink-0">월정기</span>
+        )}
+        {isNewContract && (
+          <span className="text-[7px] font-bold bg-emerald-600 text-white px-1 rounded leading-tight shrink-0">선금잔금</span>
+        )}
+        {isOldFeeCard && (
+          <span className="text-[7px] font-bold bg-gray-500 text-white px-1 rounded leading-tight shrink-0">수수료</span>
         )}
         {needsAbsorb && (
           <span className="text-[7px] font-bold bg-indigo-500 text-white px-1 rounded leading-tight shrink-0">흡수</span>
