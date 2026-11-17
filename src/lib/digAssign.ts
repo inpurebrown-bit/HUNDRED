@@ -159,3 +159,46 @@ export async function releaseDue(): Promise<number> {
   }
   return n
 }
+
+// ── 대표가 승인·배정을 놓친 건 자동 처리 ──
+// 접수한 날의 다음 날 오전 RELEASE_HOUR_KST시(주말이면 월요일)까지 대표가 승인·배정하지 않은 가망은
+// 자동으로 승인하고 손제후 팀장에게 전부 배정한다. 팀장이 알아서 팀원에게 나눈다.
+export const AUTO_ASSIGN_TO_NAME = '손제후'
+
+/** 가망 접수 시각 기준 자동 배정 마감 시각 (ms) */
+export function autoDeadline(createdAtIso: string): number {
+  const created = new Date(Date.parse(createdAtIso) + 9 * 3600 * 1000)   // KST 로 본 접수 시각
+  const day = created.toISOString().slice(0, 10)
+  let t = new Date(`${day}T${String(RELEASE_HOUR_KST).padStart(2, '0')}:00:00+09:00`).getTime() + 24 * 3600 * 1000
+  for (let i = 0; i < 3; i++) {
+    const dow = new Date(t + 9 * 3600 * 1000).getUTCDay()
+    if (dow !== 0 && dow !== 6) break
+    t += 24 * 3600 * 1000
+  }
+  return t
+}
+
+export async function autoAssignOverdue(onlyIds?: string[]): Promise<{ approved: number; assigned: number; failed: number; to: string }> {
+  const out = { approved: 0, assigned: 0, failed: 0, to: AUTO_ASSIGN_TO_NAME }
+  const { data: boss } = await supabaseAdmin.from('users').select('id, name').eq('name', AUTO_ASSIGN_TO_NAME).eq('role', 'sales').maybeSingle()
+  if (!boss?.id) return out
+  const queued = new Set((await loadQueue()).map(i => i.prospect_id))   // 이미 예약 배정된 건은 예약 시각에 들어간다
+  let q = supabaseAdmin.from('dig_prospects').select('id, status, created_at').in('status', ['pending', 'approved']).is('customer_id', null)
+  if (onlyIds?.length) q = q.in('id', onlyIds)
+  const { data: rows } = await q
+  const now = Date.now()
+  for (const p of rows || []) {
+    if (queued.has(p.id)) continue
+    if (autoDeadline(p.created_at) > now) continue
+    if (p.status === 'pending') {
+      const { data: ok } = await supabaseAdmin.from('dig_prospects')
+        .update({ status: 'approved', approved_at: new Date().toISOString(), ceo_comment: '자동 승인 — 접수 다음 날 오전 9시까지 처리되지 않아 손제후 팀장에게 배정' })
+        .eq('id', p.id).eq('status', 'pending').select('id').maybeSingle()
+      if (!ok) continue
+      out.approved++
+    }
+    const r = await assignProspect(p.id, boss.id, boss.name, { name: '자동배정', role: 'system' })
+    if (r.ok) out.assigned++; else out.failed++
+  }
+  return out
+}

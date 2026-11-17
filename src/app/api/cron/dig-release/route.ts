@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { releaseDue } from '@/lib/digAssign'
+import { releaseDue, autoAssignOverdue } from '@/lib/digAssign'
 import { supabaseAdmin } from '@/lib/supabase'
 import { playableUrl } from '@/lib/recordingConvert'
 
@@ -9,6 +9,9 @@ export const maxDuration = 60
 // 덤으로, 접수 때 변환이 안 돼 wav 로 남은 녹취가 있으면 mp3 로 바꿔 둔다 (브라우저에서 재생 가능하게).
 export async function GET() {
   const n = await releaseDue()
+  // 대표가 승인·배정을 놓친 건(접수 다음 날 오전 9시 경과)은 자동 승인 후 손제후 팀장에게 일괄 배정
+  let auto = { approved: 0, assigned: 0, failed: 0, to: '' }
+  try { auto = await autoAssignOverdue() } catch { /* 실패해도 나머지 정리는 계속 */ }
   let converted = 0
   try {
     const { data } = await supabaseAdmin.from('dig_prospects').select('id, recording_url, recording_analysis').ilike('recording_url', '%.wav%').limit(5)
@@ -24,5 +27,5 @@ export async function GET() {
       }
     }
   } catch { /* 정리 실패는 배정에 영향 없음 */ }
-  return NextResponse.json({ released: n, converted })
+  return NextResponse.json({ released: n, converted, auto })
 }
