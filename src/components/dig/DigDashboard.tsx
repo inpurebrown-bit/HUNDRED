@@ -58,7 +58,8 @@ interface Prospect {
   call_date: string
 }
 
-interface RecItem { id: string; file: File; url: string; analysis: any; status: 'working' | 'done' | 'fail' }
+// status: working=파일 올리는 중 · done=올라감(제출 가능, AI 분석은 따로 진행·실패해도 접수 때 서버가 다시 분석) · fail=업로드 실패
+interface RecItem { id: string; file: File; url: string; analysis: any; status: 'working' | 'done' | 'fail'; ai?: 'run' | 'done' | 'miss' }
 
 interface Draft {
   id: string; kind: 'save' | 'callback'; note: string
@@ -420,29 +421,41 @@ export default function DigDashboard({ userId, userName, username }: Props) {
     setPhoneSearching(false)
   }
 
-  // AI 분석 (니즈·리포트) — 일시 오류·형식 오류면 최대 3번 시도. 유효한 분석이 나와야 결과를 돌려준다
+  // AI 분석 (니즈·리포트) — 서버가 여러 AI 모델을 갈아타며 시도한다. 화면은 최대 2번, 한 번에 100초까지만 기다린다 (무한 대기 방지)
   async function analyzeWithRetry(fileUrl: string, filename: string): Promise<any | null> {
-    for (let t = 0; t < 3; t++) {
+    for (let t = 0; t < 2; t++) {
+      const ctl = new AbortController()
+      const timer = setTimeout(() => ctl.abort(), 100_000)
       try {
         const res = await fetch('/api/analyze-recording', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileUrl, filename }),
+          body: JSON.stringify({ fileUrl, filename }), signal: ctl.signal,
         })
         const data = await res.json()
         if (data.analysis && !data.analysis.parse_error && data.analysis.checklist) return data.analysis
-      } catch {}
-      await new Promise(r => setTimeout(r, 1500))
+      } catch {} finally { clearTimeout(timer) }
+      if (t === 0) await new Promise(r => setTimeout(r, 1500))
     }
     return null
   }
+  const analysisJobs = useRef<Record<string, Promise<void>>>({})
+  const recsRef = useRef<RecItem[]>([])
+  recsRef.current = recs
 
-  async function retryAnalysis(id: string) {
+  // 올라간 녹취의 AI 분석을 따로 돌린다 — 제출은 기다리지 않아도 된다
+  function runAnalysis(id: string, url: string, name: string) {
+    setRecs(prev => prev.map(x => (x.id === id ? { ...x, ai: 'run' } : x)))
+    const job = (async () => {
+      const analysis = await analyzeWithRetry(url, name)
+      setRecs(prev => prev.map(x => (x.id === id ? (analysis ? { ...x, analysis, ai: 'done' } : { ...x, ai: 'miss' }) : x)))
+    })()
+    analysisJobs.current[id] = job
+  }
+
+  function retryAnalysis(id: string) {
     const r = recs.find(x => x.id === id)
     if (!r || !r.url) return
-    setRecs(prev => prev.map(x => (x.id === id ? { ...x, status: 'working' } : x)))
-    const analysis = await analyzeWithRetry(r.url, r.file.name)
-    setRecs(prev => prev.map(x => (x.id === id ? (analysis ? { ...x, analysis, status: 'done' } : { ...x, status: 'fail' }) : x)))
-    if (!analysis) showToast('AI 분석이 계속 실패합니다. 잠시 후 다시 눌러주세요', 'error')
+    runAnalysis(id, r.url, r.file.name)
   }
 
   // 녹취 여러 개 한 번에: 하나씩 순서대로 올리고 분석한다
@@ -458,42 +471,46 @@ export default function DigDashboard({ userId, userName, username }: Props) {
     if (items.length === 0) return
     setRecs(prev => [...prev, ...items])
     const patch = (id: string, v: Partial<RecItem>) => setRecs(prev => prev.map(r => (r.id === id ? { ...r, ...v } : r)))
-    for (const it of items) {
+    // 일시적인 네트워크·서버 오류는 자동으로 다시 시도한다
+    const withRetry = async <T,>(fn: () => Promise<T>, tries = 3): Promise<T> => {
+      let last: any
+      for (let t = 0; t < tries; t++) { try { return await fn() } catch (e) { last = e; if (t < tries - 1) await new Promise(r => setTimeout(r, 1200 * (t + 1))) } }
+      throw last
+    }
+    await Promise.all(items.map(async it => {
       try {
-        // 1단계: Supabase에 직접 업로드 (Vercel 크기 제한 우회)
-        const signRes = await fetch('/api/storage-sign', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename: it.file.name }),
-        })
-        const signData = await signRes.json()
-        if (!signData.signedUrl) throw new Error(signData.error || '업로드 URL 발급 실패')
         const ext = (it.file.name.split('.').pop() || 'mp3').toLowerCase()
         const mimeMap: Record<string, string> = { m4a: 'audio/mp4', mp3: 'audio/mpeg', wav: 'audio/wav', aac: 'audio/aac', ogg: 'audio/ogg', mp4: 'audio/mp4' }
         const contentType = (it.file.type && it.file.type !== 'audio/x-m4a') ? it.file.type : (mimeMap[ext] || 'audio/mpeg')
-        const putRes = await fetch(signData.signedUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: it.file })
-        if (!putRes.ok) throw new Error(`스토리지 업로드 실패 (${putRes.status})`)
-        // 통화녹음기 wav 는 GSM 같은 압축 형식이라 브라우저에서 재생이 안 된다 → 서버에서 일반 wav 로 변환
+        // 1단계: Supabase에 직접 업로드 (Vercel 크기 제한 우회) — 주소 발급부터 다시 받아 재시도
+        const signData = await withRetry(async () => {
+          const signRes = await fetch('/api/storage-sign', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: it.file.name }) })
+          const sd = await signRes.json()
+          if (!sd.signedUrl) throw new Error(sd.error || '업로드 URL 발급 실패')
+          const putRes = await fetch(sd.signedUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: it.file })
+          if (!putRes.ok) throw new Error(`스토리지 업로드 실패 (${putRes.status})`)
+          return sd
+        })
+        // 통화녹음기 wav 는 GSM 같은 압축 형식이라 브라우저에서 재생이 안 된다 → 서버에서 mp3 로 변환 (한 번 실패하면 한 번 더)
         let finalUrl: string = signData.publicUrl
         if (ext === 'wav') {
-          try {
-            const cv = await fetch('/api/convert-recording', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: signData.path }) })
-            const cj = await cv.json()
-            if (cv.ok && cj.url) finalUrl = cj.url
-          } catch { /* 변환 실패해도 원본으로 계속 (분석은 가능) */ }
+          for (let t = 0; t < 2; t++) {
+            try {
+              const cv = await fetch('/api/convert-recording', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: signData.path }) })
+              const cj = await cv.json()
+              if (cv.ok && cj.url) { finalUrl = cj.url; break }
+            } catch { /* 다시 시도 */ }
+          }
         }
-        patch(it.id, { url: finalUrl })
-
-        // 2단계: URL로 AI 분석 요청 — 실패해도 조용히 넘기지 않고 재시도, 끝내 실패하면 '실패'로 표시해 제출을 막는다
-        const analysis = await analyzeWithRetry(finalUrl, it.file.name)
-        if (analysis) patch(it.id, { analysis, status: 'done' })
-        else { patch(it.id, { status: 'fail' }); showToast(`${it.file.name}: AI 분석 실패 — '다시 분석'을 눌러주세요`, 'error') }
+        // 올라가면 바로 제출 가능 상태로 — AI 분석은 뒤에서 따로 (실패해도 접수 때 서버가 다시 분석)
+        patch(it.id, { url: finalUrl, status: 'done' })
+        runAnalysis(it.id, finalUrl, it.file.name)
       } catch (err: any) {
         console.error('processRecordingFiles error:', err)
         patch(it.id, { status: 'fail' })
         showToast(`${it.file.name}: 업로드 실패 — 다시 시도하세요`, 'error')
       }
-    }
+    }))
   }
 
   function handleRecordingChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -600,10 +617,14 @@ export default function DigDashboard({ userId, userName, username }: Props) {
       return
     }
     setSubmitting(true)
-    const recordings = ready.map(r => ({ url: r.url, name: r.file.name }))
+    // 분석이 거의 끝났으면 결과를 같이 보낸다 (최대 60초). 안 끝나도 서버가 접수 때 직접 분석한다
+    const jobs = ready.map(r => analysisJobs.current[r.id]).filter(Boolean)
+    if (jobs.length) { await Promise.race([Promise.allSettled(jobs), new Promise(r => setTimeout(r, 60_000))]); await new Promise(r => setTimeout(r, 80)) }
+    const readyNow = recsRef.current.filter(r => r.status === 'done' && r.url)
+    const recordings = readyNow.map(r => ({ url: r.url, name: r.file.name }))
     const recording_url = recordings[0].url
     const recording_filename = recordings.map(r => r.name).join(' / ')
-    const analysis = mergeAnalyses(ready.map(r => r.analysis))
+    const analysis = mergeAnalyses(readyNow.map(r => r.analysis))
     try {
       const res  = await fetch('/api/dig-prospects', {
         method: 'POST',
@@ -684,9 +705,9 @@ export default function DigDashboard({ userId, userName, username }: Props) {
                     <span className="font-black text-gray-500">{i + 1}</span>
                     <span className="flex-1 truncate font-semibold text-gray-700">{r.file.name}</span>
                     <span className={r.status === 'fail' ? 'text-red-600' : r.status === 'done' ? 'text-emerald-600' : 'text-blue-600'}>
-                      {r.status === 'working' ? '올리는 중…' : r.status === 'done' ? '✓ 완료' : r.url ? 'AI 분석 실패' : '업로드 실패'}
+                      {r.status === 'working' ? '올리는 중…' : r.status === 'fail' ? '업로드 실패' : r.ai === 'run' ? '✓ 올라감 · AI 분석 중…' : r.ai === 'miss' ? '✓ 올라감 · AI 분석은 접수 때 자동' : '✓ 완료'}
                     </span>
-                    {r.status === 'fail' && r.url && (
+                    {r.status === 'done' && r.ai === 'miss' && r.url && (
                       <button type="button" onClick={() => retryAnalysis(r.id)} className="text-[11px] font-bold text-blue-600 border border-blue-300 bg-white rounded px-1.5 py-0.5">다시 분석</button>
                     )}
                     <button type="button" onClick={() => setRecs(prev => prev.filter(x => x.id !== r.id))} className="text-gray-400 hover:text-red-500 px-1">✕</button>

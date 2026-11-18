@@ -93,33 +93,48 @@ export const mimeFromName = (name: string) => MIME[((name || '').split('?')[0].s
 /** 유효한 분석인지 (체크리스트·니즈가 있고 파싱 오류가 아님) */
 export const isValidAnalysis = (a: any) => !!a && !a.parse_error && !!a.checklist && !!a.needs_level
 
-/** 녹취 base64 → 분석 JSON. AI 서버 일시 오류·형식 오류는 최대 3번 다시 시도한다 (parse_error 로 끝나면 유효하지 않은 결과 반환) */
+// 사용할 AI 모델 순서. 무료 요금제는 모델마다 하루 요청 수(20건 등)가 따로 정해져 있고, 큰 모델은 몰릴 때 503 이 잦다(실측: 3.8-flash 는 145초 만에 실패).
+// 그래서 빠르고 안정적인 lite 를 먼저 쓰고, 안 되면(429 한도·503 혼잡·시간초과·형식 오류) 기다리지 않고 바로 다음 모델로 넘어간다.
+const MODELS = [process.env.GEMINI_AUDIO_MODEL, 'gemini-3.1-flash-lite', 'gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-3.5-flash'].filter(Boolean) as string[]
+const PER_MODEL_TIMEOUT = 40_000   // 모델 하나에 최대 40초
+const TOTAL_BUDGET = 100_000       // 전체 최대 100초 (서버 제한 120초 안에서 끝내기)
+
+function parseAnalysis(text: string): any | null {
+  const attempts = [
+    text,
+    (() => { const m = text.match(/```json\n?([\s\S]*?)\n?```/); return m?.[1] })(),
+    (() => { const m = text.match(/(\{[\s\S]*\})/); return m?.[1] })(),
+  ]
+  for (const c of attempts) { if (!c) continue; try { return JSON.parse(c) } catch { /* next */ } }
+  return null
+}
+
+/** 녹취 base64 → 분석 JSON. 모델을 차례로 갈아타며 시도한다 (parse_error 로 끝나면 유효하지 않은 결과 반환) */
 export async function analyzeAudio(base64: string, mimeType: string): Promise<any> {
-  const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' })
+  const started = Date.now()
   let last: any = null
   let lastErr: any = null
-  for (let t = 0; t < 3; t++) {
+  const seen = new Set<string>()
+  for (const name of MODELS) {
+    if (seen.has(name)) continue
+    seen.add(name)
+    const left = TOTAL_BUDGET - (Date.now() - started)
+    if (left < 8_000) break
     try {
+      const model = genAI.getGenerativeModel({ model: name }, { timeout: Math.min(PER_MODEL_TIMEOUT, left) })
       const result = await model.generateContent([
         { inlineData: { data: base64, mimeType } },
         CHECKLIST_PROMPT + '\n\n반드시 순수 JSON만 출력하세요. ```json 마크다운 없이, 중괄호로 시작하고 중괄호로 끝내세요.',
       ])
       const text = result.response.text().trim()
-      let analysis: any = null
-      const attempts = [
-        text,
-        (() => { const m = text.match(/```json\n?([\s\S]*?)\n?```/); return m?.[1] })(),
-        (() => { const m = text.match(/(\{[\s\S]*\})/); return m?.[1] })(),
-      ]
-      for (const c of attempts) { if (!c) continue; try { analysis = JSON.parse(c); break } catch { /* next */ } }
+      const analysis = parseAnalysis(text)
       if (analysis && isValidAnalysis(analysis)) return analysis
       last = analysis || { parse_error: true, raw_snippet: text.slice(0, 300) }
-      console.error(`analyzeAudio attempt ${t + 1}: invalid result`)
+      console.error(`analyzeAudio ${name}: invalid result`)
     } catch (e: any) {
       lastErr = e
-      console.error(`analyzeAudio attempt ${t + 1} failed:`, e?.message)
+      console.error(`analyzeAudio ${name} failed:`, String(e?.message || e).slice(0, 160))
     }
-    if (t < 2) await new Promise(r => setTimeout(r, 2000 * (t + 1)))
   }
   if (last) return last
   throw lastErr || new Error('AI 응답 없음')
