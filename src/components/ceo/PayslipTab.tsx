@@ -47,6 +47,8 @@ interface EmpFinancial {
   // 발굴팀 휴무 (급여 화면에서 정한 휴무일 → 무급 공제)
   dig_leave_days?: string[]
   dig_leave_deduction?: number
+  dig_incentive?: number       // 발굴팀 인센 — 급여 화면과 같은 calcDigMonth 결과 (월 목표 = 영업일 × 8건, 초과분 × 1만원)
+  dig_month_goal?: number      // 그 달 목표 건수
   dig_resigned?: boolean
   // 공통
   allowance_details: AllowanceDetail[]
@@ -148,14 +150,16 @@ function PayslipDocument({ emp, financial, yearMonth }: {
   const digCalc = (() => {
     const base      = Number(financial.base_salary) || DIG_BASE_SALARY
     const approved  = Number(financial.contract_count) || 0
-    const extraCnt  = Math.max(0, approved - DIG_DAILY_GOAL)
-    const incentive = extraCnt * DIG_BONUS_PER_EXTRA
+    // 월 목표(영업일 × 8건)를 넘긴 개수부터 1건당 1만원 — 급여 화면(calcDigMonth)과 같은 값을 쓴다. 값이 없으면 같은 기준으로 직접 계산
+    const goal      = Number(financial.dig_month_goal) || bizDays(yearMonth).total * DIG_DAILY_GOAL
+    const extraCnt  = Math.max(0, approved - goal)
+    const incentive = financial.dig_incentive != null ? Number(financial.dig_incentive) : extraCnt * DIG_BONUS_PER_EXTRA
     const allowSum  = (financial.allowance_details || []).reduce((s, a) => s + Number(a.amount || 0), 0)
     const leaveDed  = Number(financial.dig_leave_deduction) || 0
     const subtotal  = base + incentive + allowSum - leaveDed
     const beforeTax = subtotal - financial.deduction
     const { incomeTax, localTax, after: actualPay } = calcWithholding(beforeTax)
-    return { base, incentive, extraCnt, allowSum, leaveDed, subtotal, beforeTax, incomeTax, localTax, actualPay }
+    return { base, incentive, extraCnt, goal, allowSum, leaveDed, subtotal, beforeTax, incomeTax, localTax, actualPay }
   })()
 
   const isSales = emp.team === 'sales'
@@ -266,8 +270,8 @@ function PayslipDocument({ emp, financial, yearMonth }: {
                 <td className={tdL}>② 인센티브</td>
                 <td className={tdV}>
                   {financial.contract_count > 0
-                    ? `${financial.contract_count}건 (${DIG_DAILY_GOAL}건 초과 ${digCalc.extraCnt}건 × ${DIG_BONUS_PER_EXTRA.toLocaleString()}원)`
-                    : `${DIG_DAILY_GOAL}건 초과분 × ${DIG_BONUS_PER_EXTRA.toLocaleString()}원`}
+                    ? `${financial.contract_count}건 (월 목표 ${digCalc.goal}건 초과 ${digCalc.extraCnt}건 × ${DIG_BONUS_PER_EXTRA.toLocaleString()}원)`
+                    : `월 목표(영업일 × ${DIG_DAILY_GOAL}건) 초과분 × ${DIG_BONUS_PER_EXTRA.toLocaleString()}원`}
                 </td>
                 <td className={tdN + (digCalc.incentive > 0 ? ' text-orange-700 font-semibold' : '')}>
                   {digCalc.incentive > 0 ? fmt(digCalc.incentive) : '-'}
@@ -731,6 +735,8 @@ export default function PayslipTab() {
             contract_count: match ? Number(match.approved_count || 0) : 0,
             dig_leave_days: match ? digLeaveDays(match.leave_days, yearMonth) : [],
             dig_leave_deduction: dm ? dm.leaveDeduction : 0,
+            dig_incentive:  dm ? dm.incentive : 0,
+            dig_month_goal: bizDays(yearMonth).total * DIG_DAILY_GOAL,
             dig_resigned:   dm ? dm.resigned : false,
           }
         } else {
