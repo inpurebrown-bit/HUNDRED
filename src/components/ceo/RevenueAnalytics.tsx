@@ -238,7 +238,7 @@ export default function RevenueAnalytics({ data }: { data: any }) {
 
   if (loading) return <div className="text-center py-16 text-gray-400 text-sm">불러오는 중...</div>
   if (err) return <div className="text-center py-16 text-red-500 text-sm">{err}</div>
-  if (months.length === 0) return <div className="text-center py-16 text-gray-400 text-sm">급여·손익 탭에 저장된 월별 기록이 없어 분석할 수 없습니다.</div>
+  if (months.length === 0) return <div className="text-center py-16 text-gray-400 text-sm">월 정산 탭에 저장된 월별 기록이 없어 분석할 수 없습니다.</div>
 
   const sel = months.find(m => m.ym === selected) || months[months.length - 1]
   const idx = months.findIndex(m => m.ym === sel.ym)

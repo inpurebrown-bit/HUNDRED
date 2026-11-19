@@ -68,7 +68,7 @@ function AnalyticsTab() {
       <SubTabBar
         tabs={[
           { key: 'revenue'  as const, label: '매출 관리' },
-          { key: 'payroll'  as const, label: '급여·손익' },
+          { key: 'payroll'  as const, label: '월 정산' },
           { key: 'payslip'  as const, label: '급여명세서' },
           { key: 'tax'      as const, label: '세금계산' },
           { key: 'personal' as const, label: '개인재무' },

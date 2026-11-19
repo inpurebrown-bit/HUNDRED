@@ -1004,7 +1004,7 @@ export default function PayslipTab() {
                 </div>
               )}
               <div className="px-3 py-2 bg-gray-50 border-b border-[#E8E2D4] text-[10px] text-gray-400 leading-relaxed">
-                팀 선택 시 <b className="text-gray-500">영업팀·관리팀</b> 모두 지원<br/>급여·손익탭과 자동 연동
+                팀 선택 시 <b className="text-gray-500">영업팀·관리팀</b> 모두 지원<br/>월 정산 탭과 자동 연동
               </div>
               {employees.length === 0 ? (
                 <div className="p-6 text-center text-xs text-gray-400">
@@ -1281,7 +1281,7 @@ function SalesFinancialForm({ fin, update }: { fin: EmpFinancial; update: (p: Pa
             onChange={e => update({ promo: Number(e.target.value) })} className={inp} />
         </div>
         <div>
-          <label className={lbl}>급여 방식 <span className="text-gray-400 text-[10px]">해당 월 급여·손익 탭 선택값이 불러와집니다</span></label>
+          <label className={lbl}>급여 방식 <span className="text-gray-400 text-[10px]">해당 월 월 정산 탭 선택값이 불러와집니다</span></label>
           <select value={fin.sales_pay_mode || ''} onChange={e => update({ sales_pay_mode: (e.target.value || undefined) as SalesPayMode | undefined })} className={inp}>
             <option value="">미선택 (올인센으로 표시)</option>
             <option value="base7">160만원 + 7%</option>
