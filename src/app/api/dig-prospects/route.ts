@@ -5,6 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { releaseDue, loadQueue } from '@/lib/digAssign'
 import { analyzeRecordingUrl, isValidAnalysis } from '@/lib/recordingAnalysis'
 import { playableUrl } from '@/lib/recordingConvert'
+import { findPhoneMatches } from '@/lib/phoneDup'
 
 export const maxDuration = 120   // 접수 때 서버가 AI 분석을 다시 돌릴 수 있다
 
@@ -70,6 +71,13 @@ export async function POST(req: NextRequest) {
     checklist, memo,
     recording_url: rawRecordingUrl, recording_filename, recording_analysis: rawAnalysis, recordings: rawRecordings, call_note,
   } = body
+  // 안전장치: 번호 중복검색을 건너뛰었거나(임시저장 복원 등) 예전 화면에서 들어와도, 이미 DB에 있는 번호는 접수하지 않는다
+  if (phone_010) {
+    const dup = await findPhoneMatches(String(phone_010))
+    if (dup.length) {
+      return NextResponse.json({ error: `이미 DB에 있는 번호입니다 (${dup[0].company || dup[0].ceo_name || '기존 업체'}) — 중복으로 접수할 수 없습니다`, matches: dup.slice(0, 5) }, { status: 409 })
+    }
+  }
   // 안전장치: 화면에서 변환이 안 된 채 넘어온 wav(재생 불가 형식)는 접수 때 서버가 mp3 로 바꿔 저장
   const recording_url = await playableUrl(rawRecordingUrl, 'dig-prospects:submit')
   const recordings = Array.isArray(rawRecordings)
