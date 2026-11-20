@@ -55,10 +55,13 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   }
 
   // 담당자(영업) 변경: 이름만 바꾸면 그 직원 화면에 안 나오므로 소유자(owner_id)도 함께 옮긴다
+  // (대표뿐 아니라 영업 계정으로 들어가서 옮겨도 소유자가 따라가야 한다. '손제후 수석팀장'처럼 직함이 붙은 이름도 찾는다)
   const newSalesName = body.sales_user_name ?? body.details?.sales_user_name
-  if (user.role === 'ceo' && newSalesName && body.owner_id === undefined && body.sales_user_id === undefined
+  if ((user.role === 'ceo' || user.role === 'sales') && newSalesName && body.owner_id === undefined && body.sales_user_id === undefined
       && newSalesName !== (existing.details as any)?.sales_user_name) {
-    const { data: su } = await supabaseAdmin.from('users').select('id').eq('name', newSalesName).eq('role', 'sales').maybeSingle()
+    const { data: sus } = await supabaseAdmin.from('users').select('id, name').eq('role', 'sales')
+    const key = String(newSalesName).trim()
+    const su = (sus || []).find(u => u.name === key) || (sus || []).find(u => key.startsWith(u.name + ' '))
     if (su?.id) updateBody.owner_id = su.id
   }
 
