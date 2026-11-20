@@ -22,6 +22,7 @@ import { SUPPLY_RATE_TABLE, calcRecommendedSupply, isActiveRow, contractWeight }
 import { calcRefundDeductions, calcExtraCounts, extraRevenueSum } from '@/lib/payrollCalc'
 import { isNewModel } from '@/lib/payrollV2'
 import SalesScheduleTab from './SalesScheduleTab'
+import { baseName } from '@/lib/personName'
 
 // ── Types ──────────────────────────────────────────────────────────────
 interface Contract {
@@ -327,7 +328,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
         const record = json.record
         if (!record?.employee_details) return
         // 이름 매칭 (수석팀장 등 타이틀 제거 후 비교)
-        const cleanName = (s: string) => s.replace(/\s*(수석팀장|팀장|팀원|대리|과장|부장).*/, '').trim()
+        const cleanName = (s: string) => baseName(s)
         const row = record.employee_details.find((e: any) =>
           cleanName(e.name || '') === cleanName(userName)
         )

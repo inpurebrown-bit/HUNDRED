@@ -7,6 +7,7 @@ import InCallForm, { emptyInCallData, InCallData } from '@/components/sales/InCa
 import { SUPPLY_RATE_TABLE, calcRecommendedSupply, isActiveRow, contractWeight } from '@/lib/supplyRules'
 import { getElapsedBusinessDays } from '@/lib/businessDays'
 import { calcRefundDeductions, calcExtraCounts, extraRevenueSum } from '@/lib/payrollCalc'
+import { baseName } from '@/lib/personName'
 
 // ── DB 이동 모드 컴포넌트 ─────────────────────────────────
 type TransferDir = 'sales_to_sales' | 'sales_to_ops' | 'ops_to_sales' | 'ops_to_ops'
@@ -1617,7 +1618,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab, initialSear
               <div key={p.name} className="bg-white border border-gray-100 rounded-3xl px-4 py-3.5">
                 <div className="flex items-center gap-2 mb-1.5">
                   <div className="w-6 h-6 rounded-full bg-[#0b2140]/10 text-[#0b2140] flex items-center justify-center text-[11px] font-bold">{p.name.charAt(0)}</div>
-                  <span className="text-[13.5px] font-bold text-[#0b2140] truncate">{p.name.replace(' 수석팀장', '')}</span>
+                  <span className="text-[13.5px] font-bold text-[#0b2140] truncate">{baseName(p.name)}</span>
                 </div>
                 <p className="text-[22px] leading-tight font-black tabular-nums text-[#a8873f]">{fmtWon(p.revenue)}</p>
                 <p className="text-[12.5px] text-gray-500 mt-0.5">계약 {p.count % 1 === 0 ? p.count : p.count.toFixed(1)}건</p>
@@ -1656,7 +1657,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab, initialSear
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded-full bg-[#1B2A45] text-white flex items-center justify-center text-[10px] font-bold shrink-0">{s.name.charAt(0)}</div>
-                        <span className="font-semibold text-gray-800">{s.name.replace(' 수석팀장', '')}</span>
+                        <span className="font-semibold text-gray-800">{baseName(s.name)}</span>
                       </div>
                     </td>
                     <td className="px-3 py-2.5 text-center">
@@ -1729,7 +1730,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab, initialSear
                   <div className={"w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold " + (
                     personTab === p.name ? 'bg-white/20' : 'bg-[#1B2A45] text-white'
                   )}>{p.name.charAt(0)}</div>
-                  <span>{p.name.replace(' 수석팀장', '')}</span>
+                  <span>{baseName(p.name)}</span>
                 </div>
                 <span className={"text-xs px-1.5 py-0.5 rounded-full font-bold " + (
                   personTab === p.name ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'

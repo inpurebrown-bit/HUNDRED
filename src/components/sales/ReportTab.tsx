@@ -4,6 +4,7 @@ import { useState, useEffect, FormEvent, ReactNode } from 'react'
 import { calcRefundDeductions, calcExtraCounts } from '@/lib/payrollCalc'
 import { isNewModel } from '@/lib/payrollV2'
 import { contractWeight as contractWeightLib } from '@/lib/supplyRules'
+import { baseName } from '@/lib/personName'
 
 // ── 타입 ────────────────────────────────────────────────
 interface MorningData {
@@ -206,7 +207,7 @@ export default function ReportTab({ userId, userName }: Props) {
   const contractWeight = contractWeightLib
 
   function cleanNameLocal(s: string): string {
-    return s.replace(/\s*(수석팀장|팀장|팀원|대리|과장|부장|차장|이사|수석|매니저|주임|사원).*/g, '').trim()
+    return baseName(s)
   }
 
   const todayStr   = today()

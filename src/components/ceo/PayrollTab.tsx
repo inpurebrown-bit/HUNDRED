@@ -6,6 +6,7 @@ import { bizDays } from '@/lib/digStats'
 import { calcWithholding, calcSalesStructure, resignBizProration, SALES_BASE_PAY, SALES_BASE_RATE, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, baseSalesName, calcMonthlySubBonus, calcRefundDeductions, calcDigSalary, calcDigMonth, digLeaveDays, digUnpaidLeaveCount, DIG_BASE_SALARY, DIG_HOURLY_BASE, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
 import { v2PayFor, v2PayrollOn, V2_START, V2, teamOf, OPS_V2_FROM, OPS_V2 } from '@/lib/payrollV2'
 import { contractWeight } from '@/lib/supplyRules'
+import { baseName } from '@/lib/personName'
 
 // ─── 타입 ─────────────────────────────────────────────────
 
@@ -1681,7 +1682,7 @@ export default function PayrollTab() {
                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                     {perPersonSupply.filter(p => p.count > 0).map(p => (
                       <span key={p.name} className="text-[10px] bg-sky-50 text-sky-700 border border-sky-100 rounded-full px-2 py-0.5 font-medium">
-                        {p.name.replace(/\s*(수석팀장|팀장|팀원|대리|과장|부장|차장|이사|수석|매니저|주임|사원).*/g, '')} {parseFloat(p.count.toFixed(2))}개
+                        {baseName(p.name)} {parseFloat(p.count.toFixed(2))}개
                       </span>
                     ))}
                   </div>

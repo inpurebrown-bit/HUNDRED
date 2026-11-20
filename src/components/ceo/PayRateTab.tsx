@@ -5,6 +5,7 @@ import { contractWeight, calcRecommendedSupply } from '@/lib/supplyRules'
 import { selfSupplyStats } from '@/lib/digStats'
 import { isTester } from '@/lib/tester'
 import DigTeamPanel from './DigTeamPanel'
+import { baseName } from '@/lib/personName'
 
 // ── 타입 ──────────────────────────────────────────────────────────────────────
 interface EmployeeRow {
@@ -47,7 +48,7 @@ function rateGrade(rate: number | null, top: number) {
 
 // 직책 제거 이름 정규화 (예: "손제후 수석팀장" → "손제후")
 function cleanName(s: string): string {
-  return s.replace(/\s*(수석팀장|팀장|팀원|대리|과장|부장|차장|이사|수석|매니저|주임|사원).*/g, '').trim()
+  return baseName(s)
 }
 
 // ── 헬퍼 ──────────────────────────────────────────────────────────────────────

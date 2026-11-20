@@ -64,6 +64,7 @@ export function calcWithholding(before: number): { incomeTax: number; localTax: 
 }
 
 import { v2PayrollOn } from './payrollV2'
+import { baseName } from './personName'
 
 // ── 실시간 영업팀 계약 집계 ───────────────────────────────
 // PayrollTab / PayslipTab 공통 — 인별 계약 매출·개수 한 번만 계산
@@ -253,7 +254,7 @@ export function extraRevenueSum(customers: any[], yearMonth?: string, name?: str
 }
 
 // 같은 사람이 직함 붙은 이름('손제후 수석팀장')과 이름만('손제후')으로 입력된 계약을 한 사람으로 묶는다
-export const baseSalesName = (n: any) => String(n || '').replace(/s*(수석팀장|팀장|팀원|대리|과장|부장|차장|이사|수석|매니저|주임|사원).*$/, '').trim()
+export const baseSalesName = (n: any) => baseName(n)
 
 export function buildSalesContractMap(
   customers: any[],

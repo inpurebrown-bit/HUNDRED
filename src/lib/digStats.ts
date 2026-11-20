@@ -1,6 +1,7 @@
 import { contractWeight } from '@/lib/supplyRules'
 import { isTester } from '@/lib/tester'
 import { DIG_BASE_SALARY, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
+import { baseName } from '@/lib/personName'
 
 /** 한경연 DB 기본 단가 (대표 화면에서 바꿀 수 있음) */
 export const DB_UNIT_DEFAULT = 40000
@@ -26,8 +27,7 @@ export function bizDays(ym: string): { total: number; elapsed: number; remaining
   return { total, elapsed, remaining }
 }
 
-export const stripTitle = (s: string) =>
-  (s || '').replace(/\s*(수석팀장|팀장|팀원|대리|과장|부장|차장|이사|수석|매니저|주임|사원).*/g, '').trim()
+export const stripTitle = (s: string) => baseName(s)
 
 const isSelf = (c: any) => c?.details?.supply_source === 'self_supply'
 const ownerName = (c: any) => stripTitle(String(c?.details?.sales_user_name || c?.sales_user_name || ''))

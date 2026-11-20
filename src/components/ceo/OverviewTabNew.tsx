@@ -18,6 +18,7 @@ import {
 import { SUPPLY_RATE_TABLE, isActiveRow, contractWeight, calcRecommendedSupply } from '@/lib/supplyRules'
 import { calcRefundDeductions, calcExtraCounts } from '@/lib/payrollCalc'
 import PayRateTab from './PayRateTab'
+import { baseName } from '@/lib/personName'
 
 // ─── Interfaces ───────────────────────────────────────────
 
@@ -767,8 +768,7 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
     }
 
     // 직책 제거 이름 정규화 (payrate 목표 매칭용)
-    const stripTitle = (s: string) =>
-      s.replace(/\s*(수석팀장|팀장|팀원|대리|과장|부장|차장|이사|수석|매니저|주임|사원).*/g, '').trim()
+    const stripTitle = (s: string) => baseName(s)
 
     return Object.values(userMap).map(u => {
       const goalEntry = goals.find(g => g.user_name === u.name)
