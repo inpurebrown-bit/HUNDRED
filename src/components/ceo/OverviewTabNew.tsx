@@ -19,7 +19,6 @@ import { SUPPLY_RATE_TABLE, isActiveRow, contractWeight, calcRecommendedSupply }
 import { calcRefundDeductions, calcExtraCounts } from '@/lib/payrollCalc'
 import PayRateTab from './PayRateTab'
 import { baseName } from '@/lib/personName'
-import OfficeMap, { OfficeAlert, DeptKey } from './OfficeMap'
 
 // ─── Interfaces ───────────────────────────────────────────
 
@@ -881,22 +880,9 @@ export default function OverviewTabNew({ onNavigate }: { onNavigate?: (tab: stri
 
   const fmtY = (v: number) => v.toLocaleString() + '만'
 
-  // 보고 광장에 올라올 보고 (이미 불러온 데이터로만 계산 — 추가 조회 없음)
-  const officeAlerts: OfficeAlert[] = [
-    { dept: 'sales', text: '계약 있습니다! 배정 대기', count: assignContracts.length, go: () => onNavigate?.('assign') },
-    { dept: 'sales', text: '심사 요청 있습니다!', count: allCustomers.filter((c: any) => c.details?.inspection_status === 'pending').length, go: () => onNavigate?.('sales', 'inspection') },
-    { dept: 'ops', text: 'A/S 요청 있습니다!', count: allCustomers.filter((c: any) => c.details?.as_requested && !c.details?.as_approved && !c.details?.as_not_applicable).length, go: () => onNavigate?.('sales', 'as') },
-  ]
-
   // ─────────────────────────────────────────────────────────
   return (
     <div className="space-y-5 pb-10 overflow-x-hidden">
-
-      {/* ══ 픽셀 사무실 — 부서별 직원·AI 서브, 보고 광장 ══ */}
-      <OfficeMap
-        alerts={officeAlerts}
-        onGo={(d: DeptKey) => onNavigate?.(({ ceo: 'overview', revenue: 'analytics', tax: 'analytics', legal: 'rules', qa: 'overview', sales: 'sales', dig: 'dig', ops: 'ops' } as Record<DeptKey, string>)[d])}
-      />
 
       {/* ══ 오늘 해야 할 일 ══ */}
       <div className="grid grid-cols-3 gap-3">

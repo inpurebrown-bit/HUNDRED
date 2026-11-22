@@ -5,6 +5,7 @@ import ContractSettingsTab from './ContractSettingsTab'
 import CompanyRulesTab from './CompanyRulesTab'
 import { useState, useRef, useEffect, FormEvent, ReactNode, Fragment } from 'react'
 import { useHistoryState } from '@/lib/navHistory'
+import OfficeTab from './OfficeTab'
 import { signOut, useSession } from 'next-auth/react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import Image from 'next/image'
@@ -175,8 +176,8 @@ export default function CeoDashboard() {
   const { data: session } = useSession()
   const ceoName = session?.user?.name ?? '대표'
   const ceoId = (session?.user as any)?.id ?? ''
-  type CeoTab = 'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'staffmanage' | 'balance' | 'minutesreports' | 'calendar' | 'ailogs' | 'trash' | 'authcode' | 'tools' | 'rules' | 'dbmanage' | 'profile' | 'dig'
-  const [activeTab, setActiveTab] = useHistoryState<CeoTab>('t', 'overview', ['overview','sales','ops','assign','analytics','staffmanage','balance','minutesreports','calendar','ailogs','trash','authcode','tools','rules','dbmanage','profile','dig'])
+  type CeoTab = 'office' | 'overview' | 'sales' | 'ops' | 'assign' | 'analytics' | 'staffmanage' | 'balance' | 'minutesreports' | 'calendar' | 'ailogs' | 'trash' | 'authcode' | 'tools' | 'rules' | 'dbmanage' | 'profile' | 'dig'
+  const [activeTab, setActiveTab] = useHistoryState<CeoTab>('t', 'office', ['office','overview','sales','ops','assign','analytics','staffmanage','balance','minutesreports','calendar','ailogs','trash','authcode','tools','rules','dbmanage','profile','dig'])
   const [menuOpen, setMenuOpen] = useState(false)
   const [salesInitialView, setSalesInitialView] = useState<'customers' | 'inspection' | 'as' | 'transfer' | 'diary' | undefined>(undefined)
   const [salesInitialStatusTab, setSalesInitialStatusTab] = useState<'all' | 'lead' | 'db010' | 'contracted' | 'emotional' | 'trash' | undefined>(undefined)
@@ -291,6 +292,7 @@ export default function CeoDashboard() {
 
   const tabs = [
     // ── 사업 (매출·손익·팀 성과) ──
+    { key: 'office',         label: '헌드레드 사무실' },
     { key: 'overview',       label: '전체 현황' },
     { key: 'analytics',      label: '손익·급여' },
     { key: 'sales',          label: '영업팀' },
@@ -465,6 +467,16 @@ export default function CeoDashboard() {
 
       <div className="px-4 md:px-6 pt-5 pb-10">
 
+        {activeTab === 'office'         && <OfficeTab onNavigate={(tab, subView) => {
+          setActiveTab(tab as any)
+          if (subView === 'db010') {
+            setSalesInitialStatusTab('db010')
+            setSalesInitialView(undefined)
+          } else if (subView) {
+            setSalesInitialView(subView as any)
+            setSalesInitialStatusTab(undefined)
+          }
+        }} />}
         {activeTab === 'overview'       && <OverviewTabNew onNavigate={(tab, subView) => {
           setActiveTab(tab as any)
           if (subView === 'db010') {
