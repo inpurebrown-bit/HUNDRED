@@ -331,7 +331,7 @@ export default function OfficeTab({ onNavigate }: { onNavigate: (tab: string, su
               <NameTag text={d.agent} color={d.accent} />
             </Walker>
           ))}
-          <Walker pos={pinkAt} z={9990} moving>
+          <Walker pos={pinkAt} z={8500} moving>
             <div className="of-say" style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: 4, whiteSpace: 'nowrap', borderColor: DEPT.qa.accent }}>{pinkSay}</div>
             <Bot accent={DEPT.qa.accent} name="핑크" mode="walk" />
             <NameTag text="핑크" color={DEPT.qa.accent} />
@@ -344,21 +344,28 @@ export default function OfficeTab({ onNavigate }: { onNavigate: (tab: string, su
             const pos = rep ? doorPos(wi) : deskPos(d, i, arr.length)
             return (
               <Walker key={u.name + d.key} pos={pos} moving={!!rep} z={rep ? 9000 + wi : undefined}>
-                {rep && (
-                  <div className="absolute of-report" style={{ top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 10, pointerEvents: 'auto', borderColor: d.accent }}>
-                    {rep.lines.map((l, k) => <p key={k} className={k === 0 ? 'font-black' : ''}>{l}</p>)}
-                    <div className="mt-1 flex gap-1">
-                      <button onClick={() => ack(rep)} className="of-ok">확인</button>
-                      <button onClick={() => onNavigate(rep.go, rep.sub)} className="of-go">이동</button>
-                    </div>
-                    <span className="of-tail" style={{ borderColor: d.accent }} />
-                  </div>
-                )}
                 <Human name={u.name} shirt={d.accent} mode={rep ? 'idle' : 'type'} raised={!!rep} />
                 <NameTag text={strip(u.name)} />
               </Walker>
             )
           }))}
+          {/* 보고 말풍선 — 캐릭터(핑크 포함)에 가리지 않도록 맨 위 레이어로 따로 그린다 */}
+          {waiting.map((rep, wi) => {
+            const d = DEPT[rep.dept]
+            return (
+              <Walker key={'bub' + rep.id} pos={doorPos(wi)} z={20000 + wi}>
+                <div className="absolute of-report" style={{ top: 0, left: '50%', transform: 'translateX(-50%)', marginTop: 22, pointerEvents: 'auto', borderColor: d.accent }}>
+                  {rep.lines.map((l, k) => <p key={k} className={k === 0 ? 'font-black' : ''}>{l}</p>)}
+                  <div className="mt-1 flex gap-1">
+                    <button onClick={() => ack(rep)} className="of-ok">확인</button>
+                    <button onClick={() => onNavigate(rep.go, rep.sub)} className="of-go">이동</button>
+                  </div>
+                  <span className="of-tail" style={{ borderColor: d.accent }} />
+                </div>
+                <div style={{ width: 1, height: 0 }} />
+              </Walker>
+            )
+          })}
         </div>
       </div>
 

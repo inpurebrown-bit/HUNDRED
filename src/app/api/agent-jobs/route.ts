@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { AGENT_KIND_KEYS } from '@/lib/agentKinds'
 
 // 주황 작업 대기열 — 관리팀 인콜카드의 '주황에게 지시' 버튼이 사용 (관리팀·대표만)
-export const AGENT_KINDS = ['consulting', 'bizplan', 'roadmap', 'script_kibo', 'script_jaedan', 'script_shinbo', 'finance', 'status'] as const
+export const AGENT_KINDS = AGENT_KIND_KEYS
 const ACTIVE = ['requested', 'drafting', 'draft_ready', 'approved', 'sending']
 
 async function guard() {
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
   const caseId = new URL(req.url).searchParams.get('case_id')
   if (!caseId) return NextResponse.json({ error: 'case_id 필요' }, { status: 400 })
   const { data, error } = await supabaseAdmin.from('agent_jobs')
-    .select('id, kind, status, room, requested_by, error, created_at, updated_at')
+    .select('id, kind, status, room, requested_by, error, draft, created_at, updated_at')
     .eq('case_id', caseId).order('created_at', { ascending: false }).limit(40)
   if (error) return NextResponse.json({ error: noTable(error.message) ? TABLE_HINT : error.message, needSetup: noTable(error.message) }, { status: 500 })
   return NextResponse.json({ jobs: data || [] })
