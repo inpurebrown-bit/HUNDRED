@@ -13,6 +13,7 @@ import SplitView from '@/components/shared/SplitView'
 import { contractWeight } from '@/lib/supplyRules'
 import { printIncall, buildCustomerSections } from '@/lib/printIncall'
 import ConsultingReportTab from './ConsultingReportTab'
+import AgentCommandPanel from './AgentCommandPanel'
 import { ContractModal } from '@/components/sales/InCallTableView'
 import { isNewModel } from '@/lib/payrollV2'
 // ── KST Utils ──────────────────────────────────────────────────────────
@@ -319,7 +320,7 @@ export function certOf(c: { details?: any }): string[] {
 }
 
 // ── Detail Tab Types: 진행현황 우선, 타임라인 진행현황 하단에 통합 ──────────
-const DETAIL_TABS = ['진행현황', '인콜일지', '기관ID/PW', '입금/계약', '여신구분', '컨설팅보고서'] as const
+const DETAIL_TABS = ['진행현황', '인콜일지', '기관ID/PW', '입금/계약', '여신구분', '고객서류'] as const
 type DetailTab = typeof DETAIL_TABS[number]
 
 // ──────────────────────────────────────────────────────────────────────
@@ -1196,6 +1197,14 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
               </div>
             </div>
           )}
+
+          {/* 주황에게 지시 — 자료·스크립트 작성 요청 */}
+          <AgentCommandPanel
+            caseId={c.id}
+            companyName={local.customers?.details?.company || local.customers?.name || ''}
+            room={d.kakao_room || ''}
+            onRoomChange={v => detailField('kakao_room', v)}
+          />
 
           {/* 진행 현황 — 전체 단계 + 계약날짜 */}
           <div>
@@ -2646,8 +2655,8 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
         />
       )}
 
-      {/* ── 컨설팅보고서 ── */}
-      {activeDetailTab === '컨설팅보고서' && (
+      {/* ── 고객서류 (재무제표·신분증·부가세증명·완납증명·특허 등 보관) ── */}
+      {activeDetailTab === '고객서류' && (
         <ConsultingReportTab
           caseId={c.id}
           companyName={local.customers?.details?.company || local.customers?.name || ''}

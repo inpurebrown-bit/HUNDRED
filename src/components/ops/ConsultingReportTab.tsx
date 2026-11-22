@@ -13,7 +13,10 @@ const DOC_TYPES: { key: string; label: string; hint?: string; kind: DocKind; amo
   { key: 'home_lease',   label: '자택 임대차계약서',   kind: 'amount', amountLabel: '자가 시세 / 보증금·월세' },
   { key: 'vehicle',      label: '차량보유현황', kind: 'vehicle' },
   { key: 'tax_paid',     label: '국세·지방세 완납증명서', kind: 'file' },
-  { key: 'sales_data',   label: '매출자료', hint: '부가세과세표준증명·재무제표 등 여러 파일 가능', kind: 'file' },
+  { key: 'financials',   label: '재무제표', hint: '표준재무제표증명·결산서 등 여러 해 가능', kind: 'file' },
+  { key: 'vat_cert',     label: '부가가치세 과세표준증명', kind: 'file' },
+  { key: 'patent',       label: '특허·인증 자료', hint: '특허증·출원서·벤처/이노비즈 인증서 등', kind: 'file' },
+  { key: 'sales_data',   label: '기타 매출자료', hint: '카드·현금매출 내역 등 여러 파일 가능', kind: 'file' },
   { key: 'insurance',    label: '4대보험 가입자명부', kind: 'file' },
   { key: 'corp_reg',     label: '법인등기부등본', hint: '법인인 경우', kind: 'file' },
   { key: 'shareholders', label: '법인주주명부', hint: '법인인 경우', kind: 'file' },
@@ -59,8 +62,8 @@ export default function ConsultingReportTab({ caseId, companyName, incall, credi
   }
 
   async function uploadMany(type: string, list: File[]) {
-    const ok = list.filter(f => /\.(pdf|png|jpe?g|webp)$/i.test(f.name))
-    if (ok.length < list.length) setErr('PDF·JPG·PNG 파일만 가능합니다 (그 외 파일은 제외됨)')
+    const ok = list.filter(f => /\.(pdf|png|jpe?g|webp|hwp|hwpx|docx?|xlsx?|pptx?|txt|csv)$/i.test(f.name))
+    if (ok.length < list.length) setErr('PDF·이미지·한글·워드·엑셀·PPT 파일만 가능합니다 (그 외 파일은 제외됨)')
     else setErr('')
     if (!ok.length) return
     setBusy(type)
@@ -200,8 +203,8 @@ export default function ConsultingReportTab({ caseId, companyName, incall, credi
       {!view && (
         <div className="bg-white border border-gray-200 rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-bold text-gray-800">제출 서류 <span className="text-xs font-normal text-gray-400">({uploaded}/{DOC_TYPES.length} 업로드)</span></p>
-            <p className="text-[10px] text-gray-400">파일을 각 항목에 끌어다 놓기 · PDF/JPG/PNG · 여러 개 가능</p>
+            <p className="text-sm font-bold text-gray-800">고객 서류 보관 <span className="text-xs font-normal text-gray-400">({uploaded}/{DOC_TYPES.length} 업로드)</span></p>
+            <p className="text-[10px] text-gray-400">파일을 각 항목에 끌어다 놓기 · PDF·이미지·한글·워드·엑셀 · 여러 개 가능</p>
           </div>
           <div className="space-y-1.5">
             {DOC_TYPES.map(d => {
@@ -222,7 +225,7 @@ export default function ConsultingReportTab({ caseId, companyName, incall, credi
                       {d.hint && <span className="text-[10px] text-gray-400 ml-1.5">{d.hint}</span>}
                       {st.none && !hasData && <span className="text-[10px] text-gray-400 ml-1.5">없음 — 없는 대로 진행</span>}
                     </div>
-                    <input type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp" className="hidden"
+                    <input type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.hwp,.hwpx,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv" className="hidden"
                       ref={el => { fileRefs.current[d.key] = el }}
                       onChange={e => { uploadMany(d.key, Array.from(e.target.files || [])); e.target.value = '' }} />
                     {busy === d.key ? <span className="text-[10px] text-indigo-500">업로드 중…</span> : (
@@ -276,20 +279,17 @@ export default function ConsultingReportTab({ caseId, companyName, incall, credi
               )
             })}
           </div>
-          <p className="text-[10px] text-gray-400 mt-2">인콜일지·여신구분 탭에 입력된 내용도 자동으로 함께 분석됩니다.</p>
+          <p className="text-[10px] text-gray-400 mt-2">여기에 올린 서류는 사업계획서·재무제표 분석·보고서를 만들 때 주황과 작성 사이트가 자동으로 가져다 씁니다. 카톡방으로 받은 자료도 이곳에 모읍니다.</p>
         </div>
       )}
 
       {/* 액션 바 */}
       <div className="flex flex-wrap items-center gap-2 crp-noprint">
-        <button type="button" disabled={!!busy} onClick={generate}
-          className="px-4 py-2 rounded-lg bg-[#1B2A45] text-white text-xs font-bold disabled:opacity-50 hover:bg-[#25395f]">
-          {busy === 'research' ? '웹 조사·공식 공고 교차검증 중… (1/2)' : busy === 'generate' ? '보고서 작성 중… (2/2, 1분 내외)' : report ? '보고서 다시 생성' : 'AI 보고서 생성'}
-        </button>
+        {!report && <span className="text-[11px] text-gray-400">이 탭은 고객 서류 보관용입니다. 문서 작성은 위 "주황에게 지시" 버튼을 쓰세요.</span>}
         {report && (
           <>
             <button type="button" onClick={() => setView(v => !v)}
-              className="px-3 py-2 rounded-lg bg-gray-100 text-gray-700 text-xs font-semibold">{view ? '서류 관리' : '보고서 보기'}</button>
+              className="px-3 py-2 rounded-lg bg-gray-100 text-gray-700 text-xs font-semibold">{view ? '서류 관리' : '예전 보고서 보기'}</button>
             {view && (editing ? (
               <button type="button" onClick={saveReport} className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold">수정 저장</button>
             ) : (
