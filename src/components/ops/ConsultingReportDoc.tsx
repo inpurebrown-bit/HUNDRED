@@ -428,11 +428,6 @@ export default function ReportDoc({ report: r, companyName, representative }: { 
               <span key="b" style={{ background: (STATUS_BG[x.status] || ['#e2e8f0', '#334155'])[0], color: (STATUS_BG[x.status] || ['#e2e8f0', '#334155'])[1], padding: '2px 8px', borderRadius: 10, fontWeight: 800, fontSize: 9.5 }}>{x.status}</span>,
             ])} />
         ) : <Empty h={60} />}
-        {!!r.missingDocs?.length && (
-          <div style={{ marginTop: 8, fontSize: 10, color: '#92400e', background: '#fef3c7', borderRadius: 6, padding: '6px 10px' }}>
-            미제출/미확인 서류: {r.missingDocs.join(', ')} — 제출 시 분석 정밀도가 높아집니다.
-          </div>
-        )}
         <H color={K.blue}>기업 분석 상세</H>
         <ItemList items={(s1?.items || []).slice(2)} color={K.blue} />
       </Page>
