@@ -41,7 +41,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
   }
   const kind = AGENT_KIND_LIST.find(k => k.key === job.kind)
   return NextResponse.json({
-    job: { id: job.id, kind: job.kind, label: kind?.label, where: kind?.where, no: kind?.no, fixed: !!kind?.fixed, status: job.status, room: job.room, company: job.company, case_id: job.case_id, draft: job.draft, error: job.error },
+    job: { id: job.id, kind: job.kind, label: kind?.label, where: kind?.where, no: kind?.no, fixed: !!kind?.fixed, status: job.status, room: job.room, company: job.company, case_id: job.case_id, draft: job.draft, auto_send: !!job.draft?.auto_send, target: job.draft?.target || null, review: !!job.draft?.review, error: job.error },
     company: {
       name: cu?.details?.company || cu?.name || oc.customer_name || job.company, representative: oc.details?.incall_journal?.representative || cu?.name || '',
       phone: cu?.phone || oc.phone || '', ops_user: oc.ops_user_name || oc.details?.ops_user_name || '', stage: oc.stage || '', kakao_room: d.kakao_room || '',
@@ -73,9 +73,9 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   }
   switch (body.action) {
     case 'claim': return move(['requested'], 'drafting', { error: null })
-    case 'ready': return move(['drafting'], 'draft_ready', { draft: { message: String(body.message || '').slice(0, 2000), files: body.files || [], missing: body.missing || [] }, error: null })
+    case 'ready': return move(['drafting'], 'draft_ready', { draft: { ...(job.draft || {}), message: String(body.message || '').slice(0, 2000), files: body.files || [], missing: body.missing || [] }, error: null })
     case 'approve': return move(['draft_ready'], 'approved')
-    case 'sent': return move(['approved', 'sending'], 'sent', { result: { sent_at: now(), note: String(body.message || '').slice(0, 500) } })
+    case 'sent': return move(job.draft?.auto_send ? ['requested', 'drafting', 'draft_ready', 'approved', 'sending'] : ['approved', 'sending'], 'sent', { result: { sent_at: now(), note: String(body.message || '').slice(0, 500) } })
     case 'fail': return move(['requested', 'drafting', 'draft_ready', 'approved', 'sending'], 'failed', { error: String(body.error || '실패').slice(0, 500) })
     default: return NextResponse.json({ error: '알 수 없는 action' }, { status: 400 })
   }

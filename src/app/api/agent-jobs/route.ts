@@ -4,7 +4,9 @@ import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { AGENT_KIND_KEYS } from '@/lib/agentKinds'
 
-// 주황 작업 대기열 — 관리팀 인콜카드의 '주황에게 지시' 버튼이 사용 (관리팀·대표만)
+// 주황이 작업 대기열 — 관리팀 인콜카드의 '주황이 지시' 탭이 사용 (관리팀·대표만)
+//  카톡방 이름은 받지 않는다. 주황이가 대표 이름·사업체명으로 방을 찾아 내용을 확인하고 고른다.
+//  CRM 에서 누른 요청은 확인창을 거친 것이라 auto_send: 만들면 승인 없이 바로 보낸다.
 export const AGENT_KINDS = AGENT_KIND_KEYS
 const ACTIVE = ['requested', 'drafting', 'draft_ready', 'approved', 'sending']
 
@@ -25,31 +27,33 @@ export async function GET(req: NextRequest) {
   if (!caseId) return NextResponse.json({ error: 'case_id 필요' }, { status: 400 })
   const { data, error } = await supabaseAdmin.from('agent_jobs')
     .select('id, kind, status, room, requested_by, error, draft, created_at, updated_at')
-    .eq('case_id', caseId).order('created_at', { ascending: false }).limit(40)
+    .eq('case_id', caseId).order('created_at', { ascending: false }).limit(60)
   if (error) return NextResponse.json({ error: noTable(error.message) ? TABLE_HINT : error.message, needSetup: noTable(error.message) }, { status: 500 })
   return NextResponse.json({ jobs: data || [] })
 }
 
-// POST { kind, case_id, company, room } : 작성 요청 등록
+// POST { kind | kinds[], case_id, company } : 작성·발송 요청 등록 (확인창을 거친 요청 → 바로 보냄)
 export async function POST(req: NextRequest) {
   const g = await guard(); if (g.err) return g.err
-  const { kind, case_id, company, room } = await req.json()
-  if (!AGENT_KINDS.includes(kind)) return NextResponse.json({ error: '알 수 없는 작업 종류' }, { status: 400 })
+  const body = await req.json().catch(() => ({}))
+  const kinds: string[] = Array.isArray(body.kinds) ? body.kinds : body.kind ? [body.kind] : []
+  const { case_id, company } = body
   if (!case_id) return NextResponse.json({ error: 'case_id 필요' }, { status: 400 })
-  if (!String(room || '').trim()) return NextResponse.json({ error: '보낼 단톡방 이름을 먼저 입력해 주세요' }, { status: 400 })
+  if (!kinds.length || kinds.some(k => !AGENT_KINDS.includes(k))) return NextResponse.json({ error: '알 수 없는 작업 종류' }, { status: 400 })
 
-  const dup = await supabaseAdmin.from('agent_jobs').select('id, status').eq('case_id', case_id).eq('kind', kind).in('status', ACTIVE).limit(1)
+  const dup = await supabaseAdmin.from('agent_jobs').select('kind').eq('case_id', case_id).in('kind', kinds).in('status', ACTIVE)
   if (dup.error) return NextResponse.json({ error: noTable(dup.error.message) ? TABLE_HINT : dup.error.message, needSetup: noTable(dup.error.message) }, { status: 500 })
-  if (dup.data?.length) return NextResponse.json({ error: '이미 진행 중인 같은 작업이 있습니다' }, { status: 409 })
+  const busy = new Set((dup.data || []).map(r => r.kind))
+  const todo = kinds.filter(k => !busy.has(k))
+  if (!todo.length) return NextResponse.json({ error: '이미 진행 중인 같은 작업이 있습니다' }, { status: 409 })
 
-  const { data, error } = await supabaseAdmin.from('agent_jobs')
-    .insert({ kind, case_id, company: company || '', room: String(room).trim(), requested_by: g.user.name || '' })
-    .select('id, kind, status, room, created_at').single()
+  const rows = todo.map(kind => ({ kind, case_id, company: company || '', room: '', requested_by: g.user.name || '', draft: { auto_send: true, source: 'crm' } }))
+  const { data, error } = await supabaseAdmin.from('agent_jobs').insert(rows).select('id, kind, status, created_at')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ job: data }, { status: 201 })
+  return NextResponse.json({ jobs: data, skipped: kinds.filter(k => busy.has(k)) }, { status: 201 })
 }
 
-// PATCH { id, action: 'cancel' | 'approve' } : 취소 / 검토 후 승인(시험 단계)
+// PATCH { id, action: 'cancel' | 'approve' } : 취소 / 검토 후 승인(자동 발송이 아닌 옛 요청용)
 export async function PATCH(req: NextRequest) {
   const g = await guard(); if (g.err) return g.err
   const { id, action } = await req.json()

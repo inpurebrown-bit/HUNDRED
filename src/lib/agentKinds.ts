@@ -27,3 +27,13 @@ export const CUSTOMER_DOC_TYPES = [
   'biz_reg', 'id_card', 'biz_lease', 'home_lease', 'vehicle', 'tax_paid', 'financials', 'vat_cert',
   'patent', 'sales_data', 'insurance', 'corp_reg', 'shareholders', 'etc',
 ] as const
+
+// '주황이 지시' 탭의 묶음 (2026-11-23 대표 지시)
+//  AUTO   계약 후 2·3·4일차에 CRM 이 자동으로 작업을 만들어 주황이가 그냥 보낸다(고정 자료 3종)
+//  PICK   선택해서 만들기
+//  SCRIPT 기관 스크립트
+//  BATCH  '자료 다 받은 걸로 간주하기' 한 번에 만들어 보낸다(서로 비슷한 내용의 문서 3개)
+export const AUTO_KINDS: { key: string; day: number }[] = [{ key: 'g9', day: 2 }, { key: 'g10', day: 3 }, { key: 'g11', day: 4 }]
+export const PICK_KINDS = ['finance', 'bizplan', 'road']
+export const SCRIPT_KINDS = ['jaedan', 'kibo', 'shinbo', 'kosmes', 'semas', 'miso']
+export const BATCH_KINDS = ['report', 'diag', 'plan']

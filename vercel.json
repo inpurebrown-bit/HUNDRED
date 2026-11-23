@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/dig-release",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/agent-schedule",
+      "schedule": "0 0 * * *"
     }
   ]
 }

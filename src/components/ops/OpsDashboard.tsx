@@ -2652,8 +2652,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
         <AgentCommandPanel
           caseId={c.id}
           companyName={local.customers?.details?.company || local.customers?.name || ''}
-          room={d.kakao_room || ''}
-          onRoomChange={v => detailField('kakao_room', v)}
+          contractDate={String(local.customers?.details?.contract_date || '').slice(0, 10)}
           outputs={Array.isArray(d.agent_docs) ? d.agent_docs : []}
         />
       )}
