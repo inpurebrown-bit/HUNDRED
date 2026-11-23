@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getSessionOrAgent } from '@/lib/agentSession'
 import { supabaseAdmin } from '@/lib/supabase'
 import bcrypt from 'bcryptjs'
 
 // GET: 역할별 직원 목록 (대표만 조회 가능)
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions)
+  const session = await getSessionOrAgent()
   if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
   const user = session.user as any

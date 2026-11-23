@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getSessionOrAgent } from '@/lib/agentSession'
 import { supabaseAdmin } from '@/lib/supabase'
 import { calcMonthPnl } from '@/lib/pnlCalc'
 
 // 대표 전용: 월 정산 탭에 저장된 월별 기록으로 매출·비용·순이익 추이를 계산해 돌려준다.
 export async function GET() {
-  const session = await getServerSession(authOptions)
+  const session = await getSessionOrAgent()
   if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   if ((session.user as any).role !== 'ceo') return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 

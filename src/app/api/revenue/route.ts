@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getSessionOrAgent } from '@/lib/agentSession'
 import { supabaseAdmin } from '@/lib/supabase'
 import { calcExtraCounts } from '@/lib/payrollCalc'
 import { v2PayrollOn, v2MonthlyRevenue, v2Receivables, opsUpsellByMonth } from '@/lib/payrollV2'
@@ -26,7 +27,7 @@ function calcWeightDeductAmt(c: any): number {
 }
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions)
+  const session = await getSessionOrAgent()
   if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
   const user = session.user as any

@@ -1,20 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getSessionOrAgent } from '@/lib/agentSession'
 import { supabaseAdmin } from '@/lib/supabase'
 
 // 대표 플래너 설정(가정값·대출 잔액·시뮬레이션 값) 저장 — 대표 전용
 const KEY = 'planner_v2'
 
-async function guard() {
-  const session = await getServerSession(authOptions)
+async function guard(allowAgent = false) {
+  const session = allowAgent ? await getSessionOrAgent() : await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   if ((session.user as any).role !== 'ceo') return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   return null
 }
 
 export async function GET() {
-  const denied = await guard()
+  const denied = await guard(true)
   if (denied) return denied
   const { data } = await supabaseAdmin.from('settings').select('value').eq('key', KEY).maybeSingle()
   return NextResponse.json({ value: data?.value || null })
