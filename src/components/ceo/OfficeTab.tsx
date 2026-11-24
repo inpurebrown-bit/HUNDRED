@@ -13,6 +13,7 @@ import dynamic from 'next/dynamic'
 import type { SceneCluster } from './Office3D'
 import { isTester } from '@/lib/tester'
 import { bizDays } from '@/lib/digStats'
+import TaskBoard from './TaskBoard'
 
 type DeptKey = 'ceo' | 'revenue' | 'tax' | 'legal' | 'sales' | 'dig' | 'ops' | 'qa'
 type Pt = { x: number; y: number }
@@ -394,6 +395,8 @@ export default function OfficeTab({ onNavigate }: { onNavigate: (tab: string, su
           ))}
         </div>
       </div>
+
+      <TaskBoard />
 
       {!data && <p className="text-center text-[12px] text-white/50 py-1">사무실 불러오는 중…</p>}
     </section>
