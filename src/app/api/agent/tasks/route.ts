@@ -17,7 +17,7 @@ export async function GET() {
   const since = new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString()
   const { data } = await supabaseAdmin.from('agent_jobs').select('draft, created_at, updated_at')
     .eq('case_id', 'task').gte('created_at', since).order('created_at', { ascending: false }).limit(40)
-  return NextResponse.json({ tasks: (data || []).map(r => ({ ...r.draft, created_at: r.created_at, updated_at: r.updated_at })) })
+  return NextResponse.json({ tasks: (data || []).map(r => ({ ...r.draft, created_at: r.created_at, updated_at: r.updated_at })).filter(t => !t.acked) })
 }
 
 export async function POST(req: NextRequest) {
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   const hist = [...(old?.draft?.history || [])]
   if (!old || old.draft?.stage !== stage) hist.push({ stage, at })
   const draft = {
-    key, stage, history: hist.slice(-12),
+    key, stage, history: hist.slice(-12), ...(old?.draft?.acked ? { acked: true } : {}),
     title: String(b.title || old?.draft?.title || key).slice(0, 120),
     from: String(b.from || old?.draft?.from || '').slice(0, 20),
     note: b.note != null ? String(b.note).slice(0, 300) : (old?.draft?.note || ''),
@@ -40,5 +40,19 @@ export async function POST(req: NextRequest) {
   if (old) await supabaseAdmin.from('agent_jobs').update({ draft, status, updated_at: at }).eq('id', old.id)
   else await supabaseAdmin.from('agent_jobs').insert({ kind: 'task', case_id: 'task', company: '주황이', status, requested_by: draft.from || '빨강이', draft })
   await supabaseAdmin.from('agent_jobs').delete().eq('case_id', 'task').lt('created_at', new Date(Date.now() - KEEP_MS).toISOString())
+  return NextResponse.json({ ok: true })
+}
+
+// PATCH (대표 화면) { key } → 확인 버튼: 끝난 지시를 현황판에서 치운다
+export async function PATCH(req: NextRequest) {
+  const session = await getSessionOrAgent()
+  if (!session || (session.user as any).role !== 'ceo') return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+  const b = await req.json().catch(() => ({}))
+  const keys: string[] = (Array.isArray(b.keys) ? b.keys : [b.key]).map((k: any) => String(k || '')).filter(Boolean).slice(0, 50)
+  for (const key of keys) {
+    const ex = await supabaseAdmin.from('agent_jobs').select('id, draft').eq('case_id', 'task').eq('draft->>key', key).limit(1)
+    const old = ex.data?.[0]
+    if (old) await supabaseAdmin.from('agent_jobs').update({ draft: { ...old.draft, acked: true } }).eq('id', old.id)
+  }
   return NextResponse.json({ ok: true })
 }
