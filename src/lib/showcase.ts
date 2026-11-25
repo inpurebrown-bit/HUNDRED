@@ -20,6 +20,12 @@ export const CERT_EXAMPLES = [
 ]
 
 export const SITE_PHOTOS = [
+  { img: P + 'site-factory.jpg', label: '금속 가공 공장' },
+  { img: P + 'site-clinic.jpg', label: '병·의원 시술실' },
+  { img: P + 'site-market.jpg', label: '마트·유통 매장' },
+  { img: P + 'site-restaurant.jpg', label: '음식점' },
+  { img: P + 'site-machine.jpg', label: '자동화 가공 설비' },
+  { img: P + 'site-kitchen.jpg', label: '식품 작업장' },
   { img: P + 'site-plant.jpg', label: '설비 제작 현장' },
   { img: P + 'site-welding.jpg', label: '용접 자동화 공정' },
   { img: P + 'site-fashion.jpg', label: '의류 작업실' },
