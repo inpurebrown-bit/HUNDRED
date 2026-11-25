@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   const { data: submittedReports, error: reportsError } = await supabaseAdmin
     .from('reports')
     .select('user_id')
-    .eq('report_type', type)
+    .in('report_type', [type, 'ops_' + type])
     .eq('report_date', todayStr)
 
   if (reportsError) {

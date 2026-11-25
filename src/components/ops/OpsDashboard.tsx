@@ -13,6 +13,7 @@ import SplitView from '@/components/shared/SplitView'
 import { contractWeight } from '@/lib/supplyRules'
 import { printIncall, buildCustomerSections } from '@/lib/printIncall'
 import ConsultingReportTab from './ConsultingReportTab'
+import OpsMoneyReport from './OpsMoneyReport'
 import AgentCommandPanel from './AgentCommandPanel'
 import { ContractModal } from '@/components/sales/InCallTableView'
 import { isNewModel } from '@/lib/payrollV2'
@@ -5649,7 +5650,8 @@ export default function OpsDashboard({ userId, userName }: Props) {
 
         {/* ── 관리팀보고 ── */}
         {activeTab === 'report' && (
-          <OpsReportTab userId={userId} userName={userName} activeCases={activeCases} />
+          <OpsMoneyReport userId={userId} userName={userName} activeCases={activeCases}
+            onSaveDetails={(id, patch) => handleSave(id, { details: { ...(cases.find(x => x.id === id)?.details || {}), ...patch } })} />
         )}
 
         {/* ── 매출 현황 ── */}

@@ -6,7 +6,7 @@ import tplFee from './tplFee'
 import tplNoFee from './tplNoFee'
 import bgImage from './bgImage'
 
-export type ContractType = 'fee' | 'nofee'          // fee: 성과 수수료(%) 있는 계약 · nofee: 월정기(수수료 없음)
+export type ContractType = 'fee' | 'nofee' | 'v2'   // v2: 1년 관리비(선금·잔금) — 지금 쓰는 유일한 계약. fee·nofee 는 옛 계약 재출력용
 
 export interface CompanyInfo { name: string; bizNo: string; address: string; ceo: string; bank: string; account: string; holder: string }
 export const DEFAULT_COMPANY: CompanyInfo = {
@@ -35,6 +35,9 @@ export interface ContractInput {
   contractDate?: string                       // YYYY-MM-DD (서명란 날짜)
   items: Partial<Record<ItemKey, { on: boolean; amount?: number }>>
   postCare?: { on: boolean; percent?: string }  // 과제 선정 이후 사후관리 (교부 지원금의 %)
+  prepay?: number                             // v2: 선금(공급가, 부가세 별도)
+  balance?: number                            // v2: 잔금(공급가) — 계약일로부터 90일 이내 지급, 특약에 자동 기재
+  bookkeeping?: boolean                       // v2: 세무기장(제휴) 이용 → 선금 50만원은 납부된 것으로 갈음
   pLine?: boolean                             // P라인(프리미엄)
   extraClauses?: string[]                     // 추가 특약
   company?: CompanyInfo
@@ -134,6 +137,36 @@ async function prepare(inp: ContractInput, forPdf = false) {
     return nid
   }
 
+  // 서명란 디자인용: 새 테두리·채움 모양(맨 끝에 추가)과 흰 글자 모양
+  const newBorders: string[] = []
+  const bfStart = Math.max(...[...header.matchAll(/<hh:borderFill id="(\d+)"/g)].map(m => +m[1])) + 1
+  const mkBorder = (face: string, line: string, w: string) => {
+    const id = String(bfStart + newBorders.length)
+    const side = (n: string) => `<hh:${n}Border type="SOLID" width="${w}" color="${line}"/>`
+    newBorders.push(`<hh:borderFill id="${id}" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0"><hh:slash type="NONE" Crooked="0" isCounter="0"/><hh:backSlash type="NONE" Crooked="0" isCounter="0"/>${side('left')}${side('right')}${side('top')}${side('bottom')}<hh:diagonal type="SOLID" width="0.1 mm" color="#000000"/><hc:fillBrush><hc:winBrush faceColor="${face}" hatchColor="#000000" alpha="0"/></hc:fillBrush></hh:borderFill>`)
+    return id
+  }
+  const BF_NAVY = mkBorder('#0B2140', '#0B2140', '0.12 mm')     // 갑·을 구분칸
+  const BF_TINT = mkBorder('#E8EDF7', '#8FA0C4', '0.12 mm')     // 항목 이름칸
+  const BF_LINE = mkBorder('#FFFFFF', '#8FA0C4', '0.12 mm')     // 내용칸
+  const whiteCache: Record<string, string> = {}
+  const white = (id: string) => {
+    if (whiteCache[id]) return whiteCache[id]
+    const m = header.match(new RegExp(`<hh:charPr id="${id}"[\\s\\S]*?</hh:charPr>`))
+    if (!m) return id
+    const nid = String(nextCharId++)
+    clones.push(m[0].replace(`id="${id}"`, `id="${nid}"`).replace(/textColor="#[0-9A-Fa-f]{6}"/, 'textColor="#FFFFFF"'))
+    whiteCache[id] = nid
+    return nid
+  }
+  const restyleSign = (x: string) => x.replace(/<hp:tc [\s\S]*?<\/hp:tc>/g, tc => {
+    const bf = (tc.match(/borderFillIDRef="(\d+)"/) || [])[1]
+    if (/^(갑|을)$/.test(textOf(tc).trim())) return tc.replace(/borderFillIDRef="\d+"/, `borderFillIDRef="${BF_NAVY}"`).replace(/charPrIDRef="(\d+)"/g, (_m, id) => `charPrIDRef="${white(id)}"`)
+    if (bf === '9') return tc.replace(/borderFillIDRef="9"/, `borderFillIDRef="${BF_TINT}"`)
+    if (bf === '10') return tc.replace(/borderFillIDRef="10"/, `borderFillIDRef="${BF_LINE}"`)
+    return tc
+  })
+
   // 1) 회사·계좌 문구 치환 (원픽스 → 헌드레드)
   const bankOld = '국민은행 047101-04-291976'
   const holderOld = '예금주 : 원픽스파트너스 (박원태)'
@@ -150,6 +183,13 @@ async function prepare(inp: ContractInput, forPdf = false) {
     const on = r.required ? true : !!o?.on
     return { ...r, on: B ? true : on, amount: on && !B ? Math.round(Number(o?.amount ?? r.amount) || 0) : 0 }
   })
+  if (inp.type === 'v2' && !B) {
+    // 착수금 = 선금 + 잔금. 경영진단 및 자문 금액은 착수금에서 다른 선택 업무 금액을 뺀 나머지
+    const total0 = Math.round((Number(inp.prepay) || 0) + (Number(inp.balance) || 0))
+    const others = rows.filter(r => r.key !== 'diag').reduce((t, r) => t + (r.on ? r.amount : 0), 0)
+    const d = rows.find(r => r.key === 'diag')!
+    d.amount = Math.max(0, total0 - others)
+  }
   const sum = rows.reduce((t, r) => t + (r.on ? r.amount : 0), 0)
   const vat = Math.round(sum * 0.1), total = sum + vat
 
@@ -163,9 +203,26 @@ async function prepare(inp: ContractInput, forPdf = false) {
     const art14 = ps.findIndex(b => /제\s*14\s*조/.test(textOf(b.xml)))
     for (let k = art14 - 1; k >= 0; k--) { const t = textOf(ps[k].xml).trim(); if (/^\d+\.\s/.test(t)) { lastClauseIdx = k; break } }
 
+    const hasPost = !!(inp.postCare?.on || inp.pLine)
+    const v2 = inp.type === 'v2'
+    // v2 특약: 선금·잔금 문구는 시스템이 자동으로 쓴다(영업사원이 문구를 정하지 않는다). 사후관리 보수는 P라인·사후관리 계약에만 적용
+    const autoClauses: string[] = []
+    if (v2) {
+      const pre = Math.round(Number(inp.prepay) || 0), bal = Math.round(Number(inp.balance) || 0), tot = pre + bal
+      if (B) autoClauses.push('"갑"의 요청에 따라 착수금 ____________원(부가가치세 별도) 중 선금 ____________원을 먼저 받고, 나머지 잔금 ____________원은 계약 체결일로부터 90일 이내에 지급하기로 한다.')
+      else if (bal > 0 && inp.bookkeeping) autoClauses.push(`착수금 ${won(tot)}원(부가가치세 별도)은 선금 ${won(pre)}원과 잔금 ${won(bal)}원의 합계이다. "갑"이 "을"이 안내하는 세무기장 서비스를 이용하기로 함에 따라 선금 ${won(pre)}원은 납부된 것으로 처리하고, 나머지 잔금 ${won(bal)}원은 계약 체결일로부터 90일 이내에 지급하기로 한다.`)
+      else if (bal > 0) autoClauses.push(`착수금 ${won(tot)}원(부가가치세 별도)은 선금 ${won(pre)}원과 잔금 ${won(bal)}원의 합계이다. "갑"의 요청에 따라 선금 ${won(pre)}원만 먼저 받고, 나머지 잔금 ${won(bal)}원은 계약 체결일로부터 90일 이내에 지급하기로 한다.`)
+      else autoClauses.push(`착수금 ${won(tot)}원(부가가치세 별도)은 계약 체결 시 선금으로 전액 지급한다.`)
+    }
+    const allClauses = [...autoClauses, ...(inp.extraClauses || []).filter(c => c.trim())]
     ps.forEach((b, k) => {
       const t = textOf(b.xml)
       let x = b.xml
+      if (v2 && /^2\.\s*과제 선정 이후 사후관리 보수는/.test(t.trim())) {
+        x = hasPost ? setParaText(x, '2. P라인(프리미엄) 또는 과제 선정 이후 사후관리 업무를 별도로 계약한 경우에 한하여 다음과 같이 정한다. ' + t.trim().replace(/^2\.\s*/, '') + ' 위 업무를 계약하지 않은 일반 계약에는 적용하지 아니한다.') : ''
+      } else if (v2 && /^3\.\s*본 계약은 제3조의 착수금 및 제2항의 보수 외에/.test(t.trim())) {
+        x = hasPost ? x : setParaText(x, '2. 본 계약은 제3조의 착수금 외에 별도의 성과 수수료가 발생하지 아니한다.')
+      } else
       if (B && !/별지 1\(업무범위 확인서\) 및 별지 2/.test(t)) {
         if (inp.textOverrides && inp.textOverrides[t.trim()] != null && !x.includes('<hp:tbl')) x = setParaText(x, inp.textOverrides[t.trim()])
       } else if (/경영지도 및 자문 의뢰자/.test(t) && b.xml.includes('<hp:t>            </hp:t>')) {
@@ -184,10 +241,11 @@ async function prepare(inp: ContractInput, forPdf = false) {
         x = setParaText(x, inp.textOverrides[t.trim()])
       }
       if (x !== b.xml) edits.push({ b, xml: x })
-      if (k === lastClauseIdx && inp.extraClauses?.length) {
+      if (k === lastClauseIdx && allClauses.length) {
         const m = textOf(b.xml).trim().match(/^(\d+)\./)
         let n = m ? +m[1] : 0
-        const add = inp.extraClauses.filter(c => c.trim()).map(c => setParaText(stripLayout(b.xml).replace(/ id="\d+"/, ' id="0"'), `${++n}. ${c.trim()}`)).join('')
+        if (v2 && !hasPost) n = 2
+        const add = allClauses.map(c => setParaText(stripLayout(b.xml).replace(/ id="\d+"/, ' id="0"'), `${++n}. ${c.trim()}`)).join('')
         edits.push({ b: { ...b }, xml: (edits.find(e => e.b === b)?.xml ?? b.xml) + add })
       }
     })
@@ -219,6 +277,7 @@ async function prepare(inp: ContractInput, forPdf = false) {
         x = mapCell(x, 0, 1, tc => cellText(tc, B ? '' : client.managerName || ''))
         x = mapCell(x, 0, 3, tc => cellText(tc, B ? '' : client.managerPhone || ''))
       } else continue
+      x = restyleSign(x)
       s0 = s0.slice(0, t.start) + x + s0.slice(t.end)
     }
   }
@@ -278,6 +337,10 @@ async function prepare(inp: ContractInput, forPdf = false) {
   const margin = (x: string) => x.replace(/(<hp:margin [^>]*?)bottom="4252"/g, '$1bottom="7600"')
   s0 = margin(s0); s1 = margin(s1); s2 = margin(s2)
 
+  if (newBorders.length) {
+    header = header.replace('</hh:borderFills>', newBorders.join('') + '</hh:borderFills>')
+    header = header.replace(/(<hh:borderFills itemCnt=")(\d+)(")/, (_m, a, n, c) => a + (Number(n) + newBorders.length) + c)
+  }
   if (clones.length) {
     header = header.replace('</hh:charProperties>', clones.join('') + '</hh:charProperties>')
     header = header.replace(/(<hh:charProperties itemCnt=")(\d+)(")/, (_m, a, n, c) => a + (Number(n) + clones.length) + c)
