@@ -14,6 +14,7 @@ import { contractWeight } from '@/lib/supplyRules'
 import { printIncall, buildCustomerSections } from '@/lib/printIncall'
 import ConsultingReportTab from './ConsultingReportTab'
 import OpsMoneyReport from './OpsMoneyReport'
+import RefundTab from './RefundTab'
 import AgentCommandPanel from './AgentCommandPanel'
 import { ContractModal } from '@/components/sales/InCallTableView'
 import { isNewModel } from '@/lib/payrollV2'
@@ -321,7 +322,7 @@ export function certOf(c: { details?: any }): string[] {
 }
 
 // ── Detail Tab Types: 진행현황 우선, 타임라인 진행현황 하단에 통합 ──────────
-const DETAIL_TABS = ['진행현황', '인콜일지', '기관ID/PW', '입금/계약', '여신구분', '고객서류', '주황이 지시'] as const
+const DETAIL_TABS = ['진행현황', '인콜일지', '기관ID/PW', '입금/계약', '환불·정산', '여신구분', '고객서류', '주황이 지시'] as const
 type DetailTab = typeof DETAIL_TABS[number]
 
 // ──────────────────────────────────────────────────────────────────────
@@ -2634,6 +2635,21 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── 환불·정산 (해지 시 얼마 나가야 하는지 + 교부 날짜·시간) ── */}
+      {activeDetailTab === '환불·정산' && (
+        <RefundTab
+          caseId={c.id}
+          company={local.customers?.details?.company || local.customers?.name || ''}
+          custDetails={local.customers?.details || {}}
+          opsDetails={local.details || {}}
+          onSave={(patch) => {
+            const merged = { ...(local.details || {}), ...patch }
+            setLocal(prev => ({ ...prev, details: { ...(prev.details || {}), ...patch } }))
+            savePatch({ details: merged })
+          }}
+        />
       )}
 
       {/* ── 여신구분 ── */}

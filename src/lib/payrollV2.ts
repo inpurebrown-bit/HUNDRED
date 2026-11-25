@@ -7,7 +7,9 @@
 //  · 영업팀장·주임·관리팀 새 보수는 아직 자동 계산하지 않는다 (팀장·주임은 인원이 생길 때 추가)
 // 11월 15일까지 체결한 옛 건은 payrollCalc.ts 의 종전 계산을 그대로 쓴다.
 
-export const V2_START = '2026-12-01'
+// 2026-11-25 대표 지시: 새 구조(1년 관리비 선금·잔금)는 "지금부터" 시작. 이 날짜 이후 체결 건은 새 모델이다.
+// 급여는 이미 확정된 11월분은 건드리지 않고 12월 급여부터 새 방식으로 계산한다(PAYROLL_V2_MONTH).
+export const V2_START = '2026-11-25'
 
 export const V2 = {
   stipend: 1_500_000,          // 신입 업무정착비 (월)
@@ -43,7 +45,7 @@ export const tierRate = (monthlyPrepay: number) => (V2.tiers.find(t => monthlyPr
 
 export const contractDateOf = (c: any): string => String(c?.details?.contract_date || c?.created_at || '').slice(0, 10)
 /** 새 구조(선금·잔금)로 계산하는 계약인가 — 2026-11-16 이후 체결이고, 수수료 계약(fee_model 'old')이 아닌 것 */
-export const PAYROLL_V2_MONTH = V2_START.slice(0, 7)
+export const PAYROLL_V2_MONTH = '2026-12'
 /** 새 모델(1년 관리비 선금·잔금) 계약인가 — 새로 등록한 건(fee_model 'v2') 또는 12/1 이후 체결 건. 매출·잔금 관리·카드 표시 기준 */
 export const isNewModel = (c: any): boolean => {
   const m = c?.details?.fee_model

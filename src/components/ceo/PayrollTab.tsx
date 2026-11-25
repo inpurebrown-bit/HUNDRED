@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { isTester } from '@/lib/tester'
 import { bizDays } from '@/lib/digStats'
 import { calcWithholding, calcSalesStructure, resignBizProration, SALES_BASE_PAY, SALES_BASE_RATE, SALES_PAY_MONTH_DAYS, type SalesPayMode, getPromo, PERF_BONUS_MIN_COUNT, OPS_FEE_RATE, OPS_PUTO_RATE, NET_RATE, currentYearMonth, buildSalesContractMap, baseSalesName, calcMonthlySubBonus, calcRefundDeductions, calcDigSalary, calcDigMonth, digLeaveDays, digUnpaidLeaveCount, DIG_BASE_SALARY, DIG_HOURLY_BASE, DIG_DAILY_GOAL, DIG_BONUS_PER_EXTRA } from '@/lib/payrollCalc'
-import { v2PayFor, v2PayrollOn, V2_START, V2, teamOf, OPS_V2_FROM, OPS_V2 } from '@/lib/payrollV2'
+import { v2PayFor, v2PayrollOn, V2_START, PAYROLL_V2_MONTH, V2, teamOf, OPS_V2_FROM, OPS_V2 } from '@/lib/payrollV2'
 import { contractWeight } from '@/lib/supplyRules'
 import { baseName } from '@/lib/personName'
 
@@ -761,7 +761,7 @@ export default function PayrollTab() {
   const v2CustRef = useRef<{ ym: string; list: any[] } | null>(null)
   const teamsRef = useRef<{ name: string; team_no: number }[] | null>(null)
   useEffect(() => {
-    if (yearMonth < V2_START.slice(0, 7)) return          // 시행(2026-11) 이전 달에는 새 구조 건이 없다
+    if (yearMonth < PAYROLL_V2_MONTH) return          // 시행(2026-11) 이전 달에는 새 구조 건이 없다
     if (!salesEmps.some(e => e.name)) return
     let dead = false
     ;(async () => {
