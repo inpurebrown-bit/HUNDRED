@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 
-type Task = { kind?: string; ask?: string; key: string; title: string; stage: string; note?: string; from?: string; history?: { stage: string; at: string }[]; created_at: string; updated_at: string }
+type Task = { merged?: number; attempt?: number; final?: boolean; kind?: string; ask?: string; key: string; title: string; stage: string; note?: string; from?: string; history?: { stage: string; at: string }[]; created_at: string; updated_at: string }
 const LABEL: Record<string, string> = { sent: '주황이 PC로 전달 중', taken: '주황이가 받았음', running: '작업 중', done: '작업 끝 · 나다방 보고 대기', reported: '끝남 · 나다방에 보고됨', failed: '실패' }
 const hhmm = (iso: string) => { const d = new Date(new Date(iso).getTime() + 9 * 3600 * 1000); return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}` }
 const dur = (ms: number) => { const m = Math.floor(ms / 60000); return m < 1 ? '1분 미만' : m < 60 ? `${m}분` : `${Math.floor(m / 60)}시간 ${m % 60}분` }
@@ -25,7 +25,7 @@ export default function TaskBoard() {
   const Card = ({ t }: { t: Task }) => {
     const failed = t.stage === 'failed', end = isEnd(t.stage)
     const since = now - new Date(t.updated_at).getTime()
-    const stuck = !end && ((t.stage === 'sent' && since > 3 * 60000) || (t.stage === 'taken' && since > 3 * 60000) || (t.stage === 'running' && since > 10 * 60000))
+    const stuck = !end && !failed && ((t.stage === 'sent' && since > 3 * 60000) || (t.stage === 'taken' && since > 3 * 60000) || (t.stage === 'running' && since > 10 * 60000))
     const total = (end ? new Date(t.updated_at).getTime() : now) - new Date(t.created_at).getTime()
     const tone = failed ? '#ef4444' : stuck ? '#f59e0b' : end ? '#22c55e' : '#60a5fa'
     return (
@@ -35,7 +35,9 @@ export default function TaskBoard() {
           <p className="mt-1 flex items-center gap-2 flex-wrap">
             <span className="text-[12px] font-black rounded px-2 py-0.5 text-white" style={{ background: tone }}>{LABEL[t.stage] || t.stage}</span>
             {stuck && <span className="text-[11px] font-black text-amber-300">⚠ {dur(since)} 동안 변화 없음</span>}
-            <span className="text-[11px] font-bold text-white/50">{hhmm(t.created_at)} 지시 · {end ? `${dur(total)} 걸림` : `${dur(total)} 경과`}</span>
+            <span className="text-[11px] font-bold text-white/50">{hhmm(t.created_at)} 지시{failed ? '' : end ? ` · ${dur(total)} 걸림` : ` · ${dur(total)} 경과`}</span>
+            {!!t.attempt && !end && <span className="text-[11px] font-black text-amber-300">🔁 다시 시도 {t.attempt}번째</span>}
+            {!!t.merged && <span className="text-[11px] font-bold text-white/40">앞선 같은 지시 {t.merged}건은 최신으로 정리됨</span>}
           </p>
           {t.note && <p className="text-[12px] text-white/85 mt-1 leading-snug">{t.note}</p>}
         </div>
