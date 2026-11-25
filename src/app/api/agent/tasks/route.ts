@@ -25,7 +25,7 @@ export async function GET() {
     if (d.acked) continue
     const idle = Date.now() - new Date(r.updated_at).getTime()
     const lim = d.stage === 'sent' ? 10 * 60000 : (d.stage === 'taken' || d.stage === 'running') ? 30 * 60000 : 0
-    if (d.kind !== 'blocker' && lim && idle > lim) {
+    if (d.kind !== 'blocker' && !String(d.key||'').startsWith('blocker') && lim && idle > lim) {
       const at = new Date().toISOString()
       const note = d.stage === 'sent'
         ? '실패: 주황이가 10분 안에 지시를 받지 않았습니다. 주황이 PC의 수신기·읽기 프로그램이 멈췄을 수 있습니다. 다시 하려면 주황이에게 같은 지시를 새로 보내야 합니다.'
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     title: String(b.title || old?.draft?.title || key).slice(0, 120),
     from: String(b.from || old?.draft?.from || '').slice(0, 20),
     note: b.note != null ? String(b.note).slice(0, 400) : (old?.draft?.note || ''),
-    ...(b.kind === 'blocker' || old?.draft?.kind === 'blocker' ? { kind: 'blocker' } : {}),
+    ...(b.kind === 'blocker' || key.startsWith('blocker') || old?.draft?.kind === 'blocker' ? { kind: 'blocker' } : {}),
     ask: b.ask != null ? String(b.ask).slice(0, 200) : (old?.draft?.ask || ''),
   }
   const status = stage === 'failed' ? 'failed' : stage === 'sent' ? 'requested' : stage === 'done' || stage === 'reported' ? 'sent' : 'drafting'
