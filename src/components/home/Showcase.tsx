@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, ReactNode } from 'react'
 import Image from 'next/image'
-import { CERTS, SITE_PHOTOS, TEAM, REVIEWS } from '@/lib/showcase'
+import { CERT_EXAMPLES, SITE_PHOTOS, TEAM, REVIEWS } from '@/lib/showcase'
 
 // 옆으로 넘기는 슬라이드: 4초마다 한 칸, 마우스를 올리거나 손으로 넘기는 동안은 멈춘다
 function Slider({ children, label }: { children: ReactNode; label: string }) {
@@ -40,55 +40,51 @@ function Head({ kicker, title, desc, dark }: { kicker: string; title: string; de
   )
 }
 
+// 인증 예시 두 장마다 현장 사진 한 장을 섞는다
+const MIXED = (() => {
+  const out: { img: string; title: string; kind: '예시' | '현장' }[] = []
+  let s = 0
+  CERT_EXAMPLES.forEach((c, i) => {
+    out.push({ img: c.img, title: c.title, kind: '예시' })
+    if (i % 2 === 1 && SITE_PHOTOS[s]) { out.push({ img: SITE_PHOTOS[s].img, title: SITE_PHOTOS[s].label, kind: '현장' }); s++ }
+  })
+  SITE_PHOTOS.slice(s).forEach(p => out.push({ img: p.img, title: p.label, kind: '현장' }))
+  return out
+})()
+
 export default function Showcase() {
   const [zoom, setZoom] = useState<string | null>(null)
   return (
     <>
-      {CERTS.length > 0 && (
+      {MIXED.length > 0 && (
         <section id="지원사례" className="py-20 md:py-24 px-4 md:px-8 bg-white">
           <div className="max-w-6xl mx-auto">
-            <Head kicker="CERTIFICATION" title="인증 지원 사례" desc="고객 기업이 받은 확인서입니다. 개인정보와 문서번호는 가렸습니다." />
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {CERTS.map(c => (
-                <button key={c.img} type="button" onClick={() => setZoom(c.img)} className="group text-left bg-[#FAF8F3] border border-[#E8E2D4] rounded-2xl p-4 hover:shadow-xl hover:-translate-y-1 transition-all">
-                  <div className="relative aspect-[3/4] bg-white rounded-lg shadow-md overflow-hidden">
-                    <Image src={c.img} alt={`${c.title} 확인서 (개인정보 가림)`} fill className="object-contain" unoptimized />
+            <Head kicker="CERTIFICATION & ON SITE" title="준비할 수 있는 인증, 직접 보는 현장" desc="어떤 인증을 준비할 수 있는지 예시로 보여 드리고, 사업장은 직접 확인합니다." />
+            <Slider label="인증 예시와 현장 사진">
+              {MIXED.map(m => (
+                <button key={m.img} type="button" onClick={() => setZoom(m.img)} className="relative w-64 md:w-72 aspect-[3/4] shrink-0 snap-start rounded-2xl overflow-hidden border border-[#E8E2D4] bg-[#FAF8F3] text-left">
+                  <span className={`absolute left-3 top-3 z-10 text-[11px] font-black rounded-full px-2.5 py-1 ${m.kind === '예시' ? 'bg-[#1B2A45] text-white' : 'bg-[#C5A258] text-white'}`}>{m.kind}</span>
+                  <div className={m.kind === '예시' ? 'absolute inset-x-3 top-12 bottom-14' : 'absolute inset-0'}>
+                    <Image src={m.img} alt={m.kind === '예시' ? `${m.title} 예시 (개인정보 가림)` : m.title} fill className={m.kind === '예시' ? 'object-contain' : 'object-cover'} unoptimized />
                   </div>
-                  <p className="text-base font-black mt-4">{c.title}</p>
-                  <p className="text-xs text-[#1B2A45]/55 mt-1">{c.date} · {c.org}</p>
+                  <span className={`absolute inset-x-0 bottom-0 px-4 pb-3.5 pt-8 text-sm font-bold ${m.kind === '예시' ? 'text-[#1B2A45]' : 'text-white bg-gradient-to-t from-black/80 to-transparent'}`}>{m.title}</span>
                 </button>
               ))}
-            </div>
-            <p className="text-[11px] text-[#1B2A45]/40 text-center mt-6">※ 인증·확인 가능 여부는 기업의 요건과 해당 기관의 심사에 따라 달라집니다.</p>
-          </div>
-        </section>
-      )}
-
-      {SITE_PHOTOS.length > 0 && (
-        <section id="현장" className="py-20 md:py-24 px-4 md:px-8 bg-[#0d1626]">
-          <div className="max-w-6xl mx-auto">
-            <Head dark kicker="ON SITE" title="현장에서 확인합니다" desc="서류만 보지 않고 사업장의 설비와 작업 흐름을 직접 확인합니다." />
-            <Slider label="현장 사진">
-              {SITE_PHOTOS.map(p => (
-                <figure key={p.img} className="relative w-64 md:w-80 aspect-[3/4] shrink-0 snap-start rounded-2xl overflow-hidden">
-                  <Image src={p.img} alt={p.label} fill className="object-cover" unoptimized />
-                  <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-4 pt-10 pb-4 text-sm font-bold text-white">{p.label}</figcaption>
-                </figure>
-              ))}
             </Slider>
+            <p className="text-[11px] text-[#1B2A45]/55 text-center mt-5">※ "예시" 표시는 인증서·명패의 형태를 보여 주는 견본이며 당사의 지원 실적이 아닙니다. 취득 가능 여부는 기업 요건과 해당 기관의 심사에 따라 달라집니다.</p>
           </div>
         </section>
       )}
 
       {TEAM.length > 0 && (
-        <section id="구성원" className="py-20 md:py-24 px-4 md:px-8 bg-[#FAF8F3]">
+        <section id="구성원" className="py-20 md:py-24 px-4 md:px-8 bg-[#0d1626]">
           <div className="max-w-6xl mx-auto">
-            <Head kicker="OUR TEAM" title="함께하는 사람들" desc="상담부터 사후관리까지 담당자가 이어서 맡습니다." />
+            <Head dark kicker="OUR TEAM" title="함께하는 사람들" desc="상담부터 사후관리까지 담당자가 이어서 맡습니다." />
             <Slider label="구성원 사진">
               {TEAM.map(m => (
-                <figure key={m.img} className="w-56 md:w-64 shrink-0 snap-start rounded-2xl overflow-hidden bg-white border border-[#E8E2D4]">
-                  <div className="relative aspect-[3/4]"><Image src={m.img} alt={`${m.name} ${m.role}`} fill className="object-cover" unoptimized /></div>
-                  <figcaption className="px-4 py-3"><p className="text-sm font-black">{m.name}</p><p className="text-xs text-[#1B2A45]/55">{m.role}</p></figcaption>
+                <figure key={m.img} className="relative w-[85%] md:w-[48%] aspect-[4/3] shrink-0 snap-start rounded-2xl overflow-hidden">
+                  <Image src={m.img} alt={m.label} fill className="object-cover" unoptimized />
+                  <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-4 pt-10 pb-4 text-sm font-bold text-white">{m.label}</figcaption>
                 </figure>
               ))}
             </Slider>
@@ -114,7 +110,7 @@ export default function Showcase() {
 
       {zoom && (
         <div role="dialog" aria-modal="true" onClick={() => setZoom(null)} className="fixed inset-0 z-[90] bg-black/80 flex items-center justify-center p-4 cursor-zoom-out">
-          <img src={zoom} alt="확인서 확대 (개인정보 가림)" className="max-h-full max-w-full rounded-lg shadow-2xl" />
+          <img src={zoom} alt="확대 보기" className="max-h-full max-w-full rounded-lg shadow-2xl" />
         </div>
       )}
     </>
