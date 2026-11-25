@@ -12,7 +12,9 @@ export type DocBlock =
   | { t: 'gap'; n?: number }                                   // 빈 줄 n개 (한 쪽을 알맞게 채울 때)
   | { t: 'title'; text: string; pb?: boolean }                 // 가운데 큰 제목 (묶음 서식에서 서식마다 새 쪽)
 // rowH: 표 한 줄 높이(기본 1700), gap: 표 뒤·소제목 앞 빈 줄 수 — 한 쪽짜리 서식이 위쪽에만 몰리지 않게 쪽을 알맞게 채울 때 쓴다
-export interface DocContent { title: string; subtitle?: string; blocks: DocBlock[]; rowH?: number; gap?: number }
+export interface DocContent { title: string; subtitle?: string; blocks: DocBlock[]; rowH?: number; gap?: number
+  // 새 디자인(남색 머리띠·색 표) 한글 파일. bg 는 쪽 배경 그림(jpg)
+  v2?: boolean; bg?: Buffer; compact?: boolean }
 // 표지·목차를 붙일 때 쓰는 정보 (정관 내려받기용)
 export interface CoverOpts { org: string; version: string; date: string; eyebrow?: string }
 
@@ -44,8 +46,23 @@ export async function buildDocParts(doc: DocContent, cover?: CoverOpts, mode: 'h
   }
   const CV = cover ? { eyebrow: withColor('18', 1100, '#C5A258'), title: withColor('18', 3800, '#FFFFFF'), bar: withColor('18', 1400, '#C5A258'), sub: withColor('19', 1300, '#DCE3EF'), meta: withColor('18', 1200, '#FFFFFF'), conf: withColor('19', 900, '#AEB9CE') } : null
   // 문서 규격: 제목 20pt · 장 제목 14pt · 소제목 11pt (모두 맑은 고딕 굵게) / 본문 10pt 함초롬바탕 / 표 10pt 맑은 고딕 / 주석·부제 9pt
-  const CP = { title: '26', h1: withHeight('18', 1400), h2: withHeight('18', 1100), h3: withHeight('18', 1100), p: withHeight('19', 1000), li: withHeight('19', 1000), note: withHeight('12', 900), cell: withHeight('29', 1000), cellHead: withHeight('8', 1000) }
+  const CP = { title: '26', h1: withHeight('18', 1400), h2: withHeight('18', 1100), h3: withHeight('18', 1100), p: withHeight('19', doc.compact ? 900 : 1000), li: withHeight('19', doc.compact ? 900 : 1000), note: withHeight('12', 900), cell: withHeight('29', 1000), cellHead: withHeight('8', 1000) }
+  // 새 디자인에서 쓰는 글자색
+  const V2 = doc.v2 ? { title: withColor('26', 2000, '#FFFFFF'), sub: withColor('19', 900, '#DCE1F5'), white: withColor('8', 1000, '#FFFFFF'), head: withColor('18', 1150, '#1C2448') } : null
   header = header.replace('</hh:charProperties>', clones.join('') + '</hh:charProperties>')
+  // 새 디자인에서 쓰는 칸 모양(바탕색·테두리색)
+  const fills: Record<string, string> = {}
+  if (V2) {
+    const bf5 = header.match(/<hh:borderFill id="5"[\s\S]*?<\/hh:borderFill>/)![0]
+    let id = Math.max(...[...header.matchAll(/<hh:borderFill id="(\d+)"/g)].map(m => +m[1]))
+    const add: string[] = []
+    for (const [k, face, line] of [['head', '#2B376B', '#55639C'], ['label', '#37457F', '#6572A8'], ['zebra', '#EEF0F7', '#D9DDED'], ['plain', '#FFFFFF', '#D9DDED'], ['band', '#1F2A55', '#1F2A55']]) {
+      id++; fills[k] = String(id)
+      add.push(bf5.replace('id="5"', `id="${id}"`).replace(/(<hh:(?:left|right|top|bottom)Border [^>]*color=")#[0-9A-Fa-f]{6}"/g, `$1${line}"`).replace(/faceColor="#[0-9A-Fa-f]{6}"/, `faceColor="${face}"`))
+    }
+    header = header.replace('</hh:borderFills>', add.join('') + '</hh:borderFills>')
+    header = header.replace(/(<hh:borderFills itemCnt=")(\d+)(")/, (_m, x, n, c) => x + (Number(n) + add.length) + c)
+  }
   header = header.replace(/(<hh:charProperties itemCnt=")(\d+)(")/, (_m, a, n, c) => a + (Number(n) + clones.length) + c)
 
   const para = (text: string, cp: string, pr = '0', pageBreak = false) =>
@@ -65,9 +82,9 @@ export async function buildDocParts(doc: DocContent, cover?: CoverOpts, mode: 'h
     const over = widths.reduce((a, v) => a + v, 0) - total
     widths[widths.indexOf(Math.max(...widths))] -= over
     const cell = (txt: string, r: number, c: number, head: boolean) => {
-      const bf = head ? 9 : 5
+      const bf = !V2 ? (head ? 9 : 5) : head ? (o.form ? fills.label : fills.head) : !o.form && !o.center && r % 2 === 0 ? fills.zebra : fills.plain
       const mid = !!o.center
-      const ps = String(txt ?? '').split('\n').map(line => para(line, head ? CP.cellHead : CP.cell, head ? '21' : mid ? '21' : '22')).join('')
+      const ps = String(txt ?? '').split('\n').map(line => para(line, head ? (V2 ? V2.white : CP.cellHead) : CP.cell, head ? '21' : mid ? '21' : '22')).join('')
       return `<hp:tc name="" header="${head ? 1 : 0}" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="${bf}"><hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">${ps}</hp:subList><hp:cellAddr colAddr="${c}" rowAddr="${r}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="${widths[c]}" height="${o.heights?.[r] ?? rowH}"/><hp:cellMargin left="510" right="510" top="141" bottom="141"/></hp:tc>`
     }
     const trs = rows.map((row, r) => `<hp:tr>${Array.from({ length: nC }, (_, c) => cell(row[c] ?? '', r, c, o.form ? !!o.labelCols?.includes(c) : r === 0)).join('')}</hp:tr>`).join('')
@@ -75,7 +92,9 @@ export async function buildDocParts(doc: DocContent, cover?: CoverOpts, mode: 'h
   }
 
   // 첫 문단: 쪽 설정(용지·배경)이 들어 있는 원본의 첫 문단을 그대로 쓰고 제목 글만 바꾼다
-  const first = base.match(/<hp:p [\s\S]*?<\/hp:p>/)![0].replace(/<hp:linesegarray>[\s\S]*?<\/hp:linesegarray>/g, '')
+  let first = base.match(/<hp:p [\s\S]*?<\/hp:p>/)![0].replace(/<hp:linesegarray>[\s\S]*?<\/hp:linesegarray>/g, '')
+  // 새 디자인은 위아래 여백을 줄여 한 장짜리 서식이 한 장에 담기게 한다
+  if (doc.v2) first = first.replace(/(<hp:margin header=")4251(" footer=")4252("[^>]*top=")5669(" bottom=")4252"/, '$11417$22600$32600$43000"')
   const open = base.slice(0, base.indexOf('<hp:p '))
   const setText = (x: string, t: string) => x.replace(/<hp:t>[^<]*<\/hp:t>/, t ? `<hp:t>${esc(t)}</hp:t>` : '<hp:t></hp:t>')
 
@@ -109,8 +128,13 @@ export async function buildDocParts(doc: DocContent, cover?: CoverOpts, mode: 'h
   }
 
   // ── 본문 구역 (표지가 있으면 목차부터) ──
-  let body = cover ? setText(first, '') : setText(first, doc.title)
-  if (!cover) {
+  let body = cover || V2 ? setText(first, '') : setText(first, doc.title)
+  if (V2 && !cover) {
+    // 제목 띠: 남색 한 칸 표 안에 제목과 버전
+    const cellXml = `<hp:tc name="" header="0" hasMargin="1" protect="0" editable="0" dirty="0" borderFillIDRef="${fills.band}"><hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">${para(doc.title, V2.title, '22')}${para(`${doc.subtitle || ''}   |   HUNDRED CONSULTING`, V2.sub, '22')}</hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="${W_TOTAL}" height="5200"/><hp:cellMargin left="1700" right="850" top="566" bottom="566"/></hp:tc>`
+    body += `<hp:p id="0" paraPrIDRef="25" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="${CP.cell}"><hp:tbl id="${tblId++}" zOrder="0" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="CELL" repeatHeader="0" rowCnt="1" colCnt="1" cellSpacing="0" borderFillIDRef="5" noAdjust="0"><hp:sz width="${W_TOTAL}" widthRelTo="ABSOLUTE" height="5200" heightRelTo="ABSOLUTE" protect="0"/><hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="566"/><hp:inMargin left="510" right="510" top="141" bottom="141"/><hp:tr>${cellXml}</hp:tr></hp:tbl><hp:t/></hp:run></hp:p>`
+    // (새 디자인은 띠 아래 여백을 표 바깥 여백으로만 둔다)
+  } else if (!cover) {
     if (doc.subtitle) body += para(doc.subtitle, CP.note, '25')
     body += empty()
   } else {
@@ -128,18 +152,18 @@ export async function buildDocParts(doc: DocContent, cover?: CoverOpts, mode: 'h
     if (bl.t === 'gap') { for (let i = 0; i < (bl.n ?? 1); i++) body += empty(); continue }
     if (bl.t === 'approval') {
       // 팀장·실장·대표 결재란: 오른쪽 위. 이름은 찍지 않고 각자 서명한다
-      body += table([['팀  장', '실  장', '대  표'], ['\n\n', '\n\n', '\n\n']], { widths: [1, 1, 1], heights: [1500, 2600], total: 18000, right: true, center: true, noFit: true })
+      body += table([['팀  장', '실  장', '대  표'], ['\n\n', '\n\n', '\n\n']], { widths: [1, 1, 1], heights: doc.compact ? [1100, 1700] : [1500, 2600], total: 18000, right: true, center: true, noFit: true })
       body += para('', CP.note); continue
     }
     if (bl.t === 'title') { body += para(bl.text, CP.title, '25', !!bl.pb) + empty(); continue }
     const text = bl.text || ''
     const al = bl.align === 'center' ? '25' : bl.align === 'right' ? '24' : ''
     if (bl.t === 'h1') { body += para(text, CP.h1, '12', !firstH1); firstH1 = false; body += empty(); continue }
-    if (bl.t === 'h2') { body += empty() + para(text, CP.h2, '12'); continue }
-    if (bl.t === 'h3') { for (let i = 0; i < (doc.gap ?? 0); i++) body += empty(); body += para(text, CP.h3, '12'); continue }
+    if (bl.t === 'h2') { body += empty() + para(V2 ? '▌ ' + text : text, V2 ? V2.head : CP.h2, '12'); continue }
+    if (bl.t === 'h3') { for (let i = 0; i < (doc.gap ?? 0); i++) body += empty(); body += para(V2 ? '▌ ' + text : text, V2 ? V2.head : CP.h3, '12'); continue }
     if (bl.t === 'li') { body += para(text, CP.li, al || '12'); continue }
     if (bl.t === 'note') { body += para(text, CP.note, al || '12'); continue }
-    body += para(text, CP.p, al || '0')
+    body += para(text, CP.p, al || (V2 ? '12' : '0'))
   }
   sections.push(open + body + '</hs:sec>')
   return { header, sections, zip, coverBgId }
@@ -161,7 +185,7 @@ export async function docToHwpx(doc: DocContent, cover?: CoverOpts): Promise<Buf
   hpf = hpf.replace(/<opf:item id="image1"[^>]*\/>/, '<opf:item id="image1" href="BinData/image1.jpg" media-type="image/jpg" isEmbeded="1"/>')
   hpf = hpf.replace(/<opf:title>[^<]*<\/opf:title>/, `<opf:title>${esc(doc.title)}</opf:title>`)
   zip.file('Contents/content.hpf', hpf)
-  zip.file('BinData/image1.jpg', Buffer.from(bgImage, 'base64'))
+  zip.file('BinData/image1.jpg', doc.bg || Buffer.from(bgImage, 'base64'))
   if (sections.length > 1) zip.file('BinData/image2.jpg', Buffer.from(coverImage, 'base64'))
   zip.remove('Preview/PrvImage.png')
   zip.file('Preview/PrvText.txt', doc.title)
