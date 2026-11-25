@@ -400,10 +400,14 @@ function buildLogFields(c: Customer) {
     { label: '접수일',    value: c.details?.reception_date },
     { label: '업종',      value: c.details?.business_type },
     { label: '실제업무',  value: c.details?.real_work },
+    { label: '창업일',    value: c.details?.founded_date },
     { label: '업력',      value: c.details?.years_in_business || c.details?.biz_size },
     { label: '직원수',    value: c.details?.employee_count },
     // 혁신요건은 InnovationSelect 컴포넌트로 처리
     { label: '특허',      value: c.details?.patent },
+    { label: '4대보험',   value: c.details?.insured_count },
+    { label: '기계/공장', value: c.details?.machine_factory },
+    { label: '기계 증빙', value: c.details?.machine_docs },
     { label: '26년매출',  value: c.details?.revenue_2026 },
     { label: '25년매출',  value: c.details?.revenue_2025 },
     { label: '24년매출',  value: c.details?.revenue_2024 },
@@ -414,6 +418,7 @@ function buildLogFields(c: Customer) {
     { label: '중진공',    value: c.details?.loan_jinjong },
     { label: '소진공',    value: c.details?.loan_sojin },
     { label: '신용/담보', value: c.details?.loan_other || c.details?.loan_credit },
+    { label: '가계대출',  value: c.details?.loan_household },
     { label: '기대출합계',value: c.details?.loan_total },
     { label: 'KCB점수',   value: c.details?.credit_kcb || c.details?.credit_score },
     { label: 'NICE점수',  value: c.details?.credit_nice },
@@ -432,6 +437,7 @@ function buildLogFields(c: Customer) {
     },
     { label: '기타자산',  value: c.details?.asset_other || c.details?.assets },
     { label: '필요자금',  value: c.details?.required_funds },
+    { label: '특이사항',  value: c.details?.special_note },
     { label: '솔루션',    value: c.details?.solution },
   ]
 }
@@ -926,7 +932,13 @@ function CustomerCard({
       reception_date:     d.reception_date || '',
       business_type:      d.business_type || '',
       real_work:          d.real_work || '',
+      founded_date:       d.founded_date || '',
       years_in_business:  d.years_in_business || d.biz_size || '',
+      insured_count:      d.insured_count || '',
+      machine_factory:    d.machine_factory || '',
+      machine_docs:       d.machine_docs || '',
+      loan_household:     d.loan_household || '',
+      special_note:       d.special_note || '',
       employee_count:     d.employee_count || '',
       patent:             d.patent || '',
       revenue_2026:       d.revenue_2026 || '',
@@ -983,7 +995,8 @@ function CustomerCard({
         loan_kibo, loan_shinbo, loan_jaedan, loan_jinjong, loan_sojin, loan_other, loan_total,
         credit_kcb, credit_nice, tax_status, assets,
         asset_home_type, asset_home_value, asset_biz_type, asset_biz_value, asset_other,
-        required_funds, solution } = draft
+        required_funds, solution,
+        founded_date, insured_count, machine_factory, machine_docs, loan_household, special_note } = draft
       await onUpdateRef.current(c.id, {
         name,
         phone,
@@ -995,6 +1008,7 @@ function CustomerCard({
           credit_kcb, credit_nice, tax_status, assets,
           asset_home_type, asset_home_value, asset_biz_type, asset_biz_value, asset_other,
           required_funds, solution,
+          founded_date, insured_count, machine_factory, machine_docs, loan_household, special_note,
         },
       })
       logSavedRef.current = json
@@ -1905,9 +1919,13 @@ function CustomerCard({
                     { label: '접수일',    key: 'reception_date' },
                     { label: '업종',      key: 'business_type',    isKey: true },
                     { label: '실제업무',  key: 'real_work',        isKey: true },
+                    { label: '창업일',    key: 'founded_date' },
                     { label: '업력',      key: 'years_in_business' },
                     { label: '직원수',    key: 'employee_count' },
                     { label: '특허',      key: 'patent' },
+                    { label: '4대보험',   key: 'insured_count' },
+                    { label: '기계/공장', key: 'machine_factory' },
+                    { label: '기계 증빙', key: 'machine_docs' },
                     { label: '26년매출',  key: 'revenue_2026' },
                     { label: '25년매출',  key: 'revenue_2025',     isKey: true },
                     { label: '24년매출',  key: 'revenue_2024' },
@@ -1918,14 +1936,16 @@ function CustomerCard({
                     { label: '중진공',    key: 'loan_jinjong' },
                     { label: '소진공',    key: 'loan_sojin' },
                     { label: '신용/담보', key: 'loan_other' },
+                    { label: '가계대출',  key: 'loan_household' },
                     { label: '기대출합계',key: 'loan_total' },
                     { label: 'KCB점수',   key: 'credit_kcb' },
                     { label: 'NICE점수',  key: 'credit_nice',      isKey: true },
                     { label: '세금체납',  key: 'tax_status' },
                     { label: '필요자금',  key: 'required_funds',   isKey: true },
+                    { label: '특이사항',  key: 'special_note' },
                     { label: '솔루션',    key: 'solution' },
                   ] as { label: string; key: string; isKey?: boolean }[]).map(({ label, key, isKey }) => {
-                    const isLongText = key === 'real_work' || key === 'solution'
+                    const isLongText = key === 'real_work' || key === 'solution' || key === 'special_note'
                     return (
                     <div key={key} className={`flex items-start gap-2 rounded-lg px-2.5 py-1.5 ${
                       isKey ? 'bg-blue-50 border border-blue-200' : 'bg-white border border-gray-100'
