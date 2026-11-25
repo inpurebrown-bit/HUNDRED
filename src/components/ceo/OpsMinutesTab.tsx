@@ -91,6 +91,55 @@ export default function OpsMinutesTab() {
       ) : (
         <div className="space-y-4">
           {reports.map(r => {
+            if (r.data?.form_version === 'money-v1') {
+              const d = r.data, st = d.auto_stats || {}
+              const man = (n: number) => (n >= 10000 ? Math.round(n / 10000).toLocaleString('ko-KR') + '만원' : (n || 0).toLocaleString('ko-KR') + '원')
+              const WHEN: Record<string, string> = { week: '이번주', month: '이번달', later: '그 이후' }
+              return (
+                <div key={r.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden print:break-after-page">
+                  <div className="bg-[#1B2A45] px-5 py-3 flex items-center justify-between">
+                    <h3 className="text-white font-bold text-base">{r.user_name} · 마감보고</h3>
+                    <span className="text-white/50 text-xs">{r.report_date}</span>
+                  </div>
+                  <div className="p-5 space-y-4">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-lg bg-amber-50 p-3"><p className="text-[10px] text-gray-500">이번주 예상 매출</p><p className="text-lg font-black text-amber-700">{man(d.expected_week || 0)}</p><p className="text-[10px] text-gray-400">나올 곳 + 잔금 {man(d.balance_week || 0)}</p></div>
+                      <div className="rounded-lg bg-amber-50 p-3"><p className="text-[10px] text-gray-500">이번달 예상 매출</p><p className="text-lg font-black text-amber-700">{man(d.expected_month || 0)}</p><p className="text-[10px] text-gray-400">나올 곳 + 잔금 {man(d.balance_month || 0)}</p></div>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {[['접수', st.receipt_count, st.receipt_names], ['실사대기', st.real_insp_count, st.real_insp_names], ['자금 승인 전', st.approval_count, st.approval_names], ['입금 전(승인됨)', st.payment_count, st.payment_names]].map(([l, n, names]: any) => (
+                        <div key={l} className="rounded-lg bg-slate-50 p-2.5">
+                          <p className="text-[10px] text-gray-400">{l}</p><p className="text-base font-black text-[#1B2A45]">{n ?? 0}개</p>
+                          <p className="text-[10px] text-gray-500 leading-snug">{(names || []).slice(0, 6).join(', ')}{(names || []).length > 6 ? ' 외' : ''}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-[#1B2A45] mb-1.5">나올 것 같은 곳 ({(d.expectations || []).length}곳)</p>
+                      {(d.expectations || []).length === 0 ? <p className="text-[11px] text-gray-300 pl-1">없음</p> : (
+                        <div className="space-y-1">{(d.expectations || []).map((e: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between bg-slate-50/70 rounded-lg px-2.5 py-1.5">
+                            <span className="text-[12px] font-bold text-gray-800">{e.company} <span className="font-normal text-gray-400">{e.institution}</span></span>
+                            <span className="text-[12px] font-black text-amber-700">{man(e.amount)} <span className="text-[10px] font-bold text-gray-500">· {WHEN[e.when] || e.when}</span></span>
+                          </div>
+                        ))}</div>
+                      )}
+                    </div>
+                    {(d.big_cases || []).length > 0 && (
+                      <div>
+                        <p className="text-xs font-bold text-violet-700 mb-1.5">큰건 진행 ({d.big_cases.length}건)</p>
+                        <div className="space-y-1">{d.big_cases.map((b: any, i: number) => (
+                          <div key={i} className="bg-violet-50/60 rounded-lg px-2.5 py-1.5">
+                            <p className="text-[12px] font-bold text-gray-800">{b.company} <span className="font-normal text-gray-400">{b.size ? man(b.size) : ''}</span></p>
+                            {b.last_note && <p className="text-[11px] text-gray-600 mt-0.5">{b.last_note}</p>}
+                          </div>
+                        ))}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            }
             const s = r.data?.auto_stats || {}
             const stage2: any[] = r.data?.stage2_notes || []
             const activeCases: any[] = r.data?.active_case_notes || []
