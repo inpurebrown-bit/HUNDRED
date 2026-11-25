@@ -38,7 +38,7 @@ export const isStartMember = (teams: { name: string; team_no: number }[], name: 
 
 // 관리실장 새 보수 — 2026-12 급여부터 (11월은 옛 건과 섞여 있어 종전 그대로)
 export const OPS_V2_FROM = '2026-12'
-export const OPS_V2 = { certUpsellRate: 0.20, chiefRate: 0.05, introRate: 0.40, upsellPay: 150_000 } as const   // 총 매출 5% · 소개건 선금 30% · 기장료 업셀 1개당 15만원
+export const OPS_V2 = { certUpsellRate: 0.20, chiefRate: 0.05, introRate: 0.40, upsellPay: 150_000 } as const   // 총 매출 5% · 소개건 선금 40% · 기장료 업셀 1개당 15만원
 
 export const parseMoney = (v: any) => parseInt(String(v ?? '0').replace(/[^0-9]/g, ''), 10) || 0
 export const tierRate = (monthlyPrepay: number) => (V2.tiers.find(t => monthlyPrepay >= t.min) || V2.tiers[V2.tiers.length - 1]).rate
