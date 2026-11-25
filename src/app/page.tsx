@@ -9,6 +9,7 @@ import HeroSlider from '@/components/home/HeroSlider'
 import IntroVideo from '@/components/home/IntroVideo'
 import GrowthStages from '@/components/home/GrowthStages'
 import LeadForm, { LegalModal } from '@/components/home/LeadForm'
+import Showcase from '@/components/home/Showcase'
 import { COMPANY } from '@/lib/companyInfo'
 import type { LegalKey } from '@/lib/legalTexts'
 
@@ -103,6 +104,7 @@ const NAV = [
   { label: '서비스', href: '#서비스' },
   { label: '성장단계', href: '#성장단계' },
   { label: '업종사례', href: '#업종사례' },
+  { label: '지원사례', href: '#지원사례' },
   { label: '진행절차', href: '#진행절차' },
   { label: '대표소개', href: '#대표소개' },
   { label: '강의', href: '#강의' },
@@ -298,6 +300,9 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ── 인증 지원 사례 · 현장 사진 · 구성원 · 후기 ── */}
+      <Showcase />
+
       {/* ── 진행 절차 ── */}
       <section id="진행절차" className="py-20 md:py-28 px-4 md:px-8 bg-white">
         <div className="max-w-5xl mx-auto">
@@ -443,7 +448,7 @@ export default function HomePage() {
             <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs">
               <button onClick={() => setLegal('terms')} className="hover:text-[#C5A258] transition-colors">이용약관</button>
               <button onClick={() => setLegal('privacy')} className="font-bold text-white/80 hover:text-[#C5A258] transition-colors">개인정보처리방침</button>
-              {NAV.slice(0, 6).map(n => <a key={n.label} href={n.href} className="hover:text-[#C5A258] transition-colors">{n.label}</a>)}
+              {NAV.slice(0, 7).map(n => <a key={n.label} href={n.href} className="hover:text-[#C5A258] transition-colors">{n.label}</a>)}
             </div>
           </div>
           <dl className="grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-[11px] leading-relaxed py-5">
