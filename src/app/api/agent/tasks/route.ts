@@ -15,9 +15,29 @@ export async function GET() {
   const session = await getSessionOrAgent()
   if (!session || (session.user as any).role !== 'ceo') return NextResponse.json({ tasks: [] })
   const since = new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString()
-  const { data } = await supabaseAdmin.from('agent_jobs').select('draft, created_at, updated_at')
+  const { data } = await supabaseAdmin.from('agent_jobs').select('id, draft, created_at, updated_at')
     .eq('case_id', 'task').gte('created_at', since).order('created_at', { ascending: false }).limit(40)
-  return NextResponse.json({ tasks: (data || []).map(r => ({ ...r.draft, created_at: r.created_at, updated_at: r.updated_at })).filter(t => !t.acked) })
+  // 시간 규칙: 오래 변화 없는 지시는 계속 "진행 중"으로 두지 않고 실패로 확정한다.
+  //  전달 중(sent) 10분 / 받음·작업 중(taken·running) 30분 넘게 변화가 없으면 failed
+  const out: any[] = []
+  for (const r of data || []) {
+    const d: any = r.draft || {}
+    if (d.acked) continue
+    const idle = Date.now() - new Date(r.updated_at).getTime()
+    const lim = d.stage === 'sent' ? 10 * 60000 : (d.stage === 'taken' || d.stage === 'running') ? 30 * 60000 : 0
+    if (d.kind !== 'blocker' && lim && idle > lim) {
+      const at = new Date().toISOString()
+      const note = d.stage === 'sent'
+        ? '실패: 주황이가 10분 안에 지시를 받지 않았습니다. 주황이 PC의 수신기·읽기 프로그램이 멈췄을 수 있습니다. 다시 하려면 주황이에게 같은 지시를 새로 보내야 합니다.'
+        : '실패: ' + (d.stage === 'taken' ? '받은 뒤' : '작업 중') + ' 30분 넘게 변화가 없어 시간 초과로 처리했습니다. 다시 하려면 주황이에게 새로 지시해야 합니다.'
+      d.history = [...(d.history || []), { stage: 'failed', at }].slice(-12)
+      d.stage = 'failed'; d.note = note
+      await supabaseAdmin.from('agent_jobs').update({ draft: d, status: 'failed', updated_at: at }).eq('id', r.id)
+      r.updated_at = at
+    }
+    out.push({ ...d, created_at: r.created_at, updated_at: r.updated_at })
+  }
+  return NextResponse.json({ tasks: out })
 }
 
 export async function POST(req: NextRequest) {
@@ -34,7 +54,9 @@ export async function POST(req: NextRequest) {
     key, stage, history: hist.slice(-12), ...(old?.draft?.acked ? { acked: true } : {}),
     title: String(b.title || old?.draft?.title || key).slice(0, 120),
     from: String(b.from || old?.draft?.from || '').slice(0, 20),
-    note: b.note != null ? String(b.note).slice(0, 300) : (old?.draft?.note || ''),
+    note: b.note != null ? String(b.note).slice(0, 400) : (old?.draft?.note || ''),
+    ...(b.kind === 'blocker' || old?.draft?.kind === 'blocker' ? { kind: 'blocker' } : {}),
+    ask: b.ask != null ? String(b.ask).slice(0, 200) : (old?.draft?.ask || ''),
   }
   const status = stage === 'failed' ? 'failed' : stage === 'sent' ? 'requested' : stage === 'done' || stage === 'reported' ? 'sent' : 'drafting'
   if (old) await supabaseAdmin.from('agent_jobs').update({ draft, status, updated_at: at }).eq('id', old.id)
