@@ -31,8 +31,11 @@ const fmt = (n: number) => (n ? n.toLocaleString('ko-KR') : '')
 export default function ContractWizard({ prefill, onClose, onDone }: { prefill: ContractPrefill; onClose: () => void; onDone?: () => void }) {
   const { data: session } = useSession()
   const isCeo = (session?.user as any)?.role === 'ceo'
-  const [type, setType] = useState<'fee' | 'nofee' | ''>(prefill.type || '')
-  const [feePercent, setFeePercent] = useState(prefill.feePercent ? String(prefill.feePercent).replace(/[^0-9.]/g, '') : '')
+  // 계약은 1년 관리비(선금·잔금) 한 가지뿐 — 선금+잔금이 착수금. 세무기장(제휴)을 쓰면 선금 50만원은 납부된 것으로 갈음한다
+  const type = 'v2' as const
+  const [bookkeeping, setBookkeeping] = useState(false)
+  const [prepay, setPrepay] = useState('')
+  const [balance, setBalance] = useState('')
   const [company, setCompany] = useState(prefill.company || '')
   const [ceo, setCeo] = useState(prefill.ceo || '')
   const [address, setAddress] = useState(prefill.address || '')
@@ -47,7 +50,7 @@ export default function ContractWizard({ prefill, onClose, onDone }: { prefill: 
   const [postPct, setPostPct] = useState('')
   const [pLine, setPLine] = useState(false)
   const [clauses, setClauses] = useState('')
-  const [blankMode, setBlankMode] = useState(false)   // 공계약서: 입력 없이 월정기/수수료 서식만 PDF 로 (미팅용)
+  const [blankMode, setBlankMode] = useState(false)   // 공계약서: 입력 없이 선금·잔금 서식만 PDF 로 (미팅용)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [err, setErr] = useState('')
@@ -63,7 +66,7 @@ export default function ContractWizard({ prefill, onClose, onDone }: { prefill: 
     fetch('/api/contract/generate?' + q.toString()).then(r => r.json()).then(j => {
       const d = j?.draft
       if (!d) return
-      setType(d.type || ''); setFeePercent(d.feePercent ? String(d.feePercent) : '')
+      if (d.type === 'v2') { setBookkeeping(!!d.bookkeeping); setPrepay(d.prepay ? fmt(Number(d.prepay)) : ''); setBalance(d.balance ? fmt(Number(d.balance)) : '') }
       const c = d.client || {}
       setCompany(c.company || ''); setCeo(c.ceo || ''); setAddress(c.address || ''); setBizNo(c.bizNo || '')
       setManagerName(c.managerName || ''); setManagerPhone(c.managerPhone || '')
@@ -93,26 +96,17 @@ export default function ContractWizard({ prefill, onClose, onDone }: { prefill: 
     try { if (!prefill.managerPhone) { const v = localStorage.getItem('contract_manager_phone'); if (v) setManagerPhone(v) } } catch { /* 저장값 없음 */ }
   }, [prefill.managerPhone])
 
-  // 카드에서 이미 유형이 정해져 열린 경우, 기본 금액이 도착하면 경영진단 금액을 채운다
-  useEffect(() => {
-    if (!type || !Object.keys(defaults).length) return
-    setAmt(p => (p.diag ? p : { ...p, diag: fmt(Number(type === 'fee' ? (defaults.diagFee ?? 500000) : (defaults.diag ?? 2000000)) || 0) }))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaults])
-
-  // 계약 유형을 고르면 경영진단 금액이 기본값으로 들어간다 (수수료 있음 50만원 · 없음 200만원)
-  function pickType(t: 'fee' | 'nofee') {
-    setType(t)
-    const v = t === 'fee' ? (defaults.diagFee ?? 500000) : (defaults.diag ?? 2000000)
-    setAmt(p => ({ ...p, diag: fmt(Number(v) || 0) }))
-  }
   // 업무를 켜면 기본 금액, 끄면 금액을 비운다
   function toggleItem(key: string, checked: boolean) {
     setOn(p => ({ ...p, [key]: checked }))
     setAmt(p => ({ ...p, [key]: checked ? fmt(Number(defaults[key]) || 0) : '' }))
   }
 
-  const sum = useMemo(() => ITEMS.reduce((t, it) => t + ((it.required || on[it.key]) ? num(amt[it.key] || '') : 0), 0), [on, amt])
+  const prepayN = bookkeeping ? 500000 : num(prepay)
+  const balanceN = num(balance)
+  const sum = prepayN + balanceN                       // 착수금(공급가) = 선금 + 잔금
+  const othersSum = useMemo(() => ITEMS.reduce((t, it) => t + (!it.required && on[it.key] ? num(amt[it.key] || '') : 0), 0), [on, amt])
+  const diagAmt = Math.max(0, sum - othersSum)           // 경영진단 및 자문 = 착수금에서 다른 업무를 뺀 나머지
   const vat = Math.round(sum * 0.1)
 
   // 계약서에 들어가는 값은 모두 입력해야 만들 수 있다 — 빠진 항목을 실시간으로 보여준다
@@ -121,8 +115,8 @@ export default function ContractWizard({ prefill, onClose, onDone }: { prefill: 
   const phoneOk = digits(managerPhone).length >= 9
   const missing = useMemo(() => {
     const m: string[] = []
-    if (!type) m.push('계약 유형')
-    if (type === 'fee' && !feePercent.trim()) m.push('성과 수수료율(%)')
+    if (prepayN <= 0) m.push('선금')
+    if (othersSum > sum) m.push('선금+잔금이 다른 업무 금액 합계보다 작음')
     if (!company.trim()) m.push('업체명')
     if (!ceo.trim()) m.push('대표자명')
     if (!bizOk) m.push('사업자등록번호(10자리)')
@@ -130,11 +124,11 @@ export default function ContractWizard({ prefill, onClose, onDone }: { prefill: 
     if (!managerName.trim()) m.push('우리 담당자')
     if (!phoneOk) m.push('담당자 연락처')
     if (!date) m.push('계약일')
-    for (const it of ITEMS) if ((it.required || on[it.key]) && !num(amt[it.key] || '')) m.push(it.label + ' 금액')
+    for (const it of ITEMS) if (!it.required && on[it.key] && !num(amt[it.key] || '')) m.push(it.label + ' 금액')
     if (postCare && !postPct.trim()) m.push('사후관리 %')
     return m
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type, feePercent, company, ceo, bizNo, address, managerName, managerPhone, date, on, amt, postCare, postPct])
+  }, [prepayN, sum, othersSum, company, ceo, bizNo, address, managerName, managerPhone, date, on, amt, postCare, postPct])
   const okCls = (ok: boolean) => inp + (ok ? ' !border-emerald-300' : ' !border-red-300 bg-red-50/50')
   const lab = (t: string, ok: boolean, hint?: string) => (
     <span className="text-[11.5px] text-gray-500 font-semibold">{t} {ok ? <span className="text-emerald-600">✓</span> : <span className="text-red-500">필수</span>}{hint ? <span className="font-normal text-gray-400"> {hint}</span> : null}</span>
@@ -143,7 +137,6 @@ export default function ContractWizard({ prefill, onClose, onDone }: { prefill: 
   // 공계약서 — 업체·금액·날짜를 모두 비운 서식. 미팅에서 손으로 쓰며 설명할 때 쓴다
   async function makeBlank() {
     setErr(''); setMsg('')
-    if (!type) { setErr('월정기인지 수수료 있는 일반 계약인지 먼저 골라 주세요.'); return }
     setBusy(true)
     try {
       const r = await fetch('/api/contract/generate', {
@@ -165,21 +158,20 @@ export default function ContractWizard({ prefill, onClose, onDone }: { prefill: 
   async function make(format: 'pdf' | 'hwpx' = 'pdf') {
     if (blankMode) return makeBlank()
     setErr(''); setMsg('')
-    if (!type) { setErr('계약 유형(수수료 없음 / 수수료 있음)을 먼저 골라 주세요.'); return }
-    if (type === 'fee' && !feePercent.trim()) { setErr('수수료가 있는 계약은 몇 %인지 입력해 주세요.'); return }
+    if (prepayN <= 0) { setErr('선금을 입력해 주세요.'); return }
     if (!company.trim()) { setErr('업체명을 입력해 주세요.'); return }
     if (!ceo.trim()) { setErr('대표자명을 입력해 주세요.'); return }
     if (!address.trim()) { setErr('사업장 주소를 입력해 주세요.'); return }
     if (missing.length) { setErr('입력이 안 된 항목이 있습니다: ' + missing.join(', ')); return }
-    for (const it of ITEMS) if ((it.required || on[it.key]) && !num(amt[it.key] || '')) { setErr(`"${it.label}"을 체크했으면 금액을 입력해 주세요. (안 하는 업무는 체크를 해제하세요)`); return }
+    for (const it of ITEMS) if (!it.required && on[it.key] && !num(amt[it.key] || '')) { setErr(`"${it.label}"을 체크했으면 금액을 입력해 주세요. (안 하는 업무는 체크를 해제하세요)`); return }
     if (postCare && !postPct.trim()) { setErr('과제 선정 이후 사후관리는 교부 지원금의 몇 %인지 입력해 주세요.'); return }
     setBusy(true)
     try {
-      const items = Object.fromEntries(ITEMS.map(it => [it.key, { on: !!(it.required || on[it.key]), amount: num(amt[it.key] || '') }]))
+      const items = Object.fromEntries(ITEMS.map(it => [it.key, { on: !!(it.required || on[it.key]), amount: it.required ? diagAmt : num(amt[it.key] || '') }]))
       const r = await fetch('/api/contract/generate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type, feePercent: feePercent.trim(), contractDate: date,
+          type, prepay: prepayN, balance: balanceN, bookkeeping, contractDate: date,
           client: { company: company.trim(), ceo: ceo.trim(), address: address.trim(), bizNo: bizNo.trim(), managerName: managerName.trim(), managerPhone: managerPhone.trim() },
           items, postCare: { on: postCare, percent: postPct.trim() }, pLine,
           extraClauses: clauses.split('\n').map(s => s.trim()).filter(Boolean),
@@ -222,11 +214,12 @@ export default function ContractWizard({ prefill, onClose, onDone }: { prefill: 
           </div>
           {blankMode && <p className="text-[12.5px] text-gray-500 -mt-2">업체명·금액·날짜가 모두 빈칸인 계약서입니다. 아래에서 종류만 고르면 바로 PDF로 받아집니다.</p>}
           <div>
-            <p className={sec}>{step(1)} 계약 유형</p>
+            <p className={sec}>{step(1)} 계약 구분 <span className="font-normal text-gray-400">(계약은 모두 선금·잔금 방식입니다)</span></p>
             <div className="flex flex-wrap items-center gap-2">
-              <button type="button" className={chip(type === 'nofee')} onClick={() => pickType('nofee')}>월정기 (수수료 없음)</button>
-              <button type="button" className={chip(type === 'fee')} onClick={() => pickType('fee')}>{blankMode ? '일반 (수수료 있음)' : '수수료 있음'}</button>
+              <button type="button" className={chip(!bookkeeping)} onClick={() => setBookkeeping(false)}>선금 + 잔금</button>
+              <button type="button" className={chip(bookkeeping)} onClick={() => setBookkeeping(true)}>세무기장 이용 (선금 50만원 갈음) + 잔금</button>
             </div>
+            {bookkeeping && <p className="text-[12px] text-gray-500 mt-1.5">세무기장을 제휴 업체로 옮기면 선금 50만원은 납부된 것으로 처리됩니다. 고객에게는 잔금만 받으면 됩니다.</p>}
           </div>
 
           {!blankMode && <>
@@ -244,15 +237,14 @@ export default function ContractWizard({ prefill, onClose, onDone }: { prefill: 
           </div>
 
           <div>
-            <p className={sec}>{step(3)} 수행 업무와 금액 <span className="font-normal text-gray-400">(체크 안 한 업무는 금액란에 취소선이 자동으로 들어갑니다)</span></p>
-            {type === 'fee' && (
-              <div className="mb-2 rounded-2xl border-2 border-[#b8995a] bg-[#fffaf0] px-3 py-2.5 flex items-center gap-3">
-                <span className="flex-1 text-[13.5px] font-black text-[#0b2140]">성과 수수료율 <span className="font-normal text-gray-500">(자금이 실행된 금액의 몇 %)</span></span>
-                <div className="flex items-center gap-1 text-[13.5px] font-bold text-[#0b2140]">실행금액의
-                  <input value={feePercent} onChange={e => setFeePercent(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" placeholder="0" className={'w-16 text-center border-[1.5px] rounded-lg px-2 py-1.5 outline-none bg-white ' + (feePercent.trim() ? 'border-emerald-300' : 'border-red-300 bg-red-50/50')} /> %</div>
-              </div>
-            )}
-            {!type && <p className="text-[12.5px] text-[#b3261e] font-semibold mb-2">위에서 계약 유형을 먼저 고르면 기본 금액이 채워집니다.</p>}
+            <p className={sec}>{step(3)} 선금 · 잔금 <span className="font-normal text-gray-400">(합계가 계약서의 착수금이 됩니다)</span></p>
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <label>{lab('선금', prepayN > 0)}<input className={okCls(prepayN > 0)} inputMode="numeric" disabled={bookkeeping} value={bookkeeping ? '500,000' : prepay} onChange={e => setPrepay(fmt(num(e.target.value)))} placeholder="예) 500,000" /></label>
+              <label>{lab('잔금', true, '(없으면 비워 두세요 · 90일 이내 지급)')}<input className={inp} inputMode="numeric" value={balance} onChange={e => setBalance(fmt(num(e.target.value)))} placeholder="예) 1,500,000" /></label>
+            </div>
+            <div className="rounded-xl bg-[#0b2140] text-white px-4 py-3 text-[13.5px] tabular-nums mb-3">착수금 <b className="text-[#e8c97a]">{sum.toLocaleString('ko-KR')}</b>원 <span className="text-white/60">(선금 {prepayN.toLocaleString('ko-KR')} + 잔금 {balanceN.toLocaleString('ko-KR')}) · 부가세 {vat.toLocaleString('ko-KR')}원 별도 → 총 {(sum + vat).toLocaleString('ko-KR')}원</span></div>
+            {sum > 0 && <p className="text-[12px] text-gray-500 mb-3 leading-relaxed">계약서 특약에 자동으로 들어갑니다: &ldquo;{balanceN > 0 ? (bookkeeping ? `세무기장 서비스를 이용하므로 선금 ${prepayN.toLocaleString('ko-KR')}원은 납부된 것으로 처리하고, 나머지 잔금 ${balanceN.toLocaleString('ko-KR')}원은 계약 체결일로부터 90일 이내에 지급` : `선금 ${prepayN.toLocaleString('ko-KR')}원만 먼저 받고, 나머지 잔금 ${balanceN.toLocaleString('ko-KR')}원은 계약 체결일로부터 90일 이내에 지급`) : `착수금 ${sum.toLocaleString('ko-KR')}원은 계약 체결 시 선금으로 전액 지급`}&rdquo;</p>}
+            <p className={sec}>수행 업무 <span className="font-normal text-gray-400">(경영진단 및 자문은 착수금에서 다른 업무를 뺀 금액으로 자동 계산됩니다)</span></p>
             <div className="rounded-2xl border border-gray-100 divide-y divide-gray-50">
               {ITEMS.map(it => {
                 const checked = !!(it.required || on[it.key])
@@ -261,7 +253,7 @@ export default function ContractWizard({ prefill, onClose, onDone }: { prefill: 
                     <input type="checkbox" checked={checked} disabled={it.required} onChange={e => toggleItem(it.key, e.target.checked)} className="w-4 h-4" />
                     <span className={`flex-1 text-[13.5px] ${checked ? 'font-bold text-[#0b2140]' : 'text-gray-400 line-through'}`}>{it.label}</span>
                     <div className="flex items-center gap-1 w-40">
-                      <input disabled={!checked} value={amt[it.key] || ''} onChange={e => setAmt(p => ({ ...p, [it.key]: fmt(num(e.target.value)) }))} inputMode="numeric" placeholder="금액" className={'w-full text-right tabular-nums border-[1.5px] rounded-lg px-2 py-1.5 text-[13.5px] outline-none focus:border-[#b8995a] disabled:bg-gray-50 disabled:text-gray-300 ' + (checked && !num(amt[it.key] || '') ? 'border-red-300 bg-red-50/50' : 'border-gray-200')} />
+                      <input disabled={!checked || !!it.required} value={it.required ? fmt(diagAmt) : (amt[it.key] || '')} onChange={e => setAmt(p => ({ ...p, [it.key]: fmt(num(e.target.value)) }))} inputMode="numeric" placeholder="금액" className={'w-full text-right tabular-nums border-[1.5px] rounded-lg px-2 py-1.5 text-[13.5px] outline-none focus:border-[#b8995a] disabled:bg-gray-50 disabled:text-gray-300 ' + (checked && !num(amt[it.key] || '') ? 'border-red-300 bg-red-50/50' : 'border-gray-200')} />
                       <span className="text-[12px] text-gray-400">원</span>
                     </div>
                   </div>
@@ -269,7 +261,7 @@ export default function ContractWizard({ prefill, onClose, onDone }: { prefill: 
               })}
               <div className="flex items-center gap-3 px-3 py-2">
                 <input type="checkbox" checked={postCare} onChange={e => { setPostCare(e.target.checked); if (!e.target.checked) setPostPct('') }} className="w-4 h-4" />
-                <span className={`flex-1 text-[13.5px] ${postCare ? 'font-bold text-[#0b2140]' : 'text-gray-400 line-through'}`}>과제 선정 이후 사후관리 <span className="font-normal text-gray-400">(과제 선정 후 받는 지원금 기준 · 위 성과 수수료와 다름)</span></span>
+                <span className={`flex-1 text-[13.5px] ${postCare ? 'font-bold text-[#0b2140]' : 'text-gray-400 line-through'}`}>과제 선정 이후 사후관리 <span className="font-normal text-gray-400">(P라인·사후관리 계약에만 체크 — 일반 계약은 체크하지 마세요)</span></span>
                 <div className="flex items-center gap-1 w-40 justify-end text-[13px] text-gray-500">교부 지원금의 <input disabled={!postCare} value={postPct} onChange={e => setPostPct(e.target.value.replace(/[^0-9.]/g, ''))} className={'w-12 text-center border-[1.5px] rounded-lg px-1 py-1.5 outline-none focus:border-[#b8995a] disabled:bg-gray-50 ' + (postCare && !postPct.trim() ? 'border-red-300 bg-red-50/50' : 'border-gray-200')} /> %</div>
               </div>
               <div className="flex items-center gap-3 px-3 py-2">
