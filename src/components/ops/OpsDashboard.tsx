@@ -1141,7 +1141,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
 
 
       {/* 탭 네비게이션 */}
-      <div className="flex border-b border-gray-100 overflow-x-auto">
+      <div className="flex flex-wrap border-b border-gray-100">
         {DETAIL_TABS.map(tab => (
           <button key={tab} type="button" onClick={e => { e.stopPropagation(); setActiveDetailTab(tab) }}
             className={`px-3 py-2 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
@@ -2666,6 +2666,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
           credit={d.credit_report || null}
           savedDocs={d.consulting_docs || null}
           savedReport={d.consulting_report || null}
+          receivedAt={d.docs_received_at || null}
           onSave={(patch) => {
             const merged = { ...(local.details || {}), ...patch }
             setLocal(prev => ({ ...prev, details: { ...(prev.details || {}), ...patch } }))

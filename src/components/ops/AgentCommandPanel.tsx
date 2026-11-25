@@ -5,7 +5,7 @@
 //  · 버튼을 누르면 확인창이 한 번 뜨고, 확인하면 주황이가 만들어서 바로 보낸다(CRM 에서 누른 요청은 승인 단계 없음).
 //  · ① 계약 후 2·3·4일차 고정 자료는 CRM 이 매일 아침 자동으로 보낸다. ② 선택해서 만들기 ③ 기관 스크립트 ④ 자료 다 받은 걸로 간주하기
 import { useEffect, useState, useCallback } from 'react'
-import { AGENT_KIND_LIST, AUTO_KINDS, PICK_KINDS, SCRIPT_KINDS, BATCH_KINDS } from '@/lib/agentKinds'
+import { AGENT_KIND_LIST, AUTO_KINDS, AUTO_FILES, PICK_KINDS, SCRIPT_KINDS, BATCH_KINDS } from '@/lib/agentKinds'
 
 const STATUS: Record<string, { label: string; cls: string }> = {
   requested:   { label: '작성 요청됨', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
@@ -117,6 +117,7 @@ export default function AgentCommandPanel({ caseId, companyName, contractDate = 
               <div key={a.key} className="flex items-center gap-2 rounded-lg bg-white border border-emerald-100 px-2.5 py-1.5">
                 <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 rounded px-1.5 py-0.5 shrink-0">{a.day}일차</span>
                 <span className="text-[11.5px] font-bold text-[#1B2A45] flex-1 min-w-0 truncate">{label(a.key)}</span>
+                <a href={AUTO_FILES[a.key]} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-sky-700 border border-sky-200 rounded px-1.5 py-0.5 shrink-0 hover:bg-sky-50">📎 자료 보기</a>
                 {j ? <Chip k={a.key} /> : <span className="text-[10px] text-gray-400 shrink-0">{when} 예약</span>}
                 {(!j || ['failed', 'canceled'].includes(j.status)) && (
                   <button type="button" disabled={!!busy} onClick={() => confirmKinds(label(a.key) + ' 지금 보내기', [a.key], '자동 발송 일정을 기다리지 않고 지금 보냅니다.\n')}

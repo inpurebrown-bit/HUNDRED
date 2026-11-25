@@ -35,13 +35,14 @@ function normalizeDocs(raw: Record<string, any> | null): Record<string, DocState
   }
   return out
 }
-export default function ConsultingReportTab({ caseId, companyName, incall, credit, savedDocs, savedReport, onSave }: {
+export default function ConsultingReportTab({ caseId, companyName, incall, credit, savedDocs, savedReport, receivedAt, onSave }: {
   caseId: string
   companyName: string
   incall: Record<string, any>
   credit: any
   savedDocs: Record<string, DocState> | null
   savedReport: ConsultingReport | null
+  receivedAt?: string | null
   onSave: (patch: Record<string, any>) => void
 }) {
   const [docs, setDocs] = useState<Record<string, DocState>>(() => normalizeDocs(savedDocs))
@@ -53,7 +54,15 @@ export default function ConsultingReportTab({ caseId, companyName, incall, credi
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState<string>('')
   const [err, setErr] = useState('')
-  const [view, setView] = useState(!!savedReport)
+  const [recvAt, setRecvAt] = useState<string>(receivedAt || '')
+  async function markReceived() {
+    if (!confirm('고객 서류를 다 받았습니까? 확인하면 주황이가 바로 알고 작업을 시작합니다. (재무제표 분석 · 보고서 · 경영진단 통합 리포트 · 컨설팅 수행계획서)')) return
+    const at = new Date().toISOString()
+    setRecvAt(at); onSave({ docs_received_at: at })
+    try { await fetch('/api/agent-jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kinds: ['finance', 'report', 'diag', 'plan'], case_id: caseId, company: companyName }) }) } catch { /* 주황이 지시 탭에서 다시 누를 수 있음 */ }
+  }
+  function unmarkReceived() { if (!confirm('서류 수령 표시를 취소할까요? (이미 시작된 작업은 주황이 지시 탭에서 취소하세요)')) return; setRecvAt(''); onSave({ docs_received_at: null }) }
+  const [view, setView] = useState(false)   // 예전 보고서는 더 이상 화면에 펼치지 않는다(삭제 버튼만)
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   function persistDocs(next: Record<string, DocState>) {
@@ -285,18 +294,18 @@ export default function ConsultingReportTab({ caseId, companyName, incall, credi
 
       {/* 액션 바 */}
       <div className="flex flex-wrap items-center gap-2 crp-noprint">
+        {recvAt ? (
+          <span className="inline-flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-300 px-3 py-2 text-xs font-bold text-emerald-700">
+            ✅ 서류 다 받음 · {new Date(recvAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} · 주황이가 작업 시작
+            <button type="button" onClick={unmarkReceived} className="text-[10px] font-semibold text-gray-400 hover:text-rose-500">취소</button>
+          </span>
+        ) : (
+          <button type="button" onClick={markReceived} className="px-4 py-2 rounded-lg bg-orange-500 text-white text-xs font-black hover:bg-orange-600">📥 서류 다 받음</button>
+        )}
         {!report && <span className="text-[11px] text-gray-400">이 탭은 고객 서류 보관용입니다. 문서 작성은 위 "주황에게 지시" 버튼을 쓰세요.</span>}
         {report && (
-          <>
-            <button type="button" onClick={() => setView(v => !v)}
-              className="px-3 py-2 rounded-lg bg-gray-100 text-gray-700 text-xs font-semibold">{view ? '서류 관리' : '예전 보고서 보기'}</button>
-            {view && (editing ? (
-              <button type="button" onClick={saveReport} className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold">수정 저장</button>
-            ) : (
-              <button type="button" onClick={() => setEditing(true)} className="px-3 py-2 rounded-lg bg-violet-100 text-violet-700 text-xs font-semibold">편집</button>
-            ))}
-            {view && <button type="button" onClick={printReport} className="ml-auto px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold">PDF 출력</button>}
-          </>
+          <button type="button" onClick={() => { if (!confirm('예전에 만든 보고서(옛 구조)를 삭제할까요? 업로드한 고객 서류는 그대로 남습니다.')) return; setReport(null); onSave({ consulting_report: null }) }}
+            className="px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs font-bold">예전 보고서 삭제</button>
         )}
         {err && <span className="text-xs text-red-500">{err}</span>}
       </div>

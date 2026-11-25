@@ -34,6 +34,8 @@ export const CUSTOMER_DOC_TYPES = [
 //  SCRIPT 기관 스크립트
 //  BATCH  '자료 다 받은 걸로 간주하기' 한 번에 만들어 보낸다(서로 비슷한 내용의 문서 3개)
 export const AUTO_KINDS: { key: string; day: number }[] = [{ key: 'g9', day: 2 }, { key: 'g10', day: 3 }, { key: 'g11', day: 4 }]
+// 2·3·4일차 고정 자료 원본 PDF(대표 확인용) — 주황이가 보내는 내용과 같은 문서
+export const AUTO_FILES: Record<string, string> = { g9: '/guides/day2_fin_guide.pdf', g10: '/guides/day3_tax_tips.pdf', g11: '/guides/day4_gov_roadmap.pdf' }
 export const PICK_KINDS = ['finance', 'bizplan', 'road']
 export const SCRIPT_KINDS = ['jaedan', 'kibo', 'shinbo', 'kosmes', 'semas', 'miso']
 export const BATCH_KINDS = ['report', 'diag', 'plan']
