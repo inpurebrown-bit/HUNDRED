@@ -144,6 +144,8 @@ function styleTable(t: Table) {
     else if (headerRow && c.r === 0) c.tone = 'header'
     else if (subRows.has(c.r)) c.tone = 'sub'
     else if (c.fill) c.tone = 'label'
+    // 서명란의 "갑"·"을" 구분칸은 남색 바탕에 흰 글씨로 (계약 당사자를 한눈에)
+    if (/^(갑|을)$/.test(cellText(c).trim())) c.tone = 'header'
     // 취소선이 그어진 칸(하지 않는 업무)은 옅은 회색으로 막고, 빈 금액 칸의 선은 가운데에 둔다
     const rs = c.blocks.flatMap(b => (b.kind === 'p' ? b.p.runs : [])).filter(r => r.text.length > 0)
     if (rs.length && rs.every(r => r.st.strike)) {
