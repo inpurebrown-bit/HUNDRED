@@ -34,10 +34,24 @@ export const SITE_PHOTOS = [
   { img: P + 'site-workshop.jpg', label: '야외 작업장' },
 ]
 
-// 직원 사진
-export const TEAM: { img: string; label: string }[] = [
-  { img: P + 'team-meeting.jpg', label: '팀 교육·회의' },
-  { img: P + 'team-dinner.jpg', label: '함께하는 저녁' },
+// 직원 사진: 사진 한 장 옆에 글을 붙여 한 줄씩 보여 준다
+export const TEAM: { img: string; kicker: string; title: string; body: string[] }[] = [
+  {
+    img: P + 'team-meeting.jpg', kicker: 'STUDY & MEETING', title: '같은 기준으로 말하기 위해, 함께 공부합니다',
+    body: [
+      '정책자금과 인증의 기준은 자주 바뀝니다. 그래서 한 사람의 감이 아니라 팀이 함께 확인한 내용으로 상담하려고 합니다.',
+      '바뀐 공고를 나누고, 어려웠던 상담을 같이 되짚으며, 대표님께 드리는 설명이 담당자마다 달라지지 않도록 맞춰 갑니다.',
+      '가능한 것은 근거를 들어, 어려운 것은 어렵다고 솔직하게 말씀드리는 것이 우리가 지키려는 기준입니다.',
+    ],
+  },
+  {
+    img: P + 'team-dinner.jpg', kicker: 'TOGETHER', title: '함께 뛰고, 함께 먹으며 한 팀이 됩니다',
+    body: [
+      '단체 체육대회를 마치고 모인 저녁 자리입니다. 같이 땀 흘린 하루는 회의실에서 쌓기 어려운 믿음을 만들어 줍니다.',
+      '서로를 믿는 팀은 일을 미루지 않고, 막힌 건이 있으면 먼저 손을 내밉니다. 한 업체를 한 사람이 아니라 팀이 함께 챙기는 이유입니다.',
+      '구성원이 오래 함께하는 회사여야 대표님의 다음 단계도 끝까지 곁에서 볼 수 있다고 믿습니다.',
+    ],
+  },
 ]
 
 // 고객 후기. 실제 고객이 남긴 말이고 공개에 동의한 것만 넣는다. 이름은 "이*영 대표님" 처럼 가린다.

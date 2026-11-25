@@ -51,8 +51,7 @@ function Marquee({ children, seconds, reverse }: { children: ReactNode; seconds:
   )
 }
 
-export default function Showcase() {
-  const [zoom, setZoom] = useState<string | null>(null)
+export default function Showcase({ part }: { part: 'site' | 'team' | 'cert' }) {
   return (
     <>
       <style>{`
@@ -62,53 +61,62 @@ export default function Showcase() {
         .hc-mq:hover .hc-mq-track { animation-play-state: paused; }
       `}</style>
 
-      {CERT_EXAMPLES.length > 0 && (
-        <section id="지원사례" className="py-20 md:py-24 bg-white">
+      {part === 'cert' && CERT_EXAMPLES.length > 0 && (
+        <section id="지원사례" className="py-20 md:py-24 bg-[#FAF8F3]">
           <div className="px-4"><Head kicker="CERTIFICATION" title="준비할 수 있는 인증" desc="어떤 인증을 준비할 수 있는지 보여 드립니다." /></div>
           <Marquee seconds={60}>
             {CERT_EXAMPLES.map(c => (
-              <button key={c.img} type="button" onClick={() => setZoom(c.img)} className="relative mr-4 w-52 md:w-60 aspect-[3/4] shrink-0 rounded-2xl overflow-hidden border border-[#E8E2D4] bg-[#FAF8F3] text-left">
+              <div key={c.img} className="relative mr-4 w-52 md:w-60 aspect-[3/4] shrink-0 rounded-2xl overflow-hidden border border-[#E8E2D4] bg-white text-left">
                 <div className="absolute inset-x-3 top-4 bottom-14">
                   <Image src={c.img} alt={`${c.title} (개인정보 가림)`} fill className="object-contain" unoptimized />
                 </div>
                 <span className="absolute inset-x-0 bottom-0 px-4 pb-3.5 text-sm font-bold text-[#1B2A45]">{c.title}</span>
-              </button>
+              </div>
             ))}
           </Marquee>
         </section>
       )}
 
-      {SITE_PHOTOS.length > 0 && (
+      {part === 'site' && SITE_PHOTOS.length > 0 && (
         <section id="현장" className="py-20 md:py-24 bg-[#0d1626]">
           <div className="px-4"><Head dark kicker="ON SITE" title="현장에서 확인합니다" desc="서류만 보지 않고 사업장의 설비와 작업 흐름을 직접 확인합니다." /></div>
           <Marquee seconds={55} reverse>
             {SITE_PHOTOS.map(p => (
-              <button key={p.img} type="button" onClick={() => setZoom(p.img)} className="relative mr-4 w-56 md:w-72 aspect-[3/4] shrink-0 rounded-2xl overflow-hidden text-left">
+              <div key={p.img} className="relative mr-4 w-56 md:w-72 aspect-[3/4] shrink-0 rounded-2xl overflow-hidden text-left">
                 <Image src={p.img} alt={p.label} fill className="object-cover" unoptimized />
                 <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-4 pt-10 pb-4 text-sm font-bold text-white">{p.label}</span>
-              </button>
+              </div>
             ))}
           </Marquee>
         </section>
       )}
 
-      {TEAM.length > 0 && (
+      {part === 'team' && TEAM.length > 0 && (
         <section id="구성원" className="py-20 md:py-24 px-4 md:px-8 bg-[#FAF8F3]">
           <div className="max-w-6xl mx-auto">
             <Head kicker="OUR TEAM" title="함께하는 사람들" desc="상담부터 사후관리까지 담당자가 이어서 맡습니다." />
-            <Slider label="구성원 사진">
-              {TEAM.map(m => (
-                <figure key={m.img} className="relative w-[85%] md:w-[48%] aspect-[4/3] shrink-0 snap-start rounded-2xl overflow-hidden">
-                  <Image src={m.img} alt={m.label} fill className="object-cover" unoptimized />
-                  <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-4 pt-10 pb-4 text-sm font-bold text-white">{m.label}</figcaption>
-                </figure>
+            <div className="space-y-12 md:space-y-16">
+              {TEAM.map((m, i) => (
+                <div key={m.img} className="grid md:grid-cols-2 gap-6 md:gap-12 items-center">
+                  <div className={`relative aspect-[4/3] w-full rounded-2xl overflow-hidden shadow-xl ${i % 2 ? 'md:order-2' : ''}`}>
+                    <Image src={m.img} alt={m.title} fill className="object-cover" unoptimized />
+                  </div>
+                  <div>
+                    <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] mb-3">{m.kicker}</p>
+                    <h3 className="text-xl md:text-3xl font-black leading-snug break-keep">{m.title}</h3>
+                    <div className="w-12 h-1 bg-[#C5A258] rounded my-5" />
+                    <div className="space-y-3">
+                      {m.body.map(p => <p key={p} className="text-sm md:text-base text-[#1B2A45]/70 leading-relaxed break-keep">{p}</p>)}
+                    </div>
+                  </div>
+                </div>
               ))}
-            </Slider>
+            </div>
           </div>
         </section>
       )}
 
-      {REVIEWS.length > 0 && (
+      {part === 'team' && REVIEWS.length > 0 && (
         <section id="후기" className="py-20 md:py-24 px-4 md:px-8 bg-white">
           <div className="max-w-6xl mx-auto">
             <Head kicker="VOICE" title="대표님들의 이야기" desc="공개에 동의해 주신 분들의 말씀입니다. 개인의 경험이며 결과는 기업마다 다릅니다." />
@@ -124,11 +132,6 @@ export default function Showcase() {
         </section>
       )}
 
-      {zoom && (
-        <div role="dialog" aria-modal="true" onClick={() => setZoom(null)} className="fixed inset-0 z-[90] bg-black/80 flex items-center justify-center p-4 cursor-zoom-out">
-          <img src={zoom} alt="확대 보기" className="max-h-full max-w-full rounded-lg shadow-2xl" />
-        </div>
-      )}
     </>
   )
 }

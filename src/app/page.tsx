@@ -10,6 +10,7 @@ import IntroVideo from '@/components/home/IntroVideo'
 import GrowthStages from '@/components/home/GrowthStages'
 import LeadForm, { LegalModal } from '@/components/home/LeadForm'
 import Showcase from '@/components/home/Showcase'
+import ContentGuard from '@/components/home/ContentGuard'
 import { COMPANY } from '@/lib/companyInfo'
 import type { LegalKey } from '@/lib/legalTexts'
 
@@ -101,10 +102,10 @@ const CASES: { photo: string; industry: string; title: string; desc: string; chi
 const LECTURE_TOPICS = ['정책자금 실전 활용', '소상공인 자금조달', '법인전환 전략', '정부지원사업 공략법', '사업계획서 작성법', '기업 신용관리']
 
 const NAV = [
-  { label: '서비스', href: '#서비스' },
-  { label: '성장단계', href: '#성장단계' },
   { label: '업종사례', href: '#업종사례' },
-  { label: '지원사례', href: '#지원사례' },
+  { label: '현장·팀', href: '#현장' },
+  { label: '서비스', href: '#서비스' },
+  { label: '인증', href: '#지원사례' },
   { label: '진행절차', href: '#진행절차' },
   { label: '대표소개', href: '#대표소개' },
   { label: '강의', href: '#강의' },
@@ -137,6 +138,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-[#FAF8F3] text-[#1B2A45] overflow-x-hidden">
+      <ContentGuard />
       <FloatingInquiry />
       <NoticePopups />
 
@@ -196,65 +198,7 @@ export default function HomePage() {
       </section>
 
       {/* 어두운 배너에서 밝은 영역으로 부드럽게 */}
-      <div className="h-20 bg-gradient-to-b from-[#0b1220] to-white" />
-
-      {/* ── 핵심 서비스 ── */}
-      <section id="서비스" className="pt-6 pb-20 md:pb-28 px-4 md:px-8 bg-white">
-        <div className="max-w-6xl mx-auto">
-          <Reveal className="text-center mb-12">
-            <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] mb-3">SERVICES</p>
-            <h2 className="text-2xl md:text-4xl font-black">핵심 서비스</h2>
-            <p className="text-sm text-[#1B2A45]/45 mt-3">기업의 현재 위치를 정확히 진단하고, 필요한 순서대로 준비합니다.</p>
-          </Reveal>
-          <div className="grid md:grid-cols-3 gap-5">
-            {CORE_SERVICES.map((s, i) => (
-              <Reveal key={s.title} delay={i * 100}>
-                <div className="h-full bg-[#FAF8F3] border border-[#E8E2D4] rounded-2xl p-6 hover:border-[#C5A258]/50 hover:shadow-lg transition-all">
-                  <div className="w-10 h-10 rounded-lg bg-[#1B2A45] text-[#C5A258] text-sm font-black flex items-center justify-center mb-4">{s.icon}</div>
-                  <p className="text-[10px] tracking-[0.25em] text-[#C5A258] font-bold">{s.tag}</p>
-                  <h3 className="text-lg font-black mt-1 mb-2">{s.title}</h3>
-                  <p className="text-sm text-[#1B2A45]/60 leading-relaxed mb-4">{s.lead}</p>
-                  <ul className="space-y-1.5">
-                    {s.points.map(p => (
-                      <li key={p} className="flex gap-2 text-xs text-[#1B2A45]/70 leading-relaxed">
-                        <span className="text-[#C5A258] font-bold">✓</span>{p}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-          <div className="grid sm:grid-cols-3 gap-4 mt-6">
-            {EXTRA_SERVICES.map(s => (
-              <div key={s.title} className="flex gap-3 items-start bg-white border border-[#E8E2D4] rounded-xl p-4">
-                <span className="w-8 h-8 shrink-0 rounded-md border border-[#C5A258]/50 text-[#C5A258] font-black text-sm flex items-center justify-center">{s.icon}</span>
-                <div>
-                  <p className="text-sm font-bold">{s.title}</p>
-                  <p className="text-xs text-[#1B2A45]/55 leading-relaxed mt-0.5">{s.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <div className="h-14 bg-gradient-to-b from-white to-[#0d1626]" />
-      {/* ── 성장 단계별 (마우스를 올리면 펼쳐지는 패널) ── */}
-      <section id="성장단계" className="pt-6 pb-20 md:pb-28 px-4 md:px-8 bg-[#0d1626] text-white">
-        <div className="max-w-6xl mx-auto">
-          <Reveal className="text-center mb-10">
-            <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] mb-3">GROWTH STAGES</p>
-            <h2 className="text-xl md:text-3xl font-medium text-white/80">예비 창업부터 중견·중소기업까지</h2>
-            <p className="text-xl md:text-3xl font-black mt-1">생애주기 진단으로 필요한 지원을 찾아드립니다</p>
-          </Reveal>
-          <Reveal><GrowthStages /></Reveal>
-        </div>
-      </section>
-
-      <div className="h-14 bg-gradient-to-b from-[#0d1626] to-[#FAF8F3]" />
-      {/* ── 대표 영상 (HOME_VIDEO.src 설정 시 표시) ── */}
-      <IntroVideo />
+      <div className="h-14 bg-gradient-to-b from-[#0b1220] to-[#FAF8F3]" />
 
       {/* ── 업종별 현장 사례 (옆으로 흐르는 슬라이드) ── */}
       <section id="업종사례" className="py-20 md:py-24 bg-[#FAF8F3] overflow-hidden">
@@ -300,8 +244,81 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── 인증 지원 사례 · 현장 사진 · 구성원 · 후기 ── */}
-      <Showcase />
+      {/* ── 현장 사진 ── */}
+      <Showcase part="site" />
+
+      {/* ── 함께하는 사람들 · 후기 ── */}
+      <Showcase part="team" />
+
+      {/* ── 중간 상담 안내 ── */}
+      <section className="bg-[#1B2A45] px-4 py-10">
+        <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
+          <p className="text-lg md:text-xl font-black text-white">우리 업종은 무엇을 준비할 수 있을까요?</p>
+          <a href="#문의하기" className="shrink-0 bg-[#C5A258] hover:bg-[#D4B568] text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors">무료 상담 신청 →</a>
+        </div>
+      </section>
+
+      <div className="h-14 bg-white" />
+      {/* ── 핵심 서비스 ── */}
+      <section id="서비스" className="pt-6 pb-20 md:pb-28 px-4 md:px-8 bg-white">
+        <div className="max-w-6xl mx-auto">
+          <Reveal className="text-center mb-12">
+            <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] mb-3">SERVICES</p>
+            <h2 className="text-2xl md:text-4xl font-black">핵심 서비스</h2>
+            <p className="text-sm text-[#1B2A45]/45 mt-3">기업의 현재 위치를 정확히 진단하고, 필요한 순서대로 준비합니다.</p>
+          </Reveal>
+          <div className="grid md:grid-cols-3 gap-5">
+            {CORE_SERVICES.map((s, i) => (
+              <Reveal key={s.title} delay={i * 100}>
+                <div className="h-full bg-[#FAF8F3] border border-[#E8E2D4] rounded-2xl p-6 hover:border-[#C5A258]/50 hover:shadow-lg transition-all">
+                  <div className="w-10 h-10 rounded-lg bg-[#1B2A45] text-[#C5A258] text-sm font-black flex items-center justify-center mb-4">{s.icon}</div>
+                  <p className="text-[10px] tracking-[0.25em] text-[#C5A258] font-bold">{s.tag}</p>
+                  <h3 className="text-lg font-black mt-1 mb-2">{s.title}</h3>
+                  <p className="text-sm text-[#1B2A45]/60 leading-relaxed mb-4">{s.lead}</p>
+                  <ul className="space-y-1.5">
+                    {s.points.map(p => (
+                      <li key={p} className="flex gap-2 text-xs text-[#1B2A45]/70 leading-relaxed">
+                        <span className="text-[#C5A258] font-bold">✓</span>{p}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+          <div className="grid sm:grid-cols-3 gap-4 mt-6">
+            {EXTRA_SERVICES.map(s => (
+              <div key={s.title} className="flex gap-3 items-start bg-white border border-[#E8E2D4] rounded-xl p-4">
+                <span className="w-8 h-8 shrink-0 rounded-md border border-[#C5A258]/50 text-[#C5A258] font-black text-sm flex items-center justify-center">{s.icon}</span>
+                <div>
+                  <p className="text-sm font-bold">{s.title}</p>
+                  <p className="text-xs text-[#1B2A45]/55 leading-relaxed mt-0.5">{s.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── 준비할 수 있는 인증 ── */}
+      <Showcase part="cert" />
+
+      <div className="h-14 bg-gradient-to-b from-[#FAF8F3] to-[#0d1626]" />
+      {/* ── 성장 단계별 (마우스를 올리면 펼쳐지는 패널) ── */}
+      <section id="성장단계" className="pt-6 pb-20 md:pb-28 px-4 md:px-8 bg-[#0d1626] text-white">
+        <div className="max-w-6xl mx-auto">
+          <Reveal className="text-center mb-10">
+            <p className="text-xs text-[#C5A258] font-bold tracking-[0.3em] mb-3">GROWTH STAGES</p>
+            <h2 className="text-xl md:text-3xl font-medium text-white/80">예비 창업부터 중견·중소기업까지</h2>
+            <p className="text-xl md:text-3xl font-black mt-1">생애주기 진단으로 필요한 지원을 찾아드립니다</p>
+          </Reveal>
+          <Reveal><GrowthStages /></Reveal>
+        </div>
+      </section>
+
+      <div className="h-14 bg-gradient-to-b from-[#0d1626] to-[#FAF8F3]" />
+      {/* ── 대표 영상 (HOME_VIDEO.src 설정 시 표시) ── */}
+      <IntroVideo />
 
       {/* ── 진행 절차 ── */}
       <section id="진행절차" className="py-20 md:py-28 px-4 md:px-8 bg-white">
