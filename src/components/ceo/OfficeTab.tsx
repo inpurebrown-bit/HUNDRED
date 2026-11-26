@@ -192,7 +192,7 @@ export default function OfficeTab({ onNavigate }: { onNavigate: (tab: string, su
   useEffect(() => { const t = setInterval(() => setPatrol(p => p + 1), 6000); return () => clearInterval(t) }, [])
   // 창 안에 딱 맞게 — 아래로 스크롤할 필요가 없도록 남은 높이를 전부 쓴다
   useEffect(() => {
-    const fit = () => { const el = stageRef.current; if (!el) return; const top = el.getBoundingClientRect().top + window.scrollY; setStageH(Math.max(460, Math.floor(window.innerHeight - (top - window.scrollY) - 14))) }
+    const fit = () => { const el = stageRef.current; if (!el) return; const top = el.getBoundingClientRect().top + window.scrollY; setStageH(window.innerWidth < 640 ? Math.max(380, Math.min(520, Math.floor(window.innerHeight * 0.58))) : Math.max(460, Math.floor(window.innerHeight - (top - window.scrollY) - 14))) }
     fit(); window.addEventListener('resize', fit); const t = setTimeout(fit, 400)
     return () => { window.removeEventListener('resize', fit); clearTimeout(t) }
   }, [manual, data === null])
@@ -388,12 +388,13 @@ export default function OfficeTab({ onNavigate }: { onNavigate: (tab: string, su
           </div>
         )}
 
-        {/* 아래 칩 — AI 서브 */}
-        <div className="of-chips">
-          {DEPTS.map(d => (
-            <button key={d.key} onClick={() => pick(d.key, 'bot:' + d.key)} className={`of-chip ${focus === d.key ? 'on' : ''}`}><i className="of-dot" style={{ background: d.accent }} />{d.agent}<span className="text-white/45">{d.label}</span></button>
-          ))}
-        </div>
+      </div>
+
+      {/* 아래 칩 — AI 서브 (무대 밖 가로 줄) */}
+      <div className="of-chips">
+        {DEPTS.map(d => (
+          <button key={d.key} onClick={() => pick(d.key, 'bot:' + d.key)} className={`of-chip ${focus === d.key ? 'on' : ''}`}><i className="of-dot" style={{ background: d.accent }} />{d.agent}<span className="text-white/45">{d.label}</span></button>
+        ))}
       </div>
 
       <TaskBoard />
@@ -449,7 +450,8 @@ const CSS = `
 .of-row { padding: 7px 9px; border-radius: 9px; background: #101a44; border: 1px solid #22307a; cursor: pointer }
 .of-row.on, .of-row:hover { border-color: #5b78e6; background: #17235c }
 .of-mini { width: 9px; height: 9px; border-radius: 50% }
-.of-chips { position: absolute; left: 12px; bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px; max-width: calc(100% - 340px); z-index: 29000; padding: 6px 8px; border-radius: 12px; background: rgba(8,13,34,.8); border: 1px solid #1f2d6a }
-.of-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; color: #fff; padding: 3px 9px; border-radius: 999px; background: #121c4a; border: 1px solid #2a3a8a }
+.of-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px; background: rgba(8,13,34,.9); border-top: 1px solid #1f2d6a }
+.of-chip { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; color: #fff; padding: 3px 9px; border-radius: 999px; background: #121c4a; border: 1px solid #2a3a8a }
+@media (max-width: 640px) { .of-panel { left: 8px; right: 8px; top: auto; bottom: 8px; width: auto; max-width: none; max-height: 62% } .of3-sign { min-width: 64px; padding: 3px 7px 4px } .of3-sign b { font-size: 11px } .of3-sub { font-size: 9.5px } .of-report { width: 140px; font-size: 10.5px } .of3-tip { display: none } .of-hud { padding: 3px 7px } .of-logo { font-size: 13px } }
 .of-chip:hover, .of-chip.on { background: #26378f; border-color: #5b78e6 }
 `
