@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { AUTO_KINDS } from '@/lib/agentKinds'
+import { AUTO_KINDS, AUTO_COMMENTS } from '@/lib/agentKinds'
 
 export const maxDuration = 60
 
@@ -32,7 +32,7 @@ export async function GET() {
     if (!kind) continue
     const ex = await supabaseAdmin.from('agent_jobs').select('id').eq('case_id', c.id).eq('kind', kind).limit(1)
     if (ex.data?.length) continue
-    const { error } = await supabaseAdmin.from('agent_jobs').insert({ kind, case_id: c.id, company: company[c.customer_id] || c.customer_name || '', room: '', requested_by: '자동 발송(계약 후)', draft: { auto_send: true, source: 'schedule' } })
+    const { error } = await supabaseAdmin.from('agent_jobs').insert({ kind, case_id: c.id, company: company[c.customer_id] || c.customer_name || '', room: '', requested_by: '자동 발송(계약 후)', draft: { comment: AUTO_COMMENTS[kind], auto_send: true, source: 'schedule' } })
     if (!error) made.push(`${company[c.customer_id] || c.customer_name}:${kind}`)
   }
   return NextResponse.json({ date: kstDay(), made })

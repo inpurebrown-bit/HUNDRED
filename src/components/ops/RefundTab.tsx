@@ -8,10 +8,11 @@
 //  · 지급일 = 해지 확정일 다음 달 10일(주말이면 다음 월요일)
 //  · 교부 시각은 주황이가 자료를 보낼 때 자동으로 남기고(/api/agent/deliveries), 관리팀이 직접 고칠 수도 있다.
 import { useEffect, useMemo, useState } from 'react'
+import { DIAG_STAGE_GROUPS } from '@/lib/agentKinds'
 
 type Stage = { name: string; pct: number; kinds?: string[] }
 const STAGES: Record<string, { label: string; stages: Stage[] }> = {
-  diag:    { label: '경영진단 및 자문', stages: [{ name: '업체 진단 및 진단보고서 전달', pct: 50, kinds: ['report', 'diag', 'finance'] }, { name: '회사소개서 작성 및 전달', pct: 20 }, { name: '연간 계획 및 자문', pct: 30, kinds: ['plan'] }] },
+  diag:    { label: '경영진단 및 자문', stages: DIAG_STAGE_GROUPS.map(g => ({ name: g.name, pct: g.pct, kinds: g.kinds })) },
   venture: { label: '벤처기업확인', stages: [{ name: '요건 진단 및 설계', pct: 20 }, { name: '평가서류 작성 완료', pct: 40 }, { name: '접수 후 심사 대응 및 보완', pct: 40 }] },
   lab:     { label: '기업부설연구소 설립 신고', stages: [{ name: '요건 진단 및 인력·공간 설계', pct: 25 }, { name: '신고서류 작성 완료', pct: 45 }, { name: '신고 접수 및 보완 대응 완료', pct: 30 }] },
   inno:    { label: '이노비즈', stages: [{ name: '요건 진단 및 자가진단 설계', pct: 20 }, { name: '평가서류 작성 및 온라인 평가 완료', pct: 45 }, { name: '현장평가 대응 및 보완 완료', pct: 35 }] },
@@ -85,6 +86,8 @@ export default function RefundTab({ caseId, company, custDetails, opsDetails, on
     const days = Math.max(0, (new Date(cancelDate).getTime() - new Date(contractDate).getTime()) / 86400000)
     return Math.max(1, Math.ceil(days / 30))
   })()
+  const elapsedDays = contractDate ? Math.max(0, Math.floor((new Date(cancelDate).getTime() - new Date(contractDate).getTime()) / 86400000)) : 0
+  const elapsedLabel = !contractDate ? '' : elapsedDays < 30 ? `${elapsedDays}일 경과 (1개월 안 됨 · 관리비는 시작한 1개월분 적용)` : `${Math.floor(elapsedDays / 30)}개월 ${elapsedDays % 30}일 경과`
   const mgmt = Math.min(500000, Math.round(fee * 0.08 * monthsElapsed))
   const penalty = Math.round(fee * 0.10)
   const deduct = workCost + mgmt + penalty
@@ -129,7 +132,7 @@ export default function RefundTab({ caseId, company, custDetails, opsDetails, on
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           <label className="text-[11px] text-gray-500 font-semibold">해지 확정일<input type="date" value={cancelDate} onChange={e => { setCancelDate(e.target.value); persist({ cancelDate: e.target.value }) }} className="w-full mt-0.5 border border-gray-200 rounded-lg px-2 py-1.5 text-sm" /></label>
           <label className="text-[11px] text-gray-500 font-semibold">실제 입금한 금액(공급가) <span className="font-normal text-gray-400">비우면 자동</span><input value={paidOv} onChange={e => setPaidOv(e.target.value.replace(/[^0-9]/g, ''))} onBlur={() => persist({ paidOverride: paidOv })} placeholder={won(prepaid + extras)} className="w-full mt-0.5 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right tabular-nums" /></label>
-          <div className="text-[11px] text-gray-500 font-semibold">계약일<p className="mt-1 text-sm text-[#1B2A45] font-bold">{contractDate || '미입력'} <span className="text-gray-400 font-normal">· {monthsElapsed}개월 경과</span></p></div>
+          <div className="text-[11px] text-gray-500 font-semibold">계약일<p className="mt-1 text-sm text-[#1B2A45] font-bold">{contractDate || '미입력'} <span className="text-gray-400 font-normal">· {elapsedLabel}</span></p></div>
         </div>
       </div>
 

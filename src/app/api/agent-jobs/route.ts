@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
-import { AGENT_KIND_KEYS } from '@/lib/agentKinds'
+import { AGENT_KIND_KEYS, AUTO_COMMENTS } from '@/lib/agentKinds'
 
 // 주황이 작업 대기열 — 관리팀 인콜카드의 '주황이 지시' 탭이 사용 (관리팀·대표만)
 //  카톡방 이름은 받지 않는다. 주황이가 대표 이름·사업체명으로 방을 찾아 내용을 확인하고 고른다.
@@ -38,6 +38,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const kinds: string[] = Array.isArray(body.kinds) ? body.kinds : body.kind ? [body.kind] : []
   const { case_id, company } = body
+  // mode 'draft' = 만들기만(작성 완료까지) — 전송은 CRM 의 '전송' 버튼(승인)으로 따로. 기본은 만들어서 바로 보냄.
+  const autoSend = body.mode !== 'draft'
   if (!case_id) return NextResponse.json({ error: 'case_id 필요' }, { status: 400 })
   if (!kinds.length || kinds.some(k => !AGENT_KINDS.includes(k))) return NextResponse.json({ error: '알 수 없는 작업 종류' }, { status: 400 })
 
@@ -47,7 +49,7 @@ export async function POST(req: NextRequest) {
   const todo = kinds.filter(k => !busy.has(k))
   if (!todo.length) return NextResponse.json({ error: '이미 진행 중인 같은 작업이 있습니다' }, { status: 409 })
 
-  const rows = todo.map(kind => ({ kind, case_id, company: company || '', room: '', requested_by: g.user.name || '', draft: { auto_send: true, source: 'crm' } }))
+  const rows = todo.map(kind => ({ kind, case_id, company: company || '', room: '', requested_by: g.user.name || '', draft: { auto_send: autoSend, source: 'crm', ...(AUTO_COMMENTS[kind] ? { comment: AUTO_COMMENTS[kind] } : {}) } }))
   const { data, error } = await supabaseAdmin.from('agent_jobs').insert(rows).select('id, kind, status, created_at')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ jobs: data, skipped: kinds.filter(k => busy.has(k)) }, { status: 201 })
@@ -61,7 +63,7 @@ export async function PATCH(req: NextRequest) {
   const { data: job } = await supabaseAdmin.from('agent_jobs').select('status').eq('id', id).single()
   if (!job) return NextResponse.json({ error: '작업 없음' }, { status: 404 })
   if (action === 'cancel') {
-    if (!['requested', 'drafting', 'draft_ready', 'approved'].includes(job.status)) return NextResponse.json({ error: '이미 전송 중이거나 끝난 작업입니다' }, { status: 409 })
+    if (!['requested', 'drafting', 'draft_ready', 'approved', 'sending'].includes(job.status)) return NextResponse.json({ error: '이미 끝난 작업입니다' }, { status: 409 })
   } else if (job.status !== 'draft_ready') {
     return NextResponse.json({ error: '검토 대기 상태에서만 승인할 수 있습니다' }, { status: 409 })
   }

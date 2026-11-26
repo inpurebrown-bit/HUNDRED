@@ -39,3 +39,18 @@ export const AUTO_FILES: Record<string, string> = { g9: '/guides/day2_fin_guide.
 export const PICK_KINDS = ['finance', 'bizplan', 'road']
 export const SCRIPT_KINDS = ['jaedan', 'kibo', 'shinbo', 'kosmes', 'semas', 'miso']
 export const BATCH_KINDS = ['report', 'diag', 'plan']
+
+// 경영진단 및 자문 계약의 업무수행 3단계(별지2) ← 주황이가 어떤 자료를 보내면 해당 단계 교부로 치는지.
+// 한 가지만 보내도 그 단계는 교부로 계산된다(환불·정산 탭이 이 표를 그대로 쓴다). 2026-11-26 대표 지시.
+export const DIAG_STAGE_GROUPS: { name: string; pct: number; kinds: string[] }[] = [
+  { name: '업체 진단 및 진단보고서 전달', pct: 50, kinds: ['finance', 'report', 'diag'] },
+  { name: '회사소개서 작성 및 전달', pct: 20, kinds: ['bizplan'] },
+  { name: '연간 계획 및 자문', pct: 30, kinds: ['plan', 'road'] },
+]
+
+// 자동 발송(2·3·4일차) 때 카톡방에 같이 남기는 말 — 주황이는 job.draft.comment 를 그대로 쓴다.
+export const AUTO_COMMENTS: Record<string, string> = {
+  g9: '대표님 안녕하세요, 헌드레드컨설팅입니다.\n\n사업하시면서 꼭 알아두시면 좋은 재무제표 보는 법을 쉽게 정리해서 보내드립니다.\n\n은행이나 기관에서 사업체를 볼 때 가장 먼저 보는 부분이라, 시간 되실 때 한번 훑어봐 주세요.\n\n궁금하신 점은 편하게 말씀해 주세요.',
+  g10: '대표님 안녕하세요, 헌드레드컨설팅입니다.\n\n사업하시면서 세금 부담을 줄이는 데 도움이 되는 절세요령을 정리해서 보내드립니다.\n\n바로 적용해 볼 수 있는 것 위주로 담았으니 시간 되실 때 읽어봐 주세요.\n\n궁금하신 점은 편하게 말씀해 주세요.',
+  g11: '대표님 안녕하세요, 헌드레드컨설팅입니다.\n\n앞으로 사업하시면서 활용하실 수 있는 정부지원금과 인증의 흐름을 한눈에 정리해서 보내드립니다.\n\n지금 당장 필요한 것과 나중에 준비하면 되는 것을 구분해서 보시면 편합니다.\n\n궁금하신 점은 편하게 말씀해 주세요.',
+}
