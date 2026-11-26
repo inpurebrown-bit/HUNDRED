@@ -23,9 +23,11 @@ const ACTIVE = ['requested', 'drafting', 'draft_ready', 'approved', 'sending']
 interface Job { id: string; updated_at?: string; kind: string; status: string; error?: string; draft?: { message?: string; missing?: string[]; source?: string }; created_at: string }
 interface Output { kind: string; label: string; path: string; fileName: string; at: string }
 
+const dateYmd = (iso?: string) => { const t = iso ? new Date(iso).getTime() : NaN; return Number.isNaN(t) ? '' : new Date(t + 9 * 3600 * 1000).toISOString().slice(0, 10).replace(/-/g, '') }
 const label = (k: string) => AGENT_KIND_LIST.find(x => x.key === k)?.label || k
 const addDays = (ymd: string, n: number) => { const d = new Date(ymd + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(5, 10).replace('-', '/') }
 
+const niceNameOf = (company: string, o: { label: string; fileName: string; at: string; kind?: string }) => `${(company || '업체').replace(/\s+/g, '')}_${o.label}_${dateYmd(o.at)}.${(o.fileName.split('.').pop() || 'pdf').toLowerCase()}`
 export default function AgentCommandPanel({ caseId, companyName, contractDate = '', outputs = [], receivedAt = null, onReceived }: {
   caseId: string; companyName: string; contractDate?: string; outputs?: Output[]; receivedAt?: string | null; onReceived?: (at: string | null) => void
 }) {
@@ -94,13 +96,15 @@ export default function AgentCommandPanel({ caseId, companyName, contractDate = 
     setBusy('')
   }
   async function download(path: string, name: string) {
+    name = name || 'download.pdf'
     try {
-      const r = await fetch(`/api/agent-jobs/file?path=${encodeURIComponent(path)}&case_id=${encodeURIComponent(caseId)}`)
+      const r = await fetch(`/api/agent-jobs/file?path=${encodeURIComponent(path)}&case_id=${encodeURIComponent(caseId)}&name=${encodeURIComponent(name)}`)
       const j = await r.json()
       if (j.url) { const a = document.createElement('a'); a.href = j.url; a.download = name; a.target = '_blank'; a.click() } else setMsg(j.error || '다운로드 실패')
     } catch { setMsg('네트워크 오류') }
   }
 
+  const niceName = (o: Output) => niceNameOf(companyName, o)
   const sendNote = '확인하면 주황이가 이 업체 카톡방을 찾아 만들어서 바로 보냅니다.'
   const confirmKinds = (title: string, kinds: string[], extra = '') => setAsk({ title, kinds, body: `${kinds.map(label).join(' · ')}\n${extra}${sendNote}` })
 
@@ -208,7 +212,7 @@ export default function AgentCommandPanel({ caseId, companyName, contractDate = 
             {[...outputs].reverse().map((o, i) => (
               <li key={o.path + i} className="flex items-center justify-between gap-2 rounded-lg border border-gray-100 bg-white px-2.5 py-1.5">
                 <span className="text-[11px] text-[#1B2A45] truncate"><b>{o.label}</b> <span className="text-gray-400">· {o.fileName} · {kstMDHM(o.at)}</span></span>
-                <button type="button" onClick={() => download(o.path, o.fileName)} className="text-[10px] font-bold text-orange-600 border border-orange-200 rounded px-2 py-0.5 shrink-0">열기</button>
+                <button type="button" onClick={() => download(o.path, niceName(o))} className="text-[10px] font-bold text-orange-600 border border-orange-200 rounded px-2 py-0.5 shrink-0">열기</button>
               </li>
             ))}
           </ul>

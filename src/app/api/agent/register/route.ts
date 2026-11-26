@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   const { case_id, path, file_name, kind, doc_type, job_id } = await req.json().catch(() => ({}))
   if (!case_id || !path || !file_name || !kind || !doc_type) return NextResponse.json({ error: 'case_id, path, file_name, kind, doc_type 필요' }, { status: 400 })
   if (!String(path).startsWith(`cases/${case_id}/`)) return NextResponse.json({ error: 'path 가 올바르지 않습니다' }, { status: 400 })
-  const { data: oc } = await supabaseAdmin.from('ops_cases').select('id, details').eq('id', case_id).single()
+  const { data: oc } = await supabaseAdmin.from('ops_cases').select('id, details, customer_name').eq('id', case_id).single()
   if (!oc) return NextResponse.json({ error: '업체(관리팀 카드) 없음' }, { status: 404 })
   const d: any = { ...(oc.details || {}) }
 
@@ -32,7 +32,14 @@ export async function POST(req: NextRequest) {
   } else if (kind === 'output') {
     if (!AGENT_KIND_KEYS.includes(doc_type)) return NextResponse.json({ error: '알 수 없는 작업 종류' }, { status: 400 })
     const list = Array.isArray(d.agent_docs) ? d.agent_docs : []
-    list.push({ kind: doc_type, label: AGENT_KIND_LIST.find(k => k.key === doc_type)?.label || doc_type, path, fileName: file_name, job_id: job_id || null, at: new Date().toISOString() })
+    // 파일 이름은 "업체명_자료명_날짜(_차수).확장자" 로 통일 (diag_1795….pdf 같은 임시 이름이 고객·직원에게 보이지 않게)
+    const lbl = AGENT_KIND_LIST.find(k => k.key === doc_type)?.label || doc_type
+    const ymd = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10).replace(/-/g, '')
+    const ext = (String(file_name).split('.').pop() || 'pdf').toLowerCase().replace(/[^a-z0-9]/g, '') || 'pdf'
+    const base = `${String(oc.customer_name || d.company || '업체').replace(/s+/g, '')}_${lbl}_${ymd}`
+    const same = list.filter((x: any) => String(x.fileName || '').startsWith(base)).length
+    const niceFile = `${base}${same ? '_' + (same + 1) : ''}.${ext}`
+    list.push({ kind: doc_type, label: lbl, path, fileName: niceFile, job_id: job_id || null, at: new Date().toISOString() })
     d.agent_docs = list
   } else return NextResponse.json({ error: 'kind 는 customer 또는 output' }, { status: 400 })
 
