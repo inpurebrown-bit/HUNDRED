@@ -87,6 +87,8 @@ export default function ConsultingReportTab({ caseId, companyName, incall, credi
         if (!res.ok) throw new Error(j.error || '업로드 준비 실패')
         const up = await supabase.storage.from('consulting-docs').uploadToSignedUrl(j.path, j.token, file)
         if (up.error) throw new Error(up.error.message)
+        // 3MB 넘는 스캔 PDF 는 서버가 줄여서 같은 자리에 바꿔 둔다(문서 작성 AI 가 큰 스캔본을 읽다 끊기는 문제 방지)
+        if (/\.pdf$/i.test(file.name) && file.size > 3 * 1024 * 1024) { try { await fetch('/api/consulting-docs-shrink', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: j.path }) }) } catch { /* 실패해도 원본 그대로 사용 */ } }
         added.push({ path: j.path, fileName: file.name })
       }
       const cur = docs[type] || {}

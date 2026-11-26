@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { agentGuard } from '@/lib/agentAuth'
 import { AGENT_KIND_KEYS, AGENT_KIND_LIST, CUSTOMER_DOC_TYPES } from '@/lib/agentKinds'
+import { shrinkStored } from '@/lib/pdfShrink'
+
+export const maxDuration = 60
 
 // 주황이 전용: 올린 파일을 CRM 에 등록한다.
 //  body { case_id, path, file_name, kind: 'customer' | 'output', doc_type, job_id? }
@@ -22,6 +25,8 @@ export async function POST(req: NextRequest) {
     const cur = docs[doc_type] || {}
     const files = Array.isArray(cur.files) ? cur.files : (cur.path ? [{ path: cur.path, fileName: cur.fileName || '' }] : [])
     if (files.some((f: any) => f.fileName === file_name)) return NextResponse.json({ ok: true, skipped: '같은 이름의 파일이 이미 있습니다' })
+    // 큰 스캔본 PDF 는 문서 작성 AI 가 못 읽고 끊기므로 올라온 즉시 줄여서 같은 자리에 바꿔 둔다(원본은 orig/ 보관)
+    try { await shrinkStored(String(path)) } catch { /* 줄이기 실패해도 등록은 계속 */ }
     docs[doc_type] = { ...cur, none: false, files: [...files, { path, fileName: file_name, by: '주황이' }] }
     d.consulting_docs = docs
   } else if (kind === 'output') {
