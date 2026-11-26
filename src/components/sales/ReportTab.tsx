@@ -855,7 +855,7 @@ export default function ReportTab({ userId, userName }: Props) {
                     <div>
                       <span className="text-sm font-medium text-gray-800">{r.report_date}</span>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        당일계약 {r.data?.today_contracts || 0}건 · 월누적 {r.data?.month_contracts || 0}건 · 직가DB {r.data?.month_direct_db || 0}개 · 목표 {r.data?.goal || 0}건
+                        당일계약 {r.data?.today_contracts || 0}건 · 월누적 {Math.round(Number(r.data?.month_contracts || 0) * 10) / 10}건 · 직가DB {r.data?.month_direct_db || 0}개 · 목표 {r.data?.goal || 0}건
                       </p>
                     </div>
                     <div className="flex gap-2 shrink-0 ml-2">

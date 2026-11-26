@@ -2435,7 +2435,7 @@ function ReportsTab({ isCeo = false }: { isCeo?: boolean }) {
                             <div className="flex items-center gap-3 flex-wrap mt-0.5">
                               <span className="text-[10px] text-blue-600 font-bold">마감</span>
                               <span className="text-xs text-gray-600">당일 <b className="text-blue-600">{dr.data?.today_contracts||0}</b>건</span>
-                              <span className="text-xs text-gray-600">월누적 <b>{dr.data?.month_contracts||0}</b>건</span>
+                              <span className="text-xs text-gray-600">월누적 <b>{Math.round(Number(dr.data?.month_contracts||0)*10)/10}</b>건</span>
                               {(dr.data?.month_direct_db > 0 || dr.data?.month_direct_db === '0') && (
                                 <span className="text-xs text-violet-600">직가DB <b>{dr.data?.month_direct_db}</b>개</span>
                               )}

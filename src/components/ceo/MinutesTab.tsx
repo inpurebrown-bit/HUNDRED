@@ -215,7 +215,7 @@ export default function MinutesTab() {
                       <div className="grid grid-cols-3 gap-2">
                         {[
                           { label: '당일계약', value: dr?.data?.today_contracts ?? '—' },
-                          { label: '월누적', value: dr?.data?.month_contracts ?? '—' },
+                          { label: '월누적', value: dr?.data?.month_contracts != null ? Math.round(Number(dr.data.month_contracts) * 10) / 10 : '—' },
                           { label: '월목표', value: dr?.data?.goal ?? '—' },
                         ].map(s => (
                           <div key={s.label} className="bg-blue-50 rounded-lg p-2 text-center">
