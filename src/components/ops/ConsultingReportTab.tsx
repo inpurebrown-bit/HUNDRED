@@ -294,14 +294,6 @@ export default function ConsultingReportTab({ caseId, companyName, incall, credi
 
       {/* 액션 바 */}
       <div className="flex flex-wrap items-center gap-2 crp-noprint">
-        {recvAt ? (
-          <span className="inline-flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-300 px-3 py-2 text-xs font-bold text-emerald-700">
-            ✅ 서류 다 받음 · {new Date(recvAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} · 주황이가 작업 시작
-            <button type="button" onClick={unmarkReceived} className="text-[10px] font-semibold text-gray-400 hover:text-rose-500">취소</button>
-          </span>
-        ) : (
-          <button type="button" onClick={markReceived} className="px-4 py-2 rounded-lg bg-orange-500 text-white text-xs font-black hover:bg-orange-600">📥 서류 다 받음</button>
-        )}
         {!report && <span className="text-[11px] text-gray-400">이 탭은 고객 서류 보관용입니다. 문서 작성은 위 "주황에게 지시" 버튼을 쓰세요.</span>}
         {report && (
           <button type="button" onClick={() => { if (!confirm('예전에 만든 보고서(옛 구조)를 삭제할까요? 업로드한 고객 서류는 그대로 남습니다.')) return; setReport(null); onSave({ consulting_report: null }) }}

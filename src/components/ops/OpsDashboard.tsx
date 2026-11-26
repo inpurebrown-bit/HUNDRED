@@ -2673,6 +2673,12 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
           companyName={local.customers?.details?.company || local.customers?.name || ''}
           contractDate={String(local.customers?.details?.contract_date || '').slice(0, 10)}
           outputs={Array.isArray(d.agent_docs) ? d.agent_docs : []}
+          receivedAt={d.docs_received_at || null}
+          onReceived={(at) => {
+            const merged = { ...(local.details || {}), docs_received_at: at }
+            setLocal(prev => ({ ...prev, details: { ...(prev.details || {}), docs_received_at: at } }))
+            savePatch({ details: merged })
+          }}
         />
       )}
 

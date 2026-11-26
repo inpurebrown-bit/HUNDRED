@@ -25,8 +25,8 @@ interface Output { kind: string; label: string; path: string; fileName: string; 
 const label = (k: string) => AGENT_KIND_LIST.find(x => x.key === k)?.label || k
 const addDays = (ymd: string, n: number) => { const d = new Date(ymd + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(5, 10).replace('-', '/') }
 
-export default function AgentCommandPanel({ caseId, companyName, contractDate = '', outputs = [] }: {
-  caseId: string; companyName: string; contractDate?: string; outputs?: Output[]
+export default function AgentCommandPanel({ caseId, companyName, contractDate = '', outputs = [], receivedAt = null, onReceived }: {
+  caseId: string; companyName: string; contractDate?: string; outputs?: Output[]; receivedAt?: string | null; onReceived?: (at: string | null) => void
 }) {
   const [jobs, setJobs] = useState<Job[]>([])
   const [busy, setBusy] = useState('')
@@ -72,6 +72,16 @@ export default function AgentCommandPanel({ caseId, companyName, contractDate = 
       if (!r.ok) setMsg(j.error || '처리 실패'); else await load()
     } catch { setMsg('네트워크 오류') }
     setBusy('')
+  }
+  async function markReceived() {
+    if (!window.confirm('고객 서류를 다 받았습니까?\n체크하면 주황이가 재무제표 분석·보고서·경영진단 통합 리포트·컨설팅 수행계획서를 만들어 보냅니다.')) return
+    const at = new Date().toISOString()
+    onReceived?.(at)
+    await run(['finance', 'report', 'diag', 'plan'])
+  }
+  function unmarkReceived() {
+    if (!window.confirm('자료 다 받음 체크를 풀까요?\n(이미 시작된 작업은 아래에서 중지하세요)')) return
+    onReceived?.(null)
   }
   async function approve(id: string) {
     setBusy(id); setMsg('')
@@ -141,22 +151,15 @@ export default function AgentCommandPanel({ caseId, companyName, contractDate = 
 
   return (
     <div className="space-y-3.5">
-      <div className="rounded-xl border border-orange-200 bg-orange-50/50 px-3 py-2.5">
-        <p className="text-xs font-bold text-orange-700 flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-orange-500" />주황이에게 지시</p>
-        <p className="text-[10.5px] text-gray-500 mt-1 leading-snug">카톡방 이름은 적지 않아도 됩니다. 주황이가 대표 이름·사업체명으로 방을 찾아 대화를 확인한 뒤 알맞은 방에 보냅니다. 버튼을 누르면 <b>확인창이 한 번</b> 뜨고, 확인하면 만들어서 바로 보냅니다. 고객이 카톡방에 올린 서류는 주황이가 자동으로 고객서류 탭에 올리고 관리팀방에 알립니다.</p>
-      </div>
-
-      {/* ① 자료 다 받은 걸로 간주하기 (맨 위 — 이걸 먼저 하고 아래를 시작) */}
-      <section>
-        <p className="text-[11px] font-bold text-gray-700 mb-1.5">① 자료 다 받은 걸로 간주하기 <span className="font-normal text-gray-400">· 먼저 이걸로 시작합니다</span></p>
-        <button type="button" disabled={!!busy || BATCH_KINDS.every(running)}
-          onClick={() => confirmKinds('자료 다 받은 걸로 간주하고 3종 보내기', BATCH_KINDS, '받은 자료로 최대한 만들고, 부족한 부분은 앞으로 이렇게 하면 좋아진다는 내용으로 채웁니다.\n')}
-          className="w-full text-left rounded-xl border-2 border-orange-300 bg-gradient-to-r from-orange-50 to-amber-50 px-3 py-2.5 hover:from-orange-100 hover:to-amber-100 disabled:opacity-60 transition-colors">
-          <p className="text-[12.5px] font-black text-orange-700">자료 다 받은 걸로 간주하기</p>
-          <p className="text-[10.5px] text-gray-600 mt-0.5 leading-snug">{BATCH_KINDS.map(label).join(' · ')} 를 만들어서 한꺼번에 보냅니다. 세 문서는 내용이 비슷해서 함께 보냅니다.</p>
-          <div className="mt-1 flex items-center gap-1 flex-wrap">{BATCH_KINDS.map(k => latest(k) && <span key={k} className="flex items-center gap-1 text-[9.5px] text-gray-500">{label(k)} <Chip k={k} /></span>)}</div>
-        </button>
-      </section>
+      {/* ① 자료 다 받음 — 체크하면 재무제표 분석·보고서·통합 리포트·수행계획서를 한꺼번에 시작 */}
+      <label className={'flex items-center gap-2.5 rounded-xl border px-3 py-2.5 cursor-pointer ' + (receivedAt ? 'border-emerald-300 bg-emerald-50' : 'border-orange-300 bg-orange-50')}>
+        <input type="checkbox" className="w-4 h-4 accent-orange-500" checked={!!receivedAt} disabled={!!busy}
+          onChange={e => e.target.checked ? markReceived() : unmarkReceived()} />
+        <span className="text-[12.5px] font-black text-[#1B2A45]">자료 다 받음</span>
+        <span className="text-[10.5px] text-gray-500 flex-1">
+          {receivedAt ? `${new Date(receivedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })} 체크 · 4종 작성 시작됨` : '체크하면 재무제표 분석·보고서·통합 리포트·수행계획서를 만들어 보냅니다'}
+        </span>
+      </label>
 
       {/* ② 자동 발송 */}
       <section>
