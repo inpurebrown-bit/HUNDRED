@@ -92,8 +92,9 @@ export default function RefundTab({ caseId, company, custDetails, opsDetails, on
   const refund = Math.round(refundSupply * 1.1)
   const payDay = nextMonth10(cancelDate)
 
+  useEffect(() => { if (saved.refundSupply !== undefined && saved.refundSupply !== refundSupply) persist({}) }, [refundSupply]) // eslint-disable-line react-hooks/exhaustive-deps
   function persist(next: { cancelDate?: string; stagesDone?: Record<string, string>; paidOverride?: string }) {
-    onSave({ refund_calc: { cancelDate, stagesDone: done, paidOverride: paidOv ? money(paidOv) : 0, ...next, updated_at: new Date().toISOString() } })
+    onSave({ refund_calc: { cancelDate, stagesDone: done, paidOverride: paidOv ? money(paidOv) : 0, ...next, refundSupply, refundTotal: refund, payDay, updated_at: new Date().toISOString() } })
   }
   function setStage(k: string, i: number, iso: string) {
     const next = { ...done, [stageKey(k, i)]: iso }

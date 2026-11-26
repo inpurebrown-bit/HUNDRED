@@ -929,7 +929,9 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
 
   async function handleRefundComplete() {
     const company    = d.company || c.customers?.details?.company || c.customers?.name || '—'
-    const feeAmt     = parseFloat(String(d.fee_amount || '0').replace(/[^0-9.]/g, '')) || 0
+    // 환불·정산 탭에서 계산한 반환액(공급가)이 있으면 그 금액을 매출·급여 차감액으로 쓴다
+    const calcAmt    = Number(d.refund_calc?.refundSupply)
+    const feeAmt     = Number.isFinite(calcAmt) && d.refund_calc?.refundSupply !== undefined ? calcAmt : (parseFloat(String(d.fee_amount || '0').replace(/[^0-9.]/g, '')) || 0)
     const fmtFee     = feeAmt > 0 ? feeAmt.toLocaleString('ko-KR') + '원' : '—'
     const kstNow     = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' })
     const kstMonth   = kstNow.slice(0, 7)
@@ -942,7 +944,7 @@ export function OpsDetailPanel({ c, onSave, userRole, userName }: { c: OpsCase; 
     const isSameMonth = contractMonth === kstMonth
 
     const ok = window.confirm(
-      `[환불완료 처리]\n\n업체: ${company}\n수수료 환수금액: ${fmtFee}\n계약 차감 가중치: -${contractW}개\n원계약 월: ${contractMonth || '미상'}\n\n환불완료 처리하시겠습니까?`
+      `[환불완료 처리]\n\n업체: ${company}\n매출 차감액(환불·정산 기준, 부가세 제외): ${fmtFee}\n계약 차감 가중치: -${contractW}개\n원계약 월: ${contractMonth || '미상'}\n\n환불완료 처리하시겠습니까?`
     )
     if (!ok) return
 
