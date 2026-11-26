@@ -8,6 +8,7 @@ import { SUPPLY_RATE_TABLE, calcRecommendedSupply, isActiveRow, contractWeight }
 import { getElapsedBusinessDays } from '@/lib/businessDays'
 import { calcRefundDeductions, calcExtraCounts, extraRevenueSum } from '@/lib/payrollCalc'
 import { baseName } from '@/lib/personName'
+import DbFilterView from '@/components/ceo/DbFilterView'
 
 // ── DB 이동 모드 컴포넌트 ─────────────────────────────────
 type TransferDir = 'sales_to_sales' | 'sales_to_ops' | 'ops_to_sales' | 'ops_to_ops'
@@ -532,7 +533,7 @@ const STATUS_TABS = [
   { key: 'trash' as StatusKey,      label: '자체거절',  color: 'text-gray-500',    bg: 'bg-gray-400' },
 ]
 
-type CeoView = 'customers' | 'inspection' | 'as' | 'transfer' | 'diary'
+type CeoView = 'customers' | 'inspection' | 'as' | 'transfer' | 'diary' | 'dbfilter'
 
 // ── 공급 설정 타입 ──────────────────────────────────────
 interface PersonSupply {
@@ -1334,6 +1335,12 @@ export default function SalesCeoTab({ initialView, initialStatusTab, initialSear
           )}>
           🔀 DB 이동
         </button>
+        <button type="button" onClick={() => setCeoView('dbfilter')}
+          className={"flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border transition-colors " + (
+            ceoView === 'dbfilter' ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-rose-700 border-rose-200 hover:border-rose-400'
+          )}>
+          🎯 DB 필터
+        </button>
         <button type="button" onClick={() => setCeoView('diary')}
           className={"flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border transition-colors " + (
             ceoView === 'diary' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-700 border-emerald-200 hover:border-emerald-400'
@@ -1565,6 +1572,7 @@ export default function SalesCeoTab({ initialView, initialStatusTab, initialSear
 
       {/* ── 영업일지 뷰 ── */}
       {ceoView === 'diary' && <SalesDiaryView customers={customers} />}
+      {ceoView === 'dbfilter' && <DbFilterView customers={customers as any} onClose={() => setCeoView('customers')} />}
 
       {/* ── DB 이동 뷰 ── */}
       {ceoView === 'transfer' && (
