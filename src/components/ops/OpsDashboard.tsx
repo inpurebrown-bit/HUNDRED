@@ -3647,7 +3647,7 @@ ${err.error || caseRes.status}
       )}
       {contractingCase && !contractStep2 && (
         <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4"
-          onClick={e => { if (e.target === e.currentTarget) setContractingCase(null) }}>
+          onMouseDown={e => { (e.currentTarget as any)._d = e.target === e.currentTarget }} onClick={e => { if (e.target === e.currentTarget && (e.currentTarget as any)._d) setContractingCase(null) }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
             <div className="bg-gradient-to-r from-[#1B2A45] to-sky-700 px-5 py-4">
               <div className="flex items-center justify-between">
@@ -3768,7 +3768,7 @@ ${err.error || caseRes.status}
       {/* 직접 추가 모달 — 인콜일지 전체 필드 */}
       {addModal && (
         <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-2"
-          onClick={e => { if (e.target === e.currentTarget) setAddModal(false) }}>
+          onMouseDown={e => { (e.currentTarget as any)._d = e.target === e.currentTarget }} onClick={e => { if (e.target === e.currentTarget && (e.currentTarget as any)._d) setAddModal(false) }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col" style={{ maxHeight: '95vh' }}>
             {/* 헤더 */}
             <div className="bg-gradient-to-r from-[#1B2A45] to-emerald-700 px-5 py-4 flex items-center justify-between rounded-t-2xl flex-shrink-0">

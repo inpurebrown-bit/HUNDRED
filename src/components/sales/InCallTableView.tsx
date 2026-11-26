@@ -258,7 +258,7 @@ function CeoMoveModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 z-[300] flex items-center justify-center p-4"
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      onMouseDown={e => { (e.currentTarget as any)._d = e.target === e.currentTarget }} onClick={e => { if (e.target === e.currentTarget && (e.currentTarget as any)._d) onClose() }}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
         {/* 헤더 */}
         <div className="bg-gradient-to-r from-[#1B2A45] to-blue-700 px-5 py-4 text-white flex items-start justify-between">
@@ -614,7 +614,7 @@ export function ContractModal({ company, cumulativeBase, initialMemo = '', initi
   return (
     <div
       className="fixed inset-0 bg-black/60 z-[300] flex items-center justify-center p-4"
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      onMouseDown={e => { (e.currentTarget as any)._d = e.target === e.currentTarget }} onClick={e => { if (e.target === e.currentTarget && (e.currentTarget as any)._d) onClose() }}
     >
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-y-auto max-h-[92vh] hc-in border border-[#e4e7ee]">
         {/* Header */}
@@ -1208,7 +1208,7 @@ function CustomerCard({
       {/* 관리팀 빠른 전송 모달 */}
       {quickTransferOpen && (
         <div className="fixed inset-0 bg-black/60 z-[300] flex items-center justify-center p-4"
-          onClick={e => { if (e.target === e.currentTarget) setQuickTransferOpen(false) }}>
+          onMouseDown={e => { (e.currentTarget as any)._d = e.target === e.currentTarget }} onClick={e => { if (e.target === e.currentTarget && (e.currentTarget as any)._d) setQuickTransferOpen(false) }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>
@@ -1279,7 +1279,7 @@ function CustomerCard({
       {/* 감성톡(거절업체) 감도 선택 모달 */}
       {emotionalOpen && (
         <div className="fixed inset-0 bg-black/60 z-[300] flex items-center justify-center p-4"
-          onClick={e => { if (e.target === e.currentTarget) setEmotionalOpen(false) }}>
+          onMouseDown={e => { (e.currentTarget as any)._d = e.target === e.currentTarget }} onClick={e => { if (e.target === e.currentTarget && (e.currentTarget as any)._d) setEmotionalOpen(false) }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>
@@ -1324,7 +1324,7 @@ function CustomerCard({
       {/* 자체거절 사유 입력 모달 */}
       {trashOpen && (
         <div className="fixed inset-0 bg-black/60 z-[300] flex items-center justify-center p-4"
-          onClick={e => { if (e.target === e.currentTarget) setTrashOpen(false) }}>
+          onMouseDown={e => { (e.currentTarget as any)._d = e.target === e.currentTarget }} onClick={e => { if (e.target === e.currentTarget && (e.currentTarget as any)._d) setTrashOpen(false) }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>

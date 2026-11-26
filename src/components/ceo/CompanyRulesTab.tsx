@@ -216,7 +216,7 @@ function DocEditor({ doc, teams, cats, onClose, onSave, onDelete }: { doc: Parti
     } catch (e: any) { setErr(e.message) } finally { setBusy(false) }
   }
   return (
-    <div className="fixed inset-0 z-[400] bg-black/60 flex items-center justify-center p-3" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+    <div className="fixed inset-0 z-[400] bg-black/60 flex items-center justify-center p-3" onMouseDown={e => { (e.currentTarget as any)._d = e.target === e.currentTarget }} onClick={e => { if (e.target === e.currentTarget && (e.currentTarget as any)._d) onClose() }}>
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto p-6 space-y-3">
         <p className="text-[18px] font-black text-[#0b2140]">{d.id ? '문서 수정' : '새 문서 추가'}</p>
         <label className="block"><span className="text-[12px] font-semibold text-gray-500">제목</span><input className={inp} value={d.title || ''} onChange={e => set('title', e.target.value)} /></label>

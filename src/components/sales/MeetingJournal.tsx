@@ -152,7 +152,7 @@ export default function MeetingJournal({ customer, onClose }: MeetingJournalProp
 
       {/* ── 미리보기 모달 ── */}
       <div
-        onClick={e => { if (e.target === e.currentTarget) onClose() }}
+        onMouseDown={e => { (e.currentTarget as any)._d = e.target === e.currentTarget }} onClick={e => { if (e.target === e.currentTarget && (e.currentTarget as any)._d) onClose() }}
         style={{ position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(0,0,0,0.72)', overflowY: 'auto', padding: '12px 8px' }}
       >
         <div style={{ maxWidth: 860, margin: '0 auto', background: '#fff', borderRadius: 12, boxShadow: '0 8px 40px rgba(0,0,0,0.35)' }}>

@@ -43,6 +43,7 @@ export default function OpsMoneyReport({ userName, activeCases, onSaveDetails }:
   const [local, setLocal] = useState<Record<string, Expect>>({})
   const [bigDraft, setBigDraft] = useState<Record<string, string>>({})
   const [bigAdd, setBigAdd] = useState('')
+  const [bigQ, setBigQ] = useState('')
 
   const receipt = activeCases.filter(c => has(c, G_RECEIPT))
   const inspect = activeCases.filter(c => has(c, G_INSPECT))
@@ -197,10 +198,17 @@ export default function OpsMoneyReport({ userName, activeCases, onSaveDetails }:
           <div className={card + ' px-4 py-3'}>
             <p className="text-sm font-black text-[#1B2A45] mb-1">큰건 추가 <span className="font-normal text-xs text-gray-400">· 매출 규모가 큰 업체를 골라 진행 상황을 따로 적습니다</span></p>
             <div className="flex gap-2">
-              <select value={bigAdd} onChange={e => setBigAdd(e.target.value)} className="flex-1 border border-gray-200 rounded-lg px-2 py-2 text-sm">
-                <option value="">업체 선택…</option>
-                {activeCases.filter(c => !c.details?.big?.on).map(c => <option key={c.id} value={c.id}>{nameOf(c)}</option>)}
-              </select>
+              <div className="flex-1 relative">
+                <input value={bigQ} onChange={e => { setBigQ(e.target.value); setBigAdd(''); setBigQ('') }} placeholder="업체명 검색 (일부만 쳐도 됩니다)" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+                {bigQ.trim() && !bigAdd && (
+                  <div className="absolute z-20 left-0 right-0 mt-1 max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                    {activeCases.filter(c => !c.details?.big?.on && nameOf(c).replace(/s/g, '').toLowerCase().includes(bigQ.trim().replace(/s/g, '').toLowerCase())).slice(0, 12).map(c => (
+                      <button key={c.id} type="button" onClick={() => { setBigAdd(c.id); setBigQ(nameOf(c)) }} className="block w-full text-left px-3 py-2 text-sm hover:bg-violet-50">{nameOf(c)}</button>
+                    ))}
+                    {!activeCases.some(c => !c.details?.big?.on && nameOf(c).replace(/s/g, '').toLowerCase().includes(bigQ.trim().replace(/s/g, '').toLowerCase())) && <p className="px-3 py-2 text-xs text-gray-400">맞는 업체가 없습니다</p>}
+                  </div>
+                )}
+              </div>
               <button type="button" disabled={!bigAdd} onClick={() => { const c = activeCases.find(x => x.id === bigAdd); if (c) onSaveDetails(c.id, { big: { ...(c.details?.big || {}), on: true, notes: c.details?.big?.notes || [] } }); setBigAdd('') }}
                 className="px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-bold disabled:opacity-40">큰건으로 등록</button>
             </div>

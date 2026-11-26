@@ -135,7 +135,7 @@ function LoanModal({
   const INP_NUM = INP + ' text-right'
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[300] flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+    <div className="fixed inset-0 bg-black/60 z-[300] flex items-center justify-center p-4" onMouseDown={e => { (e.currentTarget as any)._d = e.target === e.currentTarget }} onClick={e => { if (e.target === e.currentTarget && (e.currentTarget as any)._d) onClose() }}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="bg-gradient-to-r from-[#1B2A45] to-[#2d4a7a] px-5 py-4 flex items-center justify-between">
           <h3 className="font-bold text-white text-sm">대출 편집</h3>

@@ -68,7 +68,7 @@ export default function NoticePopups() {
   return (
     <div className="fixed inset-0 z-[80] flex flex-col items-center justify-center gap-3 p-4 bg-[#0b1220]/45 backdrop-blur-[3px]"
       style={{ animation: 'hcNoticeFade .5s ease both' }}
-      onClick={e => { if (e.target === e.currentTarget) closeAll() }}>
+      onMouseDown={e => { (e.currentTarget as any)._d = e.target === e.currentTarget }} onClick={e => { if (e.target === e.currentTarget && (e.currentTarget as any)._d) closeAll() }}>
       <div className="flex items-stretch justify-center gap-3 w-full max-h-[78vh]">
       <style>{`
         @keyframes hcNoticeFade { from { opacity: 0 } to { opacity: 1 } }

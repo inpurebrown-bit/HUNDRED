@@ -845,7 +845,7 @@ export default function SalesDashboard({ userId, userName, username }: Props) {
       {/* ── 자금팀 전송 담당자 선택 모달 ── */}
       {opsTransferModal.customer && (
         <div className="fixed inset-0 bg-black/60 z-[300] flex items-center justify-center p-4"
-          onClick={e => { if (e.target === e.currentTarget) setOpsTransferModal({ customer: null, opsUserId: '', opsUserName: '', contractType: '일반' }) }}>
+          onMouseDown={e => { (e.currentTarget as any)._d = e.target === e.currentTarget }} onClick={e => { if (e.target === e.currentTarget && (e.currentTarget as any)._d) setOpsTransferModal({ customer: null, opsUserId: '', opsUserName: '', contractType: '일반' }) }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>

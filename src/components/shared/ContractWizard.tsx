@@ -57,6 +57,7 @@ export default function ContractWizard({ prefill, onClose, onDone }: { prefill: 
 
   // 이 카드에서 지난번에 만든 계약서의 입력 내용 — 있으면 그대로 다시 채운다 (고쳐서 다시 뽑을 수 있게)
   const [draftNote, setDraftNote] = useState('')
+  const downOnBackdrop = useRef(false)   // 글자를 드래그하다 바깥에서 놓아도 창이 닫히지 않게 — 처음 누른 곳이 바깥일 때만 닫는다
   const hasDraft = useRef(false)   // 지난번 입력이 있으면 그 담당자를 그대로 쓴다
   useEffect(() => {
     const q = new URLSearchParams()
@@ -197,7 +198,7 @@ export default function ContractWizard({ prefill, onClose, onDone }: { prefill: 
   const step = (n: number) => <span className="w-5 h-5 rounded-full bg-[#b8995a] text-white text-[11px] font-black inline-flex items-center justify-center">{n}</span>
 
   return (
-    <div className="fixed inset-0 z-[400] bg-black/60 flex items-center justify-center p-3" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+    <div className="fixed inset-0 z-[400] bg-black/60 flex items-center justify-center p-3" onMouseDown={e => { downOnBackdrop.current = e.target === e.currentTarget }} onClick={e => { if (e.target === e.currentTarget && downOnBackdrop.current) onClose(); downOnBackdrop.current = false }}>
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl max-h-[94vh] flex flex-col overflow-hidden">
         <div className="px-6 py-4 flex items-center justify-between bg-gradient-to-br from-[#0e2446] to-[#0a1b36] shrink-0">
           <div>

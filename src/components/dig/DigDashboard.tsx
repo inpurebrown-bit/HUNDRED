@@ -677,7 +677,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
           className="fixed inset-0 z-[9998] flex items-end justify-center bg-black/60"
           onDragOver={e => e.preventDefault()}
           onDrop={handleRecordingDrop}
-          onClick={e => { if (e.target === e.currentTarget) setShowRecordingModal(false) }}>
+          onMouseDown={e => { (e.currentTarget as any)._d = e.target === e.currentTarget }} onClick={e => { if (e.target === e.currentTarget && (e.currentTarget as any)._d) setShowRecordingModal(false) }}>
           <div className="bg-white rounded-t-2xl w-full max-w-lg px-5 pt-5 pb-8 space-y-4">
             <div className="flex items-start justify-between">
               <div>
@@ -739,7 +739,7 @@ export default function DigDashboard({ userId, userName, username }: Props) {
       {/* 저장 메모 모달 */}
       {draftModal && (
         <div className="fixed inset-0 z-[9998] flex items-end sm:items-center justify-center bg-black/60 px-0 sm:px-4"
-          onClick={e => { if (e.target === e.currentTarget) setDraftModal(null) }}>
+          onMouseDown={e => { (e.currentTarget as any)._d = e.target === e.currentTarget }} onClick={e => { if (e.target === e.currentTarget && (e.currentTarget as any)._d) setDraftModal(null) }}>
           <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-md px-5 pt-5 pb-6 space-y-3">
             <div className="flex items-start justify-between">
               <div>
