@@ -6,6 +6,7 @@
 //  · 큰건(매출 규모가 큰 건)은 따로 "큰건 진행" 탭에서 진행 상황을 적는다
 //  · 그 밖의 이슈·특이사항은 받지 않는다
 import { useEffect, useMemo, useState } from 'react'
+import { kstHM } from '@/lib/kstTime'
 
 type Case = any
 type Expect = { on?: boolean; amount?: number; when?: 'week' | 'month' | 'later'; at?: string }
@@ -60,7 +61,7 @@ export default function OpsMoneyReport({ userName, activeCases, onSaveDetails }:
     }).catch(() => {})
     fetch('/api/reports', { cache: 'no-store' }).then(r => r.json()).then(j => {
       const mine = (j.reports || []).find((r: any) => r.report_type === 'ops_daily' && r.report_date === R.today)
-      if (mine) setSubmitted(String(mine.updated_at || mine.created_at || '').slice(11, 16))
+      if (mine) setSubmitted(kstHM(mine.updated_at || mine.created_at))
     }).catch(() => {})
   }, [R])
 

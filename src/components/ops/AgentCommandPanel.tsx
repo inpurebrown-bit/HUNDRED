@@ -5,6 +5,7 @@
 //  · 버튼을 누르면 확인창이 한 번 뜨고, 확인하면 주황이가 만들어서 바로 보낸다(CRM 에서 누른 요청은 승인 단계 없음).
 //  · ① 계약 후 2·3·4일차 고정 자료는 CRM 이 매일 아침 자동으로 보낸다. ② 선택해서 만들기 ③ 기관 스크립트 ④ 자료 다 받은 걸로 간주하기
 import { useEffect, useState, useCallback } from 'react'
+import { kstMDHM, kstMD } from '@/lib/kstTime'
 import { AGENT_KIND_LIST, AUTO_KINDS, AUTO_COMMENTS, SCRIPT_KINDS, BATCH_KINDS, DIAG_STAGE_GROUPS } from '@/lib/agentKinds'
 
 const STATUS: Record<string, { label: string; cls: string }> = {
@@ -130,7 +131,7 @@ export default function AgentCommandPanel({ caseId, companyName, contractDate = 
           ))}
           {st === 'failed' && <span className="text-[9.5px] font-bold text-rose-600 ml-1">실패 — 다시 만들기</span>}
           {st === 'canceled' && <span className="text-[9.5px] text-gray-400 ml-1">중지됨</span>}
-          {j && <span className="text-[9.5px] text-gray-400 ml-auto">{String(j.updated_at || j.created_at || '').slice(5, 16).replace('T', ' ')}</span>}
+          {j && <span className="text-[9.5px] text-gray-400 ml-auto">{kstMDHM(j.updated_at || j.created_at)}</span>}
         </div>
         {!!j?.draft?.missing?.length && st !== 'sent' && <p className="mt-1 text-[10px] text-amber-700">⚠ 확인 필요: {j.draft.missing.join(', ')}</p>}
       </div>
@@ -142,7 +143,7 @@ export default function AgentCommandPanel({ caseId, companyName, contractDate = 
       <div className="rounded-xl border border-orange-200 bg-orange-50/30 p-2 space-y-1.5">
         <div className="flex items-center gap-2 px-1 flex-wrap">
           <p className="text-[11.5px] font-black text-orange-700 flex-1">{g.name} <span className="font-normal text-gray-500">· 환불 정산 {g.pct}%</span></p>
-          {hit.length > 0 ? <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-[1px]">교부됨 {String(hit[0].updated_at || '').slice(5, 10).replace('-', '/')} ({label(hit[0].kind)})</span> : <span className="text-[9.5px] text-gray-400">아직 교부 전</span>}
+          {hit.length > 0 ? <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-[1px]">교부됨 {kstMD(hit[0].updated_at)} ({label(hit[0].kind)})</span> : <span className="text-[9.5px] text-gray-400">아직 교부 전</span>}
         </div>
         <p className="text-[10px] text-gray-500 px-1">아래 중 <b>하나만 보내도</b> 이 단계는 교부된 것으로 환불·정산에 자동 반영됩니다.</p>
         {g.kinds.map(k => <Row key={k} k={k} />)}
@@ -206,7 +207,7 @@ export default function AgentCommandPanel({ caseId, companyName, contractDate = 
           <ul className="space-y-1">
             {[...outputs].reverse().map((o, i) => (
               <li key={o.path + i} className="flex items-center justify-between gap-2 rounded-lg border border-gray-100 bg-white px-2.5 py-1.5">
-                <span className="text-[11px] text-[#1B2A45] truncate"><b>{o.label}</b> <span className="text-gray-400">· {o.fileName} · {String(o.at || '').slice(5, 16).replace('T', ' ')}</span></span>
+                <span className="text-[11px] text-[#1B2A45] truncate"><b>{o.label}</b> <span className="text-gray-400">· {o.fileName} · {kstMDHM(o.at)}</span></span>
                 <button type="button" onClick={() => download(o.path, o.fileName)} className="text-[10px] font-bold text-orange-600 border border-orange-200 rounded px-2 py-0.5 shrink-0">열기</button>
               </li>
             ))}
