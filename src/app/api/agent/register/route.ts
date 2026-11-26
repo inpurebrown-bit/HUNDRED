@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     const lbl = AGENT_KIND_LIST.find(k => k.key === doc_type)?.label || doc_type
     const ymd = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10).replace(/-/g, '')
     const ext = (String(file_name).split('.').pop() || 'pdf').toLowerCase().replace(/[^a-z0-9]/g, '') || 'pdf'
-    const base = `${String(oc.customer_name || d.company || '업체').replace(/s+/g, '')}_${lbl}_${ymd}`
+    const base = `${String(oc.customer_name || d.company || '업체').replace(/\s+/g, '')}_${lbl}_${ymd}`
     const same = list.filter((x: any) => String(x.fileName || '').startsWith(base)).length
     const niceFile = `${base}${same ? '_' + (same + 1) : ''}.${ext}`
     list.push({ kind: doc_type, label: lbl, path, fileName: niceFile, job_id: job_id || null, at: new Date().toISOString() })
