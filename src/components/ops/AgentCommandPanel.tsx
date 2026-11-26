@@ -132,6 +132,7 @@ export default function AgentCommandPanel({ caseId, companyName, contractDate = 
           {st === 'canceled' && <span className="text-[9.5px] text-gray-400 ml-1">중지됨</span>}
           {j && <span className="text-[9.5px] text-gray-400 ml-auto">{String(j.updated_at || j.created_at || '').slice(5, 16).replace('T', ' ')}</span>}
         </div>
+        {!!j?.draft?.missing?.length && st !== 'sent' && <p className="mt-1 text-[10px] text-amber-700">⚠ 확인 필요: {j.draft.missing.join(', ')}</p>}
       </div>
     )
   }
@@ -198,24 +199,6 @@ export default function AgentCommandPanel({ caseId, companyName, contractDate = 
         <p className="text-[11px] font-bold text-gray-700 mb-1.5">④ 기관 스크립트</p>
         <div className="space-y-1.5">{SCRIPT_KINDS.map(k => <Row key={k} k={k} />)}</div>
       </section>
-
-      {/* 진행 중·실패 */}
-      {jobs.filter(j => ACTIVE.includes(j.status) || j.status === 'failed').map(j => {
-        const st = STATUS[j.status]
-        return (
-          <div key={j.id} className="rounded-lg bg-white border border-orange-100 px-2.5 py-2">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[11px] font-semibold text-[#1B2A45] truncate">{label(j.kind)} <span className={`ml-1 text-[9px] font-bold px-1.5 py-[1px] rounded border ${st?.cls}`}>{st?.label}</span></p>
-              {['requested', 'drafting', 'draft_ready', 'approved'].includes(j.status) && (
-                <button type="button" disabled={busy === j.id} onClick={() => cancel(j.id)} className="text-[10px] font-semibold text-gray-400 hover:text-rose-500 px-1.5 py-1 shrink-0">취소</button>
-              )}
-            </div>
-            {j.error && <p className="text-[10px] text-rose-500 mt-0.5">{j.error}</p>}
-            {j.draft?.message && <p className="text-[10.5px] text-gray-600 mt-1 whitespace-pre-line leading-snug">{j.draft.message}</p>}
-            {!!j.draft?.missing?.length && <p className="text-[10.5px] text-amber-700 mt-1 leading-snug">⚠ 확인 필요: {j.draft.missing.join(', ')}</p>}
-          </div>
-        )
-      })}
 
       <div>
         <p className="text-[11px] font-bold text-gray-600 mb-1.5">만들어진 자료 {outputs.length > 0 && <span className="font-normal text-gray-400">({outputs.length}개)</span>}</p>
