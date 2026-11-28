@@ -33,9 +33,10 @@ export async function POST(req: NextRequest) {
 
   // 내려받기·미리보기용 서명 주소
   if (body.action === 'sign') {
-    const { data, error } = await supabaseAdmin.storage.from(BUCKET).createSignedUrl(String(body.path), 600, body.download ? { download: String(body.name || true) } : undefined)
+    const { data, error } = await supabaseAdmin.storage.from(BUCKET).createSignedUrl(String(body.path), 600)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ url: data.signedUrl })
+    // download 옵션을 라이브러리에 넘기면 한글이 두 번 인코딩돼 파일명이 깨진다 → 직접 한 번만 인코딩해 붙인다
+    return NextResponse.json({ url: body.download ? `${data.signedUrl}&download=${encodeURIComponent(String(body.name || ''))}` : data.signedUrl })
   }
 
   // 한글(.hwpx) 파일 안의 "현행 v○" 를 지금 번호로 바꿔 준다 (표시된 번호와 보관함 번호가 달라지지 않게)

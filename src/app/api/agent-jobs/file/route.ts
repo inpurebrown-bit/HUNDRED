@@ -13,7 +13,8 @@ export async function GET(req: NextRequest) {
   // 내려받을 때 저장되는 파일 이름(없으면 저장소 경로의 임시 이름 diag_1795….pdf 가 그대로 나온다)
   const name = String(sp.get('name') || '').replace(/[\\/:*?"<>|]/g, '').trim().slice(0, 120)
   if (!caseId || !path.startsWith(`cases/${caseId}/`) || path.includes('..')) return NextResponse.json({ error: 'path 가 올바르지 않습니다' }, { status: 400 })
-  const s = await supabaseAdmin.storage.from('consulting-docs').createSignedUrl(path, 600, name ? { download: name } : undefined)
+  const s = await supabaseAdmin.storage.from('consulting-docs').createSignedUrl(path, 600)
   if (s.error) return NextResponse.json({ error: s.error.message }, { status: 500 })
-  return NextResponse.json({ url: s.data.signedUrl })
+  // download 옵션을 라이브러리에 넘기면 한글이 두 번 인코딩돼 파일명이 %EC%A3… 로 저장된다 → 직접 한 번만 인코딩해 붙인다
+  return NextResponse.json({ url: name ? `${s.data.signedUrl}&download=${encodeURIComponent(name)}` : s.data.signedUrl })
 }
